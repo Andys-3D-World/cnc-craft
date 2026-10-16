@@ -1,0 +1,87 @@
+/* DAS ZENTRALE FARBSYSTEM (Vollwertiger Dark/Light-Wechsler) */
+:root {
+  --bg-app: #121214;
+  --bg-panel: #1e1e24;
+  --bg-input: #16161a;
+  --text-main: #ffffff;
+  --text-muted: #a0a0a0;
+  --border-color: #2d2d37;
+  --accent-color: #007acc;
+  --grid-line: #24242d;
+  --canvas-bg: #141416;
+}
+
+:root[data-theme="light"] {
+  --bg-app: #f0f2f5;
+  --bg-panel: #ffffff;
+  --bg-input: #f8f9fa;
+  --text-main: #1a1a1a;
+  --text-muted: #5f6368;
+  --border-color: #dcdfe6;
+  --accent-color: #0066cc;
+  --grid-line: #e2e4e8;
+  --canvas-bg: #fafafa;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg-app) !important;
+  color: var(--text-main);
+  overflow: hidden; height: 100vh;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+.app-container {
+  display: flex; flex-direction: column; height: 100vh; width: 100vw;
+}
+
+/* ==========================================================================
+   NEU: DIE REINWEIßE / ANTRHAZIT TAB-NAVIGATIONSLEISTE GANZ OBEN
+   ========================================================================== */
+.tab-navigation {
+  display: flex; background-color: var(--bg-panel);
+  border-bottom: 1px solid var(--border-color);
+  height: 44px; flex-shrink: 0; padding: 0 10px; gap: 4px; align-items: flex-end;
+}
+
+.tab-btn {
+  background: transparent; color: var(--text-muted); border: none;
+  padding: 8px 16px; font-size: 0.88rem; font-weight: 600; cursor: pointer;
+  border-radius: 6px 6px 0 0; border: 1px solid transparent; border-bottom: none;
+  transition: all 0.15s ease; height: 36px;
+}
+.tab-btn:hover {
+  color: var(--text-main); background-color: var(--bg-input);
+}
+.tab-btn.active {
+  color: var(--accent-color); background-color: var(--bg-app);
+  border-color: var(--border-color); font-weight: bold; position: relative;
+  z-index: 2;
+}
+
+/* Tab Sichtbarkeits-Manager */
+.tab-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.tab-content { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+.tab-content.active { display: flex; }
+
+.main-content {
+  display: flex; flex: 1; padding: 10px; gap: 10px;
+  height: calc(100vh - 44px); background-color: var(--bg-app); overflow: hidden;
+}
+
+.canvas-panel { flex: 1; display: flex; flex-direction: column; min-width: 200px; }
+
+/* Platzhalter-Design für die neuen Workshop-Tabs */
+.workshop-panel {
+  padding: 30px; max-width: 800px; margin: 0 auto; width: 100%;
+}
+.workshop-panel h2 { margin-top: 0; color: var(--accent-color); font-size: 1.6rem; }
+.panel-desc { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 20px; }
+.dummy-placeholder {
+  background-color: var(--bg-panel); border: 2px dashed var(--border-color);
+  border-radius: 6px; padding: 50px; text-align: center; color: var(--text-muted);
+  font-weight: 500; font-family: monospace;
+}

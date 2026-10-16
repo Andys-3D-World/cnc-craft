@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a2350"/><stop offset="1" stop-color="#121219"/>
+    </linearGradient>
+    <linearGradient id="shank" x1="0" x2="1">
+      <stop offset="0" stop-color="#7d8590"/><stop offset="0.45" stop-color="#eef1f5"/><stop offset="1" stop-color="#5b626c"/>
+    </linearGradient>
+    <linearGradient id="cut" x1="0" x2="1">
+      <stop offset="0" stop-color="#4a2fd0"/><stop offset="0.45" stop-color="#9b84ff"/><stop offset="1" stop-color="#3d25b0"/>
+    </linearGradient>
+    <radialGradient id="spark" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff6d6"/><stop offset="0.25" stop-color="#ffc043"/><stop offset="0.6" stop-color="#ff7a1a" stop-opacity="0.55"/><stop offset="1" stop-color="#ff5a00" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="body"><rect x="417" y="420" width="190" height="330" rx="10"/></clipPath>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="190"/></clipPath>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="190" fill="url(#bg)"/>
+  <!-- Maschinenbett-Raster -->
+  <g clip-path="url(#sq)" stroke="#ffffff" stroke-opacity="0.05" stroke-width="4">
+    <path d="M100 260H924M100 420H924M100 580H924M100 740H924M260 100V924M420 100V924M604 100V924M764 100V924"/>
+  </g>
+  <!-- Werkstück mit Nut -->
+  <path d="M190 790 H452 V812 H572 V790 H834 V858 H190 Z" fill="#cfd5dc"/>
+  <path d="M190 790 H452 V812 H572 V790 H834 V804 H190 Z" fill="#ffffff" fill-opacity="0.35"/>
+  <!-- Schaft -->
+  <rect x="452" y="150" width="120" height="290" rx="12" fill="url(#shank)"/>
+  <!-- Schneiden -->
+  <rect x="417" y="420" width="190" height="330" rx="10" fill="url(#cut)"/>
+  <g clip-path="url(#body)" stroke="#ffffff" stroke-opacity="0.55" stroke-width="16" stroke-linecap="round">
+    <path d="M400 470 L630 380 M400 560 L630 470 M400 650 L630 560 M400 740 L630 650 M400 830 L630 740"/>
+  </g>
+  <rect x="417" y="420" width="190" height="330" rx="10" fill="none" stroke="#1d1446" stroke-width="6"/>
+  <!-- Funke / Lichtbogen -->
+  <circle cx="512" cy="788" r="118" fill="url(#spark)"/>
+  <g stroke="#ffd166" stroke-width="12" stroke-linecap="round">
+    <path d="M512 788 L380 742 M512 788 L644 742 M512 788 L352 800 M512 788 L672 800"/>
+  </g>
+</svg>

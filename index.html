@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CNC Craft</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <div class="app-container">
+
+      <!-- HAUPT-TABS (modern, mit Purple-Indikator) -->
+      <nav class="tab-navigation">
+        <div class="brand">
+          <span class="brand-icon">🛠️</span> CNC<em>Craft</em>
+        </div>
+        <div class="tab-group">
+          <button class="tab-content-btn active" data-tab="tab-cam">🎨 <span data-i18n="nav.cam">CAM / Design</span></button>
+          <button class="tab-content-btn" data-tab="tab-sim">🎬 <span data-i18n="nav.sim">Simulation</span></button>
+          <button class="tab-content-btn" data-tab="tab-flash">⚡ <span data-i18n="nav.flash">Board flashen</span></button>
+          <button class="tab-content-btn" data-tab="tab-calibrate">⚙️ <span data-i18n="nav.calibrate">Einstellungen ($$)</span></button>
+          <button class="tab-content-btn" data-tab="tab-wiring">🔌 <span data-i18n="nav.wiring">Anschlüsse</span></button>
+          <button class="tab-content-btn only-mill" data-tab="tab-program">🛠️ <span data-i18n="nav.tools">Werkzeuge</span></button>
+        </div>
+        <div class="tab-status">
+          <button id="update-pill" class="update-pill" style="display:none;"></button>
+          <button id="about-btn" class="about-btn" data-i18n-tip="upd.aboutTip">ⓘ</button>
+          <div id="language-menu" class="language-menu"></div>
+          <span class="connected-dot" id="header-conn-dot"></span>
+          <span id="header-conn-text" data-i18n="nav.offline">Offline</span>
+        </div>
+      </nav>
+
+      <!-- TAB-INHALTE -->
+      <div class="tab-wrapper">
+
+        <!-- TAB 1: CAM -->
+        <div id="tab-cam" class="tab-content active">
+          <main class="main-content">
+            <nav id="dynamic-cam-panel" class="tool-strip"></nav>
+
+            <section class="canvas-panel">
+              <div id="editor-toolbar" class="editor-toolbar"></div>
+              <div class="canvas-holder">
+                <canvas id="cnc-canvas" width="600" height="500"></canvas>
+              </div>
+            </section>
+
+            <aside id="dynamic-right-panel" class="right-panel"></aside>
+          </main>
+        </div>
+
+        <!-- TAB: SIMULATION -->
+        <div id="tab-sim" class="tab-content"></div>
+
+        <!-- TAB 2: FIRMWARE FLASHEN -->
+        <div id="tab-flash" class="tab-content">
+          <div class="workshop-panel settings-panel" id="flash-page"></div>
+        </div>
+
+        <!-- TAB 3: MASCHINEN KALIBRIERUNG -->
+        <div id="tab-calibrate" class="tab-content">
+          <div class="workshop-panel settings-panel" id="settings-page"></div>
+        </div>
+
+        <!-- TAB: ANSCHLUSSPLAN – Inhalt baut src/ui/wiringPage.ts -->
+        <div id="tab-wiring" class="tab-content">
+          <div class="workshop-panel wiring-panel">
+            <h2>🔌 <span data-i18n="wr.title">Anschlussplan</span></h2>
+            <p class="panel-desc" data-i18n="wr.desc">So schließt du Motoren, Endschalter, Taster, Laser, Spindel und Plasma an dein Board an.</p>
+            <div id="wiring-page"></div>
+          </div>
+        </div>
+
+        <!-- TAB 4: WERKZEUG-BIBLIOTHEK (nur Fräsen) – Inhalt baut src/ui/toolEditor.ts -->
+        <div id="tab-program" class="tab-content">
+          <div class="workshop-panel tool-page-panel">
+            <h2>🛠️ <span data-i18n="lib.title">Werkzeug-Bibliothek</span></h2>
+            <p class="panel-desc" data-i18n="lib.desc">Hinterlege deine Fräswerkzeuge.</p>
+            <div id="tool-page"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </body>
+</html>
