@@ -1,6 +1,6 @@
 [package]
 name = "cnc-craft"
-version = "0.2.0"
+version = "0.2.1"
 description = "Open-Source CNC Control für Fräse, Plasma und Laser"
 edition = "2021"
 

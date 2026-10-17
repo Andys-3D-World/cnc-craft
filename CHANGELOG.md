@@ -1,6 +1,6 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.1 Beta
 
 **Neu**
 - **Bibliotheken sichern:** Fräswerkzeuge, Laser-Ebenen und Plasma-Schnitte als Datei exportieren
