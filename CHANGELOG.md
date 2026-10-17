@@ -1,6 +1,6 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.5 Beta
 
 **Sicherheit**
 - **Dateirechte enger:** die App darf nur noch Dateien lesen und schreiben, die du selbst im Öffnen- oder

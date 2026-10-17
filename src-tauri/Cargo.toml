@@ -1,6 +1,6 @@
 [package]
 name = "cnc-craft"
-version = "0.2.4"
+version = "0.2.5"
 description = "Open-Source CNC Control für Fräse, Plasma und Laser"
 edition = "2021"
 license = "GPL-3.0-or-later"
