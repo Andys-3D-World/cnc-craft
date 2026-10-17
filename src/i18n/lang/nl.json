@@ -1587,5 +1587,7 @@
   "sp.rst.running": "[Fabrieksinstellingen] {cmd} versturen …",
   "sp.rst.failed": "[Fabrieksinstellingen] Board weigerde: {text}",
   "sp.rst.done": "[Fabrieksinstellingen] Klaar – waarden worden opnieuw gelezen. Controleer stappen/mm, slag en $32.",
-  "sp.rst.doneOffsets": "[Fabrieksinstellingen] Nulpunten gewist – stel het werkstuknulpunt opnieuw in."
+  "sp.rst.doneOffsets": "[Fabrieksinstellingen] Nulpunten gewist – stel het werkstuknulpunt opnieuw in.",
+  "wifi.err.bracket": "Het teken ] werkt bij deze firmware niet in netwerknaam of wachtwoord (het scheidt opdracht en waarde). Kies in de router een wachtwoord zonder ].",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: samen met ! ? ~ of umlauts werken = en ] niet (de webinterface van het board splitst daarop). Kies in de router een wachtwoord zonder = en ]."
 }

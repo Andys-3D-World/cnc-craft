@@ -1587,5 +1587,7 @@
   "sp.rst.running": "[Impostazioni di fabbrica] Invio {cmd} …",
   "sp.rst.failed": "[Impostazioni di fabbrica] La scheda ha rifiutato: {text}",
   "sp.rst.done": "[Impostazioni di fabbrica] Fatto – rilettura dei valori. Controlla passi/mm, corsa e $32.",
-  "sp.rst.doneOffsets": "[Impostazioni di fabbrica] Origini cancellate – reimposta lo zero pezzo."
+  "sp.rst.doneOffsets": "[Impostazioni di fabbrica] Origini cancellate – reimposta lo zero pezzo.",
+  "wifi.err.bracket": "Il carattere ] non funziona nel nome o nella password con questo firmware (separa comando e valore). Scegli nel router una password senza ].",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: insieme a ! ? ~ o accenti, = e ] non funzionano (l’interfaccia web della scheda divide lì). Scegli nel router una password senza = e ]."
 }

@@ -322,7 +322,7 @@ export async function initMachine(logFn: (s: string) => void) {
         break;
       default:
         parseInfoLine(String(p.text || ""));
-        log(`[${t("m.board")}] ${p.text}`);
+        log(`[${t("m.board")}] ${maskSecrets(String(p.text || ""))}`);
         fire("text", p);
     }
   });
@@ -510,6 +510,14 @@ export async function send(line: string, quiet = false): Promise<void> {
 }
 
 /** Zeile senden und auf genau ihre Antwort ("ok"/"error") warten */
+/**
+ * WLAN-Passwörter in Board-Antworten verdecken (z. B. „$Wifi STA PWD=…“ aus $S, „$Sta/Password=…“),
+ * damit sie nicht offen in der Konsole oder auf Screenshots stehen
+ */
+export function maskSecrets(line: string): string {
+  return line.replace(/^(\s*\$?[^=]*(?:PWD|Password|Passwort|Pass)\s*=\s*)(\S.*)$/i, (_m, a: string) => a + "••••••••");
+}
+
 export async function sendAndWait(line: string, timeoutMs = 6000, quiet = false): Promise<Ack> {
   if (!quiet) log(`> ${line}`);
   let id: number;

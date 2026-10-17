@@ -1587,5 +1587,7 @@
   "sp.rst.running": "[Réglages d’usine] Envoi de {cmd} …",
   "sp.rst.failed": "[Réglages d’usine] La carte a refusé : {text}",
   "sp.rst.done": "[Réglages d’usine] Terminé – relecture des valeurs. Vérifie pas/mm, course et $32.",
-  "sp.rst.doneOffsets": "[Réglages d’usine] Origines effacées – redéfinis l’origine pièce."
+  "sp.rst.doneOffsets": "[Réglages d’usine] Origines effacées – redéfinis l’origine pièce.",
+  "wifi.err.bracket": "Le caractère ] ne fonctionne pas dans le nom ou le mot de passe avec ce firmware (il sépare commande et valeur). Choisis un mot de passe sans ] dans le routeur.",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX : avec ! ? ~ ou des accents, = et ] ne fonctionnent pas (l’interface web de la carte coupe dessus). Choisis un mot de passe sans = ni ] dans le routeur."
 }

@@ -1762,5 +1762,7 @@
   "sp.rst.running": "[Factory reset] Sending {cmd} …",
   "sp.rst.failed": "[Factory reset] Board refused: {text}",
   "sp.rst.done": "[Factory reset] Done – reading values again. Please check steps/mm, travel and $32.",
-  "sp.rst.doneOffsets": "[Factory reset] Offsets cleared – set the work zero again."
+  "sp.rst.doneOffsets": "[Factory reset] Offsets cleared – set the work zero again.",
+  "wifi.err.bracket": "The character ] does not work in the network name or password with this firmware (it separates command and value). Please choose a password without ] in your router.",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: together with ! ? ~ or umlauts, = and ] do not work (the board’s web interface splits on them). Please choose a password without = and ] in your router."
 }

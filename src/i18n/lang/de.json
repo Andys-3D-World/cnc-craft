@@ -1762,5 +1762,7 @@
   "sp.rst.running": "[Werkseinstellung] Sende {cmd} …",
   "sp.rst.failed": "[Werkseinstellung] Board hat abgelehnt: {text}",
   "sp.rst.done": "[Werkseinstellung] Fertig – Werte werden neu gelesen. Bitte Schritte/mm, Verfahrweg und $32 prüfen.",
-  "sp.rst.doneOffsets": "[Werkseinstellung] Nullpunkte gelöscht – Werkstück-Nullpunkt neu setzen."
+  "sp.rst.doneOffsets": "[Werkseinstellung] Nullpunkte gelöscht – Werkstück-Nullpunkt neu setzen.",
+  "wifi.err.bracket": "Das Zeichen ] geht bei dieser Firmware nicht im Netzwerk-Namen oder Passwort (es trennt Befehl und Wert). Bitte im Router ein Passwort ohne ] wählen.",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: Zusammen mit ! ? ~ oder Umlauten gehen = und ] nicht (die Weboberfläche des Boards trennt daran). Bitte im Router ein Passwort ohne = und ] wählen."
 }

@@ -30,6 +30,14 @@ export function wifiFirmware(): WifiFw {
 }
 
 /**
+ * MKS DLC32 MAX (und neuere MKS-Firmware): WLAN steht in $50–$54 statt [ESP100]/[ESP101].
+ * Erkennbar an $53 in den Einstellungen oder am Namen „DLC32 MAX“.
+ */
+export function isMksWifi(): boolean {
+  return machine.settings.has("$53") || /DLC32\s*MAX/i.test(`${machine.info.name} ${machine.info.fw}`);
+}
+
+/**
  * Das Board nach WLANs in der Nähe suchen lassen ([ESP410]).
  * Der erste Aufruf startet oft erst die Suche und liefert eine leere Liste – dann kurz warten und nochmal.
  */
@@ -193,7 +201,8 @@ export function openWifiSetup(log: (s: string) => void) {
       </div>`;
     q<HTMLButtonElement>("wifi-ap-on").onclick = async () => {
       if (!window.confirm(t("wifi.g.apOnConfirm"))) return;
-      const cmds = fw === "fluidnc" ? ["$WiFi/Mode=AP", "$Bye"] : fw === "grblhal" ? ["$73=2"] : ["[ESP110]AP", "[ESP444]RESTART"];
+      const cmds = fw === "fluidnc" ? ["$WiFi/Mode=AP", "$Bye"] : fw === "grblhal" ? ["$73=2"]
+        : isMksWifi() ? ["$50=1", "[ESP110]AP", "[ESP444]RESTART"] : ["[ESP110]AP", "[ESP444]RESTART"];
       for (const c of cmds) { try { await sendAndWait(c, 3000, true); log(t("wifi.logSent", { line: c, via: "GRBL" })); } catch { /* Neustart */ } }
       log(t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone"));
       q("wifi-ping-res").textContent = t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone");
@@ -289,7 +298,7 @@ export function openWifiSetup(log: (s: string) => void) {
   const refresh = () => {
     const ssid = q("wifi-ssid").value, pw = q("wifi-pw").value, host = q("wifi-host").value.trim();
     // Weboberfläche zunächst als möglich annehmen, damit der Weg dorthin angezeigt wird
-    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null);
+    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, fw === "esp32" && isMksWifi());
     const r = analyze(ssid + pw);
     const chips: string[] = [];
     if (r.realtime.length) chips.push(`<span class="wifi-chip warn">${esc(r.realtime.join(" "))} – ${esc(t("wifi.c.realtime"))}</span>`);

@@ -1587,5 +1587,7 @@
   "sp.rst.running": "[Ustawienia fabryczne] Wysyłanie {cmd} …",
   "sp.rst.failed": "[Ustawienia fabryczne] Płyta odmówiła: {text}",
   "sp.rst.done": "[Ustawienia fabryczne] Gotowe – ponowny odczyt wartości. Sprawdź kroki/mm, zakres i $32.",
-  "sp.rst.doneOffsets": "[Ustawienia fabryczne] Punkty zerowe usunięte – ustaw ponownie zero detalu."
+  "sp.rst.doneOffsets": "[Ustawienia fabryczne] Punkty zerowe usunięte – ustaw ponownie zero detalu.",
+  "wifi.err.bracket": "Znak ] nie działa w nazwie ani haśle przy tym firmware (oddziela polecenie od wartości). Wybierz w routerze hasło bez ].",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: razem z ! ? ~ lub znakami diakrytycznymi = i ] nie działają (interfejs WWW płyty dzieli na nich). Wybierz w routerze hasło bez = i ]."
 }

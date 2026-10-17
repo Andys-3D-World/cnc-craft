@@ -1587,5 +1587,7 @@
   "sp.rst.running": "[Valores de fábrica] Enviando {cmd}…",
   "sp.rst.failed": "[Valores de fábrica] La placa lo rechazó: {text}",
   "sp.rst.done": "[Valores de fábrica] Hecho: se vuelven a leer los valores. Revisa pasos/mm, recorrido y $32.",
-  "sp.rst.doneOffsets": "[Valores de fábrica] Ceros borrados: vuelve a fijar el cero de pieza."
+  "sp.rst.doneOffsets": "[Valores de fábrica] Ceros borrados: vuelve a fijar el cero de pieza.",
+  "wifi.err.bracket": "El carácter ] no funciona en el nombre ni en la contraseña con este firmware (separa comando y valor). Elige en el router una contraseña sin ].",
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: junto con ! ? ~ o acentos, = y ] no funcionan (la interfaz web de la placa corta ahí). Elige en el router una contraseña sin = ni ]."
 }

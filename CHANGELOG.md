@@ -20,6 +20,9 @@
 - Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
 
 **Behoben**
+- WLAN einrichten bei MKS DLC32 MAX: diese Firmware kennt [ESP100]/[ESP101] nicht („Invalid $ statement“) –
+  jetzt über ihre eigenen Einstellungen $50–$54 (per USB) bzw. [ESP401] über die Weboberfläche (bei ! ? ~ / Umlauten)
+- WLAN-Passwörter werden in der Konsole (z. B. bei $S) und im Einstellungs-Reiter ($52/$54) verdeckt angezeigt
 - WLAN-Dialog: MKS DLC32 MAX meldete „Fehler 3 – Unbekannter $-Befehl“ (Abfrage $AP/SSID kennt die Firmware nicht)
 - Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte
   Leerzeichen entfernt (wie bei G-Code-Kommentaren)

@@ -14,6 +14,9 @@
  *                   danach den alten Wert zurück. Umlaute: nur über die Weboberfläche
  *   Grbl_ESP32 / MKS DLC32 – kein Ausweg über die Leitung: dann über die Weboberfläche des Boards
  *                   (http://IP/command?plain=…), dort läuft nichts durch den Zeichenfilter
+ *   MKS DLC32 MAX (und neuere MKS-Firmware) – kennt [ESP100]/[ESP101] NICHT („Invalid $ statement“),
+ *                   dafür eigene Nummern: $50 WLAN-Art (1 = eigenes WLAN, 2 = Heimnetz), $51/$52 eigenes WLAN,
+ *                   $53/$54 Heimnetz. Über die Weboberfläche mit [ESP401]P=53 T=S V=… (ohne Zeichenfilter)
  */
 
 export type WifiFw = "fluidnc" | "grblhal" | "esp32" | "none";
@@ -84,7 +87,7 @@ export interface WifiPlan {
  * canWeb = Weboberfläche des Boards erreichbar (Adresse bekannt)
  * hal39  = aktueller Wert von $39 bei grblHAL (null = unbekannt)
  */
-export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null): WifiPlan {
+export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false): WifiPlan {
   const plan: WifiPlan = { route: "serial", lines: [], secret: [], restart: "", notes: [], error: "" };
   const both = ssid + pw;
   const r = analyze(both);
@@ -124,6 +127,8 @@ export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, c
     return plan;
   }
 
+  if (mks) return planMks(plan, mode, ssid, pw, canWeb, r);
+
   // Grbl_ESP32 / MKS DLC32: ESP3D-Befehle ([ESP100] Heimnetz-Name, [ESP101] Passwort, [ESP110] Funk-Art)
   plan.lines = mode === "sta"
     ? [`[ESP100]${ssid}`, `[ESP101]${pw}`, "[ESP110]STA"]
@@ -131,6 +136,8 @@ export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, c
   plan.secret = [1];
   plan.restart = "[ESP444]RESTART";
   const risky = r.realtime.length || r.nonAscii.length;
+  // „]“ trennt bei [ESP…]-Befehlen Befehl und Wert – im Wert geht es nicht
+  if (both.includes("]")) { plan.route = "none"; plan.error = "wifi.err.bracket"; return plan; }
   if (risky) {
     if (!canWeb) { plan.route = "none"; plan.error = "wifi.err.espNeedWeb"; return plan; }
     plan.route = "web";
@@ -142,6 +149,29 @@ export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, c
   } else if (r.comment.length || r.space) {
     plan.notes.push("wifi.note.espComment");
   }
+  return plan;
+}
+
+/** MKS DLC32 MAX: $50–$54 (über die Leitung) bzw. [ESP401] (über die Weboberfläche) */
+function planMks(plan: WifiPlan, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, r: CharReport): WifiPlan {
+  const [sId, pId, m] = mode === "sta" ? [53, 54, 2] : [51, 52, 1];
+  const vals: Array<[number, string]> = [[sId, ssid], [pId, pw], [50, String(m)]];
+  plan.restart = "[ESP444]RESTART";
+  plan.secret = [1];
+  const radio = mode === "sta" ? "[ESP110]STA" : "[ESP110]AP";
+  const risky = r.realtime.length || r.nonAscii.length;
+  const unsafe = r.comment.length || r.space;
+  if (risky || (unsafe && canWeb)) {
+    if (!canWeb) { plan.route = "none"; plan.error = "wifi.err.espNeedWeb"; return plan; }
+    // [ESP401] zerlegt „P=… T=… V=…“ an „=“ und das Ende an „]“ – diese beiden gehen dort nicht
+    if (/[=\]]/.test(ssid + pw)) { plan.route = "none"; plan.error = "wifi.err.mksWebChars"; return plan; }
+    plan.route = "web";
+    plan.lines = [...vals.map(([n, v]) => `[ESP401]P=${n} T=${n === 50 ? "B" : "S"} V=${v}`), radio];
+    plan.notes.push(risky ? "wifi.note.web" : "wifi.note.webSafer");
+    return plan;
+  }
+  plan.lines = [...vals.map(([n, v]) => `$${n}=${v}`), radio];
+  if (unsafe) plan.notes.push("wifi.note.espComment");
   return plan;
 }
 

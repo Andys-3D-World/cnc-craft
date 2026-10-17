@@ -115,7 +115,9 @@ function inputFor(key: string, kind: Kind, def?: Def): string {
     </select>`;
   }
   if (kind === "text") {
-    return `<input type="text" class="sp-input sp-text${changed}" data-key="${key}" data-kind="text" value="${esc(v)}" spellcheck="false">`;
+    // WLAN-Passwörter ($52/$54 bei MKS) nicht offen anzeigen
+    const secret = key === "$52" || key === "$54";
+    return `<input type="${secret ? "password" : "text"}" class="sp-input sp-text${changed}" data-key="${key}" data-kind="text" value="${esc(v)}" spellcheck="false" autocomplete="off">`;
   }
   return `<input type="text" inputmode="decimal" class="sp-input${changed}" data-key="${key}" data-kind="${kind}" value="${esc(v)}">`;
 }
