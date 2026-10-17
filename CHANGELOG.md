@@ -1,22 +1,8 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.4 Beta
 
-**Neu**
-- **Name der Maschine** im WLAN-Dialog (z. B. „laser-garage“): wird als Netzwerk-Name aufs Board geschrieben
-  (Grbl_ESP32/MKS: [ESP112], FluidNC: $Hostname, grblHAL: $300) – auch ohne WLAN-Daten, nur zum Umbenennen.
-  Die Maschine ist dann auch als laser-garage.local erreichbar
-- **📡-Suche zeigt den Namen** jeder Maschine; Hinweis, wenn mehrere gleiche Boards nicht zu unterscheiden sind
-- Verbindungs-Info zeigt den Namen im Netz
-
-- **❤️ Unterstützen:** ❤️-Knopf oben rechts (Ko-fi und GitHub Sponsors), Abschnitt im ⓘ-Fenster und im README,
-  „Sponsor“-Knopf auf GitHub (`.github/FUNDING.yml`); kleiner Hinweis nur nach dem 5., 25. und 100. fertigen Job,
-  mit „Nicht mehr anzeigen“ – freiwillig, alle Funktionen bleiben für alle frei
-- **Lizenz:** CNC Craft steht jetzt offiziell unter GPLv3 (LICENSE), dazu THIRD_PARTY_NOTICES.md mit allen
-  fremden Bestandteilen; README mit Datenschutz-Hinweis und Code Signing Policy; ⓘ-Fenster zeigt Lizenz und
-  Datenschutz-Hinweis
-
-**Sicherheit**
+**Sicherheit (bitte updaten)**
 - **Trennen oder Programm schließen während eines Jobs:** die Maschine wird jetzt vorher sicher angehalten
   (GRBL: Vorschub-Halt, dann Reset – Laser/Spindel aus). Bisher fuhr sie den gepufferten G-Code noch zu Ende,
   und Laser/Spindel konnten danach eingeschaltet bleiben
@@ -24,11 +10,27 @@
   importierte Bibliotheken (Werkzeuge, Laser-Ebenen, Plasma-Schnitte) und eigene Sprachpakete können keinen
   Code mehr in die Oberfläche einschleusen
 - `withGlobalTauri` ausgeschaltet (wurde nicht gebraucht)
-- README: Abschnitt „Sicherheit und Haftung“
+
+**Neu**
+- **Name der Maschine** im WLAN-Dialog (z. B. „laser-garage“): wird als Netzwerk-Name aufs Board geschrieben
+  (Grbl_ESP32/MKS: [ESP112], FluidNC: $Hostname, grblHAL: $300) – auch ohne WLAN-Daten, nur zum Umbenennen.
+  Die Maschine ist dann auch als laser-garage.local erreichbar
+- **📡-Suche zeigt den Namen** jeder Maschine; Hinweis, wenn mehrere gleiche Boards nicht zu unterscheiden sind
+- Verbindungs-Info zeigt den Namen im Netz
+- **❤️ Unterstützen:** ❤️-Knopf oben rechts (Ko-fi und GitHub Sponsors), Abschnitt im ⓘ-Fenster und im README,
+  „Sponsor“-Knopf auf GitHub; kleiner Hinweis nur nach dem 5., 25. und 100. fertigen Job, mit „Nicht mehr
+  anzeigen“ – freiwillig, alle Funktionen bleiben für alle frei
 
 **Verbessert**
 - Neue IP automatisch finden: hat die Maschine einen eigenen Namen, wird nur die Maschine mit genau diesem Namen
   genommen – bei mehreren gleichen Boards verbindet sich die App nicht mehr versehentlich mit der falschen
+
+**Projekt**
+- CNC Craft steht offiziell unter **GPLv3** (LICENSE); THIRD_PARTY_NOTICES.md mit allen fremden Bestandteilen
+  und ihren Quellen; PRIVACY.md (Datenschutz: keine Telemetrie, nur die abschaltbare Update-Prüfung)
+- ⓘ-Fenster zeigt Lizenz und Datenschutz-Hinweis
+- README: Abschnitte „Sicherheit und Haftung“, „Datenschutz“, „Code Signing Policy“ (Windows-Signierung über die
+  SignPath Foundation ist beantragt)
 
 ## 0.2.3 Beta
 
