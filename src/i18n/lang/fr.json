@@ -1589,5 +1589,19 @@
   "sp.rst.done": "[Réglages d’usine] Terminé – relecture des valeurs. Vérifie pas/mm, course et $32.",
   "sp.rst.doneOffsets": "[Réglages d’usine] Origines effacées – redéfinis l’origine pièce.",
   "wifi.err.bracket": "Le caractère ] ne fonctionne pas dans le nom ou le mot de passe avec ce firmware (il sépare commande et valeur). Choisis un mot de passe sans ] dans le routeur.",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX : avec ! ? ~ ou des accents, = et ] ne fonctionnent pas (l’interface web de la carte coupe dessus). Choisis un mot de passe sans = ni ] dans le routeur."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX : avec ! ? ~ ou des accents, = et ] ne fonctionnent pas (l’interface web de la carte coupe dessus). Choisis un mot de passe sans = ni ] dans le routeur.",
+  "wifi.b.label": "Carte",
+  "wifi.b.tip": "Chaque firmware enregistre le Wi-Fi différemment. CNC Craft le détecte d’habitude – sinon, choisis la carte ici.",
+  "wifi.b.auto": "Automatique (détecté : {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / firmware MKS récent ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (ancien) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "sans Wi-Fi",
+  "wifi.switched": "Enregistré – la carte passe maintenant au Wi-Fi « {ssid} » (sans redémarrage).",
+  "wifi.switchedNoAnswer": "Enregistré – la carte est passée tout de suite au Wi-Fi « {ssid} » et a coupé son propre Wi-Fi. D’où l’absence de réponse à la dernière commande – c’est normal. Reconnecte l’ordinateur à « {ssid} », puis 📡 trouvera la carte.",
+  "wifi.switchedAp": "Enregistré – la carte ouvre maintenant son propre Wi-Fi « {ssid} ».",
+  "wifi.checkingJoin": "Vérification via USB de la connexion de la carte au Wi-Fi …",
+  "wifi.joinedAt": "La carte est dans le Wi-Fi « {ssid} » à l’IP {ip}.",
+  "wifi.joinFailed": "La carte n’a pas encore rejoint « {ssid} ». Mot de passe correct ? Réseau 2,4 GHz ? (La carte ne gère pas le 5 GHz.)"
 }

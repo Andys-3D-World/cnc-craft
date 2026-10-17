@@ -1589,5 +1589,19 @@
   "sp.rst.done": "[Ustawienia fabryczne] Gotowe – ponowny odczyt wartości. Sprawdź kroki/mm, zakres i $32.",
   "sp.rst.doneOffsets": "[Ustawienia fabryczne] Punkty zerowe usunięte – ustaw ponownie zero detalu.",
   "wifi.err.bracket": "Znak ] nie działa w nazwie ani haśle przy tym firmware (oddziela polecenie od wartości). Wybierz w routerze hasło bez ].",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: razem z ! ? ~ lub znakami diakrytycznymi = i ] nie działają (interfejs WWW płyty dzieli na nich). Wybierz w routerze hasło bez = i ]."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: razem z ! ? ~ lub znakami diakrytycznymi = i ] nie działają (interfejs WWW płyty dzieli na nich). Wybierz w routerze hasło bez = i ].",
+  "wifi.b.label": "Płyta",
+  "wifi.b.tip": "Każdy firmware zapisuje Wi-Fi inaczej. Zwykle CNC Craft to rozpoznaje – jeśli nie, wybierz tu płytę.",
+  "wifi.b.auto": "Automatycznie (wykryto: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / nowszy firmware MKS ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (starszy) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "bez Wi-Fi",
+  "wifi.switched": "Zapisano – płyta przełącza się teraz na sieć „{ssid}” (bez restartu).",
+  "wifi.switchedNoAnswer": "Zapisano – płyta od razu przełączyła się na sieć „{ssid}” i wyłączyła własną. Dlatego ostatnie polecenie nie dostało odpowiedzi – to normalne. Połącz komputer ponownie z „{ssid}”, a 📡 znajdzie płytę.",
+  "wifi.switchedAp": "Zapisano – płyta otwiera teraz własną sieć „{ssid}”.",
+  "wifi.checkingJoin": "Sprawdzam przez USB, czy płyta połączyła się z siecią …",
+  "wifi.joinedAt": "Płyta jest w sieci „{ssid}” pod IP {ip}.",
+  "wifi.joinFailed": "Płyta nie połączyła się jeszcze z „{ssid}”. Hasło poprawne? Czy to sieć 2,4 GHz? (Płyta nie obsługuje 5 GHz.)"
 }

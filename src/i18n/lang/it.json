@@ -1589,5 +1589,19 @@
   "sp.rst.done": "[Impostazioni di fabbrica] Fatto – rilettura dei valori. Controlla passi/mm, corsa e $32.",
   "sp.rst.doneOffsets": "[Impostazioni di fabbrica] Origini cancellate – reimposta lo zero pezzo.",
   "wifi.err.bracket": "Il carattere ] non funziona nel nome o nella password con questo firmware (separa comando e valore). Scegli nel router una password senza ].",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: insieme a ! ? ~ o accenti, = e ] non funzionano (l’interfaccia web della scheda divide lì). Scegli nel router una password senza = e ]."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: insieme a ! ? ~ o accenti, = e ] non funzionano (l’interfaccia web della scheda divide lì). Scegli nel router una password senza = e ].",
+  "wifi.b.label": "Scheda",
+  "wifi.b.tip": "Ogni firmware salva il Wi-Fi in modo diverso. Di solito CNC Craft lo riconosce – altrimenti scegli qui la scheda.",
+  "wifi.b.auto": "Automatico (rilevato: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / firmware MKS recente ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (vecchio) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "senza Wi-Fi",
+  "wifi.switched": "Salvato – la scheda passa ora alla Wi-Fi «{ssid}» (senza riavvio).",
+  "wifi.switchedNoAnswer": "Salvato – la scheda è passata subito alla Wi-Fi «{ssid}» spegnendo la propria. Per questo l’ultimo comando non ha avuto risposta – è normale. Ricollega il computer a «{ssid}», poi 📡 troverà la scheda.",
+  "wifi.switchedAp": "Salvato – la scheda apre ora la propria Wi-Fi «{ssid}».",
+  "wifi.checkingJoin": "Verifico via USB se la scheda è entrata nella Wi-Fi …",
+  "wifi.joinedAt": "La scheda è nella Wi-Fi «{ssid}» all’IP {ip}.",
+  "wifi.joinFailed": "La scheda non è ancora in «{ssid}». Password corretta? È una rete a 2,4 GHz? (La scheda non supporta 5 GHz.)"
 }

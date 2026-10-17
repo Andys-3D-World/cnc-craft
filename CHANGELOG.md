@@ -22,6 +22,9 @@
 **Behoben**
 - WLAN einrichten bei MKS DLC32 MAX: diese Firmware kennt [ESP100]/[ESP101] nicht („Invalid $ statement“) –
   jetzt über ihre eigenen Einstellungen $50–$54 (per USB) bzw. [ESP401] über die Weboberfläche (bei ! ? ~ / Umlauten)
+- WLAN-Dialog: Board-Auswahl (Automatisch / MKS DLC32 MAX / älteres DLC32 · Grbl_ESP32 / FluidNC / grblHAL), falls die
+  Erkennung danebenliegt; bei der MAX wird die WLAN-Art zuletzt gesetzt (sie wechselt sofort) – keine Antwort darauf
+  gilt nicht mehr als Fehler, danach prüft die App per USB, ob das Board im WLAN ist, und zeigt seine neue IP
 - WLAN-Passwörter werden in der Konsole (z. B. bei $S) und im Einstellungs-Reiter ($52/$54) verdeckt angezeigt
 - WLAN-Dialog: MKS DLC32 MAX meldete „Fehler 3 – Unbekannter $-Befehl“ (Abfrage $AP/SSID kennt die Firmware nicht)
 - Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte

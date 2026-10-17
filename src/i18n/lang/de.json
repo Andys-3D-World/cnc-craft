@@ -1764,5 +1764,19 @@
   "sp.rst.done": "[Werkseinstellung] Fertig – Werte werden neu gelesen. Bitte Schritte/mm, Verfahrweg und $32 prüfen.",
   "sp.rst.doneOffsets": "[Werkseinstellung] Nullpunkte gelöscht – Werkstück-Nullpunkt neu setzen.",
   "wifi.err.bracket": "Das Zeichen ] geht bei dieser Firmware nicht im Netzwerk-Namen oder Passwort (es trennt Befehl und Wert). Bitte im Router ein Passwort ohne ] wählen.",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: Zusammen mit ! ? ~ oder Umlauten gehen = und ] nicht (die Weboberfläche des Boards trennt daran). Bitte im Router ein Passwort ohne = und ] wählen."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: Zusammen mit ! ? ~ oder Umlauten gehen = und ] nicht (die Weboberfläche des Boards trennt daran). Bitte im Router ein Passwort ohne = und ] wählen.",
+  "wifi.b.label": "Board",
+  "wifi.b.tip": "Jede Firmware speichert das WLAN anders. Normalerweise erkennt CNC Craft das selbst – falls nicht, hier das Board wählen.",
+  "wifi.b.auto": "Automatisch (erkannt: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / neuere MKS-Firmware ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (älter) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "ohne WLAN",
+  "wifi.switched": "Gespeichert – das Board wechselt jetzt ins WLAN „{ssid}“ (kein Neustart nötig).",
+  "wifi.switchedNoAnswer": "Gespeichert – das Board ist sofort ins WLAN „{ssid}“ gewechselt und hat dabei sein eigenes WLAN abgeschaltet. Darum kam auf den letzten Befehl keine Antwort mehr – das ist normal. Verbinde deinen Rechner wieder mit „{ssid}“, dann findet 📡 das Board.",
+  "wifi.switchedAp": "Gespeichert – das Board macht jetzt sein eigenes WLAN „{ssid}“ auf.",
+  "wifi.checkingJoin": "Prüfe über USB, ob das Board im WLAN angekommen ist …",
+  "wifi.joinedAt": "Board ist im WLAN „{ssid}“ unter der IP {ip}.",
+  "wifi.joinFailed": "Board ist noch nicht in „{ssid}“ angekommen. Passwort richtig? Ist das WLAN ein 2,4-GHz-Netz? (Das Board kann kein 5 GHz.)"
 }

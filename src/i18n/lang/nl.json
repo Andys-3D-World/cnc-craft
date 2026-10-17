@@ -1589,5 +1589,19 @@
   "sp.rst.done": "[Fabrieksinstellingen] Klaar – waarden worden opnieuw gelezen. Controleer stappen/mm, slag en $32.",
   "sp.rst.doneOffsets": "[Fabrieksinstellingen] Nulpunten gewist – stel het werkstuknulpunt opnieuw in.",
   "wifi.err.bracket": "Het teken ] werkt bij deze firmware niet in netwerknaam of wachtwoord (het scheidt opdracht en waarde). Kies in de router een wachtwoord zonder ].",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: samen met ! ? ~ of umlauts werken = en ] niet (de webinterface van het board splitst daarop). Kies in de router een wachtwoord zonder = en ]."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: samen met ! ? ~ of umlauts werken = en ] niet (de webinterface van het board splitst daarop). Kies in de router een wachtwoord zonder = en ].",
+  "wifi.b.label": "Board",
+  "wifi.b.tip": "Elke firmware slaat wifi anders op. Meestal herkent CNC Craft het zelf – anders hier het board kiezen.",
+  "wifi.b.auto": "Automatisch (herkend: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / nieuwere MKS-firmware ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (ouder) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "zonder wifi",
+  "wifi.switched": "Opgeslagen – het board schakelt nu over naar wifi „{ssid}“ (geen herstart nodig).",
+  "wifi.switchedNoAnswer": "Opgeslagen – het board is meteen naar wifi „{ssid}“ gewisseld en heeft zijn eigen wifi uitgezet. Daarom kwam er op de laatste opdracht geen antwoord – dat is normaal. Verbind je computer weer met „{ssid}“, dan vindt 📡 het board.",
+  "wifi.switchedAp": "Opgeslagen – het board opent nu zijn eigen wifi „{ssid}“.",
+  "wifi.checkingJoin": "Via USB controleren of het board in het wifi zit …",
+  "wifi.joinedAt": "Board zit in wifi „{ssid}“ op IP {ip}.",
+  "wifi.joinFailed": "Board zit nog niet in „{ssid}“. Klopt het wachtwoord? Is het een 2,4-GHz-netwerk? (Het board kan geen 5 GHz.)"
 }

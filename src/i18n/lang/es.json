@@ -1589,5 +1589,19 @@
   "sp.rst.done": "[Valores de fábrica] Hecho: se vuelven a leer los valores. Revisa pasos/mm, recorrido y $32.",
   "sp.rst.doneOffsets": "[Valores de fábrica] Ceros borrados: vuelve a fijar el cero de pieza.",
   "wifi.err.bracket": "El carácter ] no funciona en el nombre ni en la contraseña con este firmware (separa comando y valor). Elige en el router una contraseña sin ].",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: junto con ! ? ~ o acentos, = y ] no funcionan (la interfaz web de la placa corta ahí). Elige en el router una contraseña sin = ni ]."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: junto con ! ? ~ o acentos, = y ] no funcionan (la interfaz web de la placa corta ahí). Elige en el router una contraseña sin = ni ].",
+  "wifi.b.label": "Placa",
+  "wifi.b.tip": "Cada firmware guarda la Wi-Fi de forma distinta. CNC Craft suele detectarlo; si no, elige aquí la placa.",
+  "wifi.b.auto": "Automático (detectado: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / firmware MKS reciente ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (antiguo) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "sin Wi-Fi",
+  "wifi.switched": "Guardado: la placa cambia ahora a la Wi-Fi «{ssid}» (sin reiniciar).",
+  "wifi.switchedNoAnswer": "Guardado: la placa cambió enseguida a la Wi-Fi «{ssid}» y apagó su propia Wi-Fi. Por eso el último comando no tuvo respuesta; es normal. Vuelve a conectar el ordenador a «{ssid}» y 📡 encontrará la placa.",
+  "wifi.switchedAp": "Guardado: la placa abre ahora su propia Wi-Fi «{ssid}».",
+  "wifi.checkingJoin": "Comprobando por USB si la placa se conectó a la Wi-Fi…",
+  "wifi.joinedAt": "La placa está en la Wi-Fi «{ssid}» con la IP {ip}.",
+  "wifi.joinFailed": "La placa aún no está en «{ssid}». ¿Contraseña correcta? ¿Es una red de 2,4 GHz? (La placa no admite 5 GHz.)"
 }

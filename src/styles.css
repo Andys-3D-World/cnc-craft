@@ -1319,3 +1319,4 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .sp-rst-opt small { color: var(--text-muted); }
 .sp-rst-warn { font-size: 0.76rem; color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); border-radius: 6px; padding: 6px 8px; line-height: 1.35; }
 .sp-rst-go { background: #c0392b !important; border-color: #c0392b !important; }
+#wifi-board-sel { flex: 1 1 auto; min-width: 0; max-width: 250px; text-overflow: ellipsis; }

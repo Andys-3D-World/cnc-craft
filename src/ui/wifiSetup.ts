@@ -17,6 +17,26 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
 const KEY_HOST = "cnc_craft_wifi_web_host";
+const KEY_BOARD = "cnc_craft_wifi_board";
+
+/** Board-Auswahl im WLAN-Dialog (falls die Erkennung danebenliegt) */
+export type WifiBoard = "auto" | "mks" | "esp32" | "fluidnc" | "grblhal";
+const BOARD_CHOICES: WifiBoard[] = ["auto", "mks", "esp32", "fluidnc", "grblhal"];
+
+/** Was ist erkannt? */
+function detectBoard(): WifiBoard | "none" {
+  const fw = wifiFirmware();
+  if (fw === "esp32") return isMksWifi() ? "mks" : "esp32";
+  return fw;
+}
+
+/** Gewählt oder erkannt -> Firmware-Art + MKS-Nummern ja/nein */
+function resolveBoard(choice: WifiBoard): { fw: WifiFw; mks: boolean } {
+  const b = choice === "auto" ? detectBoard() : choice;
+  if (b === "none") return { fw: "none", mks: false };
+  if (b === "mks") return { fw: "esp32", mks: true };
+  return { fw: b as WifiFw, mks: false };
+}
 
 /** Welche Firmware-Familie hängt dran? */
 export function wifiFirmware(): WifiFw {
@@ -134,7 +154,12 @@ function isApIp(ip: string): boolean { return ip === BOARD_AP_IP; }
 
 export function openWifiSetup(log: (s: string) => void) {
   document.getElementById("wifi-overlay")?.remove();
-  const fw = wifiFirmware();
+  let boardChoice: WifiBoard = "auto";
+  try { const v = localStorage.getItem(KEY_BOARD) as WifiBoard | null; if (v && BOARD_CHOICES.includes(v)) boardChoice = v; } catch { /* egal */ }
+  // ohne Verbindung keine Auswahl erzwingen
+  let { fw, mks } = machine.connected ? resolveBoard(boardChoice) : { fw: "none" as WifiFw, mks: false };
+  const detected = detectBoard();
+  const boardLabel = (b: WifiBoard | "none") => t("wifi.b." + b);
   const fwName = [machine.firmware, machine.version].filter(Boolean).join(" ") + (machine.info.name ? ` · ${machine.info.name}` : "");
   const ov = document.createElement("div");
   ov.id = "wifi-overlay";
@@ -143,6 +168,10 @@ export function openWifiSetup(log: (s: string) => void) {
     <div class="dlg-box wifi-box" role="dialog">
       <h3>📶 ${esc(t("wifi.title"))}</h3>
       <div class="wifi-board">${esc(t("wifi.board", { fw: fwName || "?" }))}</div>
+      <label class="dlg-row"><span>${esc(t("wifi.b.label"))}</span>
+        <select id="wifi-board-sel" data-tip="${esc(t("wifi.b.tip"))}">
+          ${BOARD_CHOICES.map(b => `<option value="${b}" ${b === boardChoice ? "selected" : ""}>${esc(b === "auto" ? t("wifi.b.auto", { b: boardLabel(detected) }) : boardLabel(b))}</option>`).join("")}
+        </select></label>
       <div class="wifi-modes">
         <label><input type="radio" name="wifi-mode" value="sta" checked> 🏠 ${esc(t("wifi.sta"))}</label>
         <label><input type="radio" name="wifi-mode" value="ap"> 📡 ${esc(t("wifi.ap"))}</label>
@@ -202,7 +231,7 @@ export function openWifiSetup(log: (s: string) => void) {
     q<HTMLButtonElement>("wifi-ap-on").onclick = async () => {
       if (!window.confirm(t("wifi.g.apOnConfirm"))) return;
       const cmds = fw === "fluidnc" ? ["$WiFi/Mode=AP", "$Bye"] : fw === "grblhal" ? ["$73=2"]
-        : isMksWifi() ? ["$50=1", "[ESP110]AP", "[ESP444]RESTART"] : ["[ESP110]AP", "[ESP444]RESTART"];
+        : mks ? ["[ESP110]AP", "$50=1", "[ESP444]RESTART"] : ["[ESP110]AP", "[ESP444]RESTART"];
       for (const c of cmds) { try { await sendAndWait(c, 3000, true); log(t("wifi.logSent", { line: c, via: "GRBL" })); } catch { /* Neustart */ } }
       log(t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone"));
       q("wifi-ping-res").textContent = t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone");
@@ -298,7 +327,7 @@ export function openWifiSetup(log: (s: string) => void) {
   const refresh = () => {
     const ssid = q("wifi-ssid").value, pw = q("wifi-pw").value, host = q("wifi-host").value.trim();
     // Weboberfläche zunächst als möglich annehmen, damit der Weg dorthin angezeigt wird
-    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, fw === "esp32" && isMksWifi());
+    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, mks);
     const r = analyze(ssid + pw);
     const chips: string[] = [];
     if (r.realtime.length) chips.push(`<span class="wifi-chip warn">${esc(r.realtime.join(" "))} – ${esc(t("wifi.c.realtime"))}</span>`);
@@ -319,6 +348,12 @@ export function openWifiSetup(log: (s: string) => void) {
     const needHost = plan.route === "web" && !host;
     q<HTMLButtonElement>("wifi-send").disabled = !!plan.error || !ssid || needHost || fw === "none";
   };
+  q<HTMLSelectElement>("wifi-board-sel").addEventListener("change", () => {
+    boardChoice = q<HTMLSelectElement>("wifi-board-sel").value as WifiBoard;
+    try { localStorage.setItem(KEY_BOARD, boardChoice); } catch { /* egal */ }
+    if (machine.connected) ({ fw, mks } = resolveBoard(boardChoice));
+    refresh();
+  });
   ov.querySelectorAll("input").forEach(i => i.addEventListener("input", refresh));
   ov.querySelectorAll<HTMLInputElement>("input[name=wifi-mode]").forEach(i => i.addEventListener("change", refresh));
   refresh();
@@ -339,6 +374,7 @@ export function openWifiSetup(log: (s: string) => void) {
     res.className = "wifi-result";
     res.textContent = t("wifi.sending");
     const host = q("wifi-host").value.trim();
+    let switched = false;
     try {
       if (plan.route === "web") {
         try { localStorage.setItem(KEY_HOST, host); } catch { /* egal */ }
@@ -349,6 +385,12 @@ export function openWifiSetup(log: (s: string) => void) {
           try {
             await invoke<string>("esp_web_command", { host, command: plan.lines[i] });
           } catch (e) {
+            // Board hat beim Umschalten sein eigenes WLAN abgeschaltet -> keine Antwort mehr: das ist gut so
+            if (plan.switchLast && i === plan.lines.length - 1 && !String(e).startsWith("http-")) {
+              log(t("wifi.logSent", { line: shown, via: "Web" }));
+              switched = true;
+              break;
+            }
             throw new Error(t("wifi.err.webRejected", { line: shown, e: String(e) }));
           }
           log(t("wifi.logSent", { line: shown, via: "Web" }));
@@ -357,10 +399,33 @@ export function openWifiSetup(log: (s: string) => void) {
         for (let i = 0; i < plan.lines.length; i++) {
           const a = await sendAndWait(plan.lines[i], 6000, true);   // quiet: Passwort nicht in die Konsole
           log(t("wifi.logSent", { line: plan.secret.includes(i) ? t("wifi.logSecret") : plan.lines[i], via: "GRBL" }));
+          if (!a.ok && plan.switchLast && i === plan.lines.length - 1 && !(a.code !== undefined && a.code > 0)) { switched = true; break; }
           if (!a.ok) throw new Error(t("wifi.err.rejected", { line: plan.secret.includes(i) ? t("wifi.logSecret") : plan.lines[i], e: String(a.code ?? "") }));
         }
       }
       res.className = "wifi-result ok";
+      if (plan.switchLast) {
+        // MKS: wechselt sofort, kein Neustart nötig
+        const ssid = q("wifi-ssid").value;
+        res.innerHTML = `✓ ${esc(t(mode() === "sta" ? (switched ? "wifi.switchedNoAnswer" : "wifi.switched") : "wifi.switchedAp", { ssid }))}`;
+        if (mode() === "sta" && machine.connected && !tcpHost()) {
+          // per USB nachsehen, ob das Board drin ist und welche IP es bekommen hat
+          const out = document.createElement("div");
+          out.className = "wifi-note";
+          out.textContent = t("wifi.checkingJoin");
+          res.appendChild(out);
+          let found = "";
+          for (let n = 0; n < 6 && !found && document.body.contains(ov); n++) {
+            await new Promise(r => setTimeout(r, 2500));
+            const st = parseWifiInfo(await ask("$I"));
+            if (st && st.mode === "STA" && st.ip && !isApIp(st.ip)) found = st.ip;
+          }
+          out.className = found ? "wifi-note wifi-ok" : "wifi-note wifi-bad";
+          out.textContent = found ? `✓ ${t("wifi.joinedAt", { ssid, ip: found })}` : `✗ ${t("wifi.joinFailed", { ssid })}`;
+          if (found) { try { localStorage.setItem(KEY_HOST, found); } catch { /* egal */ } log(t("wifi.joinedAt", { ssid, ip: found })); }
+        }
+        return;
+      }
       res.innerHTML = `✓ ${esc(t("wifi.done"))}${plan.restart ? ` <button id="wifi-restart" class="btn-secondary">↻ ${esc(t("wifi.restart"))}</button>` : ` ${esc(t("wifi.powerCycle"))}`}`;
       const rb = ov.querySelector("#wifi-restart") as HTMLButtonElement | null;
       if (rb) rb.onclick = async () => {

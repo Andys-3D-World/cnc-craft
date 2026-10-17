@@ -1764,5 +1764,19 @@
   "sp.rst.done": "[Factory reset] Done – reading values again. Please check steps/mm, travel and $32.",
   "sp.rst.doneOffsets": "[Factory reset] Offsets cleared – set the work zero again.",
   "wifi.err.bracket": "The character ] does not work in the network name or password with this firmware (it separates command and value). Please choose a password without ] in your router.",
-  "wifi.err.mksWebChars": "MKS DLC32 MAX: together with ! ? ~ or umlauts, = and ] do not work (the board’s web interface splits on them). Please choose a password without = and ] in your router."
+  "wifi.err.mksWebChars": "MKS DLC32 MAX: together with ! ? ~ or umlauts, = and ] do not work (the board’s web interface splits on them). Please choose a password without = and ] in your router.",
+  "wifi.b.label": "Board",
+  "wifi.b.tip": "Every firmware stores Wi-Fi differently. CNC Craft usually detects it – if not, choose the board here.",
+  "wifi.b.auto": "Automatic (detected: {b})",
+  "wifi.b.mks": "MKS DLC32 MAX / newer MKS firmware ($50–$54)",
+  "wifi.b.esp32": "MKS DLC32 (older) / Grbl_ESP32 ([ESP100])",
+  "wifi.b.fluidnc": "FluidNC ($Sta/SSID)",
+  "wifi.b.grblhal": "grblHAL ($73–$77)",
+  "wifi.b.none": "no Wi-Fi",
+  "wifi.switched": "Saved – the board now switches to the Wi-Fi “{ssid}” (no restart needed).",
+  "wifi.switchedNoAnswer": "Saved – the board switched to the Wi-Fi “{ssid}” at once and turned off its own Wi-Fi. That’s why the last command got no answer – this is normal. Reconnect your computer to “{ssid}”, then 📡 finds the board.",
+  "wifi.switchedAp": "Saved – the board now opens its own Wi-Fi “{ssid}”.",
+  "wifi.checkingJoin": "Checking via USB whether the board joined the Wi-Fi …",
+  "wifi.joinedAt": "Board is in the Wi-Fi “{ssid}” at IP {ip}.",
+  "wifi.joinFailed": "Board has not joined “{ssid}” yet. Is the password right? Is it a 2.4 GHz network? (The board can’t do 5 GHz.)"
 }

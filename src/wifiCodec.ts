@@ -80,6 +80,7 @@ export interface WifiPlan {
   restart: string;        // Befehl für den Neustart ("" = von Hand aus-/einschalten)
   notes: string[];        // i18n-Schlüssel mit Hinweisen
   error: string;          // i18n-Schlüssel, warum es nicht geht ("" = geht)
+  switchLast?: boolean;   // letzte Zeile schaltet das WLAN sofort um – keine Antwort darauf ist normal
 }
 
 /**
@@ -155,7 +156,10 @@ export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, c
 /** MKS DLC32 MAX: $50–$54 (über die Leitung) bzw. [ESP401] (über die Weboberfläche) */
 function planMks(plan: WifiPlan, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, r: CharReport): WifiPlan {
   const [sId, pId, m] = mode === "sta" ? [53, 54, 2] : [51, 52, 1];
-  const vals: Array<[number, string]> = [[sId, ssid], [pId, pw], [50, String(m)]];
+  // $50 zuletzt: die MKS-Firmware wechselt dabei SOFORT das WLAN (das eigene WLAN verschwindet)
+  const vals: Array<[number, string]> = [[sId, ssid], [pId, pw]];
+  const modeVal: [number, string] = [50, String(m)];
+  plan.switchLast = true;
   plan.restart = "[ESP444]RESTART";
   plan.secret = [1];
   const radio = mode === "sta" ? "[ESP110]STA" : "[ESP110]AP";
@@ -166,11 +170,12 @@ function planMks(plan: WifiPlan, mode: WifiMode, ssid: string, pw: string, canWe
     // [ESP401] zerlegt „P=… T=… V=…“ an „=“ und das Ende an „]“ – diese beiden gehen dort nicht
     if (/[=\]]/.test(ssid + pw)) { plan.route = "none"; plan.error = "wifi.err.mksWebChars"; return plan; }
     plan.route = "web";
-    plan.lines = [...vals.map(([n, v]) => `[ESP401]P=${n} T=${n === 50 ? "B" : "S"} V=${v}`), radio];
+    const w = ([n, v]: [number, string]) => `[ESP401]P=${n} T=${n === 50 ? "B" : "S"} V=${v}`;
+    plan.lines = [...vals.map(w), radio, w(modeVal)];
     plan.notes.push(risky ? "wifi.note.web" : "wifi.note.webSafer");
     return plan;
   }
-  plan.lines = [...vals.map(([n, v]) => `$${n}=${v}`), radio];
+  plan.lines = [...vals.map(([n, v]) => `$${n}=${v}`), radio, `$${modeVal[0]}=${modeVal[1]}`];
   if (unsafe) plan.notes.push("wifi.note.espComment");
   return plan;
 }
