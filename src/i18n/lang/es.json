@@ -1612,5 +1612,7 @@
   "wifi.nameDefault": "La máquina se llama ahora «{h}», como todas las placas de esta marca. Dale un nombre propio para reconocerla.",
   "net.dupHint": "Varias máquinas parecen iguales. Consejo: conecta por USB → 📶 Configurar Wi-Fi → «Nombre de la máquina» (p. ej. laser-taller). Así aparece aquí el nombre.",
   "m.hostLine": "Nombre en la red: {h}",
-  "wifi.note.nameOnly": "Solo cambia el nombre; los datos de la Wi-Fi se mantienen. El nuevo nombre vale tras reiniciar la placa."
+  "wifi.note.nameOnly": "Solo cambia el nombre; los datos de la Wi-Fi se mantienen. El nuevo nombre vale tras reiniciar la placa.",
+  "about.license": "Código abierto · GPLv3",
+  "about.privacy": "Privacidad: CNC Craft no envía datos sobre ti ni tus máquinas. La comprobación de actualizaciones solo pregunta a GitHub por la última versión; se desactiva con la casilla de arriba."
 }

@@ -55,6 +55,7 @@ export async function openAboutDialog(log: (s: string) => void) {
           <h3>CNC Craft</h3>
           <div class="about-ver">${esc(t("upd.version", { v: me.version }))} <span class="about-beta">Beta</span></div>
           <div class="about-sys">${esc(osName(me.os, me.arch))}</div>
+          <div class="about-sys">${esc(t("about.license"))}</div>
         </div>
       </div>
       <div class="about-section">
@@ -66,6 +67,7 @@ export async function openAboutDialog(log: (s: string) => void) {
           <div id="upd-status" class="about-status"></div>
           <div id="upd-result"></div>
           <div class="about-repo">GitHub: <a href="#" id="upd-repo">${esc(updateRepo())}</a></div>
+          <div class="about-status">🔒 ${esc(t("about.privacy"))}</div>
         ` : `<div class="about-status">${esc(t("upd.disabled"))}</div>`}
       </div>
       <div class="about-section">

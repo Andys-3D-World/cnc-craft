@@ -9,6 +9,10 @@
 - **📡-Suche zeigt den Namen** jeder Maschine; Hinweis, wenn mehrere gleiche Boards nicht zu unterscheiden sind
 - Verbindungs-Info zeigt den Namen im Netz
 
+- **Lizenz:** CNC Craft steht jetzt offiziell unter GPLv3 (LICENSE), dazu THIRD_PARTY_NOTICES.md mit allen
+  fremden Bestandteilen; README mit Datenschutz-Hinweis und Code Signing Policy; ⓘ-Fenster zeigt Lizenz und
+  Datenschutz-Hinweis
+
 **Verbessert**
 - Neue IP automatisch finden: hat die Maschine einen eigenen Namen, wird nur die Maschine mit genau diesem Namen
   genommen – bei mehreren gleichen Boards verbindet sich die App nicht mehr versehentlich mit der falschen

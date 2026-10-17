@@ -1612,5 +1612,7 @@
   "wifi.nameDefault": "La macchina ora si chiama «{h}» – come tutte le schede di questa marca. Dalle un nome proprio per riconoscerla.",
   "net.dupHint": "Più macchine sembrano uguali. Consiglio: collega via USB → 📶 Configura Wi-Fi → «Nome della macchina» (es. laser-garage). Poi qui compare il nome.",
   "m.hostLine": "Nome in rete: {h}",
-  "wifi.note.nameOnly": "Cambia solo il nome – i dati Wi-Fi restano. Il nuovo nome vale dopo il riavvio della scheda."
+  "wifi.note.nameOnly": "Cambia solo il nome – i dati Wi-Fi restano. Il nuovo nome vale dopo il riavvio della scheda.",
+  "about.license": "Open source · GPLv3",
+  "about.privacy": "Privacy: CNC Craft non invia dati su di te o sulle tue macchine. Il controllo aggiornamenti chiede solo a GitHub l’ultima versione – disattivabile con la casella sopra."
 }

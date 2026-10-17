@@ -42,8 +42,47 @@ Installationsdateien für alle Systeme baut die GitHub-Action `.github/workflows
 
 ## Lizenz
 
-Die mitgelieferte GRBL-Firmware (`src-tauri/firmware/`) steht unter GPLv3, siehe dortige README.
+CNC Craft ist freie Software: Du darfst es benutzen, weitergeben und verändern – unter den Bedingungen der
+**GNU General Public License Version 3** (oder einer späteren Version), siehe [LICENSE](LICENSE).
+Copyright © 2026 Andys 3D World.
 
-Der STEP-Import nutzt [occt-import-js](https://github.com/kovacsv/occt-import-js) mit
-[Open CASCADE Technology](https://www.opencascade.com) (beide LGPL 2.1). Die Dateien liegen unverändert in
-`public/occt/` und werden zur Laufzeit geladen, siehe `public/occt/README.md`.
+Mitgelieferte Teile anderer Projekte (alle Open Source) stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md):
+die GRBL-Firmware (`src-tauri/firmware/`, GPLv3) und der STEP-Import mit
+[occt-import-js](https://github.com/kovacsv/occt-import-js) und [Open CASCADE Technology](https://www.opencascade.com)
+(`public/occt/`, LGPL 2.1).
+
+Genannte Produkt- und Firmennamen (z. B. LightBurn, Estlcam, OpenBuilds, MKS, xTool, Ruida) gehören ihren
+jeweiligen Inhabern und dienen nur zur Beschreibung, mit welchen Programmen und Maschinen CNC Craft vergleichbar
+bzw. kompatibel ist. CNC Craft ist mit keinem dieser Hersteller verbunden.
+
+## Datenschutz
+
+CNC Craft sammelt keine Daten und hat keine Telemetrie. Es gibt nur diese Netzwerk-Verbindungen:
+
+- **Update-Prüfung:** einmal am Tag eine Anfrage an die GitHub-API (`api.github.com`), welche Version die neueste
+  ist. Dabei werden keine Daten über dich, deine Zeichnungen oder Maschinen gesendet – GitHub sieht nur die
+  üblichen Verbindungsdaten (IP-Adresse). Abschalten: ⓘ oben rechts → „Automatisch nach Updates suchen“.
+- **Deine eigenen Geräte im Heimnetz:** Maschinen (Telnet/WLAN), Kameras und die 📡-Suche verbinden sich nur mit
+  Geräten in deinem lokalen Netzwerk und nur, wenn du das auslöst.
+- **Links** (Firmware-Downloads, Hilfe) öffnen sich nur auf Klick in deinem Browser.
+
+Einstellungen und Bibliotheken bleiben auf deinem Rechner (App-Datenordner, siehe ⓘ).
+
+## Code Signing Policy
+
+Die Windows-Installationsdateien werden signiert.
+
+*Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
+[SignPath Foundation](https://signpath.org).*
+
+- **Committers and reviewers:** [Mitglieder des Projekts](https://github.com/orgs/Andys-3D-World/people)
+- **Approvers:** [Inhaber der Organisation](https://github.com/orgs/Andys-3D-World/people)
+- Signiert werden nur Programme, die automatisch aus dem Quellcode dieses Repositorys gebaut wurden
+  (GitHub Actions, `.github/workflows/release.yml`). Jede Veröffentlichung wird vorher von Hand freigegeben.
+- Alle Beteiligten nutzen Zwei-Faktor-Anmeldung bei GitHub und SignPath.
+
+**Privacy policy (English):** This program will not transfer any information to other networked systems unless
+specifically requested by the user or the person installing or operating it. The only automatic connection is a
+daily update check against the public GitHub API, which can be turned off in the app (ⓘ → “Automatically check
+for updates”). Connections to machines, cameras and the 📡 network search only go to devices in the user's local
+network and only when the user starts them.

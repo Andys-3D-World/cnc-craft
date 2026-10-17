@@ -39,7 +39,8 @@
       "icons/icon.ico"
     ],
     "publisher": "Andys 3D World",
-    "copyright": "© 2026 Andys 3D World",
+    "copyright": "© 2026 Andys 3D World – GPL-3.0-or-later",
+    "license": "GPL-3.0-or-later",
     "category": "Utility",
     "shortDescription": "CNC-Steuerung für Laser, Fräse und Plasma",
     "longDescription": "CNC Craft verbindet Design, CAM und Maschinensteuerung für Laser, CNC-Fräse und Plasma – GRBL, grblHAL, FluidNC, Marlin, Ruida und K40.",
