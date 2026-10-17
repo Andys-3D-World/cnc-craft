@@ -134,6 +134,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="connect-btn" class="btn-primary" style="flex: 1; padding: 4px; font-size: 0.8rem;">🔌 ${T("rp.connect")}</button>
             </div>
             <div id="net-find-list" class="net-find" style="display: none;"></div>
+            <button id="wifi-setup-btn" class="btn-secondary btn-compact" style="display: none;" ${tip("wifi.btnTip")}>📶 ${T("wifi.title")}</button>
             <div id="machine-info" class="tool-scope"></div>
             ${machineLineHtml()}
           </div>

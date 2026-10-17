@@ -117,6 +117,66 @@ pub fn fetch_frame(url: &str, timeout: Duration) -> Result<Vec<u8>, String> {
     first_jpeg(&buf[h..]).map(|j| j.to_vec()).ok_or_else(|| "no-jpeg".to_string())
 }
 
+// ---------------------------------------------------------------------
+// Befehl über die Weboberfläche eines ESP32-Boards schicken
+// ---------------------------------------------------------------------
+
+/// Text für eine URL kodieren (alles außer A–Z a–z 0–9 - _ . ~ wird %HH, UTF-8-Bytes einzeln)
+pub fn url_encode(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() * 3);
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || b == b'-' || b == b'_' || b == b'.' {
+            o.push(b as char);
+        } else {
+            o.push_str(&format!("%{:02X}", b));
+        }
+    }
+    o
+}
+
+/// Einfache GET-Anfrage, gibt (Status, Text) zurück. Nur http, Antwort höchstens 256 KB.
+pub fn http_get(url: &str, timeout: Duration) -> Result<(u16, String), String> {
+    let (host, port, path) = parse_url(url)?;
+    let addr = (host.as_str(), port).to_socket_addrs().map_err(|e| e.to_string())?.next().ok_or_else(|| "bad-url".to_string())?;
+    let mut s = TcpStream::connect_timeout(&addr, timeout).map_err(|e| e.to_string())?;
+    let _ = s.set_read_timeout(Some(Duration::from_millis(200)));
+    let req = format!("GET {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: CNC-Craft\r\nConnection: close\r\n\r\n", path, host);
+    s.write_all(req.as_bytes()).map_err(|e| e.to_string())?;
+    let deadline = Instant::now() + timeout;
+    let mut buf = Vec::new();
+    let mut chunk = [0u8; 8192];
+    while Instant::now() < deadline && buf.len() < 256 * 1024 {
+        match s.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                // Antwort vollständig? (Content-Length erreicht)
+                if let Some(h) = find(&buf, b"\r\n\r\n", 0) {
+                    let head = String::from_utf8_lossy(&buf[..h]).to_lowercase();
+                    if let Some(len) = head.lines().find_map(|l| l.strip_prefix("content-length:").and_then(|v| v.trim().parse::<usize>().ok())) {
+                        if buf.len() >= h + 4 + len { break; }
+                    }
+                }
+            }
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    let h = find(&buf, b"\r\n\r\n", 0).ok_or_else(|| "no-answer".to_string())?;
+    let head = String::from_utf8_lossy(&buf[..h]).to_string();
+    let code: u16 = head.lines().next().and_then(|l| l.split_whitespace().nth(1)).and_then(|c| c.parse().ok()).unwrap_or(0);
+    Ok((code, String::from_utf8_lossy(&buf[h + 4..]).to_string()))
+}
+
+/// GRBL-Befehl über die Weboberfläche (Grbl_ESP32 / FluidNC / ESP3D: /command?plain=…) schicken.
+/// Dort laufen die Zeichen nicht durch den seriellen Zeichenfilter – ! ? ~ und Umlaute kommen an.
+pub fn web_command(host: &str, command: &str, timeout: Duration) -> Result<String, String> {
+    let url = format!("http://{}/command?plain={}", host.trim().trim_start_matches("http://").trim_end_matches('/'), url_encode(command));
+    let (code, body) = http_get(&url, timeout)?;
+    if code == 401 { return Err("auth-not-supported".into()); }
+    if !(200..300).contains(&code) { return Err(format!("http-{}", code)); }
+    Ok(body)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,6 +198,27 @@ mod tests {
         let d = [0u8, 1, 0xFF, 0xD8, 0xFF, 0xE0, 5, 6, 0xFF, 0xD9, 9, 0xFF, 0xD8, 0xFF];
         assert_eq!(first_jpeg(&d).unwrap(), &[0xFF, 0xD8, 0xFF, 0xE0, 5, 6, 0xFF, 0xD9]);
         assert!(first_jpeg(&[0xFF, 0xD8, 0xFF, 1, 2]).is_none());
+    }
+
+    #[test]
+    fn web_cmd() {
+        assert_eq!(url_encode("$Sta/Password=a!b ?ä"), "%24Sta%2FPassword%3Da%21b%20%3F%C3%A4");
+        let got = std::sync::Arc::new(std::sync::Mutex::new(String::new()));
+        let g2 = got.clone();
+        let l = TcpListener::bind("127.0.0.1:0").unwrap();
+        let a = l.local_addr().unwrap();
+        thread::spawn(move || {
+            for s in l.incoming() {
+                let Ok(mut s) = s else { continue };
+                let mut b = [0u8; 2048];
+                let n = s.read(&mut b).unwrap_or(0);
+                *g2.lock().unwrap() = String::from_utf8_lossy(&b[..n]).lines().next().unwrap_or("").to_string();
+                let _ = s.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+            }
+        });
+        let r = web_command(&a.to_string(), "$Sta/Password=Ab!c~?(x);ü", Duration::from_secs(2)).unwrap();
+        assert_eq!(r, "ok");
+        assert_eq!(*got.lock().unwrap(), "GET /command?plain=%24Sta%2FPassword%3DAb%21c%7E%3F%28x%29%3B%C3%BC HTTP/1.1");
     }
 
     fn fake_jpeg(tag: u8) -> Vec<u8> {

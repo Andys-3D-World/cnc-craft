@@ -3,26 +3,33 @@
 //! Sucht im eigenen Netz nach Maschinen, die GRBL über Netzwerk sprechen:
 //! FluidNC, grblHAL, Grbl_ESP32, MKS DLC32 (Original-Firmware), xTool F1 …
 //!
-//! Ablauf:
-//!   1. Eigene IP ermitteln (ohne Zusatz-Bibliothek: UDP-Socket „verbinden“, es wird nichts gesendet)
-//!   2. Alle 254 Adressen des eigenen /24-Netzes + feste Kandidaten (192.168.4.1 = Access-Point
-//!      der ESP32-Boards, 172.25.3.1 = xTool F1 per USB-Netzwerk) auf den Ports 23, 8080, 8780
-//!      mit kurzem Zeitlimit anklopfen (viele Threads gleichzeitig, dauert wenige Sekunden)
-//!   3. Offene Ports genauer ansehen: Begrüßung lesen, „?“ (GRBL-Statusabfrage) senden, Antwort
-//!      einordnen (Grbl-Version, FluidNC, Statusbericht <Idle|…>). Webserver (HTTP) werden aussortiert.
-//!   4. Für gefundene Geräte den Seitentitel der Weboberfläche (Port 80) als Namen holen
+//! ESP32-Boards sind im WLAN oft „verschlafen“ (Stromsparmodus: erste Antwort braucht bis zu
+//! 1–2 s) und nehmen meist nur EINE Telnet-Verbindung gleichzeitig an. Darum in drei Runden:
 //!
-//! Nur Lesen/Statusabfrage – es werden keine Befehle gesendet, die etwas bewegen.
+//!   1. Bekannte Adressen gründlich (langes Zeitlimit): zuletzt benutzte/gefundene Adressen
+//!      (kommen aus der Oberfläche), Geräte aus der ARP-Tabelle des Rechners, Namen wie
+//!      fluidnc.local / grblesp.local, 192.168.4.1 (Access-Point der ESP32-Boards), xTool F1
+//!   2. Ganzes /24-Netz schnell abklopfen (Ports 23 und 8080)
+//!   3. Danach steht jedes Gerät, das auf Runde 2 reagiert hat, in der ARP-Tabelle – auch wenn
+//!      es für TCP zu langsam war. Diese Geräte noch einmal mit langem Zeitlimit probieren.
+//!
+//! Pro Adresse/Port wird nur EINE Verbindung geöffnet: darin Begrüßung lesen, „?“ senden
+//! (GRBL-Statusabfrage, bewegt nichts) und die Antwort einordnen. Webserver werden aussortiert.
 //! Dieses Modul kennt kein Tauri (lässt sich mit rustc allein testen); Befehl `net_scan` in lib.rs.
 
+use std::collections::HashSet;
 use std::io::{Read, Write};
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, UdpSocket};
-use std::sync::{Arc, Mutex};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, ToSocketAddrs, UdpSocket};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Ports, auf denen GRBL-Netzwerk-Firmwares lauschen
-pub const PORTS: [u16; 3] = [23, 8080, 8780];
+/// Ports, auf denen GRBL-Netzwerk-Firmwares lauschen (8780 nur xTool F1)
+pub const PORTS: [u16; 2] = [23, 8080];
+const XTOOL: Ipv4Addr = Ipv4Addr::new(172, 25, 3, 1);
+const ESP_AP: Ipv4Addr = Ipv4Addr::new(192, 168, 4, 1);
+/// Übliche mDNS-Namen der Firmwares
+const MDNS_NAMES: [&str; 5] = ["fluidnc.local", "grblesp.local", "grblhal.local", "esp3d.local", "mks.local"];
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Found {
@@ -36,20 +43,28 @@ pub struct Found {
     pub name: String,
 }
 
+/// Ergebnis eines Verbindungsversuchs
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Knock {
+    Found,
+    Refused,  // Gerät da, Port zu
+    Timeout,  // keine Antwort (aus, zu langsam oder gar kein Gerät)
+}
+
 /// Eigene IPv4-Adresse im lokalen Netz (die, über die das Internet erreicht würde)
 pub fn local_ipv4() -> Option<Ipv4Addr> {
     let s = UdpSocket::bind("0.0.0.0:0").ok()?;
     // connect bei UDP schickt nichts, legt nur die Route/Quelladresse fest
-    s.connect("192.0.2.1:9").or_else(|_| s.connect("8.8.8.8:80")).ok()?;
+    s.connect("8.8.8.8:80").or_else(|_| s.connect("192.168.1.1:80")).ok()?;
     match s.local_addr().ok()?.ip() {
         IpAddr::V4(ip) if !ip.is_loopback() && !ip.is_unspecified() => Some(ip),
         _ => None,
     }
 }
 
-/// Kandidaten: ganzes /24-Netz der eigenen Adresse (ohne sich selbst) + feste Adressen
-pub fn candidates(own: Option<Ipv4Addr>) -> Vec<Ipv4Addr> {
-    let mut v: Vec<Ipv4Addr> = Vec::new();
+/// Ganzes /24-Netz der eigenen Adresse (ohne sich selbst)
+pub fn subnet(own: Option<Ipv4Addr>) -> Vec<Ipv4Addr> {
+    let mut v = Vec::new();
     if let Some(ip) = own {
         let o = ip.octets();
         for last in 1..=254u8 {
@@ -59,9 +74,84 @@ pub fn candidates(own: Option<Ipv4Addr>) -> Vec<Ipv4Addr> {
             }
         }
     }
-    for fixed in [Ipv4Addr::new(192, 168, 4, 1), Ipv4Addr::new(172, 25, 3, 1)] {
-        if !v.contains(&fixed) && Some(fixed) != own {
-            v.push(fixed);
+    v
+}
+
+/// Alle IPv4-Adressen aus einem Text (ARP-Ausgabe), ohne Broadcast/Multicast/0.0.0.0
+pub fn ips_in_text(text: &str) -> Vec<Ipv4Addr> {
+    let mut out = Vec::new();
+    for line in text.lines() {
+        let l = line.to_lowercase();
+        // unvollständige Einträge (Gerät antwortet nicht) überspringen
+        if l.contains("incomplete") || l.contains("00:00:00:00:00:00") || l.contains("ff-ff-ff-ff-ff-ff") || l.contains("ff:ff:ff:ff:ff:ff") {
+            continue;
+        }
+        for tok in line.split(|c: char| !(c.is_ascii_digit() || c == '.')) {
+            if let Ok(ip) = tok.parse::<Ipv4Addr>() {
+                let o = ip.octets();
+                if ip.is_unspecified() || ip.is_broadcast() || ip.is_multicast() || ip.is_loopback() || o[3] == 255 || o[3] == 0 {
+                    continue;
+                }
+                if !out.contains(&ip) {
+                    out.push(ip);
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Geräte, die der Rechner gerade im Netz kennt (ARP-Tabelle)
+pub fn arp_hosts() -> Vec<Ipv4Addr> {
+    let mut text = String::new();
+    if let Ok(s) = std::fs::read_to_string("/proc/net/arp") {
+        // Linux: Spalte "Flags" 0x0 = unvollständig
+        for line in s.lines().skip(1) {
+            let cols: Vec<&str> = line.split_whitespace().collect();
+            if cols.len() >= 4 && cols[2] != "0x0" {
+                text.push_str(cols[0]);
+                text.push('\n');
+            }
+        }
+    }
+    if text.is_empty() {
+        let mut cmd = std::process::Command::new("arp");
+        cmd.arg("-a");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW – kein Konsolenfenster aufblitzen lassen
+        }
+        if let Ok(out) = cmd.output() {
+            text = String::from_utf8_lossy(&out.stdout).to_string();
+        }
+    }
+    ips_in_text(&text)
+}
+
+/// Namen wie fluidnc.local auflösen (parallel, höchstens `limit` warten)
+fn resolve_names(names: &[&str], limit: Duration) -> Vec<Ipv4Addr> {
+    let (tx, rx) = mpsc::channel();
+    for n in names {
+        let tx = tx.clone();
+        let host = format!("{}:23", n);
+        thread::spawn(move || {
+            if let Ok(it) = host.to_socket_addrs() {
+                for a in it {
+                    if let IpAddr::V4(v4) = a.ip() {
+                        let _ = tx.send(v4);
+                    }
+                }
+            }
+        });
+    }
+    drop(tx);
+    let mut v = Vec::new();
+    let end = Instant::now() + limit;
+    while let Some(left) = end.checked_duration_since(Instant::now()) {
+        match rx.recv_timeout(left) {
+            Ok(ip) => if !v.contains(&ip) { v.push(ip) },
+            Err(_) => break,
         }
     }
     v
@@ -75,7 +165,6 @@ pub fn classify(reply: &[u8]) -> Option<(String, String)> {
         return None;
     }
     let lower = t.to_lowercase();
-    // Firmware-Name aus der Begrüßung ("Grbl 1.1h ['$' for help]", "Grbl 3.0 [FluidNC v3.9.1 …]")
     let mut fw = String::new();
     if let Some(i) = t.find("FluidNC") {
         fw = t[i..].split(|c: char| c == ']' || c == '(' || c == '\r' || c == '\n').next().unwrap_or("").trim().to_string();
@@ -85,16 +174,7 @@ pub fn classify(reply: &[u8]) -> Option<(String, String)> {
         fw = t[i..].split(|c: char| c == '[' || c == '\r' || c == '\n').next().unwrap_or("").trim().to_string();
     }
     let grbl_like = !fw.is_empty()
-        || t.contains("<Idle")
-        || t.contains("<Alarm")
-        || t.contains("<Run")
-        || t.contains("<Hold")
-        || t.contains("<Jog")
-        || t.contains("<Home")
-        || t.contains("<Door")
-        || t.contains("<Check")
-        || t.contains("MPos:")
-        || t.contains("WPos:")
+        || ["<Idle", "<Alarm", "<Run", "<Hold", "<Jog", "<Home", "<Door", "<Check", "<Sleep", "MPos:", "WPos:"].iter().any(|k| t.contains(k))
         || lower.contains("[msg:")
         || t.lines().any(|l| l.trim() == "ok");
     if grbl_like {
@@ -104,32 +184,82 @@ pub fn classify(reply: &[u8]) -> Option<(String, String)> {
     }
 }
 
-/// Offenen Port genauer ansehen: Begrüßung lesen, dann "?" senden und Antwort lesen
-pub fn probe(addr: SocketAddr, connect_timeout: Duration, read_time: Duration) -> Option<(String, String)> {
-    let mut s = TcpStream::connect_timeout(&addr, connect_timeout).ok()?;
+/// In einer offenen Verbindung nachsehen: Begrüßung lesen, "?" senden, Antwort lesen
+fn probe_stream(mut s: TcpStream, read_time: Duration) -> Option<(String, String)> {
     let _ = s.set_nodelay(true);
-    let _ = s.set_read_timeout(Some(Duration::from_millis(80)));
+    let _ = s.set_read_timeout(Some(Duration::from_millis(60)));
     let mut buf: Vec<u8> = Vec::new();
     let mut chunk = [0u8; 512];
-    let read_some = |s: &mut TcpStream, buf: &mut Vec<u8>, chunk: &mut [u8], until: Instant| {
+    let mut read_until = |s: &mut TcpStream, until: Instant, buf: &mut Vec<u8>| {
         while Instant::now() < until && buf.len() < 2048 {
-            match s.read(chunk) {
+            match s.read(&mut chunk) {
                 Ok(0) => break,
                 Ok(n) => buf.extend_from_slice(&chunk[..n]),
                 Err(_) => {}
             }
         }
     };
-    // manche schicken sofort eine Begrüßung
-    read_some(&mut s, &mut buf, &mut chunk, Instant::now() + read_time / 2);
-    // GRBL-Statusabfrage (Echtzeit-Befehl, ändert nichts an der Maschine)
+    read_until(&mut s, Instant::now() + read_time / 3, &mut buf);
     let _ = s.write_all(b"?");
-    read_some(&mut s, &mut buf, &mut chunk, Instant::now() + read_time);
+    let mut end = Instant::now() + read_time;
+    read_until(&mut s, end, &mut buf);
+    // verschlafenes Board: noch einmal fragen
     if buf.is_empty() {
-        // offen, aber stumm – könnte trotzdem passen (z. B. Telnet ohne Echo)
+        let _ = s.write_all(b"?\n");
+        end = Instant::now() + read_time;
+        read_until(&mut s, end, &mut buf);
+    }
+    let _ = s.shutdown(std::net::Shutdown::Both);
+    if buf.is_empty() {
         return Some(("open".to_string(), String::new()));
     }
     classify(&buf)
+}
+
+/// Eine Adresse/Port: EINE Verbindung, darin gleich nachsehen
+fn knock(addr: SocketAddr, connect_timeout: Duration, read_time: Duration) -> (Knock, Option<(String, String)>) {
+    match TcpStream::connect_timeout(&addr, connect_timeout) {
+        Ok(s) => match probe_stream(s, read_time) {
+            Some(r) => (Knock::Found, Some(r)),
+            None => (Knock::Refused, None), // Webserver o. Ä. – kein GRBL
+        },
+        Err(e) if e.kind() == std::io::ErrorKind::ConnectionRefused => (Knock::Refused, None),
+        Err(_) => (Knock::Timeout, None),
+    }
+}
+
+/// Liste parallel abklopfen. Gibt Funde und Adressen zurück, die gar nicht geantwortet haben.
+fn run_round(targets: Vec<SocketAddr>, connect_timeout: Duration, read_time: Duration, threads: usize) -> (Vec<Found>, Vec<SocketAddr>) {
+    let queue = Arc::new(Mutex::new(targets));
+    let found: Arc<Mutex<Vec<Found>>> = Arc::new(Mutex::new(Vec::new()));
+    let silent: Arc<Mutex<Vec<SocketAddr>>> = Arc::new(Mutex::new(Vec::new()));
+    let mut handles = Vec::new();
+    for _ in 0..threads.max(1) {
+        let (q, f, si) = (Arc::clone(&queue), Arc::clone(&found), Arc::clone(&silent));
+        handles.push(thread::spawn(move || loop {
+            let next = q.lock().ok().and_then(|mut v| v.pop());
+            let Some(addr) = next else { break };
+            match knock(addr, connect_timeout, read_time) {
+                (Knock::Found, Some((kind, firmware))) => {
+                    if let Ok(mut v) = f.lock() {
+                        v.push(Found { ip: addr.ip().to_string(), port: addr.port(), kind, firmware, name: String::new() });
+                    }
+                }
+                (Knock::Timeout, _) => {
+                    if let Ok(mut v) = si.lock() {
+                        v.push(addr);
+                    }
+                }
+                _ => {}
+            }
+        }));
+    }
+    for h in handles {
+        let _ = h.join();
+    }
+    let f = found.lock().map(|v| v.clone()).unwrap_or_default();
+    let s = silent.lock().map(|v| v.clone()).unwrap_or_default();
+    (f, s)
 }
 
 /// Titel der Weboberfläche (Port 80) – z. B. "FluidNC", "MKS DLC32", "ESP3D"
@@ -167,46 +297,26 @@ pub fn title_of(html: &str) -> String {
     t.chars().take(60).collect()
 }
 
-/// Liste von Adressen/Ports parallel abklopfen. Gibt alle offenen Ports zurück, die nicht als
-/// Webserver erkannt wurden. Geräte mit GRBL-Antwort zuerst.
-pub fn scan_targets(targets: Vec<SocketAddr>, connect_timeout: Duration, read_time: Duration, threads: usize, with_titles: bool) -> Vec<Found> {
-    let queue = Arc::new(Mutex::new(targets));
-    let found: Arc<Mutex<Vec<Found>>> = Arc::new(Mutex::new(Vec::new()));
-    let mut handles = Vec::new();
-    for _ in 0..threads.max(1) {
-        let q = Arc::clone(&queue);
-        let f = Arc::clone(&found);
-        handles.push(thread::spawn(move || loop {
-            let next = q.lock().ok().and_then(|mut v| v.pop());
-            let Some(addr) = next else { break };
-            // erst nur anklopfen (schnell), dann genauer ansehen
-            if TcpStream::connect_timeout(&addr, connect_timeout).is_err() {
-                continue;
-            }
-            if let Some((kind, firmware)) = probe(addr, connect_timeout * 2, read_time) {
-                if let Ok(mut v) = f.lock() {
-                    v.push(Found { ip: addr.ip().to_string(), port: addr.port(), kind, firmware, name: String::new() });
-                }
-            }
-        }));
+/// "192.168.1.5", "192.168.1.5:8080", "http://…" -> Adressen zum Prüfen (ohne Port: 23 und 8080)
+pub fn parse_hint(h: &str) -> Vec<SocketAddr> {
+    let s = h.trim().trim_start_matches("tcp://").trim_start_matches("http://").split('/').next().unwrap_or("").to_string();
+    if s.is_empty() {
+        return Vec::new();
     }
-    for h in handles {
-        let _ = h.join();
+    if let Ok(a) = s.parse::<SocketAddr>() {
+        return vec![a];
     }
-    let mut v = found.lock().map(|v| v.clone()).unwrap_or_default();
-    if with_titles {
-        let mut seen: Vec<String> = Vec::new();
-        for f in v.iter_mut() {
-            if let Some(i) = seen.iter().position(|s| s.starts_with(&format!("{}|", f.ip))) {
-                f.name = seen[i].split_once('|').map(|x| x.1.to_string()).unwrap_or_default();
-                continue;
-            }
-            let name = f.ip.parse::<Ipv4Addr>().map(|ip| web_title(ip, Duration::from_millis(700))).unwrap_or_default();
-            seen.push(format!("{}|{}", f.ip, name));
-            f.name = name;
-        }
+    if let Ok(ip) = s.parse::<Ipv4Addr>() {
+        return PORTS.iter().map(|p| SocketAddr::new(IpAddr::V4(ip), *p)).collect();
     }
-    // GRBL-Geräte zuerst, dann nach Adresse
+    Vec::new()
+}
+
+/// Ergebnisse zusammenführen (gleiche Adresse+Port nur einmal, GRBL-Antwort gewinnt), sortieren
+fn merge(mut v: Vec<Found>) -> Vec<Found> {
+    v.sort_by(|a, b| (a.kind != "grbl").cmp(&(b.kind != "grbl")));
+    let mut seen = HashSet::new();
+    v.retain(|f| seen.insert(format!("{}:{}", f.ip, f.port)));
     v.sort_by(|a, b| {
         (a.kind != "grbl")
             .cmp(&(b.kind != "grbl"))
@@ -220,21 +330,73 @@ pub fn scan_targets(targets: Vec<SocketAddr>, connect_timeout: Duration, read_ti
     v
 }
 
-/// Ganze Suche: eigenes Netz + feste Kandidaten auf allen Ports
-pub fn scan_network() -> (Option<Ipv4Addr>, Vec<Found>) {
+fn add_titles(v: &mut [Found]) {
+    let mut cache: Vec<(String, String)> = Vec::new();
+    for f in v.iter_mut() {
+        if let Some((_, n)) = cache.iter().find(|(ip, _)| ip == &f.ip) {
+            f.name = n.clone();
+            continue;
+        }
+        let name = f.ip.parse::<Ipv4Addr>().map(|ip| web_title(ip, Duration::from_millis(900))).unwrap_or_default();
+        cache.push((f.ip.clone(), name.clone()));
+        f.name = name;
+    }
+}
+
+/// Ganze Suche. `hints` = zuletzt benutzte/gefundene Adressen aus der Oberfläche.
+pub fn scan_network(hints: &[String]) -> (Option<Ipv4Addr>, Vec<Found>) {
     let own = local_ipv4();
-    let mut targets = Vec::new();
-    for ip in candidates(own) {
+    let mut all: Vec<Found> = Vec::new();
+    let mut done: HashSet<SocketAddr> = HashSet::new();
+    let slow = Duration::from_millis(1800);
+
+    // ---- Runde 1: bekannte Adressen gründlich ----
+    let mut first: Vec<SocketAddr> = Vec::new();
+    let push = |a: SocketAddr, list: &mut Vec<SocketAddr>| { if !list.contains(&a) { list.push(a); } };
+    for h in hints {
+        for a in parse_hint(h) { push(a, &mut first); }
+    }
+    let mut known: Vec<Ipv4Addr> = arp_hosts();
+    known.extend(resolve_names(&MDNS_NAMES, Duration::from_millis(1500)));
+    known.push(ESP_AP);
+    for ip in known {
+        if Some(ip) == own { continue; }
+        // nur eigenes Netz, 192.168.4.x (ESP-Access-Point) und xTool – keine fremden Netze aus der ARP-Tabelle
+        let same = own.map(|o| o.octets()[..3] == ip.octets()[..3]).unwrap_or(false);
+        if !(same || ip == ESP_AP) { continue; }
+        for p in PORTS { push(SocketAddr::new(IpAddr::V4(ip), p), &mut first); }
+    }
+    push(SocketAddr::new(IpAddr::V4(XTOOL), 8780), &mut first);
+    done.extend(first.iter().copied());
+    let (f1, _) = run_round(first, slow, Duration::from_millis(900), 48);
+    all.extend(f1);
+
+    // ---- Runde 2: ganzes Netz schnell ----
+    let mut sweep: Vec<SocketAddr> = Vec::new();
+    for ip in subnet(own) {
         for p in PORTS {
-            // xTool-Port nur bei der xTool-Adresse, sonst unnötig viele Versuche
-            if p == 8780 && ip != Ipv4Addr::new(172, 25, 3, 1) {
-                continue;
-            }
-            targets.push(SocketAddr::new(IpAddr::V4(ip), p));
+            let a = SocketAddr::new(IpAddr::V4(ip), p);
+            if !done.contains(&a) { sweep.push(a); }
         }
     }
-    let found = scan_targets(targets, Duration::from_millis(350), Duration::from_millis(700), 96, true);
-    (own, found)
+    done.extend(sweep.iter().copied());
+    let (f2, silent) = run_round(sweep, Duration::from_millis(450), Duration::from_millis(700), 64);
+    all.extend(f2);
+
+    // ---- Runde 3: jetzt bekannte, aber zu langsame Geräte noch einmal gründlich ----
+    let alive: HashSet<Ipv4Addr> = arp_hosts().into_iter().collect();
+    let again: Vec<SocketAddr> = silent
+        .into_iter()
+        .filter(|a| matches!(a.ip(), IpAddr::V4(v4) if alive.contains(&v4)))
+        .collect();
+    if !again.is_empty() {
+        let (f3, _) = run_round(again, slow, Duration::from_millis(900), 48);
+        all.extend(f3);
+    }
+
+    let mut v = merge(all);
+    add_titles(&mut v);
+    (own, v)
 }
 
 #[cfg(test)]
@@ -261,38 +423,65 @@ mod tests {
     }
 
     #[test]
-    fn candidates_net() {
-        let c = candidates(Some(Ipv4Addr::new(192, 168, 178, 20)));
-        assert_eq!(c.len(), 253 + 2);
+    fn subnet_and_hints() {
+        let c = subnet(Some(Ipv4Addr::new(192, 168, 178, 20)));
+        assert_eq!(c.len(), 253);
         assert!(!c.contains(&Ipv4Addr::new(192, 168, 178, 20)));
-        assert!(c.contains(&Ipv4Addr::new(192, 168, 178, 1)));
-        assert!(c.contains(&Ipv4Addr::new(192, 168, 4, 1)));
-        let c = candidates(Some(Ipv4Addr::new(192, 168, 4, 2)));
-        assert_eq!(c.iter().filter(|x| **x == Ipv4Addr::new(192, 168, 4, 1)).count(), 1);
-        assert_eq!(candidates(None).len(), 2);
+        assert!(subnet(None).is_empty());
+        assert_eq!(parse_hint("192.168.1.5:8080"), vec!["192.168.1.5:8080".parse().unwrap()]);
+        assert_eq!(parse_hint("tcp://192.168.1.5").len(), 2);
+        assert_eq!(parse_hint("http://192.168.1.5:81/stream"), vec!["192.168.1.5:81".parse().unwrap()]);
+        assert!(parse_hint("quatsch").is_empty());
     }
 
-    /// Falsches GRBL-Gerät, falscher Webserver und geschlossener Port auf 127.0.0.1
     #[test]
-    fn scan_fakes() {
-        let grbl = TcpListener::bind("127.0.0.1:0").unwrap();
-        let gaddr = grbl.local_addr().unwrap();
+    fn arp_text() {
+        // macOS
+        let mac = "? (192.168.178.1) at 3c:a6:2f:aa:bb:cc on en0 ifscope [ethernet]\n? (192.168.178.45) at 24:6f:28:11:22:33 on en0 ifscope [ethernet]\n? (192.168.178.77) at (incomplete) on en0 ifscope [ethernet]\n? (192.168.178.255) at ff:ff:ff:ff:ff:ff on en0 ifscope [ethernet]\n? (224.0.0.251) at 1:0:5e:0:0:fb on en0 ifscope permanent [ethernet]";
+        assert_eq!(ips_in_text(mac), vec![Ipv4Addr::new(192, 168, 178, 1), Ipv4Addr::new(192, 168, 178, 45)]);
+        // Windows
+        let win = "\r\nSchnittstelle: 192.168.178.20 --- 0x5\r\n  Internetadresse      Physische Adresse     Typ\r\n  192.168.178.1         3c-a6-2f-aa-bb-cc     dynamisch\r\n  192.168.178.45        24-6f-28-11-22-33     dynamisch\r\n  192.168.178.255       ff-ff-ff-ff-ff-ff     statisch\r\n";
+        let v = ips_in_text(win);
+        assert!(v.contains(&Ipv4Addr::new(192, 168, 178, 45)));
+        assert!(!v.contains(&Ipv4Addr::new(192, 168, 178, 255)));
+    }
+
+    fn fake_grbl(single_client: bool, delay_ms: u64) -> SocketAddr {
+        let l = TcpListener::bind("127.0.0.1:0").unwrap();
+        let a = l.local_addr().unwrap();
         thread::spawn(move || {
-            for s in grbl.incoming() {
+            let busy = Arc::new(Mutex::new(false));
+            for s in l.incoming() {
                 let Ok(mut s) = s else { continue };
+                let busy = Arc::clone(&busy);
+                // wie ESP32-Telnet: nur ein Client – weitere werden sofort wieder geschlossen
+                if single_client {
+                    let mut b = busy.lock().unwrap();
+                    if *b { drop(s); continue; }
+                    *b = true;
+                }
                 thread::spawn(move || {
+                    thread::sleep(Duration::from_millis(delay_ms));
                     let _ = s.write_all(b"\r\nGrbl 1.1f ['$' for help]\r\n");
                     let mut b = [0u8; 16];
-                    let _ = s.set_read_timeout(Some(Duration::from_millis(500)));
+                    let _ = s.set_read_timeout(Some(Duration::from_millis(1500)));
                     if let Ok(n) = s.read(&mut b) {
                         if n > 0 && b[0] == b'?' {
                             let _ = s.write_all(b"<Idle|MPos:0.000,0.000,0.000|FS:0,0>\r\n");
                         }
                     }
-                    thread::sleep(Duration::from_millis(300));
+                    thread::sleep(Duration::from_millis(1500));
+                    *busy.lock().unwrap() = false;
                 });
             }
         });
+        a
+    }
+
+    /// GRBL nur EIN Client, langsame Antwort; Webserver und geschlossener Port
+    #[test]
+    fn rounds() {
+        let grbl = fake_grbl(true, 300);
         let web = TcpListener::bind("127.0.0.1:0").unwrap();
         let waddr = web.local_addr().unwrap();
         thread::spawn(move || {
@@ -304,14 +493,21 @@ mod tests {
                 let _ = s.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n");
             }
         });
-        // geschlossener Port: Listener sofort wieder schließen
         let closed = TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap();
-        let t0 = Instant::now();
-        let v = scan_targets(vec![gaddr, waddr, closed], Duration::from_millis(300), Duration::from_millis(400), 4, false);
-        assert_eq!(v.len(), 1, "{:?}", v);
-        assert_eq!(v[0].port, gaddr.port());
-        assert_eq!(v[0].kind, "grbl");
-        assert_eq!(v[0].firmware, "Grbl 1.1f");
-        assert!(t0.elapsed() < Duration::from_secs(3));
+        let (f, silent) = run_round(vec![grbl, waddr, closed], Duration::from_millis(400), Duration::from_millis(600), 4);
+        assert_eq!(f.len(), 1, "{:?}", f);
+        assert_eq!(f[0].kind, "grbl");
+        assert_eq!(f[0].firmware, "Grbl 1.1f");
+        assert!(silent.is_empty(), "geschlossener Port zählt als 'abgelehnt', nicht als 'still'");
+    }
+
+    #[test]
+    fn merge_dedupe() {
+        let a = Found { ip: "10.0.0.5".into(), port: 23, kind: "open".into(), firmware: "".into(), name: "".into() };
+        let b = Found { kind: "grbl".into(), firmware: "Grbl 1.1h".into(), ..a.clone() };
+        let c = Found { ip: "10.0.0.2".into(), port: 8080, kind: "open".into(), firmware: "".into(), name: "".into() };
+        let m = merge(vec![a, c, b]);
+        assert_eq!(m.len(), 2);
+        assert_eq!((m[0].ip.as_str(), m[0].kind.as_str()), ("10.0.0.5", "grbl"));
     }
 }

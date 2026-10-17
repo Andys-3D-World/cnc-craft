@@ -21,11 +21,14 @@ import {
   alarmText, canCommand, PortInfo, fmtBuildDate, netScan, NetDevice
 } from "./machine";
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
+import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
+import { analyze } from "./wifiCodec";
 
 const KEY_LAST = "cnc_craft_last_port";
 const KEY_RUIDA_IP = "cnc_craft_ruida_ip";
 const KEY_LAST_RUIDA = "cnc_craft_last_port_ruida";
 const KEY_NET_GRBL = "cnc_craft_net_addr"; // GRBL über Netzwerk: "host:port"
+const KEY_NET_FOUND = "cnc_craft_net_found"; // zuletzt gefundene Netzwerk-Maschinen (für die nächste Suche)
 const NET = "__net__"; // Eintrag „Netzwerk (IP)“ in der Port-Auswahl (Ruida und GRBL)
 
 /** Hinweis, welches Board hinter einem Chip typischerweise steckt */
@@ -86,6 +89,20 @@ export function initConnection(appendToConsole: (text: string) => void) {
     hideFind();
     appendToConsole(t("net.picked", { addr }));
   };
+  /** zuletzt gefundene Maschinen (Adresse, Firmware, Name) */
+  const knownDevices = (): NetDevice[] => { try { return JSON.parse(get(KEY_NET_FOUND) || "[]"); } catch { return []; } };
+  /** Adressen, die die Suche zuerst und gründlich prüft */
+  const hints = (): string[] => {
+    const h = [ipInput?.value || "", get(KEY_NET_GRBL), ...knownDevices().map(d => `${d.ip}:${d.port}`)];
+    return [...new Set(h.map(s => s.trim()).filter(Boolean))];
+  };
+  const rememberFound = (devs: NetDevice[]) => {
+    const grbl = devs.filter(d => d.kind === "grbl");
+    if (!grbl.length) return;
+    // neue Funde vorne, alte (die diesmal nicht da waren) behalten – höchstens 8
+    const merged = [...grbl, ...knownDevices().filter(o => !grbl.some(n => n.ip === o.ip && n.port === o.port))].slice(0, 8);
+    try { localStorage.setItem(KEY_NET_FOUND, JSON.stringify(merged)); } catch { /* egal */ }
+  };
   let finding = false;
   const findDevices = async () => {
     if (!findList || finding || machine.connected) return;
@@ -95,9 +112,10 @@ export function initConnection(appendToConsole: (text: string) => void) {
     findList.style.display = "";
     findList.innerHTML = `<div class="net-find-busy"><span class="net-spin"></span>${esc(t("net.searching"))}</div>`;
     try {
-      const r = await netScan();
+      const r = await netScan(hints());
       const net = r.own ? r.own.replace(/\.\d+$/, ".x") : "";
       const devs = r.devices || [];
+      rememberFound(devs);
       const label = (d: NetDevice) => {
         const parts = [d.firmware, d.name].filter(Boolean);
         return parts.length ? parts.join(" · ") : t(d.kind === "grbl" ? "net.grblUnknown" : "net.openPort");
@@ -200,6 +218,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
     const fb = $("net-find-btn") as HTMLButtonElement | null;
     if (fb) fb.disabled = on;
     if (on) hideFind();
+    syncWifiBtn();
     const dot = $("header-conn-dot"), txt = $("header-conn-text");
     if (dot) dot.classList.toggle("online", on);
     if (txt) txt.textContent = on ? (machine.firmware ? `${machine.firmware} ${machine.version}`.trim() : t("nav.online")) : t("nav.offline");
@@ -262,6 +281,40 @@ export function initConnection(appendToConsole: (text: string) => void) {
       port = "tcp://" + addr;
     }
     if (!port) { appendToConsole(t("m.choosePort")); await scan(); return; }
+    if (await doConnect(port)) return;
+    // Netzwerk-Maschine nicht erreichbar: oft hat der Router ihr eine neue Adresse gegeben -> suchen
+    if (port.startsWith("tcp://") && ipInput) {
+      connectBtn.disabled = true;
+      const oldAddr = port.slice(6);
+      appendToConsole(t("net.autoSearch"));
+      try {
+        const r = await netScan(hints());
+        rememberFound(r.devices || []);
+        const grbl = (r.devices || []).filter(d => d.kind === "grbl" && `${d.ip}:${d.port}` !== oldAddr);
+        // dieselbe Maschine wie beim letzten Mal bevorzugen (gleiche Firmware/gleicher Name)
+        const before = knownDevices().find(d => `${d.ip}:${d.port}` === oldAddr || d.ip === oldAddr);
+        const same = before ? grbl.filter(d => (d.firmware && d.firmware === before.firmware) || (d.name && d.name === before.name)) : [];
+        const pickDev = same.length === 1 ? same[0] : grbl.length === 1 ? grbl[0] : null;
+        if (pickDev) {
+          const addr = `${pickDev.ip}:${pickDev.port}`;
+          ipInput.value = addr;
+          try { localStorage.setItem(KEY_NET_GRBL, addr); } catch { /* egal */ }
+          appendToConsole(t("net.autoFound", { addr }));
+          connectBtn.disabled = false;
+          await doConnect("tcp://" + addr);
+        } else {
+          appendToConsole(t(grbl.length ? "net.autoMany" : "net.autoNone"));
+          connectBtn.disabled = false;
+          if (grbl.length) void findDevices();
+        }
+      } catch {
+        connectBtn.disabled = false;
+      }
+    }
+  });
+
+  /** Verbinden; true = hat geklappt */
+  async function doConnect(port: string): Promise<boolean> {
     appendToConsole(t("m.connecting", { port, baud: baudSelect.value }));
     try {
       const baud = parseInt(baudSelect.value, 10) || 115200;
@@ -275,11 +328,13 @@ export function initConnection(appendToConsole: (text: string) => void) {
       }
       if (!port.startsWith("tcp://")) { try { localStorage.setItem(KEY_LAST, port); } catch { /* egal */ } }
       setConnectedUi(true);
+      return true;
     } catch (e) {
       appendToConsole(t("m.connectFailed", { port, e: String(e) }));
       setConnectedUi(false);
+      return false;
     }
-  });
+  }
 
   // ---------------- Status-Anzeige ----------------
   const stateClass = (s: string) => {
@@ -389,10 +444,28 @@ export function initConnection(appendToConsole: (text: string) => void) {
     redraw();
   }));
 
+  // ---------------- WLAN einrichten ----------------
+  // Knopf nur bei Boards mit WLAN (FluidNC, grblHAL, Grbl_ESP32, MKS DLC32 …)
+  function syncWifiBtn() {
+    const b = $("wifi-setup-btn");
+    if (b) b.style.display = machine.connected && wifiFirmware() !== "none" ? "" : "none";
+  }
+  window.addEventListener(MACHINE_EVENT, syncWifiBtn);
+  $("wifi-setup-btn")?.addEventListener("click", () => openWifiSetup(appendToConsole));
+
   // ---------------- Konsole ----------------
   const sendCommand = async () => {
     const cmd = cmdInput.value.trim();
     if (!cmd) return;
+    // Einstellung mit Zeichen, die GRBL unterwegs abfängt (z. B. WLAN-Passwort mit ! ? ~ oder Umlauten)
+    if ((cmd.startsWith("$") || cmd.startsWith("[ESP")) && cmd.includes("=") || cmd.startsWith("[ESP")) {
+      const r = analyze(cmd.replace(/^[^=\]]*[=\]]/, ""));
+      if (r.realtime.length || r.nonAscii.length) {
+        appendToConsole(t("wifi.consoleWarn", { c: [...r.realtime, ...r.nonAscii].join(" ") }));
+        if (wifiFirmware() !== "none") openWifiSetup(appendToConsole);
+        return;
+      }
+    }
     cmdInput.value = "";
     if (!machine.connected) { appendToConsole(`> ${cmd}`); appendToConsole(t("m.demoCmd")); return; }
     // Echtzeit-Kürzel in der Konsole

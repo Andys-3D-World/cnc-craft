@@ -323,10 +323,12 @@ struct NetScan {
     devices: Vec<NetDevice>,
 }
 
-/// Netzwerk nach GRBL-Maschinen absuchen (FluidNC, grblHAL, MKS DLC32 per WLAN …), dauert ein paar Sekunden
+/// Netzwerk nach GRBL-Maschinen absuchen (FluidNC, grblHAL, MKS DLC32 per WLAN …), dauert ein paar Sekunden.
+/// hints = zuletzt benutzte/gefundene Adressen (werden zuerst und gründlich geprüft)
 #[tauri::command]
-async fn net_scan() -> Result<NetScan, String> {
-    let (own, found) = tauri::async_runtime::spawn_blocking(netscan::scan_network).await.map_err(|e| e.to_string())?;
+async fn net_scan(hints: Option<Vec<String>>) -> Result<NetScan, String> {
+    let hints = hints.unwrap_or_default();
+    let (own, found) = tauri::async_runtime::spawn_blocking(move || netscan::scan_network(&hints)).await.map_err(|e| e.to_string())?;
     Ok(NetScan {
         own: own.map(|ip| ip.to_string()).unwrap_or_default(),
         devices: found
@@ -343,6 +345,14 @@ async fn camera_snapshot(url: String) -> Result<tauri::ipc::Response, String> {
         .await
         .map_err(|e| e.to_string())??;
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Befehl über die Weboberfläche eines ESP32-Boards schicken (für WLAN-Passwörter mit ! ? ~ oder Umlauten)
+#[tauri::command]
+async fn esp_web_command(host: String, command: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || camfetch::web_command(&host, &command, std::time::Duration::from_secs(5)))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// Einstellungen-Datei (store.rs): Ordner + gespeicherter Stand
@@ -491,7 +501,8 @@ pub fn run() {
             settings_store_read,
             settings_store_write,
             net_scan,
-            camera_snapshot
+            camera_snapshot,
+            esp_web_command
         ])
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");

@@ -169,7 +169,15 @@ pub fn parse_opt_rx(line: &str) -> Option<usize> {
 
 /// Zeile fürs Senden vorbereiten: Kommentare und überflüssige Leerzeichen weg.
 /// Gibt None zurück, wenn nichts übrig bleibt.
+/// Einstellungen ($…) und ESP-Befehle ([ESP…]) bleiben unverändert – sonst gingen in Werten wie
+/// WLAN-Passwörtern Zeichen wie ( ) ; % und doppelte Leerzeichen verloren.
 pub fn clean_line(line: &str) -> Option<String> {
+    let raw = line.trim_matches(|c| c == '\r' || c == '\n');
+    let lead = raw.trim_start();
+    if lead.starts_with('$') || lead.starts_with("[ESP") {
+        let t = lead.trim_end_matches(|c| c == ' ' || c == '\t');
+        return if t.is_empty() { None } else { Some(t.to_string()) };
+    }
     let mut out = String::with_capacity(line.len());
     let mut in_paren = false;
     for ch in line.chars() {
@@ -352,6 +360,12 @@ mod tests {
         assert!(!is_tool_change("M03"));
         assert!(!is_tool_change("M0 X1"));
         assert_eq!(comment_of("M0 (WERKZEUGWECHSEL 2: 6 mm)"), "WERKZEUGWECHSEL 2: 6 mm");
+        // Einstellungen: nichts entfernen (WLAN-Passwörter mit ( ) ; % und Leerzeichen)
+        assert_eq!(clean_line("$Sta/Password=ab(c);d%21  e\r\n"), Some("$Sta/Password=ab(c);d%21  e".into()));
+        assert_eq!(clean_line("  $75=Pa ss;(x)"), Some("$75=Pa ss;(x)".into()));
+        assert_eq!(clean_line("[ESP401]P=1 T=S V=a b"), Some("[ESP401]P=1 T=S V=a b".into()));
+        assert_eq!(clean_line("$J=G91 X10 F1000"), Some("$J=G91 X10 F1000".into()));
+        assert_eq!(clean_line("$$"), Some("$$".into()));
     }
 
     #[test]

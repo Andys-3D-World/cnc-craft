@@ -1,5 +1,26 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Neu**
+- **📶 WLAN einrichten** (Reiter „Maschine“, bei Boards mit WLAN): Heimnetz oder eigenes WLAN des Boards setzen –
+  auch mit Sonderzeichen, die GRBL unterwegs abfängt (! ? ~, Umlaute) oder als Kommentar liest (( ) ;):
+  FluidNC bekommt sie %-kodiert, grblHAL schaltet sie kurz mit $39=0 frei, Grbl_ESP32/MKS DLC32 bekommen sie über
+  die Weboberfläche des Boards. Das Passwort erscheint nie in der Konsole; Neustart-Knopf danach
+- Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
+
+**Behoben**
+- Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte
+  Leerzeichen entfernt (wie bei G-Code-Kommentaren)
+
+**Verbessert**
+- **WLAN-Suche zuverlässiger:** zuletzt benutzte/gefundene Adressen, Geräte aus der ARP-Tabelle und Namen wie
+  fluidnc.local werden zuerst und mit langer Wartezeit geprüft (für „verschlafene“ ESP32-Boards); Geräte, die
+  bei der schnellen Runde zu langsam waren, werden ein zweites Mal gefragt; nur noch EINE Verbindung pro Port
+  (ESP32-Telnet nimmt oft nur einen Client an)
+- **Neue IP automatisch finden:** ist die Maschine unter der gespeicherten Adresse nicht erreichbar, sucht das
+  Programm sie im Netz und verbindet sich mit der neuen Adresse (gleiche Firmware/gleicher Name wird bevorzugt)
+
 ## 0.2.2 Beta
 
 **Neu**

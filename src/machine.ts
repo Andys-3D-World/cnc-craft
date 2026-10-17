@@ -381,9 +381,10 @@ export interface NetDevice {
   name: string;                   // Titel der Weboberfläche, z. B. "MKS DLC32"
 }
 
-/** Eigenes Netz nach GRBL-Maschinen absuchen (dauert ein paar Sekunden) */
-export async function netScan(): Promise<{ own: string; devices: NetDevice[] }> {
-  return await invoke<{ own: string; devices: NetDevice[] }>("net_scan");
+/** Eigenes Netz nach GRBL-Maschinen absuchen (dauert ein paar Sekunden).
+ *  hints = zuletzt benutzte/gefundene Adressen – werden zuerst und gründlich geprüft */
+export async function netScan(hints: string[] = []): Promise<{ own: string; devices: NetDevice[] }> {
+  return await invoke<{ own: string; devices: NetDevice[] }>("net_scan", { hints });
 }
 
 export async function listPorts(): Promise<PortInfo[]> {
