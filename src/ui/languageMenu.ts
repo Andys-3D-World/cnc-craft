@@ -13,6 +13,10 @@ import {
 } from "../i18n/i18n";
 import { icon } from "./icons";
 
+function escName(s: string): string {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
 const LOAD = "__load__";
 const TEMPLATE = "__template__";
 
@@ -24,7 +28,7 @@ export function initLanguageMenu(container: HTMLElement | null, log: (s: string)
     container.innerHTML = `
       <span class="lang-ico">${icon("globe", 16)}</span>
       <select id="lang-select" data-tip="${t("lang.tip")}">
-        ${langs.map(l => `<option value="${l.code}" ${l.code === currentLanguage() ? "selected" : ""}>${l.name}${l.complete < 100 ? ` (${l.complete}%)` : ""}</option>`).join("")}
+        ${langs.map(l => `<option value="${l.code}" ${l.code === currentLanguage() ? "selected" : ""}>${escName(l.name)}${l.complete < 100 ? ` (${l.complete}%)` : ""}</option>`).join("")}
         <option disabled>──────────</option>
         <option value="${LOAD}">➕ ${t("lang.load")}</option>
         <option value="${TEMPLATE}">⬇ ${t("lang.template")}</option>

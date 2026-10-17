@@ -99,8 +99,9 @@ function num(v: any, d: number, min: number, max: number) {
 
 function sanitize(x: any): PlasmaCut {
   return {
-    id: String(x.id),
-    name: String(x.name || "?"),
+    // aus importierten Dateien: nur harmlose Zeichen (die ID landet in HTML-Attributen)
+    id: String(x.id).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || "x" + Date.now().toString(36),
+    name: String(x.name || "?").slice(0, 120),
     color: /^#[0-9a-f]{6}$/i.test(x.color) ? x.color : LAYER_COLORS[0],
     speed: num(x.speed, 1500, 1, 50000),
     kerf: num(x.kerf, 1.5, 0, 20),

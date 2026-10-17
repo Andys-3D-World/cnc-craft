@@ -254,6 +254,11 @@ impl Marlin {
         m
     }
 
+    /// Läuft gerade ein Job? (für sicheres Trennen/Beenden)
+    pub fn has_job(&self) -> bool {
+        self.sh.inner.lock().map(|i| i.job.is_some()).unwrap_or(false)
+    }
+
     pub fn is_alive(&self) -> bool { self.sh.alive.load(Ordering::SeqCst) }
     pub fn shutdown(&self) { self.sh.alive.store(false, Ordering::SeqCst); }
 

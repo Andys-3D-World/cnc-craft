@@ -95,8 +95,9 @@ function sanitize(x: any): LaserLayer {
   };
   const mode: LaserMode = x.mode === "fill" || x.mode === "fill+line" ? x.mode : "line";
   return {
-    id: String(x.id),
-    name: String(x.name || "?"),
+    // aus importierten Dateien: nur harmlose Zeichen (die ID landet in HTML-Attributen)
+    id: String(x.id).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || "x" + Date.now().toString(36),
+    name: String(x.name || "?").slice(0, 120),
     color: /^#[0-9a-f]{6}$/i.test(x.color) ? x.color : LAYER_COLORS[0],
     mode,
     power: num(x.power, 50, 0, 100),

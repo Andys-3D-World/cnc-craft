@@ -13,6 +13,11 @@ Mitgeliefert bzw. eingebunden werden diese Open-Source-Bestandteile anderer Proj
 
 Die vollständigen Lizenztexte liegen neben den Dateien (`public/occt/license.*.txt`, `src-tauri/firmware/README.md`).
 
+Quellcode der mitgelieferten Teile (unverändert übernommen):
+- GRBL 1.1h: https://github.com/gnea/grbl/tree/v1.1h.20190825 – auf Anfrage schicken wir den Quellcode
+  auch direkt zu (Issue im Repository genügt).
+- occt-import-js 0.0.24: https://github.com/kovacsv/occt-import-js/tree/v0.0.24
+
 ## Bibliotheken (werden beim Bauen geladen)
 
 | Bibliothek | Lizenz |

@@ -23,6 +23,21 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 
 Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 
+## ⚠️ Sicherheit und Haftung
+
+CNC-Maschinen, Laser und Plasmaschneider können schwere Verletzungen, Brände und Sachschäden verursachen.
+
+- **Laser nie unbeaufsichtigt laufen lassen**, passende Laserschutzbrille tragen, Feuerlöscher griffbereit, gut lüften
+  (Rauch von Kunststoffen kann giftig sein – PVC/Vinyl niemals lasern).
+- Jede Maschine braucht einen **echten Not-Aus-Schalter** (Hardware). Die Stopp-Knöpfe im Programm ersetzen ihn nicht –
+  eine abbrechende USB- oder WLAN-Verbindung kann jederzeit passieren.
+- Neue Jobs zuerst **ohne Werkstück bzw. mit wenig Leistung** testen, Simulation und Rahmen-Fahrt nutzen.
+- Einstellungen der Steuerung (Schritte/mm, Endschalter, Leistung) vor dem ersten Job prüfen.
+
+CNC Craft ist eine Beta-Version und wird **ohne jede Gewährleistung** bereitgestellt, so weit es das Gesetz erlaubt
+(siehe Abschnitte 15 und 16 der [GPLv3](LICENSE)). Die Verantwortung für den sicheren Betrieb der Maschine liegt beim
+Betreiber.
+
 ## ❤️ CNC Craft unterstützen
 
 CNC Craft ist kostenlos und bleibt es auch. Wenn dir das Programm hilft und du die Weiterentwicklung

@@ -177,8 +177,9 @@ export function sanitize(x: any): MillingTool {
   const diameter = num(x.diameter, d.diameter);
   const helix: Helix = (["up", "down", "compression", "straight"] as Helix[]).includes(x.helix) ? x.helix : d.helix;
   return {
-    id: String(x.id),
-    name: String(x.name || "?"),
+    // aus importierten Dateien: nur harmlose Zeichen (die ID landet in HTML-Attributen)
+    id: String(x.id).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 64) || "x" + Date.now().toString(36),
+    name: String(x.name || "?").slice(0, 120),
     type,
     diameter,
     shankDia: num(x.shankDia, x.type ? d.shankDia : diameter),

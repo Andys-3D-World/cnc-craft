@@ -16,6 +16,16 @@
   fremden Bestandteilen; README mit Datenschutz-Hinweis und Code Signing Policy; ⓘ-Fenster zeigt Lizenz und
   Datenschutz-Hinweis
 
+**Sicherheit**
+- **Trennen oder Programm schließen während eines Jobs:** die Maschine wird jetzt vorher sicher angehalten
+  (GRBL: Vorschub-Halt, dann Reset – Laser/Spindel aus). Bisher fuhr sie den gepufferten G-Code noch zu Ende,
+  und Laser/Spindel konnten danach eingeschaltet bleiben
+- Texte von außen werden nicht mehr als HTML ausgeführt: USB-Gerätenamen, Firmware-Antworten von Boards,
+  importierte Bibliotheken (Werkzeuge, Laser-Ebenen, Plasma-Schnitte) und eigene Sprachpakete können keinen
+  Code mehr in die Oberfläche einschleusen
+- `withGlobalTauri` ausgeschaltet (wurde nicht gebraucht)
+- README: Abschnitt „Sicherheit und Haftung“
+
 **Verbessert**
 - Neue IP automatisch finden: hat die Maschine einen eigenen Namen, wird nur die Maschine mit genau diesem Namen
   genommen – bei mehreren gleichen Boards verbindet sich die App nicht mehr versehentlich mit der falschen

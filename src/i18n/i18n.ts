@@ -33,10 +33,31 @@ let custom: Record<string, Dict> = {};
 let current = "de";
 let dict: Dict = de as Dict;
 
+/**
+ * Texte aus fremden Sprachpaketen landen als HTML in der Oberfläche. Damit ein weitergegebenes
+ * Sprachpaket keinen Code einschleusen kann, sind darin nur <b>, </b> und <br> erlaubt – alles
+ * andere mit < > wird als normaler Text angezeigt.
+ */
+export function safeText(v: string): string {
+  // < nur für <b>, </b>, <br> erlauben, sonst durch ‹ ersetzen; " durch ” (damit nichts aus Attributen ausbricht).
+  // Ersetzt statt maskiert, damit der Text auch in der Konsole (reiner Text) normal aussieht.
+  return String(v)
+    .replace(/<(?!\/?b>|br\s*\/?>)/gi, "‹")
+    .replace(/"/g, "”");
+}
+
+function cleanPack(d: any): Dict {
+  const out: Dict = {};
+  if (d && typeof d === "object") for (const [k, v] of Object.entries(d)) if (typeof v === "string") out[k] = safeText(v).slice(0, 4000);
+  return out;
+}
+
 function loadCustom() {
   try {
     const raw = localStorage.getItem(STORAGE_CUSTOM);
-    if (raw) custom = JSON.parse(raw) || {};
+    const parsed = raw ? JSON.parse(raw) || {} : {};
+    custom = {};
+    for (const [code, d] of Object.entries(parsed)) if (/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(code)) custom[code] = cleanPack(d);
   } catch { custom = {}; }
 }
 
@@ -127,8 +148,7 @@ export function addCustomLanguage(jsonText: string): string {
   }
   const code = data._code.trim().toLowerCase();
   if (!/^[a-z]{2,3}(-[a-z0-9]{2,8})?$/.test(code)) throw new Error(t("lang.errMissingCode"));
-  const clean: Dict = {};
-  for (const [k, v] of Object.entries(data)) if (typeof v === "string") clean[k] = v;
+  const clean: Dict = cleanPack(data);
   // Eingebaute Sprache verbessern: fehlende/geänderte Texte überschreiben
   custom[code] = { ...(BUILTIN[code] || {}), ...clean };
   try { localStorage.setItem(STORAGE_CUSTOM, JSON.stringify(custom)); } catch { /* egal */ }

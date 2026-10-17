@@ -24,6 +24,11 @@ import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from ".
 import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
 import { analyze, isDefaultHost } from "./wifiCodec";
 
+/** Text sicher in HTML einsetzen (Gerätenamen, Antworten des Boards …) */
+function escHtml(s: string): string {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+}
+
 const KEY_LAST = "cnc_craft_last_port";
 const KEY_RUIDA_IP = "cnc_craft_ruida_ip";
 const KEY_LAST_RUIDA = "cnc_craft_last_port_ruida";
@@ -180,7 +185,8 @@ export function initConnection(appendToConsole: (text: string) => void) {
     const list = ports.map(p => {
       const extra = [p.chip, p.product].filter(Boolean).join(" · ");
       const hint = chipHint(p);
-      return `<option value="${p.name}" title="${hint}">${p.name}${extra ? " – " + extra : ""}${hint ? " (" + hint + ")" : ""}</option>`;
+      // Namen kommen vom USB-Gerät selbst – nie ungeprüft als HTML einsetzen
+      return `<option value="${escHtml(p.name)}" title="${escHtml(hint)}">${escHtml(p.name)}${extra ? " – " + escHtml(extra) : ""}${hint ? " (" + escHtml(hint) + ")" : ""}</option>`;
     }).join("");
     portSelect.innerHTML = (net ? `<option value="${NET}">🌐 ${t("m.ruidaNet")}</option>` : "")
       + (list || (ruida ? "" : `<option value="">${t("m.noPorts")}</option>`));

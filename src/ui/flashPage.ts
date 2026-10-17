@@ -223,7 +223,7 @@ function boardCompareHtml(): string {
     // MAX-Datei für normales DLC32 oder umgekehrt?
     const boardMax = /MAX/i.test(bi.name), fileMax = /MAX/i.test(fileName);
     if (/DLC32/i.test(bi.name) && /DLC32/i.test(fileName) && boardMax !== fileMax) {
-      cmp += `<div class="sp-warn">⚠ ${t("fl.board.otherModel", { board: bi.name })}</div>`;
+      cmp += `<div class="sp-warn">⚠ ${t("fl.board.otherModel", { board: esc(bi.name) })}</div>`;
     }
   }
   return `<div class="fl-board">${t("fl.board.now")}: <b>${esc([bi.name, bi.version].filter(Boolean).join(" · "))}</b>${bi.date ? ` (${esc(fmtBuildDate(bi.date))})` : ""}${when}</div>${cmp}`;
@@ -319,7 +319,7 @@ function render() {
     <section class="sp-card">
       <h3>4 · ${T("fl.step.backup")}</h3>
       <label class="fl-row" style="cursor:pointer;"><input type="checkbox" id="fl-backup" checked ${busy ? "disabled" : ""}> ${t("fl.backupBefore")}</label>
-      <div class="tool-scope">${backup ? t("fl.backupHave", { n: Object.keys(backup.settings).length, date: new Date(backup.date).toLocaleString(), fw: backup.firmware }) : t("fl.backupNone")}</div>
+      <div class="tool-scope">${backup ? t("fl.backupHave", { n: Object.keys(backup.settings).length, date: new Date(backup.date).toLocaleString(), fw: esc(backup.firmware) }) : t("fl.backupNone")}</div>
       ${backup ? `<button id="fl-restore" class="btn-secondary btn-compact" ${busy ? "disabled" : ""} ${tip("fl.restoreTip")}>↩ ${T("fl.restore")}</button>` : ""}
     </section>
 

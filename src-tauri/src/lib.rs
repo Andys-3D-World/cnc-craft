@@ -64,6 +64,22 @@ impl Conn {
     fn pause_job(&self) -> Result<(), String> { each!(self, c => c.pause_job()) }
     fn resume_job(&self) -> Result<(), String> { each!(self, c => c.resume_job()) }
     fn stop_job(&self) -> Result<(), String> { each!(self, c => c.stop_job()) }
+
+    /// Vor dem Trennen/Beenden: laufenden Job sicher anhalten, damit die Maschine nicht mit
+    /// gepuffertem G-Code weiterfährt und Laser/Spindel danach nicht eingeschaltet bleiben.
+    /// Gibt zurück, wie lange gewartet werden muss, bis der Halt beim Board angekommen ist.
+    fn stop_for_close(&self) -> std::time::Duration {
+        use std::time::Duration;
+        match self {
+            // GRBL: Vorschub-Halt, abbremsen lassen, dann Soft-Reset (schaltet Spindel/Laser ab) – max. 2,5 s
+            Conn::Grbl(m) if m.has_job() => { let _ = m.stop_job(); Duration::from_millis(2700) }
+            Conn::Marlin(m) if m.has_job() => { let _ = m.stop_job(); Duration::from_millis(300) }
+            // Ruida/K40 melden keinen Job-Zustand nach außen: Stopp schadet im Leerlauf nicht
+            Conn::Ruida(m) => { let _ = m.stop_job(); Duration::from_millis(400) }
+            Conn::K40(m) => { let _ = m.stop_job(); Duration::from_millis(400) }
+            _ => Duration::ZERO,
+        }
+    }
 }
 
 /// Die aktuelle Verbindung (None = nicht verbunden)
@@ -78,8 +94,14 @@ fn current() -> Result<Conn, String> {
 }
 
 fn close_current() {
-    if let Ok(mut g) = MACHINE.lock() {
-        if let Some(m) = g.take() { m.shutdown(); }
+    // erst aus der Sperre nehmen, dann außerhalb anhalten (das Warten soll nichts blockieren)
+    let taken = MACHINE.lock().ok().and_then(|mut g| g.take());
+    if let Some(m) = taken {
+        if m.is_alive() {
+            let wait = m.stop_for_close();
+            if !wait.is_zero() { std::thread::sleep(wait); }
+        }
+        m.shutdown();
     }
 }
 
@@ -505,6 +527,12 @@ pub fn run() {
             camera_snapshot,
             esp_web_command
         ])
+        // Fenster wird geschlossen: laufenden Job vorher sicher anhalten (Laser/Spindel aus)
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                close_current();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");
 }

@@ -129,7 +129,7 @@ function render() {
     root.innerHTML = `
       <section class="sp-card sp-ruida">
         <h3>🔥 ${T("sp.k40.title")}</h3>
-        <div>${t("sp.k40.text", { board: machine.version || "M2" })}</div>
+        <div>${t("sp.k40.text", { board: esc(machine.version || "M2") })}</div>
         <ul><li>${t("sp.k40.li1")}</li><li>${t("sp.k40.li2")}</li><li>${t("sp.k40.li3")}</li></ul>
       </section>`;
     return;
@@ -139,7 +139,7 @@ function render() {
     root.innerHTML = `
       <section class="sp-card sp-ruida">
         <h3>🖨️ ${T("sp.marlin.title")}</h3>
-        <div>${t("sp.marlin.text", { v: machine.version || "?" })}</div>
+        <div>${t("sp.marlin.text", { v: esc(machine.version || "?") })}</div>
         <ul><li>${t("sp.marlin.li1")}</li><li>${t("sp.marlin.li2")}</li><li>${t("sp.marlin.li3")}</li></ul>
         <button id="sp-m503" class="btn-secondary" style="margin-top:8px;">📋 ${T("sp.marlin.show")}</button>
       </section>`;
@@ -151,7 +151,7 @@ function render() {
     root.innerHTML = `
       <section class="sp-card sp-ruida">
         <h3>🔥 ${T("sp.ruida.title")}</h3>
-        <div>${t("sp.ruida.text", { card: machine.version || "?" })}</div>
+        <div>${t("sp.ruida.text", { card: esc(machine.version || "?") })}</div>
         <ul><li>${t("sp.ruida.li1")}</li><li>${t("sp.ruida.li2")}</li><li>${t("sp.ruida.li3")}</li></ul>
       </section>`;
     return;
@@ -188,7 +188,7 @@ function render() {
   const otherHtml = others.length ? `
     <section class="sp-card">
       <h3>${T("sp.group.other")} <small>(${others.length})</small></h3>
-      <p class="sp-desc">${t("sp.otherDesc", { fw: machine.firmware || "?" })}</p>
+      <p class="sp-desc">${t("sp.otherDesc", { fw: esc(machine.firmware || "?") })}</p>
       <div class="sp-other">${others.map(k => `<label class="sp-other-item${edits.has(k) ? " sp-row-changed" : ""}"><span class="sp-key">${k}</span>${inputFor(k, Number.isFinite(parseFloat(machine.settings.get(k) || "")) ? "float" : "text")}</label>`).join("")}</div>
     </section>` : "";
 
@@ -209,7 +209,7 @@ function render() {
       </div>
     </div>
     <div class="sp-status">${connected
-      ? (haveData ? t("sp.statusData", { fw: `${machine.firmware} ${machine.version}`.trim() || "GRBL", n: machine.settings.size }) : t("sp.statusNoData"))
+      ? (haveData ? t("sp.statusData", { fw: esc(`${machine.firmware} ${machine.version}`.trim() || "GRBL"), n: machine.settings.size }) : t("sp.statusNoData"))
       : t("sp.statusOffline")}</div>
     ${boardInfoHtml()}
     ${fluid ? `<div class="sp-warn">${t("sp.fluidnc")}</div>` : ""}
