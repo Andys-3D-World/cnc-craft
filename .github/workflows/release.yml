@@ -59,6 +59,7 @@ jobs:
           releaseName: "CNC Craft v__VERSION__ Beta"
           releaseBody: |
             Beta von CNC Craft – bitte testen und Fehler melden. Was neu ist: siehe CHANGELOG.md im Repository.
+            Kostenlos & Open Source (GPL-3.0). Code Signing Policy und Datenschutz: https://github.com/Andys-3D-World/cnc-craft#code-signing-policy
 
             macOS: .dmg öffnen und CNC Craft in „Programme“ ziehen. Beim ersten Start meldet macOS „nicht verifiziert“:
             Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“.
