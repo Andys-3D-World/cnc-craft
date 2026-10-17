@@ -1,5 +1,13 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Sicherheit**
+- **Content-Security-Policy eingeschaltet:** die Oberfläche führt nur noch Programmcode aus, der zur App gehört.
+  Selbst wenn einmal fremder Text (z. B. von einem Board oder aus einer Datei) als HTML landen sollte, kann er
+  keinen Code mehr starten. Verbindungen ins Internet nur noch zur Update-Prüfung (GitHub); Kamerabilder aus dem
+  Netz und der STEP-Import funktionieren weiter
+
 ## 0.2.5 Beta
 
 **Sicherheit**
