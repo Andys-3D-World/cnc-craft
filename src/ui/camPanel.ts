@@ -14,6 +14,10 @@ import { placeButtonHtml } from "./stockPanel";
 const tool = (id: string, ico: string, tipKey: string, active = false) =>
   `<button id="tool-${id}" data-tool="${id}" class="btn-tool-icon${active ? " active" : ""}" ${tip(tipKey)}>${icon(ico, 20)}</button>`;
 
+/** Knopf in der linken Leiste, der den gleichnamigen Knopf "btn-…" im rechten Panel auslöst */
+const action = (id: string, ico: string, tipKey: string) =>
+  `<button data-click="btn-${id}" class="btn-tool-icon btn-strip-action" ${tip(tipKey)}>${icon(ico, 20)}</button>`;
+
 const cmd = (id: string, ico: string, tipKey: string) =>
   `<button data-cmd="${id}" class="btn-cmd" ${tip(tipKey)}>${icon(ico)}</button>`;
 
@@ -31,7 +35,14 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("text", "text", "tip.tool.text")}
     <div class="strip-sep"></div>
     ${tool("measure", "measure", "tip.tool.measure")}
+    <div class="strip-sep strip-push"></div>
+    ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
+    ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
+    ${action("simulate", "simulate", "rp.simulateTip")}
   `;
+  // Abkürzungen zu den Knöpfen im rechten Panel (G-Code-Bereich) – gleiche Funktion
+  container.querySelectorAll<HTMLElement>("[data-click]").forEach(b =>
+    b.addEventListener("click", () => document.getElementById(b.dataset.click!)?.click()));
 }
 
 /** Werkzeugleiste über der Zeichenfläche */

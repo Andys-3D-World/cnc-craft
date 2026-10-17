@@ -20,6 +20,11 @@ const P: Record<string, string> = {
   save: `<path d="M5 4h11l3 3v12a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>`,
   clear: `<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>`,
 
+  // ---- G-Code ----
+  gcode: `<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M10 11.5l-2 2.5 2 2.5M15 11.5l2 2.5-2 2.5"/>`,
+  gcodeSave: `<path d="M13 21H6V3h9l4 4v6"/><path d="M15 3v4h4"/><path d="M18 15v6M15.5 18.5l2.5 2.5 2.5-2.5"/>`,
+  simulate: `<circle cx="12" cy="12" r="9"/><path d="M10 8.5l5.5 3.5-5.5 3.5z"/>`,
+
   // ---- Bearbeiten ----
   undo: `<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/>`,
   redo: `<path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/>`,

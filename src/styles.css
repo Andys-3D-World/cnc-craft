@@ -543,6 +543,8 @@ body.drop-active .canvas-holder { outline: 2px dashed var(--accent-color); outli
   flex-shrink: 0;
 }
 .strip-sep { width: 26px; height: 1px; background: var(--border-color); margin: 4px 0; flex-shrink: 0; }
+/* G-Code-Knöpfe unten in der Leiste */
+.strip-sep.strip-push { margin-top: auto; }
 
 /* Werkzeugleiste über der Zeichenfläche */
 .editor-toolbar {
