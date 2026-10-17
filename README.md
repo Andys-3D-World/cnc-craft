@@ -21,7 +21,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 
-Download: [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
+Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 
 ## Selbst bauen
 
@@ -67,6 +67,8 @@ CNC Craft sammelt keine Daten und hat keine Telemetrie. Es gibt nur diese Netzwe
 - **Links** (Firmware-Downloads, Hilfe) öffnen sich nur auf Klick in deinem Browser.
 
 Einstellungen und Bibliotheken bleiben auf deinem Rechner (App-Datenordner, siehe ⓘ).
+
+Ausführlich (Deutsch/English): [PRIVACY.md](PRIVACY.md)
 
 ## Code Signing Policy
 
