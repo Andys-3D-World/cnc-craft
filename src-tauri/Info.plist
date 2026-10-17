@@ -4,6 +4,8 @@
      macOS 15+ fragt beim ersten Zugriff aufs lokale Netz nach Erlaubnis (Netzwerk-Suche, Maschinen per WLAN). -->
 <plist version="1.0">
 <dict>
+  <key>NSCameraUsageDescription</key>
+  <string>CNC Craft zeigt das Bild deiner Webcam: zum Zuschauen, für Fotos/Videos und um Teile auf dem Material zu platzieren.</string>
   <key>NSLocalNetworkUsageDescription</key>
   <string>CNC Craft sucht und verbindet Maschinen im lokalen Netzwerk (z. B. FluidNC, MKS DLC32 oder Ruida per WLAN/LAN).</string>
 </dict>

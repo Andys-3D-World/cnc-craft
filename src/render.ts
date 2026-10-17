@@ -16,6 +16,7 @@ import { cutForShape } from "./plasmaCuts";
 import { drawPlasmaLeads } from "./plasmaCam";
 import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
 import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
+import { drawCameraUnderlay } from "./camera/cameraOverlay";
 
 export const liveMachinePos = { x: 0, y: 0, z: 0 };
 
@@ -55,6 +56,8 @@ export function drawEverything(
   const bx0 = sx(0), by0 = sy(bedHPx), bx1 = sx(bedW * MM_TO_PIXEL), by1 = sy(0);
   ctx.fillStyle = "#16161c";
   ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+  // 2b. Kamerabild (falls eingeschaltet) – liegt unter Raster und Zeichnung
+  drawCameraUnderlay(ctx, bx0, by0, bx1 - bx0, by1 - by0);
 
   // 3. Raster: Abstand passt sich dem Zoom an
   const pxPerMm = scale * MM_TO_PIXEL;

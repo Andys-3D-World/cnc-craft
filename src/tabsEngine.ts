@@ -2,7 +2,8 @@
  * Initialisiert die obere Open-Source Tab-Navigation der App
  */
 export function initTabsEngine(redraw: () => void) {
-  const tabButtons = document.querySelectorAll(".tab-navigation .tab-btn, .tab-navigation button");
+  // nur echte Reiter (mit data-tab) – nicht die Knöpfe oben rechts (📷, ⓘ, Update …)
+  const tabButtons = document.querySelectorAll(".tab-navigation [data-tab]");
   const tabContents = document.querySelectorAll(".tab-content");
 
   tabButtons.forEach(btn => {

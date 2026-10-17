@@ -45,7 +45,8 @@
     "longDescription": "CNC Craft verbindet Design, CAM und Maschinensteuerung für Laser, CNC-Fräse und Plasma – GRBL, grblHAL, FluidNC, Marlin, Ruida und K40.",
     "macOS": {
       "minimumSystemVersion": "10.15",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "entitlements": "./Entitlements.plist"
     },
     "windows": {
       "nsis": {

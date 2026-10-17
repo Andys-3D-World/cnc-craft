@@ -42,6 +42,7 @@ import { initImports, importBytes } from "./importers/importManager";
 import { initLanguageMenu } from "./ui/languageMenu";
 import { renderToolTable, initToolPage } from "./ui/toolEditor";
 import { initLibraryTab } from "./ui/libraryTab";
+import { initCamera } from "./camera/camera";
 import { restoreSettings, startSettingsMirror } from "./settingsStore";
 import type { ToolName } from "./editor/editorState";
 import { t, initI18n, applyTranslations } from "./i18n/i18n";
@@ -166,6 +167,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates
+    initCamera(appendToConsole);       // 📷 oben rechts: Kamera-Fenster, Bild auf der Arbeitsfläche, Ausrichten
     if (restored > 0) appendToConsole(t("store.restored", { n: restored }));
     initUpdater(appendToConsole);      // Update-Prüfung über GitHub (aus, solange kein Repository eingetragen ist)
     initSettingsPage(appendToConsole); // $$-Einstellungen (Reiter "Kalibrieren")

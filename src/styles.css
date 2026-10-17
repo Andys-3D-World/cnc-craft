@@ -1202,3 +1202,71 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .net-find-busy { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; color: var(--text-muted); padding: 4px 2px; }
 .net-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--border-color); border-top-color: var(--accent-color); animation: net-spin 0.8s linear infinite; }
 @keyframes net-spin { to { transform: rotate(360deg); } }
+
+/* =====================================================================
+   KAMERA (camera/camera.ts, camera/cameraAlign.ts)
+   ===================================================================== */
+.camera-btn.active { border-color: var(--accent-color); color: var(--accent-color); }
+.cam-win { position: fixed; z-index: 4000; display: flex; flex-direction: column; min-width: 300px; min-height: 240px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; resize: both; }
+.cam-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-panel-2); border-bottom: 1px solid var(--border-color); cursor: move; user-select: none; }
+.cam-title { font-weight: 700; font-size: 0.82rem; white-space: nowrap; }
+.cam-head select { flex: 1; min-width: 0; font-size: 0.76rem; padding: 3px 4px; cursor: pointer; }
+.cam-x { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.9rem; padding: 2px 6px; }
+.cam-x:hover { color: var(--text-main); }
+.cam-url-row { display: flex; gap: 4px; padding: 6px 8px 0; }
+.cam-url-row input { flex: 1; min-width: 0; font-size: 0.76rem; padding: 4px 6px; }
+.cam-url-row button { padding: 4px 10px; font-size: 0.76rem; }
+.cam-view { position: relative; flex: 1; min-height: 120px; margin: 6px 8px; background: #050507; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.cam-view video, .cam-view img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cam-empty { color: var(--text-muted); font-size: 0.78rem; text-align: center; padding: 16px; line-height: 1.45; }
+.cam-rec { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,0.6); color: #ff5050; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.cam-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 8px 6px; }
+.cam-bar .btn-secondary { padding: 4px 8px; font-size: 0.74rem; }
+.cam-bar .btn-secondary:disabled { opacity: 0.4; cursor: default; }
+.cam-tg.active { border-color: var(--accent-color); background: rgba(124, 92, 255, 0.18); color: var(--text-main); }
+.cam-bar .rec-on { border-color: #ff5050; color: #ff5050; }
+.cam-sp { flex: 1; }
+.cam-lbl { font-size: 0.72rem; color: var(--text-muted); }
+.cam-ovl-row input[type=range] { flex: 1; min-width: 80px; accent-color: var(--accent-color); }
+.cam-status { font-size: 0.7rem; color: var(--text-muted); padding: 0 10px 8px; line-height: 1.35; }
+.cam-status.warn { color: #ffb547; }
+
+.cam-wiz { z-index: 5200; }
+.cam-wiz-box { display: flex; width: min(1280px, calc(100vw - 32px)); height: min(820px, calc(100vh - 32px)); background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }
+.cam-wiz-view { position: relative; flex: 1; min-width: 0; background: #050507; display: flex; align-items: center; justify-content: center; }
+.cam-wiz-view canvas#cw-canvas { cursor: crosshair; border-radius: 4px; touch-action: none; }
+.cw-loupe { position: absolute; display: none; width: 140px; height: 140px; border: 2px solid #fff; border-radius: 50%; box-shadow: 0 6px 20px rgba(0,0,0,0.6); pointer-events: none; }
+.cw-empty { position: absolute; color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px; max-width: 420px; line-height: 1.5; }
+.cam-wiz-side { flex: 0 0 340px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border-left: 1px solid var(--border-color); overflow-y: auto; }
+.cam-wiz-side h3 { margin: 0; font-size: 1rem; }
+.cw-steps { display: flex; gap: 4px; }
+.cw-steps span { flex: 1; text-align: center; font-size: 0.7rem; padding: 5px 2px; border-radius: 6px; background: var(--bg-input); color: var(--text-muted); }
+.cw-steps span.on { background: var(--accent-color); color: #fff; font-weight: 700; }
+.cw-body { flex: 1; display: flex; flex-direction: column; gap: 9px; font-size: 0.8rem; line-height: 1.45; }
+.cw-body p { margin: 0; }
+.cw-hint { font-size: 0.72rem; color: var(--text-muted); }
+.cw-hint.warn { color: #ffb547; }
+.cw-row { display: flex; align-items: center; gap: 8px; }
+.cw-row input[type=range] { flex: 1; accent-color: var(--accent-color); }
+.cw-row b { font-family: var(--font-mono); font-size: 0.75rem; min-width: 46px; text-align: right; }
+.cw-inline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cw-inline .btn-secondary, .cw-body > .btn-secondary { padding: 5px 10px; font-size: 0.76rem; }
+.cw-check { display: flex; align-items: center; gap: 5px; font-size: 0.75rem; cursor: pointer; }
+.cw-methods { display: flex; flex-direction: column; gap: 4px; }
+.cw-methods label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.cw-grid3 { display: grid; grid-template-columns: 1fr; gap: 4px; }
+.cw-grid3 label { display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; }
+.cw-grid3 .dlg-num input { width: 70px; }
+.cw-pts { display: flex; flex-direction: column; gap: 4px; }
+.cw-pt { display: flex; align-items: center; gap: 6px; padding: 5px 7px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.74rem; }
+.cw-pt b { width: 18px; height: 18px; border-radius: 50%; background: var(--bg-input); display: inline-flex; align-items: center; justify-content: center; font-size: 0.7rem; }
+.cw-pt > span:first-of-type { flex: 1; }
+.cw-pt em { font-style: normal; color: var(--text-muted); font-family: var(--font-mono); font-size: 0.7rem; }
+.cw-pt input { width: 58px; font-size: 0.72rem; padding: 2px 4px; text-align: right; }
+.cw-pt.next { border-color: #ffffff; }
+.cw-pt.done b { background: #ffb547; color: #000; }
+.cw-ok { color: #34d17b; width: 12px; }
+@media (max-width: 900px) {
+  .cam-wiz-box { flex-direction: column; }
+  .cam-wiz-side { flex: 0 0 auto; max-height: 45%; border-left: none; border-top: 1px solid var(--border-color); }
+}

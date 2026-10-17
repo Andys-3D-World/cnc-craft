@@ -3,11 +3,20 @@
 ## Nächste Version (noch nicht veröffentlicht)
 
 **Neu**
+- **Kamera 📷** (wie in LightBurn): frei verschiebbares Kamera-Fenster mit USB-Webcam oder IP-Kamera
+  (ESP32-CAM, mjpg-streamer, Handy-App) – zuschauen, Foto speichern, Video aufnehmen, 180° drehen, spiegeln
+- **Kamerabild auf der Arbeitsfläche:** entzerrt (Linse + Perspektive) unter der Zeichnung, live oder als
+  Standbild – Teile genau aufs Material oder Reststück legen
+- **Kamera ausrichten:** Assistent – Linse entzerren, dann 4 Punkte anklicken; der Laser kann dafür 4 Kreuze
+  brennen (oder eigene Punkte wie die Bettecken), Lupe zum genauen Treffen, Prüfansicht mit 50-mm-Raster
 - **Netzwerk-Suche 📡** (wie der IP-Finder in OpenBuilds): findet FluidNC, grblHAL, Grbl_ESP32 und
   MKS DLC32 im eigenen WLAN/LAN (Ports 23 und 8080, dazu 192.168.4.1 und xTool F1) – mit Firmware und
   Namen aus der Weboberfläche; Klick übernimmt die Adresse
 - Ohne Port-Angabe wird beim Verbinden erst Port 23, dann 8080 (MKS-Original-Firmware) probiert
-- macOS: Hinweistext für die Erlaubnis „Lokales Netzwerk“ (Info.plist)
+- macOS: Hinweistexte für die Erlaubnisse „Kamera“ und „Lokales Netzwerk“ (Info.plist, Entitlements)
+
+**Behoben**
+- Klick auf ⓘ (Info) oben rechts hat den aktuellen Reiter ausgeblendet
 
 ## 0.2.1 Beta
 

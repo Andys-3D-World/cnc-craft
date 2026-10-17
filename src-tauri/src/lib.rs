@@ -24,6 +24,7 @@ mod k40;
 mod machine;
 mod marlin;
 mod netscan;
+mod camfetch;
 mod ruida;
 mod serial;
 mod store;
@@ -335,6 +336,15 @@ async fn net_scan() -> Result<NetScan, String> {
     })
 }
 
+/// Ein Bild von einer IP-Kamera holen (camfetch.rs) – JPEG-Bytes direkt als ArrayBuffer
+#[tauri::command]
+async fn camera_snapshot(url: String) -> Result<tauri::ipc::Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || camfetch::fetch_frame(&url, std::time::Duration::from_secs(4)))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 /// Einstellungen-Datei (store.rs): Ordner + gespeicherter Stand
 #[derive(Serialize)]
 struct StoreRead {
@@ -480,7 +490,8 @@ pub fn run() {
             app_info,
             settings_store_read,
             settings_store_write,
-            net_scan
+            net_scan,
+            camera_snapshot
         ])
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");
