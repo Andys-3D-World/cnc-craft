@@ -351,4 +351,35 @@ export function fmt(v: number): string {
   return String(Math.round(v * 100) / 100);
 }
 
+// ---------------------------------------------------------------------
+// Sicherung (Export / Import, siehe libraryBackup.ts)
+// ---------------------------------------------------------------------
+
+/** Ganze Bibliothek für die Sicherungsdatei */
+export function exportToolLibrary() {
+  return { tools: tools.map(x => ({ ...x })), settings: { ...toolSettings }, active: activeTool?.id || null };
+}
+
+/**
+ * Bibliothek aus einer Sicherung übernehmen.
+ *   replace = true:  Liste, Einstellungen und Standard-Werkzeug werden ersetzt
+ *   replace = false: fehlende Werkzeuge kommen dazu (gleiche werden übersprungen)
+ * Gibt die Anzahl übernommener Werkzeuge zurück.
+ */
+export function importToolLibrary(data: any, replace: boolean): number {
+  const list = sanitizeList(data?.tools);
+  if (!list.length) return 0;
+  if (!replace) return mergeProjectTools(list, []);
+  // doppelte IDs in der Datei abfangen
+  const seen = new Set<string>();
+  tools = list.map(x => { const id = seen.has(x.id) ? newToolId() : x.id; seen.add(id); return { ...x, id }; });
+  activeTool = tools.find(x => x.id === data?.active) || tools[0];
+  if (data?.settings && typeof data.settings === "object") {
+    const s = data.settings;
+    setToolSettings({ minRpm: s.minRpm, maxRpm: s.maxRpm, maxFeed: s.maxFeed, material: s.material });
+  }
+  changed();
+  return tools.length;
+}
+
 // Bearbeiten-Dialog, Seite "Werkzeuge" und Schnittdaten-Rechner-Bedienung: ui/toolEditor.ts

@@ -1,9 +1,9 @@
 /**
  * UPDATE-PRÜFUNG ÜBER GITHUB RELEASES
  *
- * Aktivieren: UPDATE_REPO (gleich unter den Imports) auf das öffentliche GitHub-Repository setzen,
- * z. B. "andys3dworld/cnc-craft". Solange es leer ist, ist die Funktion aus
- * (das Info-Fenster sagt dann „noch nicht aktiviert“).
+ * Aktiv für das GitHub-Repository in UPDATE_REPO (gleich unter den Imports): Andys-3D-World/cnc-craft.
+ * Das Repository muss öffentlich sein, sonst antwortet GitHub ohne Anmeldung mit „nicht gefunden“.
+ * UPDATE_REPO leer setzen = Funktion aus (das Info-Fenster sagt dann „noch nicht aktiviert“).
  *
  * Ablauf:
  *   - Beim Start (höchstens einmal am Tag) oder per Knopf im Info-Fenster werden die
@@ -21,7 +21,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { t } from "../i18n/i18n";
 
 /** GitHub-Repository "besitzer/name" – leer = Update-Funktion aus */
-export const UPDATE_REPO = "";
+export const UPDATE_REPO = "Andys-3D-World/cnc-craft";
 
 /**
  * Repository, das tatsächlich benutzt wird. Zum Ausprobieren vor dem Aktivieren lässt es sich

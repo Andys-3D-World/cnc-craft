@@ -21,7 +21,7 @@
           <button class="tab-content-btn" data-tab="tab-flash">⚡ <span data-i18n="nav.flash">Board flashen</span></button>
           <button class="tab-content-btn" data-tab="tab-calibrate">⚙️ <span data-i18n="nav.calibrate">Einstellungen ($$)</span></button>
           <button class="tab-content-btn" data-tab="tab-wiring">🔌 <span data-i18n="nav.wiring">Anschlüsse</span></button>
-          <button class="tab-content-btn only-mill" data-tab="tab-program">🛠️ <span data-i18n="nav.tools">Werkzeuge</span></button>
+          <button class="tab-content-btn" data-tab="tab-program"><span class="only-mill">🛠️ <span data-i18n="nav.tools">Werkzeuge</span></span><span class="only-laser">🔦 <span data-i18n="nav.laserLib">Laser-Bibliothek</span></span><span class="only-plasma">🔥 <span data-i18n="nav.plasmaLib">Plasma-Bibliothek</span></span></button>
         </div>
         <div class="tab-status">
           <button id="update-pill" class="update-pill" style="display:none;"></button>
@@ -73,12 +73,28 @@
           </div>
         </div>
 
-        <!-- TAB 4: WERKZEUG-BIBLIOTHEK (nur Fräsen) – Inhalt baut src/ui/toolEditor.ts -->
-        <div id="tab-program" class="tab-content">
+        <!-- TAB 4: BIBLIOTHEK je Modus – Fräse: src/ui/toolEditor.ts, Laser: src/ui/laserLibPage.ts,
+             Plasma: src/ui/plasmaLibPage.ts, Sicherungs-Leiste: src/ui/libraryTab.ts -->
+        <!-- data-view = gerade gezeigte Bibliothek (tools / laser / plasma), umschaltbar oben im Reiter;
+             folgt beim Wechsel des Maschinen-Modus automatisch mit -->
+        <div id="tab-program" class="tab-content" data-view="tools">
           <div class="workshop-panel tool-page-panel">
-            <h2>🛠️ <span data-i18n="lib.title">Werkzeug-Bibliothek</span></h2>
-            <p class="panel-desc" data-i18n="lib.desc">Hinterlege deine Fräswerkzeuge.</p>
-            <div id="tool-page"></div>
+            <div id="lib-switch" class="lib-switch" role="tablist"></div>
+            <div class="lib-titlebar">
+              <div class="lib-titles">
+                <h2 data-lib="tools">🛠️ <span data-i18n="lib.title">Werkzeug-Bibliothek</span></h2>
+                <h2 data-lib="laser">🔦 <span data-i18n="llib.title">Laser-Bibliothek</span></h2>
+                <h2 data-lib="plasma">🔥 <span data-i18n="plib.title">Plasma-Bibliothek</span></h2>
+              </div>
+              <div id="lib-bar" class="lib-bar"></div>
+            </div>
+            <p class="panel-desc" data-lib="tools" data-i18n="lib.desc">Hinterlege deine Fräswerkzeuge.</p>
+            <p class="panel-desc" data-lib="laser" data-i18n="llib.desc">Deine Laser-Einstellungen je Material.</p>
+            <p class="panel-desc" data-lib="plasma" data-i18n="plib.desc">Deine Plasma-Schnitte je Blech.</p>
+            <div id="lib-mode-note" class="lib-mode-note" style="display:none;"></div>
+            <div id="tool-page" data-lib="tools"></div>
+            <div id="laser-lib-page" data-lib="laser"></div>
+            <div id="plasma-lib-page" data-lib="plasma"></div>
           </div>
         </div>
 

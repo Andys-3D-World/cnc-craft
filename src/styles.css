@@ -1139,3 +1139,48 @@ body.panel-resizing canvas { pointer-events: none; }
 .console-resizer::after { content: ""; position: absolute; left: 0; right: 0; top: 2px; height: 3px; background: transparent; transition: background 0.15s; }
 .console-resizer:hover::after, .console-resizer.active::after { background: var(--accent-color); }
 body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; user-select: none !important; }
+
+/* =====================================================================
+   BIBLIOTHEKEN: Laser-/Plasma-Seite + Sicherungs-Leiste (ui/libraryTab.ts, laserLibPage.ts, plasmaLibPage.ts)
+   ===================================================================== */
+.lib-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.lib-titles h2 { margin: 0; }
+.lib-bar { display: flex; gap: 14px; flex-wrap: wrap; }
+.lib-bar-group { display: flex; gap: 6px; }
+.lib-bar .btn-secondary { padding: 6px 12px; font-size: 0.8rem; white-space: nowrap; }
+.lib-io-box { width: 440px; }
+.lib-io-file { font-size: 0.85rem; line-height: 1.4; }
+.lib-io-file small { display: block; color: var(--text-muted); font-size: 0.72rem; }
+.lib-io-choice { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-panel-2, transparent); color: var(--text-main); cursor: pointer; font: inherit; }
+.lib-io-choice b { font-size: 0.9rem; }
+.lib-io-choice span { font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; }
+.lib-io-choice:hover, .lib-io-choice:focus-visible { border-color: var(--accent-color); outline: none; box-shadow: 0 0 0 1px var(--accent-color) inset; }
+.lib-io-danger:hover, .lib-io-danger:focus-visible { border-color: var(--color-danger); box-shadow: 0 0 0 1px var(--color-danger) inset; }
+
+.llp-swatch { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 5px; font-size: 0.72rem; color: rgba(0,0,0,0.65); vertical-align: -4px; flex: 0 0 20px; }
+.tlp-ico .llp-swatch { margin-top: 1px; }
+.llp-no { color: var(--text-muted); font-weight: 700; margin-right: 2px; }
+.llp-modes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.llp-mode { padding: 6px 4px 5px; font-size: 0.72rem; }
+.llp-colors { max-width: 230px; }
+.llp-range { width: 100%; accent-color: var(--accent-color); margin: -2px 0 2px; }
+.llp-svg, .plp-svg { display: block; }
+.plp-dim { stroke: #c9c9d6; stroke-width: 1; fill: none; }
+.plp-dim text { stroke: none; fill: #e6e6ef; font-size: 11px; font-family: var(--font-mono); }
+.plp-lbl text { fill: #e6e6ef; font-size: 11.5px; font-weight: 600; font-family: var(--font-ui); }
+.plp-lbl .plp-sub { fill: #a6a6b8; font-weight: 500; font-size: 10.5px; }
+#laser-lib-page .te-fields input[type="text"], #plasma-lib-page .te-fields input[type="text"] { max-width: 200px; }
+@media (max-width: 900px) {
+  .llp-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+/* Bibliothek umschalten (Fräse / Laser / Plasma) – unabhängig vom Maschinen-Modus */
+#tab-program[data-view="tools"] [data-lib]:not([data-lib="tools"]),
+#tab-program[data-view="laser"] [data-lib]:not([data-lib="laser"]),
+#tab-program[data-view="plasma"] [data-lib]:not([data-lib="plasma"]) { display: none !important; }
+.lib-switch { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; }
+.lib-switch button { border: none; background: transparent; color: var(--text-muted); padding: 7px 16px; border-radius: 7px; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+.lib-switch button:hover { color: var(--text-main); }
+.lib-switch button.active { background: var(--accent-color); color: #fff; }
+.lib-switch button .lib-sw-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #34d17b; margin-left: 6px; vertical-align: 2px; }
+.lib-mode-note { font-size: 0.78rem; color: var(--text-muted); background: rgba(255, 181, 71, 0.08); border: 1px solid rgba(255, 181, 71, 0.35); border-radius: 8px; padding: 7px 10px; margin: -6px 0 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lib-mode-note button { padding: 3px 10px; font-size: 0.76rem; }

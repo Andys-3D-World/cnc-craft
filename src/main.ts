@@ -13,7 +13,7 @@ import { renderCamPanel, renderEditorToolbar } from "./ui/camPanel";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
-import { initMachineMode, MODE_CHANGED, getMachineMode } from "./machineMode";
+import { initMachineMode } from "./machineMode";
 import { initLaserLayers } from "./laserLayers";
 import { initLaserPanel, refreshLaserPanel } from "./ui/laserPanel";
 import { initPlasmaCuts } from "./plasmaCuts";
@@ -41,6 +41,7 @@ import { setTextRedraw } from "./editor/textTool";
 import { initImports, importBytes } from "./importers/importManager";
 import { initLanguageMenu } from "./ui/languageMenu";
 import { renderToolTable, initToolPage } from "./ui/toolEditor";
+import { initLibraryTab } from "./ui/libraryTab";
 import type { ToolName } from "./editor/editorState";
 import { t, initI18n, applyTranslations } from "./i18n/i18n";
 
@@ -188,13 +189,8 @@ window.addEventListener("DOMContentLoaded", () => {
     initCollapsibleMenus();
     initLightBurnTooltips();
     initToolLibrary();
-    initToolPage();                    // Reiter "Werkzeuge" (nur im Fräs-Modus sichtbar)
-    // Werkzeuge gibt es nur beim Fräsen: steht man im Reiter und wechselt zu Laser/Plasma -> zurück zu CAM
-    window.addEventListener(MODE_CHANGED, () => {
-      if (getMachineMode() !== "mill" && document.getElementById("tab-program")?.classList.contains("active")) {
-        (document.querySelector('.tab-navigation [data-tab="tab-cam"]') as HTMLElement | null)?.click();
-      }
-    });
+    initToolPage();                    // Reiter "Werkzeuge": Fräswerkzeuge
+    initLibraryTab(appendToConsole);   // im selben Reiter: Laser-/Plasma-Bibliothek + Export/Import/Sicherung
     initToolPicker(redraw);
     initLaserPanel(redraw);
     initPlasmaPanel(redraw);

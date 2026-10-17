@@ -164,7 +164,22 @@ export function initPlasmaPanel(redraw: () => void) {
   syncThc();
   window.addEventListener("cnc-language-changed", syncThc);
 
-  window.addEventListener(PLASMA_CHANGED, () => refreshPlasmaPanel(true));
+  // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
+  const syncFields = () => {
+    const nums: [string, keyof typeof plasmaSettings][] = [["plasma-safez", "safeZ"], ["plasma-probe-offset", "probeOffset"], ["plasma-overcut", "overcut"],
+      ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
+    for (const [id, key] of nums) {
+      const el = document.getElementById(id) as HTMLInputElement | null;
+      if (el && document.activeElement !== el) el.value = String(plasmaSettings[key]);
+    }
+    const uz = document.getElementById("plasma-usez") as HTMLInputElement | null;
+    const pr = document.getElementById("plasma-probe") as HTMLInputElement | null;
+    if (uz) uz.checked = plasmaSettings.useZ;
+    if (pr) pr.checked = plasmaSettings.probe;
+    syncEnabled();
+    syncThc();
+  };
+  window.addEventListener(PLASMA_CHANGED, () => { syncFields(); refreshPlasmaPanel(true); });
   window.addEventListener(MODE_CHANGED, () => refreshPlasmaPanel(true));
   window.addEventListener("cnc-language-changed", () => refreshPlasmaPanel(true));
   refreshPlasmaPanel(true);

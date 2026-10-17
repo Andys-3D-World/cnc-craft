@@ -6,6 +6,8 @@
  * Jede Form kann einer Ebene zugeordnet werden (shape.laserLayerId). Formen ohne Ebene
  * gehören zur Standard-Ebene (activeLayer).
  *
+ * Für die Bibliothek (Reiter "Laser-Bibliothek", ui/laserLibPage.ts) zusätzlich Material, Dicke und Notiz.
+ *
  * Außerdem die Laser-Maschineneinstellungen: höchster S-Wert ($30) und M4 (dynamische Leistung).
  * Änderungen lösen "cnc-laser-layers-changed" aus.
  */
@@ -24,6 +26,9 @@ export interface LaserLayer {
   interval: number;   // Linienabstand beim Füllen in mm
   angle: number;      // Winkel der Füll-Linien in Grad
   air: boolean;       // Luftunterstützung (M8)
+  material: string;   // Material (frei, z. B. "Pappel-Sperrholz") – nur zur Übersicht
+  thickness: number;  // Materialdicke in mm (0 = keine Angabe)
+  notes: string;      // Notiz
 }
 
 export interface LaserSettings {
@@ -99,7 +104,10 @@ function sanitize(x: any): LaserLayer {
     passes: Math.round(num(x.passes, 1, 1, 100)),
     interval: num(x.interval, 0.1, 0.01, 10),
     angle: num(x.angle, 0, -180, 180),
-    air: !!x.air
+    air: !!x.air,
+    material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
+    thickness: num(x.thickness, 0, 0, 200),
+    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
   };
 }
 
@@ -175,10 +183,41 @@ export function moveLayer(id: string, dir: -1 | 1) {
   changed();
 }
 
+/** Ebene kopieren (gleiche Werte, freie Farbe, Name "… (Kopie)"), steht direkt dahinter */
+export function duplicateLayer(id: string): LaserLayer | null {
+  const src = getLayer(id);
+  if (!src) return null;
+  const used = new Set(layers.map(l => l.color));
+  const color = LAYER_COLORS.find(c => !used.has(c)) || src.color;
+  const copy = sanitize({ ...src, id: newLayerId(), color, name: t("lib.copyName", { name: src.name }) });
+  layers.splice(layers.indexOf(src) + 1, 0, copy);
+  changed();
+  return copy;
+}
+
+/** Ganze Bibliothek für die Sicherungsdatei */
+export function exportLaserLibrary() {
+  return { layers: layers.map(l => ({ ...l })), settings: { ...laserSettings }, active: activeLayer?.id || null };
+}
+
+/** Aus einer Sicherung übernehmen (replace: alles ersetzen, sonst fehlende dazu). Anzahl übernommener Ebenen. */
+export function importLaserLibrary(data: any, replace: boolean): number {
+  const list = sanitizeList(data?.layers);
+  if (!list.length) return 0;
+  if (!replace) return mergeProjectLayers(list, []);
+  const seen = new Set<string>();
+  layers = list.map(l => { const id = seen.has(l.id) ? newLayerId() : l.id; seen.add(id); return { ...l, id }; });
+  activeLayer = layers.find(l => l.id === data?.active) || layers[0];
+  if (data?.settings && typeof data.settings === "object") setLaserSettings({ sMax: data.settings.sMax, dynamic: data.settings.dynamic });
+  changed();
+  return layers.length;
+}
+
 export function setLaserSettings(s: Partial<LaserSettings>) {
   if (s.sMax !== undefined && Number.isFinite(+s.sMax) && +s.sMax > 0) laserSettings.sMax = Math.round(+s.sMax);
   if (s.dynamic !== undefined) laserSettings.dynamic = !!s.dynamic;
   save();
+  window.dispatchEvent(new CustomEvent(LAYERS_CHANGED));
 }
 
 /** Projekt öffnen: fehlende Ebenen übernehmen (wie bei den Fräswerkzeugen) */

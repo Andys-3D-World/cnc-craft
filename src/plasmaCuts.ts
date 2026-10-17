@@ -5,6 +5,9 @@
  * Einstechzeit, Schneidhöhe, Anfahrlänge. Formen bekommen ihn über shape.plasmaCutId,
  * Formen ohne Schnitt nutzen den Standard-Schnitt.
  *
+ * Für die Bibliothek (Reiter "Plasma-Bibliothek", ui/plasmaLibPage.ts) zusätzlich Material, Dicke,
+ * Stromstärke und Notiz.
+ *
  * Maschinen-Einstellungen (für alle Schnitte): Sicherheitshöhe, Z-Achse benutzen,
  * Blechhöhe vor jedem Einstich abtasten (G38.2) + Schalter-Versatz, Überlauf am Konturende.
  * Änderungen lösen "cnc-plasma-changed" aus.
@@ -22,6 +25,10 @@ export interface PlasmaCut {
   pierceDelay: number;  // s
   cutHeight: number;    // mm
   leadIn: number;       // Anfahrlänge in mm (0 = direkt auf der Kontur einstechen)
+  material: string;     // Material (frei, z. B. "Baustahl") – nur zur Übersicht
+  thickness: number;    // Blechdicke in mm (0 = keine Angabe)
+  amps: number;         // Stromstärke am Gerät in A (0 = keine Angabe)
+  notes: string;        // Notiz (Düse, Gerät, …)
 }
 
 export interface PlasmaSettings {
@@ -65,9 +72,9 @@ export function initPlasmaCuts() {
   if (cuts.length === 0) {
     // Richtwerte für ein 40-A-Gerät, Baustahl – bitte an Gerät/Tabelle anpassen
     cuts = [
-      sanitize({ id: "P1", name: t("plasma.def2"), color: LAYER_COLORS[0], speed: 2500, kerf: 1.5, pierceHeight: 3.8, pierceDelay: 0.3, cutHeight: 1.5, leadIn: 3 }),
-      sanitize({ id: "P2", name: t("plasma.def4"), color: LAYER_COLORS[1], speed: 1500, kerf: 1.7, pierceHeight: 3.8, pierceDelay: 0.6, cutHeight: 1.5, leadIn: 4 }),
-      sanitize({ id: "P3", name: t("plasma.def6"), color: LAYER_COLORS[2], speed: 900, kerf: 1.9, pierceHeight: 4.0, pierceDelay: 1.0, cutHeight: 1.5, leadIn: 5 })
+      sanitize({ id: "P1", name: t("plasma.def2"), color: LAYER_COLORS[0], speed: 2500, kerf: 1.5, pierceHeight: 3.8, pierceDelay: 0.3, cutHeight: 1.5, leadIn: 3, thickness: 2, amps: 40 }),
+      sanitize({ id: "P2", name: t("plasma.def4"), color: LAYER_COLORS[1], speed: 1500, kerf: 1.7, pierceHeight: 3.8, pierceDelay: 0.6, cutHeight: 1.5, leadIn: 4, thickness: 4, amps: 40 }),
+      sanitize({ id: "P3", name: t("plasma.def6"), color: LAYER_COLORS[2], speed: 900, kerf: 1.9, pierceHeight: 4.0, pierceDelay: 1.0, cutHeight: 1.5, leadIn: 5, thickness: 6, amps: 40 })
     ];
     save();
   }
@@ -100,7 +107,11 @@ function sanitize(x: any): PlasmaCut {
     pierceHeight: num(x.pierceHeight, 3.8, 0, 50),
     pierceDelay: num(x.pierceDelay, 0.5, 0, 30),
     cutHeight: num(x.cutHeight, 1.5, 0, 50),
-    leadIn: num(x.leadIn, 3, 0, 50)
+    leadIn: num(x.leadIn, 3, 0, 50),
+    material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
+    thickness: num(x.thickness, 0, 0, 200),
+    amps: num(x.amps, 0, 0, 1000),
+    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
   };
 }
 
@@ -166,6 +177,36 @@ export function moveCut(id: string, dir: -1 | 1) {
   if (i < 0 || j < 0 || j >= cuts.length) return;
   [cuts[i], cuts[j]] = [cuts[j], cuts[i]];
   changed();
+}
+
+/** Schnitt kopieren (gleiche Werte, freie Farbe, Name "… (Kopie)"), steht direkt dahinter */
+export function duplicateCut(id: string): PlasmaCut | null {
+  const src = getCut(id);
+  if (!src) return null;
+  const used = new Set(cuts.map(c => c.color));
+  const color = LAYER_COLORS.find(c => !used.has(c)) || src.color;
+  const copy = sanitize({ ...src, id: newCutId(), color, name: t("lib.copyName", { name: src.name }) });
+  cuts.splice(cuts.indexOf(src) + 1, 0, copy);
+  changed();
+  return copy;
+}
+
+/** Ganze Bibliothek für die Sicherungsdatei */
+export function exportPlasmaLibrary() {
+  return { cuts: cuts.map(c => ({ ...c })), settings: { ...plasmaSettings }, active: activeCut?.id || null };
+}
+
+/** Aus einer Sicherung übernehmen (replace: alles ersetzen, sonst fehlende dazu). Anzahl übernommener Schnitte. */
+export function importPlasmaLibrary(data: any, replace: boolean): number {
+  const list = sanitizeList(data?.cuts);
+  if (!list.length) return 0;
+  if (!replace) return mergeProjectCuts(list, []);
+  const seen = new Set<string>();
+  cuts = list.map(c => { const id = seen.has(c.id) ? newCutId() : c.id; seen.add(id); return { ...c, id }; });
+  activeCut = cuts.find(c => c.id === data?.active) || cuts[0];
+  if (data?.settings && typeof data.settings === "object") setPlasmaSettings(data.settings, false);
+  changed();
+  return cuts.length;
 }
 
 export function setPlasmaSettings(s: Partial<PlasmaSettings>, notify = true) {

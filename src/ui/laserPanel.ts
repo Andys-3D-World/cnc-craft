@@ -131,7 +131,12 @@ export function initLaserPanel(redraw: () => void) {
     dyn.addEventListener("change", () => setLaserSettings({ dynamic: dyn.checked }));
   }
 
-  window.addEventListener(LAYERS_CHANGED, () => refreshLaserPanel(true));
+  // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
+  const syncFields = () => {
+    if (smax && document.activeElement !== smax) smax.value = String(laserSettings.sMax);
+    if (dyn) dyn.checked = laserSettings.dynamic;
+  };
+  window.addEventListener(LAYERS_CHANGED, () => { syncFields(); refreshLaserPanel(true); });
   window.addEventListener("cnc-language-changed", () => refreshLaserPanel(true));
   refreshLaserPanel(true);
 }

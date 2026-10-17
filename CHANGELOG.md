@@ -1,5 +1,18 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Neu**
+- **Bibliotheken sichern:** Fräswerkzeuge, Laser-Ebenen und Plasma-Schnitte als Datei exportieren
+  und wieder importieren (Hinzufügen oder Ersetzen) – plus **Komplett-Sicherung** aller drei in einer
+  Datei, z. B. vor einer Neuinstallation oder für einen zweiten Rechner
+- **Laser-Bibliothek** und **Plasma-Bibliothek** als eigene Seite im Reiter „Werkzeuge“ (wechselt mit dem
+  Modus), aufgebaut wie die Werkzeug-Bibliothek der Fräse: Liste, Kopieren, Reihenfolge, Standard (★),
+  großer Editor mit Vorschau (Laser: Linie/Füllen mit Abstand und Winkel, DPI-Anzeige;
+  Plasma: Seitenansicht mit Einstech- und Schneidhöhe, Anfahrt und Schnittspalt)
+- Im Reiter oben **Fräse / Laser / Plasma umschalten** – zeigt jede Bibliothek, ohne den Maschinen-Modus zu ändern
+- Laser-Ebenen bekommen Material, Dicke und Notiz; Plasma-Schnitte Material, Blechdicke, Stromstärke und Notiz
+
 ## 0.2.0 Beta
 
 **Neu**
@@ -9,7 +22,6 @@
   neue Boards lassen sich einfach ergänzen
 - **Update-Prüfung** über GitHub Releases (Info-Fenster ⓘ oben rechts): zeigt neue Versionen
   mit Änderungen und lädt die passende Datei für das eigene System herunter
-  (wird aktiviert, sobald das Repository eingetragen ist)
 - **Rechtes Panel in der Breite verstellbar** (Griff am linken Rand ziehen, Doppelklick = Standard),
   im CAM-Bereich und in der Simulation; die Breite wird gemerkt
 - **Konsole in der Höhe verstellbar** (Oberkante ziehen, Doppelklick = Standard)
