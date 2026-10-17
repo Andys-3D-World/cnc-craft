@@ -1734,5 +1734,10 @@
   "wifi.pinging": "Checking {ip} …",
   "wifi.pingOk": "Board answers at {ip}.",
   "wifi.pingFail": "Board does not answer at {ip}. Is your computer connected to the board’s Wi-Fi “{ap}” (or in the same network as the board)?",
-  "wifi.err.webRejected": "Board rejected “{line}” via the web interface: {e}"
+  "wifi.err.webRejected": "Board rejected “{line}” via the web interface: {e}",
+  "wifi.g.reading": "Asking the board which Wi-Fi it is in …",
+  "wifi.g.nowHome": "The board is already in a Wi-Fi, at IP {ip} (filled in above). Its own Wi-Fi is OFF then. Either: put your computer into the same Wi-Fi as the board → check with 🔎 → send. Or: press “Turn on the board’s Wi-Fi”.",
+  "wifi.g.nowAp": "The board’s own Wi-Fi is on: “{ap}”. Connect your computer to it (password usually 12345678), then 🔎.",
+  "wifi.g.nowUnknown": "The board did not tell which Wi-Fi it is in. If you don’t see a Wi-Fi “MKS_DLC”: press “Turn on the board’s Wi-Fi”.",
+  "wifi.pingFailAp": "Board does not answer at {ip}. This address only exists while your computer is connected to the board’s Wi-Fi “{ap}”. If you don’t see that Wi-Fi, it is off → “Turn on the board’s Wi-Fi”."
 }

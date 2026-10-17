@@ -1559,5 +1559,10 @@
   "wifi.pinging": "{ip} controleren …",
   "wifi.pingOk": "Board antwoordt op {ip}.",
   "wifi.pingFail": "Board antwoordt niet op {ip}. Is je computer verbonden met het wifi „{ap}“ van het board (of in hetzelfde netwerk)?",
-  "wifi.err.webRejected": "Board weigerde „{line}“ via de webinterface: {e}"
+  "wifi.err.webRejected": "Board weigerde „{line}“ via de webinterface: {e}",
+  "wifi.g.reading": "Board vragen in welk wifi het nu zit …",
+  "wifi.g.nowHome": "Het board zit al in een wifi, op IP {ip} (hierboven ingevuld). Zijn eigen wifi is dan UIT. Of: zet je computer in hetzelfde wifi → controleer met 🔎 → verstuur. Of: druk op „Wifi van het board aanzetten“.",
+  "wifi.g.nowAp": "Het eigen wifi van het board staat aan: „{ap}“. Verbind je computer ermee (wachtwoord meestal 12345678), dan 🔎.",
+  "wifi.g.nowUnknown": "Het board vertelde niet in welk wifi het zit. Zie je geen wifi „MKS_DLC“: druk op „Wifi van het board aanzetten“.",
+  "wifi.pingFailAp": "Board antwoordt niet op {ip}. Dit adres bestaat alleen als je computer met het wifi „{ap}“ van het board verbonden is. Zie je dat wifi niet, dan staat het uit → „Wifi van het board aanzetten“."
 }

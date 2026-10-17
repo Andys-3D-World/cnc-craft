@@ -1559,5 +1559,10 @@
   "wifi.pinging": "Comprobando {ip} …",
   "wifi.pingOk": "La placa responde en {ip}.",
   "wifi.pingFail": "La placa no responde en {ip}. ¿Está el ordenador conectado a la Wi-Fi «{ap}» de la placa (o en la misma red)?",
-  "wifi.err.webRejected": "La placa rechazó «{line}» por la interfaz web: {e}"
+  "wifi.err.webRejected": "La placa rechazó «{line}» por la interfaz web: {e}",
+  "wifi.g.reading": "Preguntando a la placa en qué Wi-Fi está …",
+  "wifi.g.nowHome": "La placa ya está en una Wi-Fi, con la IP {ip} (puesta arriba). Su Wi-Fi propia está APAGADA. O bien: conecta el ordenador a la misma Wi-Fi → comprueba con 🔎 → envía. O bien: pulsa «Activar la Wi-Fi de la placa».",
+  "wifi.g.nowAp": "La Wi-Fi propia de la placa está activa: «{ap}». Conecta el ordenador (contraseña normalmente 12345678) y luego 🔎.",
+  "wifi.g.nowUnknown": "La placa no indicó en qué Wi-Fi está. Si no ves una Wi-Fi «MKS_DLC»: pulsa «Activar la Wi-Fi de la placa».",
+  "wifi.pingFailAp": "La placa no responde en {ip}. Esta dirección solo existe si el ordenador está conectado a la Wi-Fi «{ap}» de la placa. Si no la ves, está apagada → «Activar la Wi-Fi de la placa»."
 }

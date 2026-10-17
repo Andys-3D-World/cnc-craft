@@ -70,21 +70,59 @@ function defaultHost(): string {
   return tcpHost() || BOARD_AP_IP;
 }
 
-/** Einstellung über die Leitung lesen (z. B. "$AP/SSID" -> "MKS_DLC"). "" wenn keine Antwort */
-async function readSetting(key: string): Promise<string> {
+/** Befehl über die Leitung schicken und die Antwortzeilen einsammeln */
+async function ask(cmd: string): Promise<string[]> {
   const lines: string[] = [];
   const grab = (e: Event) => {
     const d = (e as CustomEvent).detail;
     const txt = d?.type === "text" ? String(d.data?.text || "") : d?.type === "setting" ? `${d.data?.key}=${d.data?.value}` : "";
-    if (txt) lines.push(txt);
+    if (txt) lines.push(txt.trim());
   };
   window.addEventListener(MACHINE_EVENT, grab);
-  try { await sendAndWait(key, 3000, true); await new Promise(r => setTimeout(r, 150)); }
+  try { await sendAndWait(cmd, 3000, true); await new Promise(r => setTimeout(r, 150)); }
   catch { /* egal */ }
   finally { window.removeEventListener(MACHINE_EVENT, grab); }
-  const hit = lines.map(l => l.trim()).find(l => l.toLowerCase().startsWith(key.toLowerCase() + "="));
-  return hit ? hit.slice(key.length + 1).trim() : "";
+  return lines;
 }
+
+export interface BoardWifi { mode: string; ip: string; apName: string }
+
+/**
+ * Was macht das WLAN des Boards gerade?
+ * 1. "$I" (Grbl_ESP32 / MKS DLC32 / MKS MAX) meldet z. B.
+ *      [MSG:Mode=STA:SSID=MeinNetz:Status=Connected:IP=192.168.99.38:MAC=…]
+ *      [MSG:Mode=AP:SSDI=MKS_DLC:IP=192.168.4.1:MAC=…]
+ * 2. Sonst ESP3D-Befehle (FluidNC u. a.): [ESP110] Funk-Art, [ESP111] aktuelle IP
+ */
+export function parseWifiInfo(lines: string[]): BoardWifi | null {
+  let res: BoardWifi | null = null;
+  for (const l of lines) {
+    const m = l.match(/Mode=(STA|AP)\b(.*)/i);
+    if (!m) continue;
+    const mode = m[1].toUpperCase();
+    const ip = (m[2].match(/IP=(\d{1,3}(?:\.\d{1,3}){3})/) || [])[1] || "";
+    const name = (m[2].match(/:SS[DI]{2}=([^:\]]*)/i) || [])[1] || "";
+    const connected = !/Status=Not/i.test(m[2]);
+    if (mode === "STA" && connected && ip && ip !== "0.0.0.0") return { mode, ip, apName: res?.apName || "" };
+    if (mode === "AP") res = { mode, ip: ip || BOARD_AP_IP, apName: name };
+    else if (!res) res = { mode, ip: "", apName: "" };
+  }
+  return res;
+}
+
+export async function readBoardWifi(fw: WifiFw): Promise<BoardWifi> {
+  if (fw === "esp32") {
+    const r = parseWifiInfo(await ask("$I"));
+    if (r) return r;
+  }
+  const pick = (lines: string[], re: RegExp) => { for (const l of lines) { const m = l.match(re); if (m) return m[1].trim(); } return ""; };
+  const mode = pick(await ask("[ESP110]"), /(?:ESP110|Radio\/Mode|WiFi\/Mode)\s*=\s*(\S+)/i);
+  const ip = pick(await ask("[ESP111]"), /^(?:IP:?\s*)?(\d{1,3}(?:\.\d{1,3}){3})$/);
+  return { mode: mode.toUpperCase(), ip: ip === "0.0.0.0" ? "" : ip, apName: "" };
+}
+
+/** Der Rechner ist im 192.168.4.x-Netz des Boards? (dann ist die Board-WLAN-Adresse richtig) */
+function isApIp(ip: string): boolean { return ip === BOARD_AP_IP; }
 
 export function openWifiSetup(log: (s: string) => void) {
   document.getElementById("wifi-overlay")?.remove();
@@ -128,18 +166,28 @@ export function openWifiSetup(log: (s: string) => void) {
 
   // ---- Erst-Einrichtung über das eigene WLAN des Boards ----
   let apName = "";
+  let state: BoardWifi | null = null;
+  let stateAsked = false;
   const guide = q("wifi-guide");
   const showGuide = async () => {
     if (tcpHost()) { guide.style.display = "none"; return; }   // per WLAN verbunden: IP ist bekannt
     guide.style.display = "";
-    const name = apName || (fw === "grblhal" ? "" : "MKS_DLC / FluidNC / GRBL_ESP");
+    const name = apName || (fw === "grblhal" ? "" : "MKS_DLC");
+    // Zustand des Boards: im Heimnetz (mit IP) oder eigenes WLAN an?
+    const inHome = !!state && !!state.ip && !isApIp(state.ip) && state.mode !== "AP";
+    const apOn = !!state && (state.mode === "AP" || isApIp(state.ip));
+    const now = !state ? `<div class="wifi-g-now">${esc(t("wifi.g.reading"))}</div>`
+      : inHome ? `<div class="wifi-g-now warn">${esc(t("wifi.g.nowHome", { ip: state.ip }))}</div>`
+      : apOn ? `<div class="wifi-g-now ok">${esc(t("wifi.g.nowAp", { ap: name }))}</div>`
+      : `<div class="wifi-g-now">${esc(t("wifi.g.nowUnknown"))}</div>`;
     guide.innerHTML = `
-      <b>${esc(t("wifi.g.title"))}</b>
-      <ol>
+      ${inHome ? "" : `<b>${esc(t("wifi.g.title"))}</b>`}
+      ${now}
+      ${inHome ? "" : `<ol>
         <li>${esc(t("wifi.g.s1", { ap: name || "?" }))}</li>
         <li>${esc(t("wifi.g.s2", { ip: BOARD_AP_IP }))}</li>
         <li>${esc(t("wifi.g.s3"))}</li>
-      </ol>
+      </ol>`}
       <div class="wifi-g-btns">
         <button type="button" id="wifi-ap-on" class="btn-secondary" data-tip="${esc(t("wifi.g.apOnTip"))}">📡 ${esc(t("wifi.g.apOn"))}</button>
       </div>`;
@@ -149,19 +197,46 @@ export function openWifiSetup(log: (s: string) => void) {
       for (const c of cmds) { try { await sendAndWait(c, 3000, true); log(t("wifi.logSent", { line: c, via: "GRBL" })); } catch { /* Neustart */ } }
       log(t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone"));
       q("wifi-ping-res").textContent = t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone");
+      // ab jetzt gilt die feste Adresse im WLAN des Boards
+      state = { mode: "AP", ip: BOARD_AP_IP, apName };
+      q("wifi-host").value = BOARD_AP_IP;
+      void showGuide();
+      startWatch();
     };
-    // Namen des Board-WLANs vom Board holen (nur einmal)
-    if (!apName && machine.connected && !tcpHost()) {
-      apName = await readSetting(fw === "grblhal" ? "$76" : "$AP/SSID");
-      if (apName) void showGuide();
+    // Zustand und Namen des Board-WLANs vom Board holen (einmal)
+    if (!stateAsked && machine.connected && !tcpHost() && fw !== "grblhal") {
+      stateAsked = true;
+      state = await readBoardWifi(fw);
+      if (state.apName) apName = state.apName;
+      // Board ist schon in einem Netz: dessen IP vorschlagen (geht, wenn der Mac im selben Netz ist)
+      if (state.ip && document.activeElement !== q("wifi-host")) q("wifi-host").value = state.ip;
+      void showGuide();
+      startWatch();
     }
   };
 
+  // Adresse alle paar Sekunden prüfen – so sieht man sofort, wenn der Mac im richtigen WLAN ist
+  let watch: ReturnType<typeof setInterval> | null = null;
+  const startWatch = () => {
+    if (watch) return;
+    let busy = false;
+    watch = setInterval(async () => {
+      if (!document.body.contains(ov)) { if (watch) clearInterval(watch); watch = null; return; }
+      if (busy || q("wifi-host-row").style.display === "none") return;
+      // nur solange das Board noch nicht antwortet, und nicht während gesendet wird
+      if (q("wifi-ping-res").classList.contains("wifi-ok") || q<HTMLButtonElement>("wifi-send").disabled) return;
+      const h = q("wifi-host").value.trim();
+      if (!h) return;
+      busy = true;
+      await ping(h, true);
+      busy = false;
+    }, 4000);
+  };
+
   /** Ist die Weboberfläche erreichbar? ([ESP800] = Firmware-Info, ändert nichts) */
-  const ping = async (host: string): Promise<boolean> => {
+  const ping = async (host: string, quiet = false): Promise<boolean> => {
     const out = q("wifi-ping-res");
-    out.className = "wifi-note";
-    out.textContent = t("wifi.pinging", { ip: host });
+    if (!quiet) { out.className = "wifi-note"; out.textContent = t("wifi.pinging", { ip: host }); }
     try {
       await invoke<string>("esp_web_command", { host, command: "[ESP800]" });
       out.className = "wifi-note wifi-ok";
@@ -169,10 +244,11 @@ export function openWifiSetup(log: (s: string) => void) {
       return true;
     } catch {
       out.className = "wifi-note wifi-bad";
-      out.textContent = `✗ ${t("wifi.pingFail", { ip: host, ap: apName || "MKS_DLC" })}`;
+      out.textContent = `✗ ${t(isApIp(host) ? "wifi.pingFailAp" : "wifi.pingFail", { ip: host, ap: apName || "MKS_DLC" })}`;
       return false;
     }
   };
+  q("wifi-host").addEventListener("input", () => { const o = q("wifi-ping-res"); o.className = "wifi-note"; o.textContent = ""; });
   q("wifi-ping").onclick = () => { const h = q("wifi-host").value.trim(); if (h) void ping(h); };
   q("wifi-eye").onclick = () => { const p = q("wifi-pw"); p.type = p.type === "password" ? "text" : "password"; };
 

@@ -1559,5 +1559,10 @@
   "wifi.pinging": "Sprawdzanie {ip} …",
   "wifi.pingOk": "Płyta odpowiada pod {ip}.",
   "wifi.pingFail": "Płyta nie odpowiada pod {ip}. Czy komputer jest połączony z siecią „{ap}” płyty (lub w tej samej sieci)?",
-  "wifi.err.webRejected": "Płyta odrzuciła „{line}” przez interfejs WWW: {e}"
+  "wifi.err.webRejected": "Płyta odrzuciła „{line}” przez interfejs WWW: {e}",
+  "wifi.g.reading": "Pytam płytę, w jakiej sieci jest …",
+  "wifi.g.nowHome": "Płyta jest już w sieci, pod IP {ip} (wpisane powyżej). Jej własna sieć jest wtedy WYŁĄCZONA. Albo: połącz komputer z tą samą siecią → sprawdź 🔎 → wyślij. Albo: naciśnij „Włącz sieć płyty”.",
+  "wifi.g.nowAp": "Własna sieć płyty jest włączona: „{ap}”. Połącz z nią komputer (hasło zwykle 12345678), potem 🔎.",
+  "wifi.g.nowUnknown": "Płyta nie podała, w jakiej jest sieci. Jeśli nie widzisz sieci „MKS_DLC”: naciśnij „Włącz sieć płyty”.",
+  "wifi.pingFailAp": "Płyta nie odpowiada pod {ip}. Ten adres istnieje tylko, gdy komputer jest połączony z siecią „{ap}” płyty. Jeśli jej nie widzisz, jest wyłączona → „Włącz sieć płyty”."
 }

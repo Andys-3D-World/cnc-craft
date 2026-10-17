@@ -1559,5 +1559,10 @@
   "wifi.pinging": "Vérification de {ip} …",
   "wifi.pingOk": "La carte répond à {ip}.",
   "wifi.pingFail": "La carte ne répond pas à {ip}. L’ordinateur est-il connecté au Wi-Fi « {ap} » de la carte (ou dans le même réseau) ?",
-  "wifi.err.webRejected": "La carte a refusé « {line} » via l’interface web : {e}"
+  "wifi.err.webRejected": "La carte a refusé « {line} » via l’interface web : {e}",
+  "wifi.g.reading": "Je demande à la carte dans quel Wi-Fi elle se trouve …",
+  "wifi.g.nowHome": "La carte est déjà dans un Wi-Fi, à l’IP {ip} (indiquée ci-dessus). Son propre Wi-Fi est alors ÉTEINT. Soit : mets l’ordinateur dans le même Wi-Fi → vérifie avec 🔎 → envoie. Soit : clique « Activer le Wi-Fi de la carte ».",
+  "wifi.g.nowAp": "Le Wi-Fi de la carte est actif : « {ap} ». Connecte l’ordinateur (mot de passe souvent 12345678), puis 🔎.",
+  "wifi.g.nowUnknown": "La carte n’a pas indiqué son Wi-Fi. Si tu ne vois pas de Wi-Fi « MKS_DLC » : clique « Activer le Wi-Fi de la carte ».",
+  "wifi.pingFailAp": "La carte ne répond pas à {ip}. Cette adresse n’existe que si l’ordinateur est connecté au Wi-Fi « {ap} » de la carte. Si tu ne le vois pas, il est éteint → « Activer le Wi-Fi de la carte »."
 }

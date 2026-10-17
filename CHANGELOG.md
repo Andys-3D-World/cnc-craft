@@ -12,9 +12,12 @@
 - **Erst-Einrichtung ohne IP:** Anleitung im Dialog über das eigene WLAN des Boards (MKS DLC32: „MKS_DLC“,
   Passwort 12345678, 192.168.4.1) – Name wird vom Board gelesen, Knopf „WLAN des Boards einschalten“,
   🔎 prüft vor dem Senden, ob das Board antwortet; Fehlermeldungen zeigen die Antwort des Boards
+- **WLAN-Dialog zeigt, wo das Board gerade ist:** liest per USB aus, ob das Board schon in einem WLAN hängt
+  (dann wird dessen IP eingetragen) oder sein eigenes WLAN an hat; prüft die Adresse alle paar Sekunden selbst
 - Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
 
 **Behoben**
+- WLAN-Dialog: MKS DLC32 MAX meldete „Fehler 3 – Unbekannter $-Befehl“ (Abfrage $AP/SSID kennt die Firmware nicht)
 - Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte
   Leerzeichen entfernt (wie bei G-Code-Kommentaren)
 

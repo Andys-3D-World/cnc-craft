@@ -1734,5 +1734,10 @@
   "wifi.pinging": "Prüfe {ip} …",
   "wifi.pingOk": "Board antwortet unter {ip}.",
   "wifi.pingFail": "Board antwortet nicht unter {ip}. Ist dein Rechner mit dem WLAN „{ap}“ des Boards verbunden (bzw. im selben Netz wie das Board)?",
-  "wifi.err.webRejected": "Board hat „{line}“ über die Weboberfläche abgelehnt: {e}"
+  "wifi.err.webRejected": "Board hat „{line}“ über die Weboberfläche abgelehnt: {e}",
+  "wifi.g.reading": "Frage das Board, in welchem WLAN es gerade ist …",
+  "wifi.g.nowHome": "Das Board ist gerade schon in einem WLAN, unter der IP {ip} (oben eingetragen). Sein eigenes WLAN ist dann AUS. Entweder: Rechner in dasselbe WLAN wie das Board → 🔎 prüfen → schicken. Oder: „WLAN des Boards einschalten“ drücken.",
+  "wifi.g.nowAp": "Das eigene WLAN des Boards ist an: „{ap}“. Rechner damit verbinden (Passwort meist 12345678), dann 🔎.",
+  "wifi.g.nowUnknown": "Das Board hat nicht verraten, in welchem WLAN es ist. Falls du kein WLAN „MKS_DLC“ siehst: „WLAN des Boards einschalten“ drücken.",
+  "wifi.pingFailAp": "Board antwortet nicht unter {ip}. Diese Adresse gibt es nur, wenn dein Rechner mit dem WLAN „{ap}“ des Boards verbunden ist. Siehst du dieses WLAN nicht, ist es aus → „WLAN des Boards einschalten“."
 }

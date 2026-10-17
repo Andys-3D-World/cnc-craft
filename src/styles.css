@@ -1306,3 +1306,6 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .wifi-guide li { margin: 2px 0; }
 .wifi-g-btns { display: flex; gap: 6px; }
 .wifi-g-btns .btn-secondary { padding: 4px 10px; font-size: 0.74rem; }
+.wifi-g-now { margin: 4px 0 2px; padding: 4px 8px; border-radius: 6px; background: var(--bg-input); font-size: 0.74rem; }
+.wifi-g-now.warn { color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); }
+.wifi-g-now.ok { color: #8ff0b9; border: 1px solid rgba(52, 209, 123, 0.5); }

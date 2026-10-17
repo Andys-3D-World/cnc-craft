@@ -1559,5 +1559,10 @@
   "wifi.pinging": "Verifica di {ip} …",
   "wifi.pingOk": "La scheda risponde a {ip}.",
   "wifi.pingFail": "La scheda non risponde a {ip}. Il computer è collegato alla Wi-Fi «{ap}» della scheda (o nella stessa rete)?",
-  "wifi.err.webRejected": "La scheda ha rifiutato «{line}» via web: {e}"
+  "wifi.err.webRejected": "La scheda ha rifiutato «{line}» via web: {e}",
+  "wifi.g.reading": "Chiedo alla scheda in quale Wi-Fi si trova …",
+  "wifi.g.nowHome": "La scheda è già in una Wi-Fi, all’IP {ip} (inserito sopra). La sua Wi-Fi propria è quindi SPENTA. O: metti il computer nella stessa Wi-Fi → verifica con 🔎 → invia. Oppure: premi «Attiva la Wi-Fi della scheda».",
+  "wifi.g.nowAp": "La Wi-Fi della scheda è attiva: «{ap}». Collega il computer (password di solito 12345678), poi 🔎.",
+  "wifi.g.nowUnknown": "La scheda non ha indicato la sua Wi-Fi. Se non vedi una Wi-Fi «MKS_DLC»: premi «Attiva la Wi-Fi della scheda».",
+  "wifi.pingFailAp": "La scheda non risponde a {ip}. Questo indirizzo esiste solo se il computer è collegato alla Wi-Fi «{ap}» della scheda. Se non la vedi, è spenta → «Attiva la Wi-Fi della scheda»."
 }
