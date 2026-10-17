@@ -23,6 +23,19 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 
 Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 
+## ❤️ CNC Craft unterstützen
+
+CNC Craft ist kostenlos und bleibt es auch. Wenn dir das Programm hilft und du die Weiterentwicklung
+unterstützen möchtest, freue ich mich über einen Kaffee:
+
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-CNC%20Craft%20unterst%C3%BCtzen-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/andys3dworld)
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Andys--3D--World-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Andys-3D-World)
+
+Genauso hilfreich und kostenlos: ⭐ Stern auf GitHub vergeben, Fehler melden ([Issues](https://github.com/Andys-3D-World/cnc-craft/issues))
+und das Programm weitererzählen – z. B. über meine Videos auf YouTube, TikTok und Instagram („Andys 3D World“).
+
+Unterstützung ist freiwillig – alle Funktionen sind für alle frei, es gibt keine Bezahl-Version.
+
 ## Selbst bauen
 
 Voraussetzungen: [Node.js](https://nodejs.org) (LTS), [Rust](https://rustup.rs) und die
@@ -77,8 +90,8 @@ Die Windows-Installationsdateien werden signiert.
 *Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
 [SignPath Foundation](https://signpath.org).*
 
-- **Committers and reviewers:** [Mitglieder des Projekts](https://github.com/orgs/Andys-3D-World/people)
-- **Approvers:** [Inhaber der Organisation](https://github.com/orgs/Andys-3D-World/people)
+- **Committers and reviewers:** [Andys-3D-World](https://github.com/Andys-3D-World) (Andreas Piaszek)
+- **Approvers:** [Andys-3D-World](https://github.com/Andys-3D-World) (Andreas Piaszek)
 - Signiert werden nur Programme, die automatisch aus dem Quellcode dieses Repositorys gebaut wurden
   (GitHub Actions, `.github/workflows/release.yml`). Jede Veröffentlichung wird vorher von Hand freigegeben.
 - Alle Beteiligten nutzen Zwei-Faktor-Anmeldung bei GitHub und SignPath.
