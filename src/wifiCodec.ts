@@ -88,7 +88,44 @@ export interface WifiPlan {
  * canWeb = Weboberfläche des Boards erreichbar (Adresse bekannt)
  * hal39  = aktueller Wert von $39 bei grblHAL (null = unbekannt)
  */
-export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false): WifiPlan {
+/**
+ * Name der Maschine im Netzwerk (Hostname) – damit man mehrere gleiche Boards auseinanderhält.
+ * Erlaubt sind nur a–z, 0–9 und „-“ (so verlangt es WLAN/mDNS): „Laser Garage“ -> „laser-garage“
+ */
+export function hostSlug(name: string): string {
+  return name.trim().toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "")
+    .slice(0, 32).replace(/-$/, "");
+}
+
+/** Befehl für den Namen je Firmware */
+export function hostLine(fw: WifiFw, host: string): string {
+  if (!host) return "";
+  if (fw === "fluidnc") return `$Hostname=${host}`;
+  if (fw === "grblhal") return `$300=${host}`;
+  if (fw === "esp32") return `[ESP112]${host}`;
+  return "";
+}
+
+/** Standard-Namen ab Werk – mehrere Boards heißen dann gleich */
+export function isDefaultHost(h: string): boolean {
+  return /^(mks[_-]?(grbl|dlc32?)?|grblesp|grbl|fluidnc|grblhal|esp3d|espressif|esp32[-_a-z0-9]*)$/i.test(h.trim());
+}
+
+export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false, host = ""): WifiPlan {
+  const plan = planWifiCore(fw, mode, ssid, pw, canWeb, hal39, mks);
+  const hl = hostLine(fw, host);
+  if (hl && !plan.error && plan.lines.length) {
+    // gleich hinter das Passwort, vor das Umschalten
+    const at = Math.max(...plan.secret, 1) + 1;
+    plan.lines.splice(at, 0, hl);
+  }
+  return plan;
+}
+
+function planWifiCore(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false): WifiPlan {
   const plan: WifiPlan = { route: "serial", lines: [], secret: [], restart: "", notes: [], error: "" };
   const both = ssid + pw;
   const r = analyze(both);

@@ -1603,5 +1603,14 @@
   "wifi.switchedAp": "Salvato – la scheda apre ora la propria Wi-Fi «{ssid}».",
   "wifi.checkingJoin": "Verifico via USB se la scheda è entrata nella Wi-Fi …",
   "wifi.joinedAt": "La scheda è nella Wi-Fi «{ssid}» all’IP {ip}.",
-  "wifi.joinFailed": "La scheda non è ancora in «{ssid}». Password corretta? È una rete a 2,4 GHz? (La scheda non supporta 5 GHz.)"
+  "wifi.joinFailed": "La scheda non è ancora in «{ssid}». Password corretta? È una rete a 2,4 GHz? (La scheda non supporta 5 GHz.)",
+  "wifi.name": "Nome della macchina",
+  "wifi.namePh": "es. laser-garage",
+  "wifi.nameTip": "Nome proprio nella rete – per riconoscere la macchina nella ricerca 📡, anche con più schede uguali. Vuoto = non cambiare.",
+  "wifi.nameAs": "Salvato come «{h}» (solo a–z, 0–9 e -).",
+  "wifi.nameLocal": "Raggiungibile in rete come {h}.local",
+  "wifi.nameDefault": "La macchina ora si chiama «{h}» – come tutte le schede di questa marca. Dalle un nome proprio per riconoscerla.",
+  "net.dupHint": "Più macchine sembrano uguali. Consiglio: collega via USB → 📶 Configura Wi-Fi → «Nome della macchina» (es. laser-garage). Poi qui compare il nome.",
+  "m.hostLine": "Nome in rete: {h}",
+  "wifi.note.nameOnly": "Cambia solo il nome – i dati Wi-Fi restano. Il nuovo nome vale dopo il riavvio della scheda."
 }

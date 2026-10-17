@@ -1603,5 +1603,14 @@
   "wifi.switchedAp": "Opgeslagen – het board opent nu zijn eigen wifi „{ssid}“.",
   "wifi.checkingJoin": "Via USB controleren of het board in het wifi zit …",
   "wifi.joinedAt": "Board zit in wifi „{ssid}“ op IP {ip}.",
-  "wifi.joinFailed": "Board zit nog niet in „{ssid}“. Klopt het wachtwoord? Is het een 2,4-GHz-netwerk? (Het board kan geen 5 GHz.)"
+  "wifi.joinFailed": "Board zit nog niet in „{ssid}“. Klopt het wachtwoord? Is het een 2,4-GHz-netwerk? (Het board kan geen 5 GHz.)",
+  "wifi.name": "Naam van de machine",
+  "wifi.namePh": "bijv. laser-garage",
+  "wifi.nameTip": "Eigen naam in het netwerk – zo herken je de machine in de 📡-zoekfunctie, ook met meerdere gelijke boards. Leeg = naam niet wijzigen.",
+  "wifi.nameAs": "Wordt opgeslagen als „{h}“ (alleen a–z, 0–9 en -).",
+  "wifi.nameLocal": "Bereikbaar in het netwerk als {h}.local",
+  "wifi.nameDefault": "De machine heet nu „{h}“ – zoals alle boards van dit merk. Geef hem een eigen naam zodat je hem herkent.",
+  "net.dupHint": "Meerdere machines zien er hetzelfde uit. Tip: via USB verbinden → 📶 Wifi instellen → „Naam van de machine“ (bijv. laser-garage). Dan staat hier de naam.",
+  "m.hostLine": "Netwerknaam: {h}",
+  "wifi.note.nameOnly": "Alleen de naam verandert – wifi-gegevens blijven zoals ze zijn. De nieuwe naam geldt na het herstarten van het board."
 }

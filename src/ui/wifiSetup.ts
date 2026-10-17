@@ -11,7 +11,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n/i18n";
 import { machine, sendAndWait, MACHINE_EVENT } from "../machine";
-import { analyze, planWifi, WifiFw, WifiMode, WifiPlan, parseApList, signalBars, ApInfo } from "../wifiCodec";
+import { analyze, planWifi, WifiFw, WifiMode, WifiPlan, parseApList, signalBars, ApInfo, hostSlug, isDefaultHost, hostLine } from "../wifiCodec";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -182,6 +182,9 @@ export function openWifiSetup(log: (s: string) => void) {
       <label class="dlg-row"><span>${esc(t("wifi.pw"))}</span>
         <span class="wifi-pw"><input id="wifi-pw" type="password" autocomplete="new-password" spellcheck="false"><button type="button" id="wifi-eye" class="btn-secondary" data-tip="${esc(t("wifi.showPw"))}">👁</button></span></label>
       <div id="wifi-check" class="wifi-check"></div>
+      <label class="dlg-row"><span>${esc(t("wifi.name"))}</span>
+        <input id="wifi-name" type="text" autocomplete="off" spellcheck="false" maxlength="40" placeholder="${esc(t("wifi.namePh"))}" data-tip="${esc(t("wifi.nameTip"))}"></label>
+      <div id="wifi-name-hint" class="wifi-note"></div>
       <div id="wifi-guide" class="wifi-guide" style="display:none;"></div>
       <label class="dlg-row" id="wifi-host-row" style="display:none;"><span>${esc(t("wifi.host"))}</span>
         <span class="wifi-pw"><input id="wifi-host" type="text" placeholder="192.168.4.1" spellcheck="false"><button type="button" id="wifi-ping" class="btn-secondary" data-tip="${esc(t("wifi.pingTip"))}">🔎</button></span></label>
@@ -200,6 +203,9 @@ export function openWifiSetup(log: (s: string) => void) {
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   q("wifi-cancel").onclick = close;
   q("wifi-host").value = defaultHost();
+  const oldHost = machine.info.host || "";
+  // Standard-Namen ab Werk nicht vorbelegen (sonst würde „mks_grbl“ unbemerkt zu „mks-grbl“)
+  q("wifi-name").value = oldHost && !isDefaultHost(oldHost) ? oldHost : "";
 
   // ---- Erst-Einrichtung über das eigene WLAN des Boards ----
   let apName = "";
@@ -327,7 +333,18 @@ export function openWifiSetup(log: (s: string) => void) {
   const refresh = () => {
     const ssid = q("wifi-ssid").value, pw = q("wifi-pw").value, host = q("wifi-host").value.trim();
     // Weboberfläche zunächst als möglich annehmen, damit der Weg dorthin angezeigt wird
-    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, mks);
+    const slug = hostSlug(q("wifi-name").value);
+    const newHost = slug && slug !== oldHost && slug !== hostSlug(oldHost) ? slug : "";
+    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, mks, newHost);
+    // nur umbenennen (ohne WLAN-Daten): nur den Namen schicken
+    const nameOnly = !ssid && !!newHost && fw !== "none";
+    if (nameOnly) plan = { route: "serial", lines: [hostLine(fw, newHost)], secret: [], restart: fw === "fluidnc" ? "$Bye" : fw === "esp32" ? "[ESP444]RESTART" : "", notes: ["wifi.note.nameOnly"], error: "" };
+    const nh = q("wifi-name-hint");
+    nh.className = "wifi-note";
+    nh.textContent = slug
+      ? (slug !== q("wifi-name").value.trim() ? t("wifi.nameAs", { h: slug }) + " " : "") + t("wifi.nameLocal", { h: slug })
+      : (oldHost && isDefaultHost(oldHost) ? t("wifi.nameDefault", { h: oldHost }) : "");
+    if (!slug && oldHost && isDefaultHost(oldHost)) nh.className = "wifi-note wifi-warn";
     const r = analyze(ssid + pw);
     const chips: string[] = [];
     if (r.realtime.length) chips.push(`<span class="wifi-chip warn">${esc(r.realtime.join(" "))} – ${esc(t("wifi.c.realtime"))}</span>`);
@@ -346,7 +363,7 @@ export function openWifiSetup(log: (s: string) => void) {
     q("wifi-cmds").textContent = plan.lines.map((l, i) => plan.secret.includes(i) ? l.replace(/(Password=|\]|=)(.*)$/, (_m, a) => a + "••••••••") : l).join("\n")
       + (plan.route === "web" ? `\n(→ http://${host || "IP"}/command?plain=…)` : "");
     const needHost = plan.route === "web" && !host;
-    q<HTMLButtonElement>("wifi-send").disabled = !!plan.error || !ssid || needHost || fw === "none";
+    q<HTMLButtonElement>("wifi-send").disabled = !!plan.error || (!ssid && !nameOnly) || needHost || fw === "none";
   };
   q<HTMLSelectElement>("wifi-board-sel").addEventListener("change", () => {
     boardChoice = q<HTMLSelectElement>("wifi-board-sel").value as WifiBoard;

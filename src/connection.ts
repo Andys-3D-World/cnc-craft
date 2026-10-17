@@ -22,7 +22,7 @@ import {
 } from "./machine";
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
 import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
-import { analyze } from "./wifiCodec";
+import { analyze, isDefaultHost } from "./wifiCodec";
 
 const KEY_LAST = "cnc_craft_last_port";
 const KEY_RUIDA_IP = "cnc_craft_ruida_ip";
@@ -116,8 +116,17 @@ export function initConnection(appendToConsole: (text: string) => void) {
       const net = r.own ? r.own.replace(/\.\d+$/, ".x") : "";
       const devs = r.devices || [];
       rememberFound(devs);
+      // mehrere Maschinen, die man nicht auseinanderhalten kann (gleicher oder Standard-Name)?
+      const dupHint = (list: NetDevice[]) => {
+        const g = list.filter(d => d.kind === "grbl");
+        const ips = [...new Set(g.map(d => d.ip))];
+        if (ips.length < 2) return "";
+        const names = ips.map(ip => g.find(d => d.ip === ip)?.host || "");
+        const unclear = names.some(n => !n || isDefaultHost(n)) || new Set(names).size < names.length;
+        return unclear ? `<div class="net-find-dup">${esc(t("net.dupHint"))}</div>` : "";
+      };
       const label = (d: NetDevice) => {
-        const parts = [d.firmware, d.name].filter(Boolean);
+        const parts = [d.firmware, d.name, d.host && isDefaultHost(d.host) ? d.host : ""].filter(Boolean);
         return parts.length ? parts.join(" · ") : t(d.kind === "grbl" ? "net.grblUnknown" : "net.openPort");
       };
       const portHint = (p: number) => p === 23 ? "Telnet" : p === 8080 ? "MKS" : p === 8780 ? "xTool" : "";
@@ -127,9 +136,12 @@ export function initConnection(appendToConsole: (text: string) => void) {
         ${devs.length ? devs.map(d => `
           <button class="net-find-item${d.kind === "grbl" ? " grbl" : ""}" data-addr="${esc(d.ip + ":" + d.port)}">
             <span class="net-find-dot"></span>
-            <span class="net-find-txt"><b>${esc(d.ip)}<em>:${d.port}</em></b><small>${esc(label(d))}${portHint(d.port) ? " · " + portHint(d.port) : ""}</small></span>
+            <span class="net-find-txt">${d.host && !isDefaultHost(d.host)
+              ? `<b><span class="net-host">${esc(d.host)}</span><span class="net-ipline">${esc(d.ip)}:${d.port}</span></b>`
+              : `<b>${esc(d.ip)}<em>:${d.port}</em></b>`}<small>${esc(label(d))}${portHint(d.port) ? " · " + portHint(d.port) : ""}</small></span>
             <span class="net-find-use">${esc(t("net.use"))}</span>
-          </button>`).join("") : `<div class="net-find-none">${esc(t("net.none"))}</div>`}`;
+          </button>`).join("") : `<div class="net-find-none">${esc(t("net.none"))}</div>`}
+        ${dupHint(devs)}`;
       findList.querySelector(".net-find-x")?.addEventListener("click", hideFind);
       findList.querySelectorAll<HTMLButtonElement>(".net-find-item").forEach(b => b.addEventListener("click", () => pick(b.dataset.addr!)));
       const grbl = devs.filter(d => d.kind === "grbl");
@@ -192,8 +204,9 @@ export function initConnection(appendToConsole: (text: string) => void) {
       const board = bi.version
         ? t("m.boardLine", { name: bi.name || machine.firmware, v: bi.version, d: bi.date ? fmtBuildDate(bi.date) : "–" })
         : "";
+      const host = bi.host ? "\n" + t("m.hostLine", { h: bi.host }) : "";
       info.textContent = machine.firmware
-        ? t("m.infoConnected", { fw: machine.firmware, v: machine.version, port: machine.port }) + (board ? "\n" + board : "")
+        ? t("m.infoConnected", { fw: machine.firmware, v: machine.version, port: machine.port }) + (board ? "\n" + board : "") + host
         : t("m.infoWaiting", { port: machine.port });
     } else if (isK40Machine()) {
       info.textContent = t("m.k40Hint");
@@ -293,8 +306,11 @@ export function initConnection(appendToConsole: (text: string) => void) {
         const grbl = (r.devices || []).filter(d => d.kind === "grbl" && `${d.ip}:${d.port}` !== oldAddr);
         // dieselbe Maschine wie beim letzten Mal bevorzugen (gleiche Firmware/gleicher Name)
         const before = knownDevices().find(d => `${d.ip}:${d.port}` === oldAddr || d.ip === oldAddr);
-        const same = before ? grbl.filter(d => (d.firmware && d.firmware === before.firmware) || (d.name && d.name === before.name)) : [];
-        const pickDev = same.length === 1 ? same[0] : grbl.length === 1 ? grbl[0] : null;
+        // Hat die Maschine einen eigenen Namen, zählt NUR der – sonst landet man bei mehreren gleichen Boards an der falschen
+        const named = before?.host && !isDefaultHost(before.host) ? before.host : "";
+        const same = named ? grbl.filter(d => d.host === named)
+          : before ? grbl.filter(d => (d.firmware && d.firmware === before.firmware) || (d.name && d.name === before.name)) : [];
+        const pickDev = same.length === 1 ? same[0] : !named && grbl.length === 1 ? grbl[0] : null;
         if (pickDev) {
           const addr = `${pickDev.ip}:${pickDev.port}`;
           ipInput.value = addr;

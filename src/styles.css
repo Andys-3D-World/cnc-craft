@@ -1320,3 +1320,7 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .sp-rst-warn { font-size: 0.76rem; color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); border-radius: 6px; padding: 6px 8px; line-height: 1.35; }
 .sp-rst-go { background: #c0392b !important; border-color: #c0392b !important; }
 #wifi-board-sel { flex: 1 1 auto; min-width: 0; max-width: 250px; text-overflow: ellipsis; }
+.wifi-note.wifi-warn { color: #ffd28a; }
+.net-find-txt b .net-host { color: #fff; }
+.net-find-txt .net-ipline { font-weight: 400; color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
+.net-find-dup { margin: 4px 6px; padding: 6px 8px; border-radius: 6px; font-size: 0.72rem; line-height: 1.35; color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); }

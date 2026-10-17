@@ -1603,5 +1603,14 @@
   "wifi.switchedAp": "Guardado: la placa abre ahora su propia Wi-Fi «{ssid}».",
   "wifi.checkingJoin": "Comprobando por USB si la placa se conectó a la Wi-Fi…",
   "wifi.joinedAt": "La placa está en la Wi-Fi «{ssid}» con la IP {ip}.",
-  "wifi.joinFailed": "La placa aún no está en «{ssid}». ¿Contraseña correcta? ¿Es una red de 2,4 GHz? (La placa no admite 5 GHz.)"
+  "wifi.joinFailed": "La placa aún no está en «{ssid}». ¿Contraseña correcta? ¿Es una red de 2,4 GHz? (La placa no admite 5 GHz.)",
+  "wifi.name": "Nombre de la máquina",
+  "wifi.namePh": "p. ej. laser-taller",
+  "wifi.nameTip": "Nombre propio en la red: así reconoces la máquina en la búsqueda 📡, aunque tengas varias placas iguales. Vacío = no cambiar.",
+  "wifi.nameAs": "Se guarda como «{h}» (solo a–z, 0–9 y -).",
+  "wifi.nameLocal": "Accesible en la red como {h}.local",
+  "wifi.nameDefault": "La máquina se llama ahora «{h}», como todas las placas de esta marca. Dale un nombre propio para reconocerla.",
+  "net.dupHint": "Varias máquinas parecen iguales. Consejo: conecta por USB → 📶 Configurar Wi-Fi → «Nombre de la máquina» (p. ej. laser-taller). Así aparece aquí el nombre.",
+  "m.hostLine": "Nombre en la red: {h}",
+  "wifi.note.nameOnly": "Solo cambia el nombre; los datos de la Wi-Fi se mantienen. El nuevo nombre vale tras reiniciar la placa."
 }

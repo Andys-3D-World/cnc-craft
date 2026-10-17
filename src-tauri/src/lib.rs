@@ -316,6 +316,7 @@ struct NetDevice {
     kind: String,
     firmware: String,
     name: String,
+    host: String,
 }
 #[derive(Serialize)]
 struct NetScan {
@@ -333,7 +334,7 @@ async fn net_scan(hints: Option<Vec<String>>) -> Result<NetScan, String> {
         own: own.map(|ip| ip.to_string()).unwrap_or_default(),
         devices: found
             .into_iter()
-            .map(|f| NetDevice { ip: f.ip, port: f.port, kind: f.kind, firmware: f.firmware, name: f.name })
+            .map(|f| NetDevice { ip: f.ip, port: f.port, kind: f.kind, firmware: f.firmware, name: f.name, host: f.host })
             .collect(),
     })
 }

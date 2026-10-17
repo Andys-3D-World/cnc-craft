@@ -1603,5 +1603,14 @@
   "wifi.switchedAp": "Zapisano – płyta otwiera teraz własną sieć „{ssid}”.",
   "wifi.checkingJoin": "Sprawdzam przez USB, czy płyta połączyła się z siecią …",
   "wifi.joinedAt": "Płyta jest w sieci „{ssid}” pod IP {ip}.",
-  "wifi.joinFailed": "Płyta nie połączyła się jeszcze z „{ssid}”. Hasło poprawne? Czy to sieć 2,4 GHz? (Płyta nie obsługuje 5 GHz.)"
+  "wifi.joinFailed": "Płyta nie połączyła się jeszcze z „{ssid}”. Hasło poprawne? Czy to sieć 2,4 GHz? (Płyta nie obsługuje 5 GHz.)",
+  "wifi.name": "Nazwa maszyny",
+  "wifi.namePh": "np. laser-garaz",
+  "wifi.nameTip": "Własna nazwa w sieci – rozpoznasz maszynę w wyszukiwaniu 📡, nawet przy kilku takich samych płytach. Puste = bez zmiany.",
+  "wifi.nameAs": "Zapisane jako „{h}” (tylko a–z, 0–9 i -).",
+  "wifi.nameLocal": "Dostępna w sieci jako {h}.local",
+  "wifi.nameDefault": "Maszyna nazywa się teraz „{h}” – jak wszystkie płyty tej marki. Nadaj jej własną nazwę, żeby ją rozpoznać.",
+  "net.dupHint": "Kilka maszyn wygląda tak samo. Wskazówka: połącz przez USB → 📶 Konfiguracja Wi-Fi → „Nazwa maszyny” (np. laser-garaz). Wtedy pojawi się tu nazwa.",
+  "m.hostLine": "Nazwa w sieci: {h}",
+  "wifi.note.nameOnly": "Zmienia się tylko nazwa – dane Wi-Fi zostają. Nowa nazwa obowiązuje po ponownym uruchomieniu płyty."
 }

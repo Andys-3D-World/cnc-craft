@@ -41,6 +41,8 @@ pub struct Found {
     pub firmware: String,
     /// Name aus der Weboberfläche (Seitentitel), leer wenn keiner
     pub name: String,
+    /// Name im Netzwerk (Hostname aus [ESP800]), z. B. "laser-garage" – leer wenn unbekannt
+    pub host: String,
 }
 
 /// Ergebnis eines Verbindungsversuchs
@@ -242,7 +244,7 @@ fn run_round(targets: Vec<SocketAddr>, connect_timeout: Duration, read_time: Dur
             match knock(addr, connect_timeout, read_time) {
                 (Knock::Found, Some((kind, firmware))) => {
                     if let Ok(mut v) = f.lock() {
-                        v.push(Found { ip: addr.ip().to_string(), port: addr.port(), kind, firmware, name: String::new() });
+                        v.push(Found { ip: addr.ip().to_string(), port: addr.port(), kind, firmware, name: String::new(), host: String::new() });
                     }
                 }
                 (Knock::Timeout, _) => {
@@ -331,16 +333,38 @@ fn merge(mut v: Vec<Found>) -> Vec<Found> {
 }
 
 fn add_titles(v: &mut [Found]) {
-    let mut cache: Vec<(String, String)> = Vec::new();
+    let mut cache: Vec<(String, String, String)> = Vec::new();
     for f in v.iter_mut() {
-        if let Some((_, n)) = cache.iter().find(|(ip, _)| ip == &f.ip) {
+        if let Some((_, n, h)) = cache.iter().find(|(ip, _, _)| ip == &f.ip) {
             f.name = n.clone();
+            f.host = h.clone();
             continue;
         }
         let name = f.ip.parse::<Ipv4Addr>().map(|ip| web_title(ip, Duration::from_millis(900))).unwrap_or_default();
-        cache.push((f.ip.clone(), name.clone()));
+        // Hostname über die Weboberfläche ([ESP800] – Grbl_ESP32, MKS DLC32, FluidNC, ESP3D)
+        let host = if name.is_empty() && f.kind != "grbl" {
+            String::new()
+        } else {
+            crate::camfetch::web_command(&f.ip, "[ESP800]", Duration::from_millis(900))
+                .map(|r| hostname_of(&r))
+                .unwrap_or_default()
+        };
+        cache.push((f.ip.clone(), name.clone(), host.clone()));
         f.name = name;
+        f.host = host;
     }
+}
+
+/// "FW version:1.0.4 # FW target:grbl-embedded # hostname:laser-garage # axis:3" -> "laser-garage"
+pub fn hostname_of(text: &str) -> String {
+    let lower = text.to_lowercase();
+    let Some(i) = lower.find("hostname:") else { return String::new() };
+    text[i + 9..]
+        .trim_start()
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_' || *c == '.')
+        .take(40)
+        .collect()
 }
 
 /// Ganze Suche. `hints` = zuletzt benutzte/gefundene Adressen aus der Oberfläche.
@@ -502,10 +526,17 @@ mod tests {
     }
 
     #[test]
+    fn hostname_from_esp800() {
+        assert_eq!(hostname_of("FW version:1.0.4 # FW target:grbl-embedded # FW HW:Direct SD # hostname:laser-garage # axis:3"), "laser-garage");
+        assert_eq!(hostname_of("FW version:3.9.1 # hostname: fluidnc # webcommunication"), "fluidnc");
+        assert_eq!(hostname_of("Error: no such command"), "");
+    }
+
+    #[test]
     fn merge_dedupe() {
-        let a = Found { ip: "10.0.0.5".into(), port: 23, kind: "open".into(), firmware: "".into(), name: "".into() };
+        let a = Found { ip: "10.0.0.5".into(), port: 23, kind: "open".into(), firmware: "".into(), name: "".into(), host: "".into() };
         let b = Found { kind: "grbl".into(), firmware: "Grbl 1.1h".into(), ..a.clone() };
-        let c = Found { ip: "10.0.0.2".into(), port: 8080, kind: "open".into(), firmware: "".into(), name: "".into() };
+        let c = Found { ip: "10.0.0.2".into(), port: 8080, kind: "open".into(), firmware: "".into(), name: "".into(), host: "".into() };
         let m = merge(vec![a, c, b]);
         assert_eq!(m.len(), 2);
         assert_eq!((m[0].ip.as_str(), m[0].kind.as_str()), ("10.0.0.5", "grbl"));

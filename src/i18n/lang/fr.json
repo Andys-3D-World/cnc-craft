@@ -1603,5 +1603,14 @@
   "wifi.switchedAp": "Enregistré – la carte ouvre maintenant son propre Wi-Fi « {ssid} ».",
   "wifi.checkingJoin": "Vérification via USB de la connexion de la carte au Wi-Fi …",
   "wifi.joinedAt": "La carte est dans le Wi-Fi « {ssid} » à l’IP {ip}.",
-  "wifi.joinFailed": "La carte n’a pas encore rejoint « {ssid} ». Mot de passe correct ? Réseau 2,4 GHz ? (La carte ne gère pas le 5 GHz.)"
+  "wifi.joinFailed": "La carte n’a pas encore rejoint « {ssid} ». Mot de passe correct ? Réseau 2,4 GHz ? (La carte ne gère pas le 5 GHz.)",
+  "wifi.name": "Nom de la machine",
+  "wifi.namePh": "p. ex. laser-atelier",
+  "wifi.nameTip": "Nom propre sur le réseau – pour reconnaître la machine dans la recherche 📡, même avec plusieurs cartes identiques. Vide = ne pas changer.",
+  "wifi.nameAs": "Enregistré comme « {h} » (seulement a–z, 0–9 et -).",
+  "wifi.nameLocal": "Joignable sur le réseau comme {h}.local",
+  "wifi.nameDefault": "La machine s’appelle actuellement « {h} » – comme toutes les cartes de cette marque. Donne-lui un nom propre pour la reconnaître.",
+  "net.dupHint": "Plusieurs machines se ressemblent. Astuce : connecter en USB → 📶 Configurer le Wi-Fi → « Nom de la machine » (p. ex. laser-atelier). Le nom s’affichera ici.",
+  "m.hostLine": "Nom réseau : {h}",
+  "wifi.note.nameOnly": "Seul le nom change – les réglages Wi-Fi restent. Le nouveau nom s’applique après le redémarrage de la carte."
 }

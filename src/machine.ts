@@ -39,6 +39,7 @@ export interface BoardInfo {
   options: string;   // GRBL-Optionen aus [OPT:…], z. B. "VNMZL"
   rx: number;        // Empfangspuffer in Zeichen
   fw: string;        // ESP-Firmware-Text aus [ESP800]
+  host: string;      // Name im Netzwerk (Hostname), z. B. "laser-garage" – aus [ESP800] / $System/Hostname
   raw: string[];     // alle Info-Zeilen
 }
 const INFO_KEY = "cnc_craft_board_info";
@@ -61,14 +62,14 @@ export const machine = {
   job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
   settings: new Map<string, string>(),  // "$110" -> "5000.000"
   lastAlarm: 0,
-  info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", raw: [] } as BoardInfo
+  info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] } as BoardInfo
 };
 
 let infoRequested = false;
 let espInfoRequested = false;
 
 function resetInfo() {
-  machine.info = { name: "", version: "", date: "", options: "", rx: 0, fw: "", raw: [] };
+  machine.info = { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] };
   infoRequested = false;
   espInfoRequested = false;
 }
@@ -124,6 +125,8 @@ function parseInfoLine(text: string): boolean {
   if (mks && !info.name) { info.name = mks[0].replace(/_/g, " ").trim(); hit = true; }
   const fw = text.match(/FW version:\s*([^,#\]]+)/i);
   if (fw) { info.fw = fw[1].trim(); hit = true; }
+  const host = text.match(/hostname:\s*([A-Za-z0-9_.-]+)/i) || text.match(/^\$(?:System\/Hostname|ESP112|Hostname|300)=([A-Za-z0-9_.-]+)\s*$/);
+  if (host) { info.host = host[1]; hit = true; }
   if (hit || /^\[(VER|OPT|ESP|MSG:.*(MKS|Version))/i.test(text) || /FW (version|target|HW)/i.test(text)) {
     if (!info.raw.includes(text) && info.raw.length < 40) info.raw.push(text);
   }
@@ -379,6 +382,7 @@ export interface NetDevice {
   kind: "grbl" | "open" | string; // grbl = antwortet wie GRBL, open = Port offen, Antwort unklar
   firmware: string;               // z. B. "Grbl 1.1h", "FluidNC v3.9.1"
   name: string;                   // Titel der Weboberfläche, z. B. "MKS DLC32"
+  host?: string;                  // Name im Netzwerk (Hostname), z. B. "laser-garage"
 }
 
 /** Eigenes Netz nach GRBL-Maschinen absuchen (dauert ein paar Sekunden).

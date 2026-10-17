@@ -1778,5 +1778,14 @@
   "wifi.switchedAp": "Gespeichert – das Board macht jetzt sein eigenes WLAN „{ssid}“ auf.",
   "wifi.checkingJoin": "Prüfe über USB, ob das Board im WLAN angekommen ist …",
   "wifi.joinedAt": "Board ist im WLAN „{ssid}“ unter der IP {ip}.",
-  "wifi.joinFailed": "Board ist noch nicht in „{ssid}“ angekommen. Passwort richtig? Ist das WLAN ein 2,4-GHz-Netz? (Das Board kann kein 5 GHz.)"
+  "wifi.joinFailed": "Board ist noch nicht in „{ssid}“ angekommen. Passwort richtig? Ist das WLAN ein 2,4-GHz-Netz? (Das Board kann kein 5 GHz.)",
+  "wifi.name": "Name der Maschine",
+  "wifi.namePh": "z. B. laser-garage",
+  "wifi.nameTip": "Eigener Name im Netzwerk – so erkennst du die Maschine in der 📡-Suche wieder, auch wenn du mehrere gleiche Boards hast. Leer lassen = Name nicht ändern.",
+  "wifi.nameAs": "Wird gespeichert als „{h}“ (nur a–z, 0–9 und -).",
+  "wifi.nameLocal": "Im Netz erreichbar als {h}.local",
+  "wifi.nameDefault": "Die Maschine heißt im Moment „{h}“ – so heißen alle Boards dieser Marke. Gib ihr einen eigenen Namen, damit du sie wiedererkennst.",
+  "net.dupHint": "Mehrere Maschinen sehen gleich aus. Tipp: per USB verbinden → 📶 WLAN einrichten → „Name der Maschine“ (z. B. laser-garage). Dann steht hier der Name.",
+  "m.hostLine": "Name im Netz: {h}",
+  "wifi.note.nameOnly": "Nur der Name wird geändert – WLAN-Daten bleiben, wie sie sind. Der neue Name gilt nach dem Neustart des Boards."
 }

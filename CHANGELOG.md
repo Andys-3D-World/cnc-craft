@@ -1,5 +1,18 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Neu**
+- **Name der Maschine** im WLAN-Dialog (z. B. „laser-garage“): wird als Netzwerk-Name aufs Board geschrieben
+  (Grbl_ESP32/MKS: [ESP112], FluidNC: $Hostname, grblHAL: $300) – auch ohne WLAN-Daten, nur zum Umbenennen.
+  Die Maschine ist dann auch als laser-garage.local erreichbar
+- **📡-Suche zeigt den Namen** jeder Maschine; Hinweis, wenn mehrere gleiche Boards nicht zu unterscheiden sind
+- Verbindungs-Info zeigt den Namen im Netz
+
+**Verbessert**
+- Neue IP automatisch finden: hat die Maschine einen eigenen Namen, wird nur die Maschine mit genau diesem Namen
+  genommen – bei mehreren gleichen Boards verbindet sich die App nicht mehr versehentlich mit der falschen
+
 ## 0.2.3 Beta
 
 **Neu**

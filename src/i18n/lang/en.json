@@ -1778,5 +1778,14 @@
   "wifi.switchedAp": "Saved – the board now opens its own Wi-Fi “{ssid}”.",
   "wifi.checkingJoin": "Checking via USB whether the board joined the Wi-Fi …",
   "wifi.joinedAt": "Board is in the Wi-Fi “{ssid}” at IP {ip}.",
-  "wifi.joinFailed": "Board has not joined “{ssid}” yet. Is the password right? Is it a 2.4 GHz network? (The board can’t do 5 GHz.)"
+  "wifi.joinFailed": "Board has not joined “{ssid}” yet. Is the password right? Is it a 2.4 GHz network? (The board can’t do 5 GHz.)",
+  "wifi.name": "Machine name",
+  "wifi.namePh": "e.g. laser-garage",
+  "wifi.nameTip": "Own name on the network – lets you recognise the machine in the 📡 search, even with several identical boards. Leave empty = keep the name.",
+  "wifi.nameAs": "Saved as “{h}” (only a–z, 0–9 and -).",
+  "wifi.nameLocal": "Reachable on the network as {h}.local",
+  "wifi.nameDefault": "The machine is currently called “{h}” – like every board of this brand. Give it its own name so you can recognise it.",
+  "net.dupHint": "Several machines look the same. Tip: connect via USB → 📶 Wi-Fi setup → “Machine name” (e.g. laser-garage). Then the name shows here.",
+  "m.hostLine": "Network name: {h}",
+  "wifi.note.nameOnly": "Only the name is changed – Wi-Fi settings stay as they are. The new name applies after the board restarts."
 }
