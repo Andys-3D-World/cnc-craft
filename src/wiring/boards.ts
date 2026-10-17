@@ -12,6 +12,17 @@
  *   - MKS DLC32 MAX V1.0: Makerbase-Pinplan „MKS DLC32 MAX V1.0_002 PIN“.
  *
  * Koordinaten: Board-Fläche w × h je Board (Zeichnung in ui/wiringPage.ts).
+ *
+ * NEUES BOARD HINZUFÜGEN
+ *   1. Ein Objekt `const meinBoard: Board = { … }` anlegen (Vorlage: dlcMax unten):
+ *        id, name, maker (Hersteller = Gruppe in der Auswahlliste), mcu, volt, w/h,
+ *        conns  = Stecker mit Pins (Beschriftung wie auf der Platine, mcu = Controller-Pin, fn = Funktion),
+ *        deco   = Treiber-Steckplätze, Chip, USB … (nur Optik)
+ *        fw / source = i18n-Schlüssel für Firmware und Herkunft der Zeichnung
+ *   2. In hookupsFor() steht, welches Bauteil an welchen Stecker kommt. Neue Boards brauchen dort
+ *      einen eigenen Zweig (wie isShield / isMax) – Stecker-IDs wie "lx", "probe", "ttl", "spin", "pwr"
+ *      wiederzuverwenden spart Arbeit.
+ *   3. Unten in BOARDS eintragen (und ggf. shiftRight aufrufen). Die Auswahlliste sortiert sich selbst.
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
@@ -41,6 +52,7 @@ export interface Hookup {
 export interface Board {
   id: string;
   name: string;
+  maker: string;       // Hersteller – Gruppe in der Auswahlliste
   mcu: string;
   fw: string;          // i18n-Schlüssel
   source: string;      // i18n-Schlüssel (Herkunft der Zeichnung)
@@ -81,6 +93,7 @@ const switchPart = (axis: string, conn: string, sig = "S", gnd = "G", side: Part
 // =====================================================================
 const shield: Board = {
   id: "cnc-shield-v3",
+  maker: "Arduino",
   name: "Arduino UNO + CNC Shield V3",
   mcu: "ATmega328P",
   fw: "wr.fw.shield",
@@ -121,6 +134,7 @@ const esd = (axis: string, x: number, mcu = ""): BConn => ({
 });
 const dlc21: Board = {
   id: "mks-dlc32-v21",
+  maker: "Makerbase (MKS)",
   name: "MKS DLC32 V2.1",
   mcu: "ESP32",
   fw: "wr.fw.dlc32",
@@ -158,6 +172,7 @@ const dlc21: Board = {
 // =====================================================================
 const dlcMax: Board = {
   id: "mks-dlc32-max",
+  maker: "Makerbase (MKS)",
   name: "MKS DLC32 MAX V1.0",
   mcu: "ESP32-S3",
   fw: "wr.fw.dlcmax",

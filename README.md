@@ -3,17 +3,19 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.1.0 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.2.0 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ## Was es kann
 
-- Zeichnen, Import (SVG, DXF, PDF, PLT, Bilder, STL), Fräsbahnen mit Werkzeug-Bibliothek wie in Estlcam
+- Zeichnen, Import (SVG, DXF, PDF, PLT, Bilder, 3D-Modelle als STL, 3MF und STEP), Fräsbahnen mit Werkzeug-Bibliothek wie in Estlcam
 - Laser-Ebenen wie in LightBurn, Plasma mit Schnittspalt, Anfahrbahn und Höhenregelung (THC)
 - Steuerungen: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB und WLAN), Marlin, Ruida (CO₂), K40 (M2 Nano)
 - Spindel, Laser-Testschuss, Overrides 10–200 %, Eingangs-Lämpchen für Endschalter und Taster
 - Board flashen (ESP32/ESP32-S3 inkl. .elf, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
 - Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
+
+Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 
 ## Selbst bauen
 
@@ -35,3 +37,7 @@ Installationsdateien für alle Systeme baut die GitHub-Action `.github/workflows
 ## Lizenz
 
 Die mitgelieferte GRBL-Firmware (`src-tauri/firmware/`) steht unter GPLv3, siehe dortige README.
+
+Der STEP-Import nutzt [occt-import-js](https://github.com/kovacsv/occt-import-js) mit
+[Open CASCADE Technology](https://www.opencascade.com) (beide LGPL 2.1). Die Dateien liegen unverändert in
+`public/occt/` und werden zur Laufzeit geladen, siehe `public/occt/README.md`.

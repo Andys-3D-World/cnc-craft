@@ -58,7 +58,7 @@ jobs:
           tagName: v__VERSION__-beta
           releaseName: "CNC Craft v__VERSION__ Beta"
           releaseBody: |
-            Erste Beta von CNC Craft – bitte testen und Fehler melden.
+            Beta von CNC Craft – bitte testen und Fehler melden. Was neu ist: siehe CHANGELOG.md im Repository.
 
             macOS: .dmg öffnen und CNC Craft in „Programme“ ziehen. Beim ersten Start meldet macOS „nicht verifiziert“:
             Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“.

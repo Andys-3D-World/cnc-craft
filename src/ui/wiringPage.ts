@@ -1,7 +1,7 @@
 /**
  * ANSCHLUSSPLAN (Reiter „Anschlüsse“)
  *
- * Board wählen (CNC Shield V3, MKS DLC32 V2.1, MKS DLC32 MAX), dann ein Bauteil
+ * Board aus der Liste wählen (wie beim Board-Flashen, nach Hersteller gruppiert), dann ein Bauteil
  * (Netzteil, Motoren, Endschalter, Taster/WLS, Laser, Spindel, Plasma, Luft, Not-Aus, Tür):
  *   - Zeichnung: Board mit Steckern + Bauteile mit farbigen Drähten an die richtigen Pins
  *   - Einsteiger: Schritt-für-Schritt-Anleitung, Warnungen, was danach einzustellen ist
@@ -313,9 +313,17 @@ export function initWiringPage() {
       }));
     }
 
-    const boardCards = BOARDS.map(x => `
-      <button class="wr-boardbtn${x.id === b.id ? " active" : ""}" data-board="${x.id}">
-        <b>${esc(x.name)}</b><span>${esc(x.mcu)} · ${esc(x.volt)}</span></button>`).join("");
+    // Auswahlliste wie beim Board-Flashen – nach Hersteller gruppiert, damit es auch mit vielen Boards übersichtlich bleibt
+    const makers = [...new Set(BOARDS.map(x => x.maker))].sort((a, c) => a.localeCompare(c));
+    const boardSelect = `
+      <label class="wr-boardpick">
+        <span>${esc(t("wr.board"))}</span>
+        <select id="wr-board">
+          ${makers.map(mk => `<optgroup label="${esc(mk)}">${BOARDS.filter(x => x.maker === mk)
+            .map(x => `<option value="${x.id}"${x.id === b.id ? " selected" : ""}>${esc(x.name)} – ${esc(x.mcu)}</option>`).join("")}</optgroup>`).join("")}
+        </select>
+        <em>${esc(b.mcu)} · ${esc(b.volt)} · ${esc(t(b.fw))}</em>
+      </label>`;
     const chips = [`<button class="wr-chip${comp === "overview" ? " active" : ""}" data-comp="overview">🗺️ ${esc(t("wr.overview"))}</button>`]
       .concat(COMPS.map(c => {
         const h = b.hookups[c];
@@ -365,7 +373,7 @@ export function initWiringPage() {
     root.innerHTML = `
       <div class="wr">
         <div class="wr-top">
-          <div class="wr-boards">${boardCards}</div>
+          ${boardSelect}
           <div class="wr-level" role="group">
             <button data-level="beginner" class="${level === "beginner" ? "active" : ""}">🙂 ${esc(t("wr.level.beginner"))}</button>
             <button data-level="pro" class="${level === "pro" ? "active" : ""}">🛠️ ${esc(t("wr.level.pro"))}</button>
@@ -380,10 +388,12 @@ export function initWiringPage() {
       </div>`;
   };
 
+  root.addEventListener("change", (e) => {
+    const el = e.target as HTMLSelectElement;
+    if (el.id === "wr-board") { boardId = el.value; put(KEY_BOARD, boardId); render(); }
+  });
   root.addEventListener("click", (e) => {
     const el = e.target as Element;
-    const bb = el.closest("[data-board]") as HTMLElement | null;
-    if (bb) { boardId = bb.dataset.board!; put(KEY_BOARD, boardId); render(); return; }
     const lv = el.closest("[data-level]") as HTMLElement | null;
     if (lv) { level = lv.dataset.level === "pro" ? "pro" : "beginner"; put(KEY_LEVEL, level); render(); return; }
     const cc = el.closest("[data-comp]") as HTMLElement | null;

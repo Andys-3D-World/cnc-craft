@@ -1,5 +1,5 @@
 /**
- * STL-IMPORT-DIALOG: Datei laden -> Ansicht und Schnitthöhe wählen -> als 2D-Konturen einfügen.
+ * 3D-IMPORT-DIALOG (STL, 3MF, STEP): Datei laden -> Ansicht und Schnitthöhe wählen -> als 2D-Konturen einfügen.
  *
  * Farben in der Vorschau:  Blau = Außenkontur, Gelb = Loch, Rot = offene Linie (Modell undicht)
  */
@@ -13,6 +13,7 @@ import { Mesh3DPreview, render2D } from "./stlPreview";
 import { createPolyline, MM_TO_PIXEL } from "./shapeTransform";
 import { updateDimensionInputs } from "./uiInputs";
 import { assignPartGroups } from "./editor/parts";
+import { parse3mf, parseStep, MODEL_EXTENSIONS } from "./importers/meshImport";
 import { t } from "./i18n/i18n";
 
 export function setupStlLoader(
@@ -29,7 +30,7 @@ export function setupStlLoader(
         multiple: false,
         directory: false,
         title: t("stl.dlgTitle"),
-        filters: [{ name: t("stl.dlgFilter"), extensions: ["stl", "STL"] }]
+        filters: [{ name: t("stl.dlgFilter"), extensions: [...MODEL_EXTENSIONS, ...MODEL_EXTENSIONS.map(e => e.toUpperCase())] }]
       });
       if (!selectedFile) return;
 
@@ -38,15 +39,15 @@ export function setupStlLoader(
         : selectedFile;
       const fileName = String(filePath).split(/[\\/]/).pop() || "Modell";
       const binary = await readFile(filePath);
-      openStlFromBytes(fileName, binary, state, redraw, appendToConsole);
+      await openStlFromBytes(fileName, binary, state, redraw, appendToConsole);
     } catch (err) {
       appendToConsole(t("stl.loadError", { e: String(err) }));
     }
   });
 }
 
-/** STL aus bereits gelesenen Bytes öffnen (wird auch vom allgemeinen Import benutzt) */
-export function openStlFromBytes(
+/** 3D-Modell (STL, 3MF, STEP) aus bereits gelesenen Bytes öffnen (wird auch vom allgemeinen Import benutzt) */
+export async function openStlFromBytes(
   fileName: string,
   binary: Uint8Array,
   state: any,
@@ -54,12 +55,22 @@ export function openStlFromBytes(
   appendToConsole: (t: string) => void
 ) {
   appendToConsole(t("stl.reading", { name: fileName }));
-  const buffer = binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength) as ArrayBuffer;
-  const mesh = parseStl(buffer);
+  const ext = (fileName.split(".").pop() || "").toLowerCase();
+  let mesh;
+  if (ext === "3mf") mesh = await parse3mf(binary);
+  else if (ext === "step" || ext === "stp") {
+    appendToConsole(t("m3d.stepWait"));
+    const t0 = performance.now();
+    mesh = await parseStep(binary);
+    appendToConsole(t("m3d.stepDone", { s: ((performance.now() - t0) / 1000).toFixed(1) }));
+  } else {
+    const buffer = binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength) as ArrayBuffer;
+    mesh = parseStl(buffer);
+  }
   const welded = weldMesh(mesh);
   const size = mesh.max.map((m, i) => (m - mesh.min[i]).toFixed(1));
   appendToConsole(
-    t("stl.loaded", { n: mesh.triangleCount, fmt: mesh.format === "ascii" ? t("stl.ascii") : t("stl.binary"), x: size[0], y: size[1], z: size[2] })
+    t("stl.loaded", { n: mesh.triangleCount, fmt: mesh.format === "ascii" ? t("stl.ascii") : mesh.format === "binary" ? t("stl.binary") : mesh.format.toUpperCase(), x: size[0], y: size[1], z: size[2] })
   );
   showStlDialog(fileName, welded, size, state, redraw, appendToConsole);
 }

@@ -1,5 +1,6 @@
 /**
  * STL-LOADER: Liest STL-Dateien (Binär UND ASCII) und schneidet daraus 2D-Konturen.
+ * 3MF und STEP werden in importers/meshImport.ts in dieselbe Dreiecksliste umgewandelt.
  *
  * Ablauf:
  *   1. parseStl()        -> Datei lesen (Binär oder Text), alle Dreiecke in mm
@@ -15,11 +16,13 @@ import { t } from "./i18n/i18n";
 
 export type StlView = "top" | "bottom" | "front" | "back" | "left" | "right";
 
+export type MeshFormat = "binary" | "ascii" | "3mf" | "step";
+
 export interface StlMesh {
   /** 9 Werte pro Dreieck: x1,y1,z1, x2,y2,z2, x3,y3,z3 */
   positions: Float32Array;
   triangleCount: number;
-  format: "binary" | "ascii";
+  format: MeshFormat;
   min: [number, number, number];
   max: [number, number, number];
 }
@@ -111,7 +114,12 @@ function parseAscii(buffer: ArrayBuffer): StlMesh {
   return finishMesh(new Float32Array(values.slice(0, usable)), "ascii");
 }
 
-function finishMesh(positions: Float32Array, format: "binary" | "ascii"): StlMesh {
+/** Dreiecksliste (9 Werte je Dreieck) -> Modell mit Größe */
+export function meshFromPositions(positions: Float32Array, format: MeshFormat): StlMesh {
+  return finishMesh(positions, format);
+}
+
+function finishMesh(positions: Float32Array, format: MeshFormat): StlMesh {
   const min: [number, number, number] = [Infinity, Infinity, Infinity];
   const max: [number, number, number] = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < positions.length; i += 3) {

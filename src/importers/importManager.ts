@@ -2,7 +2,7 @@
  * IMPORT-ZENTRALE: Ein Knopf (oder Datei aufs Fenster ziehen) für alle Formate.
  *
  *   Vektoren:  SVG, DXF, PDF, AI (PDF-kompatibel), HPGL/PLT
- *   3D:        STL (eigener Dialog zum Schneiden)
+ *   3D:        STL, 3MF, STEP/STP (eigener Dialog zum Schneiden, siehe meshImport.ts)
  *   Bilder:    PNG, JPG, BMP, GIF, WEBP (Nachzeichnen-Dialog)
  *   G-Code:    NC, GCODE, TAP, NGC (als Konturen)
  *   Projekt:   CNCC (eigenes Projektformat)
@@ -35,7 +35,7 @@ import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
-  model: ["stl"],
+  model: ["stl", "3mf", "step", "stp"],
   image: ["png", "jpg", "jpeg", "bmp", "gif", "webp"],
   gcode: ["nc", "gcode", "gc", "tap", "ngc", "cnc"],
   project: ["cncc"]
@@ -98,7 +98,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     else if (["plt", "hpgl", "hpg"].includes(ext)) res = parseHpgl(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.gcode.includes(ext)) res = parseGcode(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.image.includes(ext)) res = await openImageTraceDialog(name, bytes);
-    else if (ext === "stl") { openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
+    else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
     else if (ext === "cncc") { loadProjectText(decodeText(bytes), name, fullPath); return; }
     else if (ext === "dwg") throw new Error(t("imp.errDwg"));
     else if (ext === "eps") throw new Error(t("imp.errEps"));

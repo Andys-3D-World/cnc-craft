@@ -26,6 +26,7 @@ import { initSpindlePanel } from "./ui/spindlePanel";
 import { initPinLeds } from "./ui/pinLeds";
 import { initWiringPage } from "./ui/wiringPage";
 import { initAboutDialog } from "./ui/aboutDialog";
+import { attachPanelResizer, attachConsoleResizer } from "./ui/panelResize";
 import { initUpdater } from "./update/updater";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
@@ -166,6 +167,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
     // ---- Simulation ----
     initSimulation(document.getElementById("tab-sim"), appendToConsole);
+    // rechtes Panel breiter/schmaler ziehen (CAM und Simulation, Breite wird gemerkt)
+    attachPanelResizer(document.querySelector<HTMLElement>(".main-content"), rightContainer, "cam");
+    attachConsoleResizer(document.getElementById("rp-console"));
+    attachPanelResizer(document.querySelector<HTMLElement>("#tab-sim .sim-layout"), document.querySelector<HTMLElement>("#tab-sim .sim-side"), "sim");
     const openSimTab = () => (document.querySelector('.tab-navigation [data-tab="tab-sim"]') as HTMLElement | null)?.click();
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
       const gcode = generateGcode(state.shapes);
