@@ -6,11 +6,12 @@
  * Welche Zeichen wo Probleme machen und wie sie umgangen werden: wifiCodec.ts.
  *
  * Die Zeile mit dem Passwort wird nie ins Protokoll/die Konsole geschrieben.
+ * 📡 Suchen: das Board selbst sucht WLANs in der Nähe ([ESP410]) – Name anklicken statt abtippen.
  */
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n/i18n";
-import { machine, sendAndWait } from "../machine";
-import { analyze, planWifi, WifiFw, WifiMode, WifiPlan } from "../wifiCodec";
+import { machine, sendAndWait, MACHINE_EVENT } from "../machine";
+import { analyze, planWifi, WifiFw, WifiMode, WifiPlan, parseApList, signalBars, ApInfo } from "../wifiCodec";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -26,6 +27,34 @@ export function wifiFirmware(): WifiFw {
   // Netzwerk-Verbindung = hat sicher WLAN; Rest (Arduino-GRBL) hat keins
   if (machine.port.startsWith("tcp://")) return "esp32";
   return "none";
+}
+
+/**
+ * Das Board nach WLANs in der Nähe suchen lassen ([ESP410]).
+ * Der erste Aufruf startet oft erst die Suche und liefert eine leere Liste – dann kurz warten und nochmal.
+ */
+export async function scanBoardNetworks(cancelled: () => boolean = () => false): Promise<ApInfo[]> {
+  for (let attempt = 0; attempt < 4; attempt++) {
+    if (cancelled() || !machine.connected) return [];
+    const lines: string[] = [];
+    const grab = (e: Event) => {
+      const d = (e as CustomEvent).detail;
+      if (d?.type === "text" && d.data?.text) lines.push(String(d.data.text));
+    };
+    window.addEventListener(MACHINE_EVENT, grab);
+    try {
+      const a = await sendAndWait("[ESP410]", 12000, true);
+      await new Promise(r => setTimeout(r, 400)); // Rest der Antwort abwarten
+      if (!a.ok && !lines.length) throw new Error("scan-failed");
+    } finally {
+      window.removeEventListener(MACHINE_EVENT, grab);
+    }
+    const aps = parseApList(lines);
+    if (aps.length) return aps;
+    if (cancelled()) return [];
+    await new Promise(r => setTimeout(r, 2500));
+  }
+  return [];
 }
 
 /** Adresse der Weboberfläche: bei WLAN-Verbindung die IP der Verbindung, sonst gemerkte/eingetragene */
@@ -49,7 +78,9 @@ export function openWifiSetup(log: (s: string) => void) {
         <label><input type="radio" name="wifi-mode" value="sta" checked> 🏠 ${esc(t("wifi.sta"))}</label>
         <label><input type="radio" name="wifi-mode" value="ap"> 📡 ${esc(t("wifi.ap"))}</label>
       </div>
-      <label class="dlg-row"><span>${esc(t("wifi.ssid"))}</span><input id="wifi-ssid" type="text" autocomplete="off" spellcheck="false"></label>
+      <label class="dlg-row"><span>${esc(t("wifi.ssid"))}</span>
+        <span class="wifi-pw"><input id="wifi-ssid" type="text" autocomplete="off" spellcheck="false"><button type="button" id="wifi-scan" class="btn-secondary" data-tip="${esc(t("wifi.scanTip"))}">📡</button></span></label>
+      <div id="wifi-aps" class="wifi-aps" style="display:none;"></div>
       <label class="dlg-row"><span>${esc(t("wifi.pw"))}</span>
         <span class="wifi-pw"><input id="wifi-pw" type="password" autocomplete="new-password" spellcheck="false"><button type="button" id="wifi-eye" class="btn-secondary" data-tip="${esc(t("wifi.showPw"))}">👁</button></span></label>
       <div id="wifi-check" class="wifi-check"></div>
@@ -69,6 +100,37 @@ export function openWifiSetup(log: (s: string) => void) {
   q("wifi-cancel").onclick = close;
   q("wifi-host").value = defaultHost();
   q("wifi-eye").onclick = () => { const p = q("wifi-pw"); p.type = p.type === "password" ? "text" : "password"; };
+
+  // ---- WLANs in der Nähe (sucht das Board selbst) ----
+  const apBox = q("wifi-aps");
+  const scanBtn = q<HTMLButtonElement>("wifi-scan");
+  const doScan = async () => {
+    if (scanBtn.disabled) return;
+    scanBtn.disabled = true;
+    apBox.style.display = "";
+    apBox.innerHTML = `<div class="net-find-busy"><span class="net-spin"></span>${esc(t("wifi.scanning"))}</div>`;
+    try {
+      const aps = await scanBoardNetworks(() => !document.body.contains(ov));
+      apBox.innerHTML = aps.length
+        ? aps.map(a => `<button type="button" class="wifi-ap" data-ssid="${esc(a.ssid)}">
+            <span class="wifi-ap-bars" title="${a.signal} %">${signalBars(a.signal)}</span>
+            <span class="wifi-ap-name">${esc(a.ssid)}</span>
+            <span class="wifi-ap-lock">${a.secure ? "🔒" : esc(t("wifi.open"))}</span></button>`).join("")
+          + `<div class="wifi-note">${esc(t("wifi.scanHint"))}</div>`
+        : `<div class="wifi-note">${esc(t("wifi.scanNone"))}</div>`;
+      apBox.querySelectorAll<HTMLButtonElement>(".wifi-ap").forEach(b => b.addEventListener("click", () => {
+        q("wifi-ssid").value = b.dataset.ssid!;
+        apBox.style.display = "none";
+        refresh();
+        q("wifi-pw").focus();
+      }));
+    } catch {
+      apBox.innerHTML = `<div class="wifi-note">${esc(t("wifi.scanFailed"))}</div>`;
+    } finally {
+      scanBtn.disabled = false;
+    }
+  };
+  scanBtn.onclick = doScan;
 
   const mode = () => (ov.querySelector<HTMLInputElement>("input[name=wifi-mode]:checked")?.value || "sta") as WifiMode;
   let plan: WifiPlan;
@@ -98,6 +160,12 @@ export function openWifiSetup(log: (s: string) => void) {
   ov.querySelectorAll<HTMLInputElement>("input[name=wifi-mode]").forEach(i => i.addEventListener("change", refresh));
   refresh();
   setTimeout(() => q("wifi-ssid").focus(), 0);
+  // Board mit WLAN: gleich nach Netzen suchen (nur für „In mein Heimnetz“ sinnvoll)
+  if (fw !== "none") void doScan();
+  ov.querySelectorAll<HTMLInputElement>("input[name=wifi-mode]").forEach(i => i.addEventListener("change", () => {
+    if (mode() === "ap") apBox.style.display = "none";
+    scanBtn.style.display = mode() === "sta" ? "" : "none";
+  }));
 
   q("wifi-send").onclick = async () => {
     refresh();

@@ -1539,5 +1539,11 @@
   "wifi.restartConfirm": "Riavviare ora la scheda? La connessione cadrà brevemente.",
   "wifi.restarted": "[Wi-Fi] La scheda si riavvia – poi cercala con 📡.",
   "wifi.failed": "Non riuscito: {e}",
-  "wifi.consoleWarn": "[Wi-Fi] Questa riga contiene caratteri ({c}) che GRBL intercetta – non arriverebbero. Usa «📶 Configura Wi-Fi»."
+  "wifi.consoleWarn": "[Wi-Fi] Questa riga contiene caratteri ({c}) che GRBL intercetta – non arriverebbero. Usa «📶 Configura Wi-Fi».",
+  "wifi.scanTip": "Cerca reti Wi-Fi vicine – la scheda cerca da sola",
+  "wifi.scanning": "La scheda cerca reti … (fino a 10 secondi)",
+  "wifi.open": "aperta",
+  "wifi.scanHint": "Clicca un nome – poi inserisci solo la password. La scheda vede solo reti a 2,4 GHz.",
+  "wifi.scanNone": "Nessuna rete trovata. La scheda vede solo 2,4 GHz (non 5 GHz) – altrimenti digita il nome.",
+  "wifi.scanFailed": "Questa scheda non fornisce l’elenco – digita il nome."
 }

@@ -144,3 +144,41 @@ export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, c
   }
   return plan;
 }
+
+// ---------------------------------------------------------------------
+// WLAN-Liste vom Board ([ESP410] – Grbl_ESP32, MKS DLC32, FluidNC, ESP3D)
+// ---------------------------------------------------------------------
+
+export interface ApInfo { ssid: string; signal: number; secure: boolean }
+
+/**
+ * Antwort auf [ESP410] auswerten: {"AP_LIST":[{"SSID":"…","SIGNAL":"80","IS_PROTECTED":"1"}, …]}
+ * (einzeilig oder über mehrere Zeilen verteilt, Zahlen/Wahrheitswerte mit oder ohne Anführungszeichen).
+ * Gleiche Namen nur einmal (stärkstes Signal), versteckte Netze (ohne Namen) weg, stärkste zuerst.
+ */
+export function parseApList(lines: string[]): ApInfo[] {
+  const text = lines.join("\n");
+  const out = new Map<string, ApInfo>();
+  const obj = /\{[^{}]*?"SSID"\s*:\s*"((?:[^"\\]|\\.)*)"[^{}]*\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = obj.exec(text))) {
+    let ssid = m[1];
+    try { ssid = JSON.parse(`"${m[1]}"`); } catch { /* roh lassen */ }
+    if (!ssid.trim()) continue;
+    const body = m[0];
+    const sig = body.match(/"SIGNAL"\s*:\s*"?(-?\d+)/);
+    const prot = body.match(/"IS_PROTECTED"\s*:\s*"?(true|false|1|0)/i);
+    let signal = sig ? parseInt(sig[1], 10) : 0;
+    if (signal < 0) signal = Math.max(0, Math.min(100, 2 * (signal + 100))); // dBm -> %
+    const ap: ApInfo = { ssid, signal: Math.max(0, Math.min(100, signal)), secure: prot ? /^(true|1)$/i.test(prot[1]) : true };
+    const old = out.get(ssid);
+    if (!old || old.signal < ap.signal) out.set(ssid, ap);
+  }
+  return [...out.values()].sort((a, b) => b.signal - a.signal || a.ssid.localeCompare(b.ssid));
+}
+
+/** Signal als Balken ▂▄▆█ */
+export function signalBars(p: number): string {
+  const n = p >= 75 ? 4 : p >= 50 ? 3 : p >= 25 ? 2 : 1;
+  return "▂▄▆█".slice(0, n) + "·".repeat(4 - n);
+}

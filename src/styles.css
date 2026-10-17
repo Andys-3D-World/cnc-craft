@@ -1295,3 +1295,9 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .wifi-result.ok { color: #34d17b; }
 .wifi-result.bad { color: #ff7070; }
 .wifi-result button { margin-left: 6px; padding: 3px 10px; font-size: 0.74rem; }
+.wifi-aps { display: flex; flex-direction: column; gap: 3px; max-height: 190px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 5px; background: var(--bg-input); }
+.wifi-ap { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 5px 8px; border: 1px solid transparent; border-radius: 6px; background: var(--bg-panel); color: var(--text-main); cursor: pointer; font: inherit; font-size: 0.8rem; }
+.wifi-ap:hover { border-color: var(--accent-color); }
+.wifi-ap-bars { font-family: var(--font-mono); color: #34d17b; letter-spacing: -1px; width: 38px; }
+.wifi-ap-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wifi-ap-lock { font-size: 0.72rem; color: var(--text-muted); }

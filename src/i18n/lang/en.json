@@ -1714,5 +1714,11 @@
   "wifi.restartConfirm": "Restart the board now? The connection will drop briefly.",
   "wifi.restarted": "[Wi-Fi] Board is restarting – then search the network with 📡.",
   "wifi.failed": "Did not work: {e}",
-  "wifi.consoleWarn": "[Wi-Fi] This line contains characters ({c}) that GRBL intercepts – they would not arrive. Please use “📶 Set up Wi-Fi”, which works around this."
+  "wifi.consoleWarn": "[Wi-Fi] This line contains characters ({c}) that GRBL intercepts – they would not arrive. Please use “📶 Set up Wi-Fi”, which works around this.",
+  "wifi.scanTip": "Search nearby Wi-Fi networks – the board scans itself",
+  "wifi.scanning": "Board is scanning for nearby Wi-Fi … (up to 10 seconds)",
+  "wifi.open": "open",
+  "wifi.scanHint": "Click a name – then just enter the password. The board only sees 2.4 GHz networks.",
+  "wifi.scanNone": "No Wi-Fi networks found. The board only sees 2.4 GHz networks (not 5 GHz) – otherwise type the name.",
+  "wifi.scanFailed": "This board can’t provide a Wi-Fi list – please type the name."
 }

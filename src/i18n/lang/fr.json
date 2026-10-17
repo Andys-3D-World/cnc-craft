@@ -1539,5 +1539,11 @@
   "wifi.restartConfirm": "Redémarrer la carte maintenant ? La connexion sera brièvement coupée.",
   "wifi.restarted": "[Wi-Fi] La carte redémarre – puis cherche-la avec 📡.",
   "wifi.failed": "Échec : {e}",
-  "wifi.consoleWarn": "[Wi-Fi] Cette ligne contient des caractères ({c}) que GRBL intercepte – ils n’arriveraient pas. Utilise « 📶 Configurer le Wi-Fi »."
+  "wifi.consoleWarn": "[Wi-Fi] Cette ligne contient des caractères ({c}) que GRBL intercepte – ils n’arriveraient pas. Utilise « 📶 Configurer le Wi-Fi ».",
+  "wifi.scanTip": "Chercher les Wi-Fi proches – la carte cherche elle-même",
+  "wifi.scanning": "La carte cherche les Wi-Fi … (jusqu’à 10 secondes)",
+  "wifi.open": "ouvert",
+  "wifi.scanHint": "Clique sur un nom – il ne reste que le mot de passe. La carte ne voit que les réseaux 2,4 GHz.",
+  "wifi.scanNone": "Aucun Wi-Fi trouvé. La carte ne voit que le 2,4 GHz (pas le 5 GHz) – sinon saisis le nom.",
+  "wifi.scanFailed": "Cette carte ne fournit pas de liste Wi-Fi – saisis le nom."
 }

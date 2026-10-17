@@ -1539,5 +1539,11 @@
   "wifi.restartConfirm": "¿Reiniciar la placa ahora? La conexión se cortará un momento.",
   "wifi.restarted": "[Wi-Fi] La placa se reinicia; después búscala con 📡.",
   "wifi.failed": "No funcionó: {e}",
-  "wifi.consoleWarn": "[Wi-Fi] Esta línea contiene caracteres ({c}) que GRBL intercepta; no llegarían. Usa «📶 Configurar Wi-Fi»."
+  "wifi.consoleWarn": "[Wi-Fi] Esta línea contiene caracteres ({c}) que GRBL intercepta; no llegarían. Usa «📶 Configurar Wi-Fi».",
+  "wifi.scanTip": "Buscar redes Wi-Fi cercanas: la placa busca por sí misma",
+  "wifi.scanning": "La placa busca redes … (hasta 10 segundos)",
+  "wifi.open": "abierta",
+  "wifi.scanHint": "Haz clic en un nombre y solo falta la contraseña. La placa solo ve redes de 2,4 GHz.",
+  "wifi.scanNone": "No se encontraron redes. La placa solo ve 2,4 GHz (no 5 GHz); si no, escribe el nombre.",
+  "wifi.scanFailed": "Esta placa no puede dar la lista de redes: escribe el nombre."
 }

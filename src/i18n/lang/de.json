@@ -1714,5 +1714,11 @@
   "wifi.restartConfirm": "Board jetzt neu starten? Die Verbindung bricht dabei kurz ab.",
   "wifi.restarted": "[WLAN] Board startet neu – danach mit 📡 im Netzwerk suchen.",
   "wifi.failed": "Hat nicht geklappt: {e}",
-  "wifi.consoleWarn": "[WLAN] In dieser Zeile stehen Zeichen ({c}), die GRBL unterwegs abfängt – sie würden nicht ankommen. Bitte „📶 WLAN einrichten“ benutzen, das umgeht das Problem."
+  "wifi.consoleWarn": "[WLAN] In dieser Zeile stehen Zeichen ({c}), die GRBL unterwegs abfängt – sie würden nicht ankommen. Bitte „📶 WLAN einrichten“ benutzen, das umgeht das Problem.",
+  "wifi.scanTip": "WLANs in der Nähe suchen – das Board sucht selbst",
+  "wifi.scanning": "Board sucht WLANs in der Nähe … (bis zu 10 Sekunden)",
+  "wifi.open": "offen",
+  "wifi.scanHint": "Name anklicken – dann nur noch das Passwort eingeben. Das Board sieht nur 2,4-GHz-Netze.",
+  "wifi.scanNone": "Keine WLANs gefunden. Das Board sieht nur 2,4-GHz-Netze (nicht 5 GHz) – den Namen sonst von Hand eintragen.",
+  "wifi.scanFailed": "Dieses Board kann keine WLAN-Liste liefern – bitte den Namen von Hand eintragen."
 }

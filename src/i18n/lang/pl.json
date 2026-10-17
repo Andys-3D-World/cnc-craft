@@ -1539,5 +1539,11 @@
   "wifi.restartConfirm": "Uruchomić płytę ponownie? Połączenie na chwilę zniknie.",
   "wifi.restarted": "[Wi-Fi] Płyta się restartuje – potem szukaj jej przez 📡.",
   "wifi.failed": "Nie udało się: {e}",
-  "wifi.consoleWarn": "[Wi-Fi] Ta linia zawiera znaki ({c}), które GRBL przechwytuje – nie dotrą. Użyj „📶 Konfiguruj Wi-Fi”."
+  "wifi.consoleWarn": "[Wi-Fi] Ta linia zawiera znaki ({c}), które GRBL przechwytuje – nie dotrą. Użyj „📶 Konfiguruj Wi-Fi”.",
+  "wifi.scanTip": "Szukaj pobliskich sieci – płyta szuka sama",
+  "wifi.scanning": "Płyta szuka sieci … (do 10 sekund)",
+  "wifi.open": "otwarta",
+  "wifi.scanHint": "Kliknij nazwę – wtedy wpisz tylko hasło. Płyta widzi tylko sieci 2,4 GHz.",
+  "wifi.scanNone": "Nie znaleziono sieci. Płyta widzi tylko 2,4 GHz (nie 5 GHz) – w przeciwnym razie wpisz nazwę.",
+  "wifi.scanFailed": "Ta płyta nie poda listy sieci – wpisz nazwę ręcznie."
 }

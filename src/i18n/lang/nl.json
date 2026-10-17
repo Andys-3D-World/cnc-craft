@@ -1539,5 +1539,11 @@
   "wifi.restartConfirm": "Board nu herstarten? De verbinding valt kort weg.",
   "wifi.restarted": "[Wifi] Board herstart – zoek daarna met 📡 in het netwerk.",
   "wifi.failed": "Mislukt: {e}",
-  "wifi.consoleWarn": "[Wifi] Deze regel bevat tekens ({c}) die GRBL afvangt – ze zouden niet aankomen. Gebruik „📶 Wifi instellen“."
+  "wifi.consoleWarn": "[Wifi] Deze regel bevat tekens ({c}) die GRBL afvangt – ze zouden niet aankomen. Gebruik „📶 Wifi instellen“.",
+  "wifi.scanTip": "Wifi-netwerken in de buurt zoeken – het board zoekt zelf",
+  "wifi.scanning": "Board zoekt wifi-netwerken … (tot 10 seconden)",
+  "wifi.open": "open",
+  "wifi.scanHint": "Klik een naam aan – dan alleen nog het wachtwoord. Het board ziet alleen 2,4-GHz-netwerken.",
+  "wifi.scanNone": "Geen wifi gevonden. Het board ziet alleen 2,4 GHz (geen 5 GHz) – anders de naam intypen.",
+  "wifi.scanFailed": "Dit board kan geen wifi-lijst geven – typ de naam in."
 }

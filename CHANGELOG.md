@@ -7,6 +7,8 @@
   auch mit Sonderzeichen, die GRBL unterwegs abfängt (! ? ~, Umlaute) oder als Kommentar liest (( ) ;):
   FluidNC bekommt sie %-kodiert, grblHAL schaltet sie kurz mit $39=0 frei, Grbl_ESP32/MKS DLC32 bekommen sie über
   die Weboberfläche des Boards. Das Passwort erscheint nie in der Konsole; Neustart-Knopf danach
+- **WLANs in der Nähe auswählen:** das Board sucht selbst ([ESP410]) und zeigt die Netze mit Signalstärke und 🔒 –
+  Namen anklicken statt abtippen
 - Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
 
 **Behoben**
