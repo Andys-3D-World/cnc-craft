@@ -1309,3 +1309,13 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .wifi-g-now { margin: 4px 0 2px; padding: 4px 8px; border-radius: 6px; background: var(--bg-input); font-size: 0.74rem; }
 .wifi-g-now.warn { color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); }
 .wifi-g-now.ok { color: #8ff0b9; border: 1px solid rgba(52, 209, 123, 0.5); }
+/* Werkseinstellung */
+.sp-factory { color: #ffb547; }
+.sp-rst-box { width: 440px; }
+.sp-rst-opt { display: flex; gap: 8px; align-items: flex-start; padding: 7px 9px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.82rem; cursor: pointer; line-height: 1.35; }
+.sp-rst-opt input { margin-top: 3px; }
+.sp-rst-opt:has(input:checked) { border-color: var(--accent, #7c5cff); background: rgba(124, 92, 255, 0.08); }
+.sp-rst-opt code { font-size: 0.72rem; color: var(--text-muted); }
+.sp-rst-opt small { color: var(--text-muted); }
+.sp-rst-warn { font-size: 0.76rem; color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); border-radius: 6px; padding: 6px 8px; line-height: 1.35; }
+.sp-rst-go { background: #c0392b !important; border-color: #c0392b !important; }

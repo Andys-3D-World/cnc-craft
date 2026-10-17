@@ -6,6 +6,7 @@
  *  - Ja/Nein als Haken, Achsen-Masken ($3, $23 …) als X/Y/Z-Haken
  *  - geänderte Werte werden markiert und erst mit "Schreiben" an die Maschine geschickt
  *  - Sichern in eine Datei / Wiederherstellen aus einer Datei
+ *  - Werkseinstellung: $RST=$ (Einstellungen), $RST=# (Nullpunkte), $RST=* (alles) – vorher automatisch sichern
  *  - Schritte/mm-Rechner: Soll-Strecke fahren, nachmessen, neuen Wert übernehmen
  *  - unbekannte Einstellungen (grblHAL, FluidNC …) werden trotzdem angezeigt und sind änderbar
  */
@@ -202,6 +203,7 @@ function render() {
         <button id="sp-discard" class="btn-secondary" ${edits.size && !busy ? "" : "disabled"}>✕ ${T("sp.discard")}</button>
         <button id="sp-backup" class="btn-secondary" ${tip("sp.backupTip")} ${haveData ? "" : "disabled"}>⬇ ${T("sp.backup")}</button>
         <button id="sp-restore" class="btn-secondary" ${tip("sp.restoreTip")} ${haveData ? "" : "disabled"}>⬆ ${T("sp.restore")}</button>
+        <button id="sp-factory" class="btn-secondary sp-factory" ${tip("sp.rst.tip")} ${connected && !busy ? "" : "disabled"}>🏭 ${T("sp.rst.btn")}</button>
       </div>
     </div>
     <div class="sp-status">${connected
@@ -303,6 +305,7 @@ function bind() {
   document.getElementById("sp-discard")?.addEventListener("click", () => { edits.clear(); render(); });
   document.getElementById("sp-backup")?.addEventListener("click", backup);
   document.getElementById("sp-restore")?.addEventListener("click", restore);
+  document.getElementById("sp-factory")?.addEventListener("click", openFactoryReset);
 
   // ---- Schritte/mm-Rechner ----
   const axisSel = document.getElementById("sp-calc-axis") as HTMLSelectElement | null;
@@ -380,15 +383,104 @@ async function writeAll() {
   render();
 }
 
-async function backup() {
+async function backup(): Promise<boolean> {
   try {
     const p = await save({ title: t("sp.backup"), defaultPath: `grbl-settings-${(machine.firmware || "grbl").toLowerCase()}.txt`, filters: [{ name: "Text", extensions: ["txt", "nc"] }] });
-    if (!p) return;
+    if (!p) return false;
     const keys = [...machine.settings.keys()].sort((a, b) => parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10));
     const text = `; CNC Craft – ${machine.firmware} ${machine.version} – ${new Date().toISOString()}\n` + keys.map(k => `${k}=${machine.settings.get(k)}`).join("\n") + "\n";
     await writeFile(String(p), new TextEncoder().encode(text));
     log(t("sp.backupSaved", { p: String(p) }));
-  } catch (e) { log(`${t("log.error")} ${e}`); }
+    return true;
+  } catch (e) { log(`${t("log.error")} ${e}`); return false; }
+}
+
+// ---------------------------------------------------------------------
+// Werkseinstellung (GRBL 1.1, grblHAL, Grbl_ESP32 / MKS, FluidNC)
+//   $RST=$  alle $-Einstellungen auf die Werte der Firmware
+//   $RST=#  Nullpunkte G54–G59, G28/G30, G92 und Werkzeuglänge löschen
+//   $RST=*  beides (bei ESP32-Boards zusätzlich die WLAN-Zugangsdaten)
+// ---------------------------------------------------------------------
+
+type RstKind = "$" | "#" | "*";
+
+function isEsp32Board(): boolean {
+  const s = `${machine.firmware} ${machine.version} ${machine.info.name || ""} ${machine.info.fw || ""}`;
+  return /FluidNC|ESP32|MKS|DLC32/i.test(s) || machine.port.startsWith("tcp://");
+}
+
+function openFactoryReset() {
+  if (!machine.connected) return;
+  if (!canCommand() || machine.job.active) { log(t("m.why.job running")); return; }
+  document.getElementById("sp-rst-overlay")?.remove();
+  const esp = isEsp32Board();
+  const viaWifi = machine.port.startsWith("tcp://");
+  const haveData = machine.settings.size > 0;
+  const fluid = machine.firmware === "FluidNC";
+  const ov = document.createElement("div");
+  ov.id = "sp-rst-overlay";
+  ov.className = "dlg-overlay";
+  const opt = (k: RstKind, checked: boolean) => `
+    <label class="sp-rst-opt">
+      <input type="radio" name="sp-rst" value="${k}" ${checked ? "checked" : ""}>
+      <span><b>${esc(t("sp.rst.o" + (k === "$" ? "1" : k === "#" ? "2" : "3")))}</b> <code>$RST=${k}</code><br>
+      <small>${esc(t("sp.rst.d" + (k === "$" ? "1" : k === "#" ? "2" : "3")))}${k === "*" && esp ? " " + esc(t("sp.rst.wifi")) : ""}</small></span>
+    </label>`;
+  ov.innerHTML = `
+    <div class="dlg-box sp-rst-box" role="dialog">
+      <h3>🏭 ${esc(t("sp.rst.title"))}</h3>
+      <div class="dlg-hint">${esc(t("sp.rst.intro"))}</div>
+      ${opt("$", true)}${opt("#", false)}${opt("*", false)}
+      ${fluid ? `<div class="sp-rst-warn">${esc(t("sp.rst.fluid"))}</div>` : ""}
+      <div class="sp-rst-warn" id="sp-rst-wifiwarn" style="display:none;">${esc(t("sp.rst.viaWifi"))}</div>
+      <label class="sp-rst-opt"><input type="checkbox" id="sp-rst-backup" ${haveData ? "checked" : "disabled"}>
+        <span>${esc(t("sp.rst.backup"))}</span></label>
+      <div class="dlg-hint">${esc(t("sp.rst.after"))}</div>
+      <div class="dlg-buttons">
+        <button type="button" id="sp-rst-cancel" class="btn-secondary" style="flex:1;">${esc(t("sp.rst.cancel"))}</button>
+        <button type="button" id="sp-rst-go" class="btn-primary sp-rst-go" style="flex:1;">🏭 ${esc(t("sp.rst.go"))}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  (ov.querySelector("#sp-rst-cancel") as HTMLButtonElement).onclick = close;
+  const kind = () => ((ov.querySelector('input[name="sp-rst"]:checked') as HTMLInputElement)?.value || "$") as RstKind;
+  const upd = () => { (ov.querySelector("#sp-rst-wifiwarn") as HTMLElement).style.display = kind() === "*" && esp && viaWifi ? "" : "none"; };
+  ov.querySelectorAll('input[name="sp-rst"]').forEach(r => r.addEventListener("change", upd));
+  (ov.querySelector("#sp-rst-go") as HTMLButtonElement).onclick = async () => {
+    const k = kind();
+    if (!window.confirm(t("sp.rst.confirm", { what: t("sp.rst.o" + (k === "$" ? "1" : k === "#" ? "2" : "3")) }))) return;
+    const wantBackup = (ov.querySelector("#sp-rst-backup") as HTMLInputElement).checked;
+    if (wantBackup && k !== "#") {
+      // ohne gespeicherte Sicherung kein Zurücksetzen (Abbrechen im Speichern-Dialog = abbrechen)
+      if (!(await backup())) { log(t("sp.rst.noBackup")); return; }
+    }
+    close();
+    await factoryReset(k);
+  };
+}
+
+async function factoryReset(k: RstKind) {
+  if (!machine.connected) return;
+  busy = true; render();
+  log(t("sp.rst.running", { cmd: `$RST=${k}` }));
+  const r = await sendAndWait(`$RST=${k}`, 8000);
+  busy = false;
+  if (!r.ok && r.code !== undefined && r.code > 0) {
+    log(t("sp.rst.failed", { text: errorText(r.code) }));
+    render();
+    return;
+  }
+  edits.clear();
+  log(t(k === "#" ? "sp.rst.doneOffsets" : "sp.rst.done"));
+  if (k !== "#") {
+    machine.settings.clear();
+    await new Promise(res => setTimeout(res, 600));
+    if (machine.connected) await readAll();
+  }
+  render();
 }
 
 async function restore() {

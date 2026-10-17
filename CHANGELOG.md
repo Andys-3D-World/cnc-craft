@@ -14,6 +14,9 @@
   🔎 prüft vor dem Senden, ob das Board antwortet; Fehlermeldungen zeigen die Antwort des Boards
 - **WLAN-Dialog zeigt, wo das Board gerade ist:** liest per USB aus, ob das Board schon in einem WLAN hängt
   (dann wird dessen IP eingetragen) oder sein eigenes WLAN an hat; prüft die Adresse alle paar Sekunden selbst
+- **🏭 Werkseinstellung** im Reiter „Einstellungen ($$)“: Maschinen-Einstellungen ($RST=$), Nullpunkte ($RST=#)
+  oder alles ($RST=*) zurücksetzen – vorher automatisch in eine Datei sichern, danach werden die Werte neu gelesen;
+  Warnung, wenn „Alles“ bei ESP32-Boards die WLAN-Zugangsdaten löscht
 - Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
 
 **Behoben**
