@@ -1,5 +1,12 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Sicherheit**
+- **Dateirechte enger:** die App darf nur noch Dateien lesen und schreiben, die du selbst im Öffnen- oder
+  Speichern-Dialog ausgewählt hast (vorher: jede Datei auf dem Rechner). Ziehen aufs Fenster geht weiter wie bisher
+- Projekt speichern hängt „.cncc“ nicht mehr selbst an – die Endung kommt vom Speichern-Dialog
+
 ## 0.2.4 Beta
 
 **Sicherheit (bitte updaten)**

@@ -216,8 +216,9 @@ export async function saveProject(saveAs: boolean) {
   if (!p) {
     const sel = await save({ title: t("proj.saveTitle"), defaultPath: t("proj.defaultName") + ".cncc", filters: [{ name: t("imp.fProject"), extensions: ["cncc"] }] });
     if (!sel) return;
+    // Genau den gewählten Pfad nehmen: nur der ist zum Schreiben freigegeben (kein ".cncc" mehr anhängen –
+    // der Dialog setzt die Endung über den Filter selbst)
     p = String(sel);
-    if (!/\.cncc$/i.test(p)) p += ".cncc";
   }
   const bed = bedSizeMm();
   const data = { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: state.shapes, tools: toolsUsedBy(state.shapes),

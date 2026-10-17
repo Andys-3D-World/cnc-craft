@@ -1,24 +1,14 @@
 {
   "$schema": "gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Standard-Berechtigungen der CNC-Craft App",
+  "description": "Standard-Berechtigungen der CNC-Craft App. Dateien: kein fester Bereich – nur Pfade, die im Öffnen-/Speichern-Dialog gewählt wurden (der Dialog gibt sie selbst frei)",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "opener:default",
     "dialog:default",
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [
-        { "path": "**" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [
-        { "path": "**" }
-      ]
-    },
-    "fs:allow-read-file"
+    "fs:allow-read-text-file",
+    "fs:allow-read-file",
+    "fs:allow-write-file"
   ]
 }
