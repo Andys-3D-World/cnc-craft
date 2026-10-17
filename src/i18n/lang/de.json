@@ -1789,5 +1789,14 @@
   "m.hostLine": "Name im Netz: {h}",
   "wifi.note.nameOnly": "Nur der Name wird geändert – WLAN-Daten bleiben, wie sie sind. Der neue Name gilt nach dem Neustart des Boards.",
   "about.license": "Open Source · GPLv3",
-  "about.privacy": "Datenschutz: CNC Craft sendet keine Daten über dich oder deine Maschinen. Beim Update-Prüfen wird nur bei GitHub nach der neuesten Version gefragt – abschaltbar mit dem Haken oben."
+  "about.privacy": "Datenschutz: CNC Craft sendet keine Daten über dich oder deine Maschinen. Beim Update-Prüfen wird nur bei GitHub nach der neuesten Version gefragt – abschaltbar mit dem Haken oben.",
+  "about.support": "CNC Craft unterstützen",
+  "about.supportText": "CNC Craft ist kostenlos und bleibt es. Wenn es dir hilft, freue ich mich über einen Kaffee – freiwillig, alle Funktionen bleiben für alle frei.",
+  "about.supportBtn": "Einen Kaffee spendieren (Ko-fi)",
+  "support.btnTip": "CNC Craft unterstützen (freiwillig)",
+  "support.sponsors": "Über GitHub Sponsors",
+  "support.free": "Ein ⭐ auf GitHub oder ein Video teilen hilft auch!",
+  "support.milestone": "Schon {n} Jobs mit CNC Craft fertig!",
+  "support.toastText": "Schön, dass es läuft! CNC Craft ist kostenlos – wenn du magst, freue ich mich über einen Kaffee.",
+  "support.never": "Nicht mehr anzeigen"
 }

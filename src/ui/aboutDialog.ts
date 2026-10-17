@@ -9,6 +9,7 @@
  * Gibt es ein Update, erscheint oben zusätzlich der Knopf „⬆ v…“ (öffnet dieses Fenster).
  */
 import { t } from "../i18n/i18n";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { settingsDir } from "../settingsStore";
 import {
   updateRepo, UPDATE_EVENT, updateSettings, saveSettings, updatesEnabled, appInfo, checkForUpdate,
@@ -32,6 +33,9 @@ function showPill(r: UpdateResult | null) {
     pill.setAttribute("data-tip", t("upd.pillTip", { v: r!.latest!.tag_name }));
   }
 }
+
+/** Freiwillige Unterstützung (Ko-fi) */
+export const SUPPORT_URL = "https://ko-fi.com/andys3dworld";
 
 export function initAboutDialog(log: (s: string) => void) {
   document.getElementById("about-btn")?.addEventListener("click", () => openAboutDialog(log));
@@ -70,6 +74,11 @@ export async function openAboutDialog(log: (s: string) => void) {
           <div class="about-status">🔒 ${esc(t("about.privacy"))}</div>
         ` : `<div class="about-status">${esc(t("upd.disabled"))}</div>`}
       </div>
+      <div class="about-section about-support">
+        <h4>❤️ ${esc(t("about.support"))}</h4>
+        <div class="about-status">${esc(t("about.supportText"))}</div>
+        <button id="about-kofi" class="btn-secondary">☕ ${esc(t("about.supportBtn"))}</button>
+      </div>
       <div class="about-section">
         <h4>💾 ${esc(t("store.title"))}</h4>
         <div class="about-status">${esc(t(settingsDir() ? "store.info" : "store.noFile"))}</div>
@@ -82,6 +91,9 @@ export async function openAboutDialog(log: (s: string) => void) {
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   ov.querySelector<HTMLButtonElement>("#about-close")!.onclick = close;
+  ov.querySelector<HTMLButtonElement>("#about-kofi")!.onclick = async () => {
+    try { await openUrl(SUPPORT_URL); } catch { window.open(SUPPORT_URL, "_blank"); }
+  };
   if (!on) return;
 
   const status = ov.querySelector("#upd-status") as HTMLElement;

@@ -26,6 +26,7 @@ import { initSpindlePanel } from "./ui/spindlePanel";
 import { initPinLeds } from "./ui/pinLeds";
 import { initWiringPage } from "./ui/wiringPage";
 import { initAboutDialog } from "./ui/aboutDialog";
+import { initSupport } from "./ui/supportTip";
 import { attachPanelResizer, attachConsoleResizer } from "./ui/panelResize";
 import { initUpdater } from "./update/updater";
 import { setupUiInputs } from "./uiInputs";
@@ -167,6 +168,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates
+    initSupport();                     // ❤️ oben rechts: freiwillig unterstützen
     initCamera(appendToConsole);       // 📷 oben rechts: Kamera-Fenster, Bild auf der Arbeitsfläche, Ausrichten
     if (restored > 0) appendToConsole(t("store.restored", { n: restored }));
     initUpdater(appendToConsole);      // Update-Prüfung über GitHub (aus, solange kein Repository eingetragen ist)

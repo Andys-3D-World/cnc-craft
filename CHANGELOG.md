@@ -9,6 +9,9 @@
 - **📡-Suche zeigt den Namen** jeder Maschine; Hinweis, wenn mehrere gleiche Boards nicht zu unterscheiden sind
 - Verbindungs-Info zeigt den Namen im Netz
 
+- **❤️ Unterstützen:** ❤️-Knopf oben rechts (Ko-fi und GitHub Sponsors), Abschnitt im ⓘ-Fenster und im README,
+  „Sponsor“-Knopf auf GitHub (`.github/FUNDING.yml`); kleiner Hinweis nur nach dem 5., 25. und 100. fertigen Job,
+  mit „Nicht mehr anzeigen“ – freiwillig, alle Funktionen bleiben für alle frei
 - **Lizenz:** CNC Craft steht jetzt offiziell unter GPLv3 (LICENSE), dazu THIRD_PARTY_NOTICES.md mit allen
   fremden Bestandteilen; README mit Datenschutz-Hinweis und Code Signing Policy; ⓘ-Fenster zeigt Lizenz und
   Datenschutz-Hinweis

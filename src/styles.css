@@ -1324,3 +1324,16 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .net-find-txt b .net-host { color: #fff; }
 .net-find-txt .net-ipline { font-weight: 400; color: var(--text-muted); font-size: 0.72rem; margin-left: 6px; }
 .net-find-dup { margin: 4px 6px; padding: 6px 8px; border-radius: 6px; font-size: 0.72rem; line-height: 1.35; color: #ffd28a; border: 1px solid rgba(255, 181, 71, 0.5); }
+.about-support #about-kofi { margin-top: 6px; }
+/* ❤️ Unterstützen */
+.support-btn { font-size: 0.8rem; }
+.support-pop { position: fixed; z-index: 6000; width: 290px; padding: 14px; border-radius: 12px; background: var(--bg-panel); border: 1px solid var(--border-color); box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem; color: var(--text-main); }
+.support-pop button { width: 100%; }
+.support-txt { color: var(--text-muted); line-height: 1.4; font-size: 0.78rem; }
+.support-free { color: var(--text-muted); font-size: 0.7rem; text-align: center; }
+.support-toast { position: fixed; right: 16px; bottom: 16px; z-index: 6000; width: 320px; padding: 14px 14px 12px; border-radius: 12px; background: var(--bg-panel); border: 1px solid rgba(255, 94, 91, 0.6); box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem; color: var(--text-main); animation: supIn .3s ease-out; }
+.support-toast-title { font-weight: 700; padding-right: 20px; }
+.support-toast-btns { display: flex; gap: 8px; }
+.support-toast-btns button { flex: 1; font-size: 0.75rem; }
+.support-x { position: absolute; top: 8px; right: 8px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
+@keyframes supIn { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
