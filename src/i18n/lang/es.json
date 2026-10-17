@@ -1545,5 +1545,19 @@
   "wifi.open": "abierta",
   "wifi.scanHint": "Haz clic en un nombre y solo falta la contraseña. La placa solo ve redes de 2,4 GHz.",
   "wifi.scanNone": "No se encontraron redes. La placa solo ve 2,4 GHz (no 5 GHz); si no, escribe el nombre.",
-  "wifi.scanFailed": "Esta placa no puede dar la lista de redes: escribe el nombre."
+  "wifi.scanFailed": "Esta placa no puede dar la lista de redes: escribe el nombre.",
+  "wifi.pingTip": "Comprobar si la placa responde en esta dirección",
+  "wifi.g.title": "Primera configuración: la placa aún no tiene IP en tu red:",
+  "wifi.g.s1": "Mientras la placa no conozca una red, abre su propia Wi-Fi: «{ap}» (MKS DLC32: contraseña 12345678). Conecta el ordenador a esa Wi-Fi; el cable USB sigue conectado.",
+  "wifi.g.s2": "Deja la dirección {ip}, comprueba con 🔎 y pulsa «Enviar a la placa».",
+  "wifi.g.s3": "Reinicia la placa y vuelve a conectar el ordenador a tu red; 📡 encontrará la placa en su nueva IP.",
+  "wifi.g.apOn": "Activar la Wi-Fi de la placa",
+  "wifi.g.apOnTip": "Si la placa no muestra su Wi-Fi (p. ej. sigue en otra red): cambiar a Wi-Fi propia y reiniciar",
+  "wifi.g.apOnConfirm": "¿Cambiar la placa a Wi-Fi propia y reiniciar? Después conecta el ordenador a su Wi-Fi en unos segundos.",
+  "wifi.g.apOnDone": "[Wi-Fi] La placa se reinicia con su Wi-Fi: conecta el ordenador y comprueba con 🔎.",
+  "wifi.g.apOnHal": "[Wi-Fi] grblHAL: Wi-Fi propia ajustada; apaga y enciende la placa.",
+  "wifi.pinging": "Comprobando {ip} …",
+  "wifi.pingOk": "La placa responde en {ip}.",
+  "wifi.pingFail": "La placa no responde en {ip}. ¿Está el ordenador conectado a la Wi-Fi «{ap}» de la placa (o en la misma red)?",
+  "wifi.err.webRejected": "La placa rechazó «{line}» por la interfaz web: {e}"
 }

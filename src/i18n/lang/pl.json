@@ -1545,5 +1545,19 @@
   "wifi.open": "otwarta",
   "wifi.scanHint": "Kliknij nazwę – wtedy wpisz tylko hasło. Płyta widzi tylko sieci 2,4 GHz.",
   "wifi.scanNone": "Nie znaleziono sieci. Płyta widzi tylko 2,4 GHz (nie 5 GHz) – w przeciwnym razie wpisz nazwę.",
-  "wifi.scanFailed": "Ta płyta nie poda listy sieci – wpisz nazwę ręcznie."
+  "wifi.scanFailed": "Ta płyta nie poda listy sieci – wpisz nazwę ręcznie.",
+  "wifi.pingTip": "Sprawdź, czy płyta odpowiada pod tym adresem",
+  "wifi.g.title": "Pierwsza konfiguracja – płyta nie ma jeszcze IP w twojej sieci:",
+  "wifi.g.s1": "Dopóki płyta nie zna sieci domowej, otwiera własną sieć: „{ap}” (MKS DLC32: hasło 12345678). Połącz komputer z tą siecią – kabel USB zostaje podłączony.",
+  "wifi.g.s2": "Zostaw adres {ip}, sprawdź przez 🔎 i kliknij „Wyślij do płyty”.",
+  "wifi.g.s3": "Uruchom ponownie płytę, połącz komputer z siecią domową – 📡 znajdzie płytę pod nowym IP.",
+  "wifi.g.apOn": "Włącz sieć płyty",
+  "wifi.g.apOnTip": "Jeśli płyta nie pokazuje własnej sieci (np. wciąż w innej sieci): przełącz na własną sieć i uruchom ponownie",
+  "wifi.g.apOnConfirm": "Przełączyć płytę na własną sieć i uruchomić ponownie? Potem po kilku sekundach połącz komputer z jej siecią.",
+  "wifi.g.apOnDone": "[Wi-Fi] Płyta uruchamia się z własną siecią – połącz komputer, potem sprawdź 🔎.",
+  "wifi.g.apOnHal": "[Wi-Fi] grblHAL: ustawiono własną sieć – wyłącz i włącz płytę.",
+  "wifi.pinging": "Sprawdzanie {ip} …",
+  "wifi.pingOk": "Płyta odpowiada pod {ip}.",
+  "wifi.pingFail": "Płyta nie odpowiada pod {ip}. Czy komputer jest połączony z siecią „{ap}” płyty (lub w tej samej sieci)?",
+  "wifi.err.webRejected": "Płyta odrzuciła „{line}” przez interfejs WWW: {e}"
 }

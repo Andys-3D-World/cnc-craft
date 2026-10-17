@@ -1720,5 +1720,19 @@
   "wifi.open": "offen",
   "wifi.scanHint": "Name anklicken – dann nur noch das Passwort eingeben. Das Board sieht nur 2,4-GHz-Netze.",
   "wifi.scanNone": "Keine WLANs gefunden. Das Board sieht nur 2,4-GHz-Netze (nicht 5 GHz) – den Namen sonst von Hand eintragen.",
-  "wifi.scanFailed": "Dieses Board kann keine WLAN-Liste liefern – bitte den Namen von Hand eintragen."
+  "wifi.scanFailed": "Dieses Board kann keine WLAN-Liste liefern – bitte den Namen von Hand eintragen.",
+  "wifi.pingTip": "Prüfen, ob das Board unter dieser Adresse antwortet",
+  "wifi.g.title": "Erstes Einrichten – das Board hat noch keine IP im Heimnetz:",
+  "wifi.g.s1": "Solange das Board kein Heimnetz kennt, macht es ein eigenes WLAN auf: „{ap}“ (MKS DLC32: Passwort 12345678). Verbinde deinen Rechner mit diesem WLAN – das USB-Kabel bleibt dran.",
+  "wifi.g.s2": "Adresse {ip} eingetragen lassen, mit 🔎 prüfen und „Ans Board schicken“ klicken.",
+  "wifi.g.s3": "Board neu starten, Rechner wieder mit deinem Heimnetz verbinden – dann findet 📡 das Board unter seiner neuen IP.",
+  "wifi.g.apOn": "WLAN des Boards einschalten",
+  "wifi.g.apOnTip": "Falls das Board kein eigenes WLAN zeigt (z. B. weil es noch in einem anderen Netz hängt): auf eigenes WLAN umstellen und neu starten",
+  "wifi.g.apOnConfirm": "Board auf eigenes WLAN umstellen und neu starten? Danach in ein paar Sekunden den Rechner mit dem WLAN des Boards verbinden.",
+  "wifi.g.apOnDone": "[WLAN] Board startet mit eigenem WLAN neu – Rechner gleich damit verbinden, dann 🔎 prüfen.",
+  "wifi.g.apOnHal": "[WLAN] grblHAL: eigenes WLAN eingestellt – Board jetzt kurz aus- und einschalten.",
+  "wifi.pinging": "Prüfe {ip} …",
+  "wifi.pingOk": "Board antwortet unter {ip}.",
+  "wifi.pingFail": "Board antwortet nicht unter {ip}. Ist dein Rechner mit dem WLAN „{ap}“ des Boards verbunden (bzw. im selben Netz wie das Board)?",
+  "wifi.err.webRejected": "Board hat „{line}“ über die Weboberfläche abgelehnt: {e}"
 }

@@ -57,10 +57,33 @@ export async function scanBoardNetworks(cancelled: () => boolean = () => false):
   return [];
 }
 
-/** Adresse der Weboberfläche: bei WLAN-Verbindung die IP der Verbindung, sonst gemerkte/eingetragene */
+/** Adresse, unter der das Board sein eigenes WLAN aufmacht (ESP32-Boards, solange sie kein Heimnetz kennen) */
+export const BOARD_AP_IP = "192.168.4.1";
+
+/** Verbunden über WLAN? Dann ist die Weboberfläche unter derselben IP */
+function tcpHost(): string {
+  return machine.port.startsWith("tcp://") ? machine.port.slice(6).replace(/:\d+$/, "") : "";
+}
+
+/** Adresse der Weboberfläche: bei WLAN-Verbindung die IP der Verbindung, sonst das eigene WLAN des Boards */
 function defaultHost(): string {
-  if (machine.port.startsWith("tcp://")) return machine.port.slice(6).replace(/:\d+$/, "");
-  try { return localStorage.getItem(KEY_HOST) || ""; } catch { return ""; }
+  return tcpHost() || BOARD_AP_IP;
+}
+
+/** Einstellung über die Leitung lesen (z. B. "$AP/SSID" -> "MKS_DLC"). "" wenn keine Antwort */
+async function readSetting(key: string): Promise<string> {
+  const lines: string[] = [];
+  const grab = (e: Event) => {
+    const d = (e as CustomEvent).detail;
+    const txt = d?.type === "text" ? String(d.data?.text || "") : d?.type === "setting" ? `${d.data?.key}=${d.data?.value}` : "";
+    if (txt) lines.push(txt);
+  };
+  window.addEventListener(MACHINE_EVENT, grab);
+  try { await sendAndWait(key, 3000, true); await new Promise(r => setTimeout(r, 150)); }
+  catch { /* egal */ }
+  finally { window.removeEventListener(MACHINE_EVENT, grab); }
+  const hit = lines.map(l => l.trim()).find(l => l.toLowerCase().startsWith(key.toLowerCase() + "="));
+  return hit ? hit.slice(key.length + 1).trim() : "";
 }
 
 export function openWifiSetup(log: (s: string) => void) {
@@ -84,7 +107,10 @@ export function openWifiSetup(log: (s: string) => void) {
       <label class="dlg-row"><span>${esc(t("wifi.pw"))}</span>
         <span class="wifi-pw"><input id="wifi-pw" type="password" autocomplete="new-password" spellcheck="false"><button type="button" id="wifi-eye" class="btn-secondary" data-tip="${esc(t("wifi.showPw"))}">👁</button></span></label>
       <div id="wifi-check" class="wifi-check"></div>
-      <label class="dlg-row" id="wifi-host-row" style="display:none;"><span>${esc(t("wifi.host"))}</span><input id="wifi-host" type="text" placeholder="192.168.4.1" spellcheck="false"></label>
+      <div id="wifi-guide" class="wifi-guide" style="display:none;"></div>
+      <label class="dlg-row" id="wifi-host-row" style="display:none;"><span>${esc(t("wifi.host"))}</span>
+        <span class="wifi-pw"><input id="wifi-host" type="text" placeholder="192.168.4.1" spellcheck="false"><button type="button" id="wifi-ping" class="btn-secondary" data-tip="${esc(t("wifi.pingTip"))}">🔎</button></span></label>
+      <div id="wifi-ping-res" class="wifi-note"></div>
       <details class="wifi-cmds"><summary>${esc(t("wifi.cmds"))}</summary><pre id="wifi-cmds"></pre></details>
       <div id="wifi-result" class="wifi-result"></div>
       <div class="dlg-buttons">
@@ -99,6 +125,55 @@ export function openWifiSetup(log: (s: string) => void) {
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   q("wifi-cancel").onclick = close;
   q("wifi-host").value = defaultHost();
+
+  // ---- Erst-Einrichtung über das eigene WLAN des Boards ----
+  let apName = "";
+  const guide = q("wifi-guide");
+  const showGuide = async () => {
+    if (tcpHost()) { guide.style.display = "none"; return; }   // per WLAN verbunden: IP ist bekannt
+    guide.style.display = "";
+    const name = apName || (fw === "grblhal" ? "" : "MKS_DLC / FluidNC / GRBL_ESP");
+    guide.innerHTML = `
+      <b>${esc(t("wifi.g.title"))}</b>
+      <ol>
+        <li>${esc(t("wifi.g.s1", { ap: name || "?" }))}</li>
+        <li>${esc(t("wifi.g.s2", { ip: BOARD_AP_IP }))}</li>
+        <li>${esc(t("wifi.g.s3"))}</li>
+      </ol>
+      <div class="wifi-g-btns">
+        <button type="button" id="wifi-ap-on" class="btn-secondary" data-tip="${esc(t("wifi.g.apOnTip"))}">📡 ${esc(t("wifi.g.apOn"))}</button>
+      </div>`;
+    q<HTMLButtonElement>("wifi-ap-on").onclick = async () => {
+      if (!window.confirm(t("wifi.g.apOnConfirm"))) return;
+      const cmds = fw === "fluidnc" ? ["$WiFi/Mode=AP", "$Bye"] : fw === "grblhal" ? ["$73=2"] : ["[ESP110]AP", "[ESP444]RESTART"];
+      for (const c of cmds) { try { await sendAndWait(c, 3000, true); log(t("wifi.logSent", { line: c, via: "GRBL" })); } catch { /* Neustart */ } }
+      log(t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone"));
+      q("wifi-ping-res").textContent = t(fw === "grblhal" ? "wifi.g.apOnHal" : "wifi.g.apOnDone");
+    };
+    // Namen des Board-WLANs vom Board holen (nur einmal)
+    if (!apName && machine.connected && !tcpHost()) {
+      apName = await readSetting(fw === "grblhal" ? "$76" : "$AP/SSID");
+      if (apName) void showGuide();
+    }
+  };
+
+  /** Ist die Weboberfläche erreichbar? ([ESP800] = Firmware-Info, ändert nichts) */
+  const ping = async (host: string): Promise<boolean> => {
+    const out = q("wifi-ping-res");
+    out.className = "wifi-note";
+    out.textContent = t("wifi.pinging", { ip: host });
+    try {
+      await invoke<string>("esp_web_command", { host, command: "[ESP800]" });
+      out.className = "wifi-note wifi-ok";
+      out.textContent = `✓ ${t("wifi.pingOk", { ip: host })}`;
+      return true;
+    } catch {
+      out.className = "wifi-note wifi-bad";
+      out.textContent = `✗ ${t("wifi.pingFail", { ip: host, ap: apName || "MKS_DLC" })}`;
+      return false;
+    }
+  };
+  q("wifi-ping").onclick = () => { const h = q("wifi-host").value.trim(); if (h) void ping(h); };
   q("wifi-eye").onclick = () => { const p = q("wifi-pw"); p.type = p.type === "password" ? "text" : "password"; };
 
   // ---- WLANs in der Nähe (sucht das Board selbst) ----
@@ -150,7 +225,10 @@ export function openWifiSetup(log: (s: string) => void) {
       : `<div class="wifi-ok">✓ ${esc(t(plan.route === "web" ? "wifi.route.web" : "wifi.route.serial"))}</div>`;
     q("wifi-check").innerHTML = (ssid || pw ? `<div class="wifi-chips">${chips.join("") || `<span class="wifi-chip ok">${esc(t("wifi.c.allOk"))}</span>`}</div>` : "")
       + (ssid ? okLine : "") + plan.notes.map(n => `<div class="wifi-note">${esc(t(n))}</div>`).join("");
-    q("wifi-host-row").style.display = plan.route === "web" ? "" : "none";
+    const web = plan.route === "web" && !plan.error;
+    q("wifi-host-row").style.display = web ? "" : "none";
+    if (web && guide.style.display === "none" && !tcpHost()) void showGuide();
+    if (!web) { guide.style.display = "none"; q("wifi-ping-res").textContent = ""; }
     q("wifi-cmds").textContent = plan.lines.map((l, i) => plan.secret.includes(i) ? l.replace(/(Password=|\]|=)(.*)$/, (_m, a) => a + "••••••••") : l).join("\n")
       + (plan.route === "web" ? `\n(→ http://${host || "IP"}/command?plain=…)` : "");
     const needHost = plan.route === "web" && !host;
@@ -179,9 +257,16 @@ export function openWifiSetup(log: (s: string) => void) {
     try {
       if (plan.route === "web") {
         try { localStorage.setItem(KEY_HOST, host); } catch { /* egal */ }
+        // erst prüfen, ob das Board dort überhaupt antwortet – sonst klare Meldung statt Netzwerkfehler
+        if (!(await ping(host))) { res.textContent = ""; btn.disabled = false; return; }
         for (let i = 0; i < plan.lines.length; i++) {
-          await invoke<string>("esp_web_command", { host, command: plan.lines[i] });
-          log(t("wifi.logSent", { line: plan.secret.includes(i) ? t("wifi.logSecret") : plan.lines[i], via: "Web" }));
+          const shown = plan.secret.includes(i) ? t("wifi.logSecret") : plan.lines[i];
+          try {
+            await invoke<string>("esp_web_command", { host, command: plan.lines[i] });
+          } catch (e) {
+            throw new Error(t("wifi.err.webRejected", { line: shown, e: String(e) }));
+          }
+          log(t("wifi.logSent", { line: shown, via: "Web" }));
         }
       } else {
         for (let i = 0; i < plan.lines.length; i++) {

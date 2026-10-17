@@ -1545,5 +1545,19 @@
   "wifi.open": "ouvert",
   "wifi.scanHint": "Clique sur un nom – il ne reste que le mot de passe. La carte ne voit que les réseaux 2,4 GHz.",
   "wifi.scanNone": "Aucun Wi-Fi trouvé. La carte ne voit que le 2,4 GHz (pas le 5 GHz) – sinon saisis le nom.",
-  "wifi.scanFailed": "Cette carte ne fournit pas de liste Wi-Fi – saisis le nom."
+  "wifi.scanFailed": "Cette carte ne fournit pas de liste Wi-Fi – saisis le nom.",
+  "wifi.pingTip": "Vérifier si la carte répond à cette adresse",
+  "wifi.g.title": "Première configuration – la carte n’a pas encore d’IP dans ton réseau :",
+  "wifi.g.s1": "Tant que la carte ne connaît pas de réseau, elle ouvre son propre Wi-Fi : « {ap} » (MKS DLC32 : mot de passe 12345678). Connecte l’ordinateur à ce Wi-Fi – le câble USB reste branché.",
+  "wifi.g.s2": "Garde l’adresse {ip}, vérifie avec 🔎 et clique sur « Envoyer à la carte ».",
+  "wifi.g.s3": "Redémarre la carte, reconnecte l’ordinateur à ton réseau – 📡 trouvera la carte à sa nouvelle IP.",
+  "wifi.g.apOn": "Activer le Wi-Fi de la carte",
+  "wifi.g.apOnTip": "Si la carte n’affiche pas son Wi-Fi (p. ex. encore dans un autre réseau) : passer en Wi-Fi propre et redémarrer",
+  "wifi.g.apOnConfirm": "Passer la carte en Wi-Fi propre et redémarrer ? Puis connecte l’ordinateur à son Wi-Fi après quelques secondes.",
+  "wifi.g.apOnDone": "[Wi-Fi] La carte redémarre avec son Wi-Fi – connecte l’ordinateur, puis vérifie avec 🔎.",
+  "wifi.g.apOnHal": "[Wi-Fi] grblHAL : Wi-Fi propre réglé – éteins puis rallume la carte.",
+  "wifi.pinging": "Vérification de {ip} …",
+  "wifi.pingOk": "La carte répond à {ip}.",
+  "wifi.pingFail": "La carte ne répond pas à {ip}. L’ordinateur est-il connecté au Wi-Fi « {ap} » de la carte (ou dans le même réseau) ?",
+  "wifi.err.webRejected": "La carte a refusé « {line} » via l’interface web : {e}"
 }

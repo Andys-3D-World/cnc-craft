@@ -1720,5 +1720,19 @@
   "wifi.open": "open",
   "wifi.scanHint": "Click a name – then just enter the password. The board only sees 2.4 GHz networks.",
   "wifi.scanNone": "No Wi-Fi networks found. The board only sees 2.4 GHz networks (not 5 GHz) – otherwise type the name.",
-  "wifi.scanFailed": "This board can’t provide a Wi-Fi list – please type the name."
+  "wifi.scanFailed": "This board can’t provide a Wi-Fi list – please type the name.",
+  "wifi.pingTip": "Check whether the board answers at this address",
+  "wifi.g.title": "First setup – the board has no IP in your home network yet:",
+  "wifi.g.s1": "As long as the board knows no home network, it opens its own Wi-Fi: “{ap}” (MKS DLC32: password 12345678). Connect your computer to this Wi-Fi – keep the USB cable plugged in.",
+  "wifi.g.s2": "Keep the address {ip}, check with 🔎 and click “Send to board”.",
+  "wifi.g.s3": "Restart the board, reconnect your computer to your home network – then 📡 finds the board at its new IP.",
+  "wifi.g.apOn": "Turn on the board’s Wi-Fi",
+  "wifi.g.apOnTip": "If the board shows no Wi-Fi of its own (e.g. still joined to another network): switch to its own Wi-Fi and restart",
+  "wifi.g.apOnConfirm": "Switch the board to its own Wi-Fi and restart? Then connect your computer to the board’s Wi-Fi after a few seconds.",
+  "wifi.g.apOnDone": "[Wi-Fi] Board restarts with its own Wi-Fi – connect your computer to it, then check with 🔎.",
+  "wifi.g.apOnHal": "[Wi-Fi] grblHAL: own Wi-Fi set – now switch the board off and on.",
+  "wifi.pinging": "Checking {ip} …",
+  "wifi.pingOk": "Board answers at {ip}.",
+  "wifi.pingFail": "Board does not answer at {ip}. Is your computer connected to the board’s Wi-Fi “{ap}” (or in the same network as the board)?",
+  "wifi.err.webRejected": "Board rejected “{line}” via the web interface: {e}"
 }

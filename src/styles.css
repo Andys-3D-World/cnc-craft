@@ -1301,3 +1301,8 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .wifi-ap-bars { font-family: var(--font-mono); color: #34d17b; letter-spacing: -1px; width: 38px; }
 .wifi-ap-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wifi-ap-lock { font-size: 0.72rem; color: var(--text-muted); }
+.wifi-guide { border: 1px solid rgba(124, 92, 255, 0.5); background: rgba(124, 92, 255, 0.08); border-radius: 8px; padding: 8px 10px; font-size: 0.76rem; line-height: 1.45; }
+.wifi-guide ol { margin: 4px 0 6px; padding-left: 18px; }
+.wifi-guide li { margin: 2px 0; }
+.wifi-g-btns { display: flex; gap: 6px; }
+.wifi-g-btns .btn-secondary { padding: 4px 10px; font-size: 0.74rem; }

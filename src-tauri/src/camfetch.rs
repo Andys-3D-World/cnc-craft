@@ -173,7 +173,11 @@ pub fn web_command(host: &str, command: &str, timeout: Duration) -> Result<Strin
     let url = format!("http://{}/command?plain={}", host.trim().trim_start_matches("http://").trim_end_matches('/'), url_encode(command));
     let (code, body) = http_get(&url, timeout)?;
     if code == 401 { return Err("auth-not-supported".into()); }
-    if !(200..300).contains(&code) { return Err(format!("http-{}", code)); }
+    if !(200..300).contains(&code) {
+        // Antwort des Boards mitgeben (z. B. "Error: Invalid value"), sonst sieht man nur die Nummer
+        let b: String = body.trim().chars().take(160).collect();
+        return Err(if b.is_empty() { format!("http-{}", code) } else { format!("http-{}: {}", code, b) });
+    }
     Ok(body)
 }
 

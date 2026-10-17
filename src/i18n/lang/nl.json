@@ -1545,5 +1545,19 @@
   "wifi.open": "open",
   "wifi.scanHint": "Klik een naam aan – dan alleen nog het wachtwoord. Het board ziet alleen 2,4-GHz-netwerken.",
   "wifi.scanNone": "Geen wifi gevonden. Het board ziet alleen 2,4 GHz (geen 5 GHz) – anders de naam intypen.",
-  "wifi.scanFailed": "Dit board kan geen wifi-lijst geven – typ de naam in."
+  "wifi.scanFailed": "Dit board kan geen wifi-lijst geven – typ de naam in.",
+  "wifi.pingTip": "Controleren of het board op dit adres antwoordt",
+  "wifi.g.title": "Eerste keer instellen – het board heeft nog geen IP in je thuisnetwerk:",
+  "wifi.g.s1": "Zolang het board geen thuisnetwerk kent, opent het een eigen wifi: „{ap}“ (MKS DLC32: wachtwoord 12345678). Verbind je computer met dit wifi – de USB-kabel blijft aangesloten.",
+  "wifi.g.s2": "Laat adres {ip} staan, controleer met 🔎 en klik op „Naar board sturen“.",
+  "wifi.g.s3": "Board herstarten, computer weer met je thuisnetwerk verbinden – dan vindt 📡 het board op zijn nieuwe IP.",
+  "wifi.g.apOn": "Wifi van het board aanzetten",
+  "wifi.g.apOnTip": "Als het board geen eigen wifi toont (bijv. nog in een ander netwerk): naar eigen wifi omschakelen en herstarten",
+  "wifi.g.apOnConfirm": "Board naar eigen wifi omschakelen en herstarten? Verbind daarna na een paar seconden de computer met het wifi van het board.",
+  "wifi.g.apOnDone": "[Wifi] Board herstart met eigen wifi – verbind de computer ermee en controleer met 🔎.",
+  "wifi.g.apOnHal": "[Wifi] grblHAL: eigen wifi ingesteld – zet het board nu even uit en aan.",
+  "wifi.pinging": "{ip} controleren …",
+  "wifi.pingOk": "Board antwoordt op {ip}.",
+  "wifi.pingFail": "Board antwoordt niet op {ip}. Is je computer verbonden met het wifi „{ap}“ van het board (of in hetzelfde netwerk)?",
+  "wifi.err.webRejected": "Board weigerde „{line}“ via de webinterface: {e}"
 }

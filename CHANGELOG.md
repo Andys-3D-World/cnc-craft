@@ -9,6 +9,9 @@
   die Weboberfläche des Boards. Das Passwort erscheint nie in der Konsole; Neustart-Knopf danach
 - **WLANs in der Nähe auswählen:** das Board sucht selbst ([ESP410]) und zeigt die Netze mit Signalstärke und 🔒 –
   Namen anklicken statt abtippen
+- **Erst-Einrichtung ohne IP:** Anleitung im Dialog über das eigene WLAN des Boards (MKS DLC32: „MKS_DLC“,
+  Passwort 12345678, 192.168.4.1) – Name wird vom Board gelesen, Knopf „WLAN des Boards einschalten“,
+  🔎 prüft vor dem Senden, ob das Board antwortet; Fehlermeldungen zeigen die Antwort des Boards
 - Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
 
 **Behoben**

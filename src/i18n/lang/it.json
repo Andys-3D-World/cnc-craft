@@ -1545,5 +1545,19 @@
   "wifi.open": "aperta",
   "wifi.scanHint": "Clicca un nome – poi inserisci solo la password. La scheda vede solo reti a 2,4 GHz.",
   "wifi.scanNone": "Nessuna rete trovata. La scheda vede solo 2,4 GHz (non 5 GHz) – altrimenti digita il nome.",
-  "wifi.scanFailed": "Questa scheda non fornisce l’elenco – digita il nome."
+  "wifi.scanFailed": "Questa scheda non fornisce l’elenco – digita il nome.",
+  "wifi.pingTip": "Verifica se la scheda risponde a questo indirizzo",
+  "wifi.g.title": "Prima configurazione – la scheda non ha ancora un IP nella tua rete:",
+  "wifi.g.s1": "Finché la scheda non conosce una rete, apre la propria Wi-Fi: «{ap}» (MKS DLC32: password 12345678). Collega il computer a questa Wi-Fi – il cavo USB resta collegato.",
+  "wifi.g.s2": "Lascia l’indirizzo {ip}, verifica con 🔎 e clicca «Invia alla scheda».",
+  "wifi.g.s3": "Riavvia la scheda, ricollega il computer alla tua rete – 📡 troverà la scheda al nuovo IP.",
+  "wifi.g.apOn": "Attiva la Wi-Fi della scheda",
+  "wifi.g.apOnTip": "Se la scheda non mostra la sua Wi-Fi (es. ancora in un’altra rete): passa alla Wi-Fi propria e riavvia",
+  "wifi.g.apOnConfirm": "Passare la scheda alla Wi-Fi propria e riavviare? Poi collega il computer alla sua Wi-Fi dopo qualche secondo.",
+  "wifi.g.apOnDone": "[Wi-Fi] La scheda si riavvia con la sua Wi-Fi – collega il computer, poi verifica con 🔎.",
+  "wifi.g.apOnHal": "[Wi-Fi] grblHAL: Wi-Fi propria impostata – spegni e riaccendi la scheda.",
+  "wifi.pinging": "Verifica di {ip} …",
+  "wifi.pingOk": "La scheda risponde a {ip}.",
+  "wifi.pingFail": "La scheda non risponde a {ip}. Il computer è collegato alla Wi-Fi «{ap}» della scheda (o nella stessa rete)?",
+  "wifi.err.webRejected": "La scheda ha rifiutato «{line}» via web: {e}"
 }
