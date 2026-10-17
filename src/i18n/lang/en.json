@@ -1566,5 +1566,9 @@
   "lib.sw.name.laser": "laser library",
   "lib.sw.name.plasma": "plasma library",
   "lib.sw.note": "You are viewing the {lib} – the machine is set to “{mode}” in the CAM area. You can still edit and back up.",
-  "lib.sw.apply": "Switch machine to {mode}"
+  "lib.sw.apply": "Switch machine to {mode}",
+  "store.title": "Your settings",
+  "store.info": "Tools, laser layers, plasma cuts and all other settings are also saved in this folder (with one backup per day, 14 days). They survive updates and are restored automatically at startup if missing.",
+  "store.noFile": "Settings are only kept in the app storage (no file available).",
+  "store.restored": "[System] Restored {n} settings from the settings file (e.g. after an update)."
 }

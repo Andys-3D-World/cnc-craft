@@ -1184,3 +1184,4 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .lib-switch button .lib-sw-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #34d17b; margin-left: 6px; vertical-align: 2px; }
 .lib-mode-note { font-size: 0.78rem; color: var(--text-muted); background: rgba(255, 181, 71, 0.08); border: 1px solid rgba(255, 181, 71, 0.35); border-radius: 8px; padding: 7px 10px; margin: -6px 0 12px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .lib-mode-note button { padding: 3px 10px; font-size: 0.76rem; }
+.about-path { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-main); background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 6px; padding: 5px 8px; margin-top: 4px; word-break: break-all; user-select: text; }

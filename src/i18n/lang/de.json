@@ -1566,5 +1566,9 @@
   "lib.sw.name.laser": "Laser-Bibliothek",
   "lib.sw.name.plasma": "Plasma-Bibliothek",
   "lib.sw.note": "Du siehst die {lib} – die Maschine steht im CAM-Bereich auf „{mode}“. Bearbeiten und Sichern geht trotzdem.",
-  "lib.sw.apply": "Maschine auf {mode} umschalten"
+  "lib.sw.apply": "Maschine auf {mode} umschalten",
+  "store.title": "Deine Einstellungen",
+  "store.info": "Werkzeuge, Laser-Ebenen, Plasma-Schnitte und alle anderen Einstellungen werden zusätzlich in diesem Ordner gespeichert (mit einer Sicherung pro Tag, 14 Tage). Sie bleiben bei Updates erhalten und werden beim Start automatisch zurückgeholt, falls sie fehlen.",
+  "store.noFile": "Einstellungen werden nur im Programm-Speicher gehalten (keine Datei verfügbar).",
+  "store.restored": "[System] {n} Einstellungen aus der Sicherungsdatei zurückgeholt (z. B. nach einem Update)."
 }

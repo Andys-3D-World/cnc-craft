@@ -1391,5 +1391,9 @@
   "lib.sw.name.laser": "laserbibliotheek",
   "lib.sw.name.plasma": "plasmabibliotheek",
   "lib.sw.note": "Je bekijkt de {lib} – de machine staat in het CAM-gedeelte op „{mode}“. Bewerken en back-uppen kan toch.",
-  "lib.sw.apply": "Machine naar {mode} omschakelen"
+  "lib.sw.apply": "Machine naar {mode} omschakelen",
+  "store.title": "Je instellingen",
+  "store.info": "Gereedschappen, laserlagen, plasmasneden en alle andere instellingen worden ook in deze map opgeslagen (één back-up per dag, 14 dagen). Ze blijven bij updates behouden en worden bij het starten automatisch teruggezet als ze ontbreken.",
+  "store.noFile": "Instellingen worden alleen in het programmageheugen bewaard (geen bestand).",
+  "store.restored": "[Systeem] {n} instellingen teruggezet uit het bestand (bijv. na een update)."
 }

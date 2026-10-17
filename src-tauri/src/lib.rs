@@ -25,6 +25,7 @@ mod machine;
 mod marlin;
 mod ruida;
 mod serial;
+mod store;
 mod usb_k40;
 
 use machine::{Emit, Machine};
@@ -34,7 +35,7 @@ use ruida::{Origin, RdOptions, Ruida};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 /// Eine Verbindung: GRBL-Familie oder Ruida
 #[derive(Clone)]
@@ -305,6 +306,33 @@ fn app_info(app: tauri::AppHandle) -> AppInfo {
     }
 }
 
+/// Einstellungen-Datei (store.rs): Ordner + gespeicherter Stand
+#[derive(Serialize)]
+struct StoreRead {
+    dir: String,
+    main: Option<String>,
+    backups: Vec<String>,
+}
+
+fn store_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+    app.path().app_data_dir().map_err(|e| e.to_string())
+}
+
+/// Gespeicherte Einstellungen lesen (beim Start, falls der Speicher der Oberfläche leer ist)
+#[tauri::command]
+async fn settings_store_read(app: AppHandle) -> Result<StoreRead, String> {
+    let dir = store_dir(&app)?;
+    let s = store::read_settings(&dir);
+    Ok(StoreRead { dir: dir.to_string_lossy().to_string(), main: s.main, backups: s.backups })
+}
+
+/// Einstellungen in die Datei schreiben (+ Tages-Sicherung)
+#[tauri::command]
+async fn settings_store_write(app: AppHandle, data: String) -> Result<(), String> {
+    let dir = store_dir(&app)?;
+    store::write_settings(&dir, &data).map_err(|e| e.to_string())
+}
+
 /// Text einer mitgelieferten Firmware (zum Anzeigen/Prüfen in der Oberfläche)
 #[tauri::command]
 async fn bundled_firmware(name: String) -> Result<String, String> {
@@ -420,7 +448,9 @@ pub fn run() {
             bundled_firmware,
             elf_inspect,
             flash_cancel,
-            app_info
+            app_info,
+            settings_store_read,
+            settings_store_write
         ])
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");

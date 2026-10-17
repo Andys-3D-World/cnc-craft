@@ -9,6 +9,7 @@
  * Gibt es ein Update, erscheint oben zusätzlich der Knopf „⬆ v…“ (öffnet dieses Fenster).
  */
 import { t } from "../i18n/i18n";
+import { settingsDir } from "../settingsStore";
 import {
   updateRepo, UPDATE_EVENT, updateSettings, saveSettings, updatesEnabled, appInfo, checkForUpdate,
   openDownload, errorText, lastResult, UpdateResult
@@ -66,6 +67,11 @@ export async function openAboutDialog(log: (s: string) => void) {
           <div id="upd-result"></div>
           <div class="about-repo">GitHub: <a href="#" id="upd-repo">${esc(updateRepo())}</a></div>
         ` : `<div class="about-status">${esc(t("upd.disabled"))}</div>`}
+      </div>
+      <div class="about-section">
+        <h4>💾 ${esc(t("store.title"))}</h4>
+        <div class="about-status">${esc(t(settingsDir() ? "store.info" : "store.noFile"))}</div>
+        ${settingsDir() ? `<div class="about-path" title="${esc(settingsDir())}">${esc(settingsDir())}</div>` : ""}
       </div>
       <div class="dlg-buttons"><button id="about-close" class="btn-secondary" style="flex:1;">${esc(t("upd.close"))}</button></div>
     </div>`;

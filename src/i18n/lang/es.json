@@ -1391,5 +1391,9 @@
   "lib.sw.name.laser": "biblioteca láser",
   "lib.sw.name.plasma": "biblioteca plasma",
   "lib.sw.note": "Estás viendo la {lib}: la máquina está en «{mode}» en el área CAM. Puedes editar y guardar igualmente.",
-  "lib.sw.apply": "Cambiar la máquina a {mode}"
+  "lib.sw.apply": "Cambiar la máquina a {mode}",
+  "store.title": "Tus ajustes",
+  "store.info": "Herramientas, capas láser, cortes de plasma y todos los demás ajustes se guardan también en esta carpeta (una copia por día, 14 días). Se conservan con las actualizaciones y se recuperan al iniciar si faltan.",
+  "store.noFile": "Los ajustes solo se guardan en la memoria de la aplicación (sin archivo).",
+  "store.restored": "[Sistema] {n} ajustes recuperados del archivo (p. ej. tras una actualización)."
 }

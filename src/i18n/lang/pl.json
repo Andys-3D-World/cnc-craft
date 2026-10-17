@@ -1391,5 +1391,9 @@
   "lib.sw.name.laser": "biblioteka lasera",
   "lib.sw.name.plasma": "biblioteka plazmy",
   "lib.sw.note": "Oglądasz: {lib} – maszyna w obszarze CAM jest ustawiona na „{mode}”. Edycja i kopia nadal działają.",
-  "lib.sw.apply": "Przełącz maszynę na: {mode}"
+  "lib.sw.apply": "Przełącz maszynę na: {mode}",
+  "store.title": "Twoje ustawienia",
+  "store.info": "Narzędzia, warstwy lasera, cięcia plazmą i wszystkie inne ustawienia są też zapisywane w tym folderze (jedna kopia dziennie, 14 dni). Przetrwają aktualizacje i są automatycznie przywracane przy starcie, jeśli ich brakuje.",
+  "store.noFile": "Ustawienia są przechowywane tylko w pamięci programu (brak pliku).",
+  "store.restored": "[System] Przywrócono {n} ustawień z pliku (np. po aktualizacji)."
 }

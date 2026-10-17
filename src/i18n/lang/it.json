@@ -1391,5 +1391,9 @@
   "lib.sw.name.laser": "libreria laser",
   "lib.sw.name.plasma": "libreria plasma",
   "lib.sw.note": "Stai vedendo la {lib} – la macchina è su «{mode}» nell’area CAM. Puoi comunque modificare e salvare.",
-  "lib.sw.apply": "Passa la macchina a {mode}"
+  "lib.sw.apply": "Passa la macchina a {mode}",
+  "store.title": "Le tue impostazioni",
+  "store.info": "Utensili, livelli laser, tagli plasma e tutte le altre impostazioni vengono salvati anche in questa cartella (un backup al giorno, 14 giorni). Restano dopo gli aggiornamenti e vengono ripristinati all’avvio se mancano.",
+  "store.noFile": "Le impostazioni sono conservate solo nella memoria dell’app (nessun file).",
+  "store.restored": "[Sistema] {n} impostazioni ripristinate dal file (ad es. dopo un aggiornamento)."
 }

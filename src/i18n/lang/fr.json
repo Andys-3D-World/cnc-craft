@@ -1391,5 +1391,9 @@
   "lib.sw.name.laser": "bibliothèque laser",
   "lib.sw.name.plasma": "bibliothèque plasma",
   "lib.sw.note": "Tu consultes la {lib} – la machine est sur « {mode} » dans la zone CAM. Modifier et sauvegarder reste possible.",
-  "lib.sw.apply": "Passer la machine en {mode}"
+  "lib.sw.apply": "Passer la machine en {mode}",
+  "store.title": "Tes réglages",
+  "store.info": "Outils, calques laser, coupes plasma et tous les autres réglages sont aussi enregistrés dans ce dossier (une sauvegarde par jour, 14 jours). Ils survivent aux mises à jour et sont restaurés au démarrage s’ils manquent.",
+  "store.noFile": "Les réglages ne sont conservés que dans la mémoire de l’application (pas de fichier).",
+  "store.restored": "[Système] {n} réglages restaurés depuis le fichier (p. ex. après une mise à jour)."
 }

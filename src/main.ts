@@ -42,6 +42,7 @@ import { initImports, importBytes } from "./importers/importManager";
 import { initLanguageMenu } from "./ui/languageMenu";
 import { renderToolTable, initToolPage } from "./ui/toolEditor";
 import { initLibraryTab } from "./ui/libraryTab";
+import { restoreSettings, startSettingsMirror } from "./settingsStore";
 import type { ToolName } from "./editor/editorState";
 import { t, initI18n, applyTranslations } from "./i18n/i18n";
 
@@ -72,7 +73,11 @@ function appendToConsole(text: string) {
   console.log(text);
 }
 
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  // Zuerst: Einstellungen aus der Datei im App-Datenordner zurückholen, falls sie im Speicher
+  // der Oberfläche fehlen (z. B. nach einem Update) – danach jede Änderung in die Datei spiegeln
+  const restored = await restoreSettings();
+  startSettingsMirror();
   initI18n();
   initMachineMode();   // Fräse oder Laser (setzt die CSS-Klasse am <body>)
   initLaserLayers();
@@ -161,6 +166,7 @@ window.addEventListener("DOMContentLoaded", () => {
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates
+    if (restored > 0) appendToConsole(t("store.restored", { n: restored }));
     initUpdater(appendToConsole);      // Update-Prüfung über GitHub (aus, solange kein Repository eingetragen ist)
     initSettingsPage(appendToConsole); // $$-Einstellungen (Reiter "Kalibrieren")
     initFlashPage(appendToConsole);    // Firmware flashen (Reiter "Board flashen")
