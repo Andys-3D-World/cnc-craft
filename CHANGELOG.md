@@ -1,42 +1,43 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.3 Beta
 
 **Neu**
 - **📶 WLAN einrichten** (Reiter „Maschine“, bei Boards mit WLAN): Heimnetz oder eigenes WLAN des Boards setzen –
   auch mit Sonderzeichen, die GRBL unterwegs abfängt (! ? ~, Umlaute) oder als Kommentar liest (( ) ;):
   FluidNC bekommt sie %-kodiert, grblHAL schaltet sie kurz mit $39=0 frei, Grbl_ESP32/MKS DLC32 bekommen sie über
-  die Weboberfläche des Boards. Das Passwort erscheint nie in der Konsole; Neustart-Knopf danach
+  die Weboberfläche des Boards. Das Passwort erscheint nie in der Konsole
+- **Board-Auswahl im WLAN-Dialog:** Automatisch (erkannt), MKS DLC32 MAX / neuere MKS-Firmware ($50–$54),
+  älteres MKS DLC32 / Grbl_ESP32 ([ESP100]), FluidNC, grblHAL – falls die Erkennung danebenliegt; wird gemerkt
+- **MKS DLC32 MAX:** WLAN über die eigenen MKS-Einstellungen $50–$54 (per USB) bzw. [ESP401] über die
+  Weboberfläche; die MAX wechselt sofort ins neue WLAN – danach prüft die App per USB, ob das Board angekommen
+  ist, und zeigt seine neue IP (kein Neustart nötig)
 - **WLANs in der Nähe auswählen:** das Board sucht selbst ([ESP410]) und zeigt die Netze mit Signalstärke und 🔒 –
   Namen anklicken statt abtippen
-- **Erst-Einrichtung ohne IP:** Anleitung im Dialog über das eigene WLAN des Boards (MKS DLC32: „MKS_DLC“,
-  Passwort 12345678, 192.168.4.1) – Name wird vom Board gelesen, Knopf „WLAN des Boards einschalten“,
-  🔎 prüft vor dem Senden, ob das Board antwortet; Fehlermeldungen zeigen die Antwort des Boards
-- **WLAN-Dialog zeigt, wo das Board gerade ist:** liest per USB aus, ob das Board schon in einem WLAN hängt
-  (dann wird dessen IP eingetragen) oder sein eigenes WLAN an hat; prüft die Adresse alle paar Sekunden selbst
+- **Erst-Einrichtung ohne IP:** Anleitung im Dialog über das eigene WLAN des Boards (MKS: „MKS_DLC…“,
+  Passwort 12345678, 192.168.4.1), Knopf „WLAN des Boards einschalten“, 🔎 prüft vor dem Senden, ob das Board
+  antwortet. Der Dialog liest per USB aus, ob das Board schon in einem WLAN hängt (dann wird dessen IP
+  eingetragen) oder sein eigenes WLAN an hat, und prüft die Adresse alle paar Sekunden selbst
 - **🏭 Werkseinstellung** im Reiter „Einstellungen ($$)“: Maschinen-Einstellungen ($RST=$), Nullpunkte ($RST=#)
   oder alles ($RST=*) zurücksetzen – vorher automatisch in eine Datei sichern, danach werden die Werte neu gelesen;
   Warnung, wenn „Alles“ bei ESP32-Boards die WLAN-Zugangsdaten löscht
-- Konsole warnt bei Einstellungen mit solchen Zeichen, statt ein verstümmeltes Passwort zu schicken
-
-**Behoben**
-- WLAN einrichten bei MKS DLC32 MAX: diese Firmware kennt [ESP100]/[ESP101] nicht („Invalid $ statement“) –
-  jetzt über ihre eigenen Einstellungen $50–$54 (per USB) bzw. [ESP401] über die Weboberfläche (bei ! ? ~ / Umlauten)
-- WLAN-Dialog: Board-Auswahl (Automatisch / MKS DLC32 MAX / älteres DLC32 · Grbl_ESP32 / FluidNC / grblHAL), falls die
-  Erkennung danebenliegt; bei der MAX wird die WLAN-Art zuletzt gesetzt (sie wechselt sofort) – keine Antwort darauf
-  gilt nicht mehr als Fehler, danach prüft die App per USB, ob das Board im WLAN ist, und zeigt seine neue IP
-- WLAN-Passwörter werden in der Konsole (z. B. bei $S) und im Einstellungs-Reiter ($52/$54) verdeckt angezeigt
-- WLAN-Dialog: MKS DLC32 MAX meldete „Fehler 3 – Unbekannter $-Befehl“ (Abfrage $AP/SSID kennt die Firmware nicht)
-- Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte
-  Leerzeichen entfernt (wie bei G-Code-Kommentaren)
 
 **Verbessert**
-- **WLAN-Suche zuverlässiger:** zuletzt benutzte/gefundene Adressen, Geräte aus der ARP-Tabelle und Namen wie
-  fluidnc.local werden zuerst und mit langer Wartezeit geprüft (für „verschlafene“ ESP32-Boards); Geräte, die
-  bei der schnellen Runde zu langsam waren, werden ein zweites Mal gefragt; nur noch EINE Verbindung pro Port
-  (ESP32-Telnet nimmt oft nur einen Client an)
+- **WLAN-Suche 📡 zuverlässiger:** zuletzt benutzte/gefundene Adressen, Geräte aus der ARP-Tabelle und Namen wie
+  fluidnc.local werden zuerst und mit langer Wartezeit geprüft (für „verschlafene“ ESP32-Boards); zu langsame
+  Geräte werden ein zweites Mal gefragt; nur noch EINE Verbindung pro Port (ESP32-Telnet nimmt oft nur einen Client an)
 - **Neue IP automatisch finden:** ist die Maschine unter der gespeicherten Adresse nicht erreichbar, sucht das
   Programm sie im Netz und verbindet sich mit der neuen Adresse (gleiche Firmware/gleicher Name wird bevorzugt)
+- WLAN-Passwörter werden verdeckt: in der Konsole (z. B. bei $S) und im Einstellungs-Reiter ($52/$54)
+- Fehlermeldungen beim WLAN-Senden zeigen die Antwort des Boards
+- Konsole warnt bei Einstellungen mit Zeichen, die GRBL abfängt, statt ein verstümmeltes Passwort zu schicken
+
+**Behoben**
+- MKS DLC32 MAX: „Invalid $ statement“ beim WLAN-Senden ([ESP100]/[ESP101] gibt es dort nicht) und
+  „Fehler 3 – Unbekannter $-Befehl“ beim Öffnen des WLAN-Dialogs ($AP/SSID)
+- „Keine Antwort“ beim Umschalten des WLANs wurde als Fehler gemeldet, obwohl es geklappt hatte
+- Einstellungen ($…) und ESP-Befehle ([ESP…]) werden unverändert gesendet – bisher wurden ( ) ; % und doppelte
+  Leerzeichen entfernt (wie bei G-Code-Kommentaren)
 
 ## 0.2.2 Beta
 
