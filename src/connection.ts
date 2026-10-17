@@ -2,6 +2,7 @@
  * VERBINDUNG & BEDIENUNG (Reiter "Maschine")
  *
  *  - Ports mit Chip-Erkennung auflisten (CH340, CP210x, ESP32-S3 USB …)
+ *  - Netzwerk-Suche 📡 (wie der IP-Finder in OpenBuilds): findet FluidNC, grblHAL, MKS DLC32 … im WLAN
  *  - Verbinden / Trennen, Firmware-Anzeige (GRBL, grblHAL, FluidNC, Grbl_ESP32 …)
  *  - echte Position (Werkstück- und Maschinenkoordinaten) aus dem Statusbericht
  *  - Status-Anzeige (Bereit, Läuft, Angehalten, Alarm …) mit Alarm-Erklärung
@@ -17,7 +18,7 @@ import { handleJogClick } from "./jogSimulator";
 import { t } from "./i18n/i18n";
 import {
   machine, MACHINE_EVENT, RT, listPorts, connect, connectMarlin, connectRuida, connectK40, k40Count, disconnect, send, sendAndWait, realtime,
-  alarmText, canCommand, PortInfo, fmtBuildDate
+  alarmText, canCommand, PortInfo, fmtBuildDate, netScan, NetDevice
 } from "./machine";
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
 
@@ -61,14 +62,73 @@ export function initConnection(appendToConsole: (text: string) => void) {
     if (ipFor !== proto) {
       ipFor = proto;
       ipInput.value = proto === "ruida" ? (get(KEY_RUIDA_IP) || "192.168.1.100") : (get(KEY_NET_GRBL) || "");
-      ipInput.placeholder = proto === "ruida" ? "192.168.1.100" : "192.168.4.1:23";
+      ipInput.placeholder = proto === "ruida" ? "192.168.1.100" : "192.168.4.1";
       ipInput.title = t(proto === "ruida" ? "m.ruidaIpTip" : "m.netIpTip");
     }
     const show = netCapable() && portSelect.value === NET;
     ipInput.style.display = show ? "" : "none";
+    // Netzwerk-Suche gibt es für GRBL über Netzwerk (Ruida spricht UDP mit eigenem Protokoll)
+    const findBtn = $("net-find-btn");
+    if (findBtn) findBtn.style.display = show && !isRuidaMachine() ? "" : "none";
+    if (!(show && !isRuidaMachine())) hideFind();
     if (!isRuidaMachine() && !isK40Machine()) baudSelect.style.display = show ? "none" : "";
   };
   window.addEventListener("cnc-protocol-changed", () => { ipFor = ""; });
+
+  // ---------------- Netzwerk-Suche (IP-Finder) ----------------
+  const findList = $("net-find-list");
+  const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
+  function hideFind() { if (findList) { findList.style.display = "none"; findList.innerHTML = ""; } }
+  const pick = (addr: string) => {
+    if (!ipInput) return;
+    ipInput.value = addr;
+    try { localStorage.setItem(KEY_NET_GRBL, addr); } catch { /* egal */ }
+    hideFind();
+    appendToConsole(t("net.picked", { addr }));
+  };
+  let finding = false;
+  const findDevices = async () => {
+    if (!findList || finding || machine.connected) return;
+    finding = true;
+    const btn = $("net-find-btn") as HTMLButtonElement | null;
+    if (btn) btn.disabled = true;
+    findList.style.display = "";
+    findList.innerHTML = `<div class="net-find-busy"><span class="net-spin"></span>${esc(t("net.searching"))}</div>`;
+    try {
+      const r = await netScan();
+      const net = r.own ? r.own.replace(/\.\d+$/, ".x") : "";
+      const devs = r.devices || [];
+      const label = (d: NetDevice) => {
+        const parts = [d.firmware, d.name].filter(Boolean);
+        return parts.length ? parts.join(" · ") : t(d.kind === "grbl" ? "net.grblUnknown" : "net.openPort");
+      };
+      const portHint = (p: number) => p === 23 ? "Telnet" : p === 8080 ? "MKS" : p === 8780 ? "xTool" : "";
+      findList.innerHTML = `
+        <div class="net-find-head"><span>${esc(net ? t("net.foundIn", { net, n: devs.length }) : t("net.found", { n: devs.length }))}</span>
+          <button class="net-find-x" data-tip="${esc(t("upd.close"))}">✕</button></div>
+        ${devs.length ? devs.map(d => `
+          <button class="net-find-item${d.kind === "grbl" ? " grbl" : ""}" data-addr="${esc(d.ip + ":" + d.port)}">
+            <span class="net-find-dot"></span>
+            <span class="net-find-txt"><b>${esc(d.ip)}<em>:${d.port}</em></b><small>${esc(label(d))}${portHint(d.port) ? " · " + portHint(d.port) : ""}</small></span>
+            <span class="net-find-use">${esc(t("net.use"))}</span>
+          </button>`).join("") : `<div class="net-find-none">${esc(t("net.none"))}</div>`}`;
+      findList.querySelector(".net-find-x")?.addEventListener("click", hideFind);
+      findList.querySelectorAll<HTMLButtonElement>(".net-find-item").forEach(b => b.addEventListener("click", () => pick(b.dataset.addr!)));
+      const grbl = devs.filter(d => d.kind === "grbl");
+      appendToConsole(t("net.log", { n: devs.length, g: grbl.length }));
+      // genau eine Maschine gefunden: gleich eintragen (Liste bleibt zum Nachsehen offen)
+      if (grbl.length === 1 && ipInput) {
+        ipInput.value = grbl[0].ip + ":" + grbl[0].port;
+        try { localStorage.setItem(KEY_NET_GRBL, ipInput.value); } catch { /* egal */ }
+      }
+    } catch (e) {
+      findList.innerHTML = `<div class="net-find-none">${esc(t("net.error", { e: String(e) }))}</div>`;
+    } finally {
+      finding = false;
+      if (btn) btn.disabled = false;
+    }
+  };
+  $("net-find-btn")?.addEventListener("click", findDevices);
   const scan = async () => {
     if (isK40Machine()) {
       // K40-Original-Board ist kein serieller Port, sondern ein USB-Gerät (CH341, 1a86:5512)
@@ -137,6 +197,9 @@ export function initConnection(appendToConsole: (text: string) => void) {
     portSelect.disabled = on;
     baudSelect.disabled = on;
     if (ipInput) ipInput.disabled = on;
+    const fb = $("net-find-btn") as HTMLButtonElement | null;
+    if (fb) fb.disabled = on;
+    if (on) hideFind();
     const dot = $("header-conn-dot"), txt = $("header-conn-text");
     if (dot) dot.classList.toggle("online", on);
     if (txt) txt.textContent = on ? (machine.firmware ? `${machine.firmware} ${machine.version}`.trim() : t("nav.online")) : t("nav.offline");

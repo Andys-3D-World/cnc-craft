@@ -372,6 +372,20 @@ export async function initMachine(logFn: (s: string) => void) {
 // Befehle
 // ---------------------------------------------------------------------
 
+/** Gerät aus der Netzwerk-Suche (Rust: netscan.rs) */
+export interface NetDevice {
+  ip: string;
+  port: number;
+  kind: "grbl" | "open" | string; // grbl = antwortet wie GRBL, open = Port offen, Antwort unklar
+  firmware: string;               // z. B. "Grbl 1.1h", "FluidNC v3.9.1"
+  name: string;                   // Titel der Weboberfläche, z. B. "MKS DLC32"
+}
+
+/** Eigenes Netz nach GRBL-Maschinen absuchen (dauert ein paar Sekunden) */
+export async function netScan(): Promise<{ own: string; devices: NetDevice[] }> {
+  return await invoke<{ own: string; devices: NetDevice[] }>("net_scan");
+}
+
 export async function listPorts(): Promise<PortInfo[]> {
   try { return await invoke<PortInfo[]>("list_ports"); } catch { return []; }
 }

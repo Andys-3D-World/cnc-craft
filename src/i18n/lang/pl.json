@@ -884,8 +884,8 @@
   "sp.k40.li1": "Moc lasera: potencjometrem lub na wyświetlaczu maszyny (dla większości rur nie przekraczaj ok. 10–18 mA).",
   "sp.k40.li2": "Prędkość pochodzi z warstw lasera; każde zadanie zaczyna się bazowaniem w lewym górnym rogu.",
   "sp.k40.li3": "„Odblokuj” zwalnia głowicę, aby przesunąć ją ręcznie.",
-  "m.netIpTip": "Adres maszyny w sieci, np. 192.168.4.1:23 (FluidNC/płyty ESP32 przez Wi-Fi, port 23) lub 172.25.3.1:8780 (xTool F1). Bez portu używany jest 23.",
-  "m.netHint": "GRBL przez sieć (Telnet): FluidNC, grblHAL, płyty ESP32 jak MKS DLC32 przez Wi-Fi, xTool F1.",
+  "m.netIpTip": "Adres maszyny w sieci, np. 192.168.178.45 – albo użyj 📡 obok. Bez portu najpierw próbowany jest 23 (FluidNC, grblHAL, Grbl_ESP32), potem 8080 (MKS DLC32 oryginalny firmware). xTool F1: 172.25.3.1:8780.",
+  "m.netHint": "GRBL przez sieć: FluidNC, grblHAL, płyty ESP32 jak MKS DLC32 przez Wi-Fi, xTool F1. Przyciskiem 📡 znajdziesz maszynę w sieci.",
   "mw.note.xtoolF1": "F1 to laser galwo sterowany – jak w LightBurn z plikiem xTool – przez GRBL w sieci USB (172.25.3.1, port 8780). Według użytkowników nowszy firmware tam nie odpowiada; pomaga powrót do starszej wersji w xTool Studio. Dostosuj pole (F1: 115 × 115 mm, Lite/Ultra inne). Nowość, nieprzetestowane – najpierw sprawdź „Objedź ramkę”.",
   "mw.switched": "{mode}: wybrano maszynę „{name}”.",
   "fl.bundled": "GRBL 1.1h dla Arduino UNO/Nano (w zestawie)",
@@ -1395,5 +1395,16 @@
   "store.title": "Twoje ustawienia",
   "store.info": "Narzędzia, warstwy lasera, cięcia plazmą i wszystkie inne ustawienia są też zapisywane w tym folderze (jedna kopia dziennie, 14 dni). Przetrwają aktualizacje i są automatycznie przywracane przy starcie, jeśli ich brakuje.",
   "store.noFile": "Ustawienia są przechowywane tylko w pamięci programu (brak pliku).",
-  "store.restored": "[System] Przywrócono {n} ustawień z pliku (np. po aktualizacji)."
+  "store.restored": "[System] Przywrócono {n} ustawień z pliku (np. po aktualizacji).",
+  "net.findTip": "Szukaj maszyn w sieci (jak wyszukiwarka IP w OpenBuilds): znajduje FluidNC, grblHAL, Grbl_ESP32 i MKS DLC32 w twojej sieci Wi-Fi/LAN.",
+  "net.searching": "Szukanie w sieci … (kilka sekund)",
+  "net.foundIn": "Sieć {net}: znaleziono {n}",
+  "net.found": "Znaleziono {n}",
+  "net.use": "Użyj",
+  "net.grblUnknown": "odpowiada jak GRBL",
+  "net.openPort": "port otwarty – nieznane urządzenie",
+  "net.none": "Nic nie znaleziono. Czy maszyna jest włączona i w tej samej sieci Wi-Fi co komputer? Na Macu przy pierwszym razie zezwól CNC Craft na „Sieć lokalna” (Ustawienia → Prywatność i ochrona). Możesz też wpisać IP odczytane z wyświetlacza/routera.",
+  "net.error": "Wyszukiwanie niemożliwe: {e}",
+  "net.log": "[Sieć] Wyszukiwanie zakończone: {n} urządzeń, {g} odpowiada jak GRBL.",
+  "net.picked": "[Sieć] Ustawiono adres {addr} – teraz kliknij „Połącz”."
 }

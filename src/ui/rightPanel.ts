@@ -123,6 +123,7 @@ export function renderRightPanel(container: HTMLElement) {
             </div>
             <div style="display: flex; gap: 4px;">
               <input type="text" id="ruida-ip" style="flex: 1; min-width: 0; font-size: 0.78rem; padding: 4px; display: none;" placeholder="192.168.1.100" ${tip("m.ruidaIpTip")}>
+              <button id="net-find-btn" class="btn-secondary btn-icon" style="display: none;" ${tip("net.findTip")}>📡</button>
               <select id="baud-select" class="not-ruida not-k40" style="flex: 1; min-width: 0; font-size: 0.78rem; padding: 4px;" ${tip("m.baudTip")}>
                 <option value="115200">115200 Baud</option>
                 <option value="250000">250000 Baud</option>
@@ -132,6 +133,7 @@ export function renderRightPanel(container: HTMLElement) {
               </select>
               <button id="connect-btn" class="btn-primary" style="flex: 1; padding: 4px; font-size: 0.8rem;">🔌 ${T("rp.connect")}</button>
             </div>
+            <div id="net-find-list" class="net-find" style="display: none;"></div>
             <div id="machine-info" class="tool-scope"></div>
             ${machineLineHtml()}
           </div>

@@ -1059,8 +1059,8 @@
   "sp.k40.li1": "Laserleistung: am Poti bzw. Display der Maschine (ca. 10–18 mA für die meisten Röhren nicht überschreiten).",
   "sp.k40.li2": "Geschwindigkeit kommt aus den Laser-Ebenen; jeder Auftrag startet mit einer Referenzfahrt nach oben links.",
   "sp.k40.li3": "„Entsperren“ gibt den Kopf frei, damit du ihn von Hand schieben kannst.",
-  "m.netIpTip": "Adresse der Maschine im Netzwerk, z. B. 192.168.4.1:23 (FluidNC/ESP32-Boards per WLAN, Port 23) oder 172.25.3.1:8780 (xTool F1). Ohne Port wird 23 benutzt.",
-  "m.netHint": "GRBL über Netzwerk (Telnet): FluidNC, grblHAL, ESP32-Boards wie MKS DLC32 per WLAN, xTool F1.",
+  "m.netIpTip": "Adresse der Maschine im Netzwerk, z. B. 192.168.178.45 – oder 📡 daneben suchen lassen. Ohne Port wird erst 23 (FluidNC, grblHAL, Grbl_ESP32), dann 8080 (MKS DLC32 Original-Firmware) probiert. xTool F1: 172.25.3.1:8780.",
+  "m.netHint": "GRBL über Netzwerk: FluidNC, grblHAL, ESP32-Boards wie MKS DLC32 per WLAN, xTool F1. Mit 📡 findest du die Maschine im Netz.",
   "mw.note.xtoolF1": "Das F1 ist ein Galvo-Laser und wird – wie in LightBurn mit xTools Gerätedatei – per GRBL über das USB-Netzwerk angesprochen (172.25.3.1, Port 8780). Laut Nutzerberichten antworten neuere Firmware-Versionen dort nicht; dann hilft ein Firmware-Downgrade in xTool Studio. Arbeitsfläche anpassen (F1: 115 × 115 mm, Lite/Ultra anders). Neu und ungetestet – zuerst mit „Rahmen abfahren“ prüfen.",
   "mw.switched": "{mode}: Maschine „{name}“ eingestellt.",
   "fl.bundled": "GRBL 1.1h für Arduino UNO/Nano (mitgeliefert)",
@@ -1570,5 +1570,16 @@
   "store.title": "Deine Einstellungen",
   "store.info": "Werkzeuge, Laser-Ebenen, Plasma-Schnitte und alle anderen Einstellungen werden zusätzlich in diesem Ordner gespeichert (mit einer Sicherung pro Tag, 14 Tage). Sie bleiben bei Updates erhalten und werden beim Start automatisch zurückgeholt, falls sie fehlen.",
   "store.noFile": "Einstellungen werden nur im Programm-Speicher gehalten (keine Datei verfügbar).",
-  "store.restored": "[System] {n} Einstellungen aus der Sicherungsdatei zurückgeholt (z. B. nach einem Update)."
+  "store.restored": "[System] {n} Einstellungen aus der Sicherungsdatei zurückgeholt (z. B. nach einem Update).",
+  "net.findTip": "Maschinen im Netzwerk suchen (wie der IP-Finder in OpenBuilds): findet FluidNC, grblHAL, Grbl_ESP32 und MKS DLC32 im eigenen WLAN/LAN.",
+  "net.searching": "Suche im Netzwerk … (ein paar Sekunden)",
+  "net.foundIn": "Im Netz {net}: {n} gefunden",
+  "net.found": "{n} gefunden",
+  "net.use": "Nehmen",
+  "net.grblUnknown": "antwortet wie GRBL",
+  "net.openPort": "Port offen – Gerät unbekannt",
+  "net.none": "Nichts gefunden. Ist die Maschine eingeschaltet und im selben WLAN wie der Rechner? Am Mac beim ersten Mal „Lokales Netzwerk“ für CNC Craft erlauben (Systemeinstellungen → Datenschutz & Sicherheit). Du kannst die IP-Adresse auch vom Display/Router abschreiben und eintragen.",
+  "net.error": "Suche nicht möglich: {e}",
+  "net.log": "[Netzwerk] Suche fertig: {n} Gerät(e), davon {g} mit GRBL-Antwort.",
+  "net.picked": "[Netzwerk] Adresse {addr} übernommen – jetzt „Verbinden“ klicken."
 }

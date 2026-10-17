@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Wird von Tauri beim Bauen in die Info.plist der Mac-App übernommen.
+     macOS 15+ fragt beim ersten Zugriff aufs lokale Netz nach Erlaubnis (Netzwerk-Suche, Maschinen per WLAN). -->
+<plist version="1.0">
+<dict>
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>CNC Craft sucht und verbindet Maschinen im lokalen Netzwerk (z. B. FluidNC, MKS DLC32 oder Ruida per WLAN/LAN).</string>
+</dict>
+</plist>

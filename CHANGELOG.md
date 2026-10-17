@@ -1,5 +1,14 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Neu**
+- **Netzwerk-Suche 📡** (wie der IP-Finder in OpenBuilds): findet FluidNC, grblHAL, Grbl_ESP32 und
+  MKS DLC32 im eigenen WLAN/LAN (Ports 23 und 8080, dazu 192.168.4.1 und xTool F1) – mit Firmware und
+  Namen aus der Weboberfläche; Klick übernimmt die Adresse
+- Ohne Port-Angabe wird beim Verbinden erst Port 23, dann 8080 (MKS-Original-Firmware) probiert
+- macOS: Hinweistext für die Erlaubnis „Lokales Netzwerk“ (Info.plist)
+
 ## 0.2.1 Beta
 
 **Neu**

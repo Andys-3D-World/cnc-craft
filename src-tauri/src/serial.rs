@@ -98,14 +98,31 @@ impl Read for TcpReader {
     }
 }
 
-/// GRBL über Netzwerk (Telnet/TCP): FluidNC, grblHAL, Grbl_ESP32/MKS DLC32 per WLAN (Port 23),
-/// xTool F1 per USB-Netzwerk (172.25.3.1:8780). addr = "host:port" (ohne Port: 23)
+/// GRBL über Netzwerk (Telnet/TCP): FluidNC, grblHAL, Grbl_ESP32 per WLAN (Port 23),
+/// MKS DLC32 mit Original-Firmware (Port 8080), xTool F1 per USB-Netzwerk (172.25.3.1:8780).
+/// addr = "host:port"; ohne Port wird erst 23, dann 8080 versucht.
 pub fn open_machine_tcp(addr: &str, emit: Emit) -> Result<Machine, String> {
     use std::net::{TcpStream, ToSocketAddrs};
     let a = addr.trim();
-    let with_port = if a.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()).unwrap_or(false) { a.to_string() } else { format!("{}:23", a) };
-    let sock = with_port.to_socket_addrs().map_err(|e| e.to_string())?.next().ok_or_else(|| "bad address".to_string())?;
-    let stream = TcpStream::connect_timeout(&sock, Duration::from_secs(4)).map_err(|e| e.to_string())?;
+    let has_port = a.rsplit_once(':').map(|(_, p)| p.parse::<u16>().is_ok()).unwrap_or(false);
+    let tries: Vec<(String, Duration)> = if has_port {
+        vec![(a.to_string(), Duration::from_secs(4))]
+    } else {
+        vec![(format!("{}:23", a), Duration::from_millis(2500)), (format!("{}:8080", a), Duration::from_millis(2500))]
+    };
+    let mut last_err = String::from("bad address");
+    let mut stream: Option<TcpStream> = None;
+    for (target, timeout) in tries {
+        let sock = match target.to_socket_addrs().map_err(|e| e.to_string()).and_then(|mut it| it.next().ok_or_else(|| "bad address".to_string())) {
+            Ok(s) => s,
+            Err(e) => { last_err = e; continue; }
+        };
+        match TcpStream::connect_timeout(&sock, timeout) {
+            Ok(s) => { stream = Some(s); break; }
+            Err(e) => last_err = format!("{}: {}", target, e),
+        }
+    }
+    let stream = stream.ok_or(last_err)?;
     let _ = stream.set_nodelay(true);
     stream.set_read_timeout(Some(Duration::from_millis(50))).map_err(|e| e.to_string())?;
     let reader = stream.try_clone().map_err(|e| e.to_string())?;

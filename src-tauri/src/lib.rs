@@ -23,6 +23,7 @@ mod grbl;
 mod k40;
 mod machine;
 mod marlin;
+mod netscan;
 mod ruida;
 mod serial;
 mod store;
@@ -306,6 +307,34 @@ fn app_info(app: tauri::AppHandle) -> AppInfo {
     }
 }
 
+/// Ergebnis der Netzwerk-Suche (netscan.rs)
+#[derive(Serialize)]
+struct NetDevice {
+    ip: String,
+    port: u16,
+    kind: String,
+    firmware: String,
+    name: String,
+}
+#[derive(Serialize)]
+struct NetScan {
+    own: String,
+    devices: Vec<NetDevice>,
+}
+
+/// Netzwerk nach GRBL-Maschinen absuchen (FluidNC, grblHAL, MKS DLC32 per WLAN …), dauert ein paar Sekunden
+#[tauri::command]
+async fn net_scan() -> Result<NetScan, String> {
+    let (own, found) = tauri::async_runtime::spawn_blocking(netscan::scan_network).await.map_err(|e| e.to_string())?;
+    Ok(NetScan {
+        own: own.map(|ip| ip.to_string()).unwrap_or_default(),
+        devices: found
+            .into_iter()
+            .map(|f| NetDevice { ip: f.ip, port: f.port, kind: f.kind, firmware: f.firmware, name: f.name })
+            .collect(),
+    })
+}
+
 /// Einstellungen-Datei (store.rs): Ordner + gespeicherter Stand
 #[derive(Serialize)]
 struct StoreRead {
@@ -450,7 +479,8 @@ pub fn run() {
             flash_cancel,
             app_info,
             settings_store_read,
-            settings_store_write
+            settings_store_write,
+            net_scan
         ])
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");
