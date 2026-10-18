@@ -1,6 +1,6 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.6 Beta
 
 **Neu**
 - **Update direkt aus der App:** im ⓘ-Fenster gibt es bei einer neuen Version „Jetzt aktualisieren“. CNC Craft lädt
@@ -27,6 +27,9 @@
   Selbst wenn einmal fremder Text (z. B. von einem Board oder aus einer Datei) als HTML landen sollte, kann er
   keinen Code mehr starten. Verbindungen ins Internet nur noch zur Update-Prüfung (GitHub); Kamerabilder aus dem
   Netz und der STEP-Import funktionieren weiter
+
+**Projekt**
+- README mit Bildern der App (Design, Simulation, Laser, Plasma, Anschlussplan)
 
 ## 0.2.5 Beta
 

@@ -3,12 +3,17 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.2.5 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.2.6 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+
+![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
 ## Was es kann
 
 - Zeichnen, Import (SVG, DXF, PDF, PLT, Bilder, 3D-Modelle als STL, 3MF und STEP), Fräsbahnen mit Werkzeug-Bibliothek wie in Estlcam
-- Laser-Ebenen wie in LightBurn, Plasma mit Schnittspalt, Anfahrbahn und Höhenregelung (THC)
+- Laser-Ebenen wie in LightBurn (Gravieren, Linie, Schneiden mit Freischnitt), Plasma mit Schnittspalt, Anfahrbahn,
+  Blechhöhe abtasten und Höhenregelung (THC)
+- Restplatten-Verwaltung: verbrauchte Fläche wird gemerkt, Teile darauf werden nicht geschnitten
+- 3D-Simulation mit Zeit, Weg und G-Code vor jedem Job
 - Bibliotheken für Fräswerkzeuge, Laser-Ebenen und Plasma-Schnitte – mit Export/Import und Komplett-Sicherung;
   alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates
 - Steuerungen: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB und WLAN), Marlin, Ruida (CO₂), K40 (M2 Nano)
@@ -19,7 +24,15 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung
 - Board flashen (ESP32/ESP32-S3 inkl. .elf, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
 - Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX
+- Update direkt aus der App („Jetzt aktualisieren“ im ⓘ-Fenster, signiert)
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
+
+## Bilder
+
+| | |
+|---|---|
+| ![3D-Simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – Fräsbahnen in 3D, Zeit und G-Code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – Ebenen: Gravieren (Fläche) und Schneiden |
+| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – Schnitte, Einstichpunkte und Anfahrbahnen | ![Anschlussplan](docs/screenshots/05-anschluesse.png) <br> **Anschlussplan** – so wird das Board verkabelt |
 
 Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 
