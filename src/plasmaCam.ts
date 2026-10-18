@@ -323,6 +323,8 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   g += `\nM5\n`;
   if (thcOff) g += `${S.thc === "grblhal" ? "M64 P2" : "M9"}\n`;
   if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
+  // Verschiebung durchs Abtasten (G92) wieder aufheben – sonst stimmt Z beim nächsten Job nicht
+  if (S.useZ && S.probe) g += `G92.1 ${c("pgc.probeClear")}\n`;
   g += `G0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
   return { gcode: g, warnings };
 }

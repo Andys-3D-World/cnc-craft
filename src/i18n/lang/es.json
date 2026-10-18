@@ -509,6 +509,7 @@
   "pgc.pierce": "perforación {n}",
   "pgc.probe": "palpar chapa",
   "pgc.probeSet": "Z = desfase interruptor",
+  "pgc.probeClear": "Anular desplazamiento del palpado",
   "pgc.pierceHeight": "altura de perforación",
   "pgc.torchOn": "antorcha encendida",
   "pgc.pierceDelay": "tiempo de perforación",

@@ -509,6 +509,7 @@
   "pgc.pierce": "Einstich {n}",
   "pgc.probe": "Blech abtasten",
   "pgc.probeSet": "Z = Schalter-Versatz",
+  "pgc.probeClear": "Abtast-Verschiebung aufheben",
   "pgc.pierceHeight": "Einstechhöhe",
   "pgc.torchOn": "Brenner an",
   "pgc.pierceDelay": "Einstechzeit",

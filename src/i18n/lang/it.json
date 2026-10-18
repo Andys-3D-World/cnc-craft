@@ -509,6 +509,7 @@
   "pgc.pierce": "sfondamento {n}",
   "pgc.probe": "tastare lamiera",
   "pgc.probeSet": "Z = offset interruttore",
+  "pgc.probeClear": "Annulla offset della tastatura",
   "pgc.pierceHeight": "altezza di sfondamento",
   "pgc.torchOn": "torcia accesa",
   "pgc.pierceDelay": "tempo di sfondamento",

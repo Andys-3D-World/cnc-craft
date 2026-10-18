@@ -509,6 +509,7 @@
   "pgc.pierce": "przebicie {n}",
   "pgc.probe": "pomiar blachy",
   "pgc.probeSet": "Z = przesunięcie czujnika",
+  "pgc.probeClear": "Usuń przesunięcie z pomiaru",
   "pgc.pierceHeight": "wysokość przebicia",
   "pgc.torchOn": "palnik wł.",
   "pgc.pierceDelay": "czas przebicia",

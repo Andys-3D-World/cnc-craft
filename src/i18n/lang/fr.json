@@ -509,6 +509,7 @@
   "pgc.pierce": "perçage {n}",
   "pgc.probe": "palper la tôle",
   "pgc.probeSet": "Z = décalage contact",
+  "pgc.probeClear": "Annuler le décalage du palpage",
   "pgc.pierceHeight": "hauteur de perçage",
   "pgc.torchOn": "torche allumée",
   "pgc.pierceDelay": "temps de perçage",

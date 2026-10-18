@@ -509,6 +509,7 @@
   "pgc.pierce": "doorsteek {n}",
   "pgc.probe": "plaat aftasten",
   "pgc.probeSet": "Z = schakelaarverschil",
+  "pgc.probeClear": "Tast-verschuiving opheffen",
   "pgc.pierceHeight": "doorsteekhoogte",
   "pgc.torchOn": "toorts aan",
   "pgc.pierceDelay": "doorsteektijd",

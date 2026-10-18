@@ -509,6 +509,7 @@
   "pgc.pierce": "pierce {n}",
   "pgc.probe": "probe plate",
   "pgc.probeSet": "Z = switch offset",
+  "pgc.probeClear": "Clear probe offset",
   "pgc.pierceHeight": "pierce height",
   "pgc.torchOn": "torch on",
   "pgc.pierceDelay": "pierce delay",
