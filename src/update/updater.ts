@@ -143,6 +143,11 @@ export function errorText(e: unknown): string {
   return t("upd.err.net");
 }
 
+/** latest.json im Release = Update direkt aus der App möglich (signiert, update.rs) */
+export function manifestAsset(r: UpdateResult): Asset | null {
+  return r.latest?.assets?.find(a => a.name === "latest.json") || null;
+}
+
 /** Download im Browser starten (oder Release-Seite, wenn keine passende Datei dabei ist) */
 export async function openDownload(r: UpdateResult) {
   const url = r.asset ? r.asset.browser_download_url : r.latest?.html_url;

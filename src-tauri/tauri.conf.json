@@ -39,7 +39,9 @@
         "form-action": "'none'",
         "frame-src": "'none'"
       },
-      "dangerousDisableAssetCspModification": ["style-src"]
+      "dangerousDisableAssetCspModification": [
+        "style-src"
+      ]
     }
   },
   "bundle": {
@@ -71,6 +73,15 @@
           "English"
         ],
         "displayLanguageSelector": false
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVFRDhEQjNFRDM0QkExRkUKUldUK29VdlRQdHZZWHJZYXFOQzdwM0tXcDBNL1FLa0Y4dXBmNklvSFdVWXIvK2VGZmwrSTBjOEkK",
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

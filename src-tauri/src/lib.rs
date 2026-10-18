@@ -28,6 +28,7 @@ mod camfetch;
 mod ruida;
 mod serial;
 mod store;
+mod update;
 mod usb_k40;
 
 use machine::{Emit, Machine};
@@ -498,6 +499,7 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             list_ports,
             machine_connect,
@@ -525,7 +527,9 @@ pub fn run() {
             settings_store_write,
             net_scan,
             camera_snapshot,
-            esp_web_command
+            esp_web_command,
+            update::update_install,
+            update::update_restart
         ])
         // Fenster wird geschlossen: laufenden Job vorher sicher anhalten (Laser/Spindel aus)
         .on_window_event(|_window, event| {

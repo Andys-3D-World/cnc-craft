@@ -13,8 +13,11 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { settingsDir } from "../settingsStore";
 import {
   updateRepo, UPDATE_EVENT, updateSettings, saveSettings, updatesEnabled, appInfo, checkForUpdate,
-  openDownload, errorText, lastResult, UpdateResult
+  openDownload, errorText, lastResult, UpdateResult, manifestAsset
 } from "../update/updater";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { machine } from "../machine";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -107,13 +110,16 @@ export async function openAboutDialog(log: (s: string) => void) {
     if (!r.newer) { status.textContent = t("upd.upToDate", { v: r.current }); box.innerHTML = ""; return; }
     const rel = r.latest;
     const date = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : "";
+    const manifest = manifestAsset(r);
     status.textContent = t("upd.available", { v: rel.tag_name, cur: r.current });
     box.innerHTML = `
       <div class="upd-card">
         <div class="upd-title"><b>${esc(rel.name || rel.tag_name)}</b>${rel.prerelease ? ` <span class="about-beta">Beta</span>` : ""}<span>${esc(date)}</span></div>
         ${rel.body ? `<pre class="upd-notes">${esc(rel.body.slice(0, 4000))}</pre>` : ""}
+        ${manifest ? `<button id="upd-install" class="btn-primary">⟳ ${esc(t("upd.install"))}</button>
+          <div id="upd-progress" class="about-status" style="display:none;"></div>` : ""}
         ${r.asset
-          ? `<button id="upd-dl" class="btn-primary">⬇ ${esc(t("upd.download"))} <small>${esc(r.asset.name)} · ${mb(r.asset.size)}</small></button>`
+          ? `<button id="upd-dl" class="${manifest ? "btn-secondary" : "btn-primary"}">⬇ ${esc(t("upd.download"))} <small>${esc(r.asset.name)} · ${mb(r.asset.size)}</small></button>`
           : `<div class="about-status">${esc(t("upd.noAsset"))}</div>`}
         <div class="upd-btns">
           <button id="upd-page" class="btn-secondary">🌐 ${esc(t("upd.page"))}</button>
@@ -122,6 +128,31 @@ export async function openAboutDialog(log: (s: string) => void) {
         <div id="upd-after" class="about-status" style="display:none;">${esc(t("upd.after." + (r.asset ? "dl" : "page")))}</div>
       </div>`;
     const after = box.querySelector("#upd-after") as HTMLElement;
+    // Update direkt aus der App: laden, Unterschrift prüfen, installieren, neu starten (update.rs)
+    const inst = box.querySelector<HTMLButtonElement>("#upd-install");
+    if (inst && manifest) inst.onclick = async () => {
+      const prog = box.querySelector("#upd-progress") as HTMLElement;
+      if (machine.job.active) { prog.textContent = t("upd.jobRunning"); prog.style.display = ""; return; }
+      inst.disabled = true;
+      prog.style.display = "";
+      prog.textContent = t("upd.installing");
+      const off = await listen<{ done: number; total: number | null }>("update-progress", e => {
+        const { done, total } = e.payload;
+        prog.textContent = t("upd.installing") + " " + (total ? Math.round(done / total * 100) + " %" : mb(done));
+      });
+      try {
+        const v = await invoke<string>("update_install", { manifest: manifest.browser_download_url });
+        if (!v) { prog.textContent = t("upd.upToDate", { v: r.current }); return; }
+        log(t("upd.log.installed", { v }));
+        prog.textContent = t("upd.restarting");
+        setTimeout(() => { void invoke("update_restart"); }, 1200);
+      } catch (e) {
+        prog.textContent = t("upd.installErr", { e: String(e) });
+        inst.disabled = false;
+      } finally {
+        off();
+      }
+    };
     box.querySelector<HTMLButtonElement>("#upd-dl")?.addEventListener("click", async () => {
       await openDownload(r);
       after.textContent = t("upd.after.dl");
