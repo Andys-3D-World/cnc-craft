@@ -176,7 +176,7 @@ function farPoint(loop: Pt[], i: number, step: 1 | -1, dist: number): Pt {
 }
 
 /** Index der schärfsten Ecke (Richtungsänderung > 30°), sonst 0 */
-function cornerIndex(loop: Pt[]): number {
+export function cornerIndex(loop: Pt[]): number {
   let best = 0, bestTurn = 0.52; // ~30°
   const n = loop.length;
   for (let i = 0; i < n; i++) {
@@ -195,7 +195,7 @@ function cornerIndex(loop: Pt[]): number {
  * Einstichpunkt senkrecht zur Kontur auf der Abfallseite. Bei kleinen Löchern wird die
  * Anfahrbahn verkürzt; passt gar nichts, wird direkt auf der Kontur eingestochen.
  */
-function leadPoint(loop: Pt[], outside: boolean, len: number): Pt | null {
+export function leadPoint(loop: Pt[], outside: boolean, len: number): Pt | null {
   if (!(len > 0)) return null;
   const p0 = loop[0];
   // Richtung am Start: Mittel aus ankommender und abgehender Strecke

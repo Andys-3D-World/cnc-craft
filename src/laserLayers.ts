@@ -26,6 +26,7 @@ export interface LaserLayer {
   interval: number;   // Linienabstand beim Füllen in mm
   angle: number;      // Winkel der Füll-Linien in Grad
   air: boolean;       // Luftunterstützung (M8)
+  leadIn: number;     // Freischnitt: Anfahrlänge in mm bei geschlossenen Konturen (0 = aus)
   material: string;   // Material (frei, z. B. "Pappel-Sperrholz") – nur zur Übersicht
   thickness: number;  // Materialdicke in mm (0 = keine Angabe)
   notes: string;      // Notiz
@@ -106,6 +107,7 @@ function sanitize(x: any): LaserLayer {
     interval: num(x.interval, 0.1, 0.01, 10),
     angle: num(x.angle, 0, -180, 180),
     air: !!x.air,
+    leadIn: num(x.leadIn, 0, 0, 20),
     material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
     thickness: num(x.thickness, 0, 0, 200),
     notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
@@ -306,6 +308,7 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       ${row("laser.passes", "ll-passes", src.passes, "1", "×")}
       ${row("laser.interval", "ll-interval", src.interval, "0.01", "mm", 'data-fill="1"')}
       ${row("laser.angle", "ll-angle", src.angle, "15", "°", 'data-fill="1"')}
+      ${row("laser.leadIn", "ll-leadin", src.leadIn, "0.5", "mm", `data-line="1" data-tip="${esc(t("laser.leadInTip"))}"`)}
       <label class="dlg-row"><span>${t("laser.air")}</span><input id="ll-air" type="checkbox" ${src.air ? "checked" : ""} style="width:auto;"></label>
       <div class="dlg-hint">${t("laser.dlgHint")}</div>
       <div class="dlg-buttons">
@@ -321,8 +324,9 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
   const close = (r: LaserLayer | null) => { ov.remove(); onDone?.(r); };
 
   const syncFill = () => {
-    const fill = q("ll-mode").value !== "line";
+    const fill = q("ll-mode").value !== "line", line = q("ll-mode").value !== "fill";
     ov.querySelectorAll<HTMLElement>("[data-fill]").forEach(el => { el.style.display = fill ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>("[data-line]").forEach(el => { el.style.display = line ? "" : "none"; });
   };
   q("ll-mode").addEventListener("change", syncFill);
   syncFill();
@@ -356,6 +360,7 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       passes: parseFloat(q("ll-passes").value),
       interval: parseFloat(q("ll-interval").value),
       angle: parseFloat(q("ll-angle").value),
+      leadIn: parseFloat(q("ll-leadin").value) || 0,
       air: (q("ll-air") as HTMLInputElement).checked
     };
     if (layer) { updateLayer(layer.id, data); close(getLayer(layer.id)); }

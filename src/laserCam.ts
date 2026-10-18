@@ -11,7 +11,8 @@
  *   M3 = konstante Leistung. Bei jeder Leerfahrt steht zusätzlich S0 (Sicherheit).
  */
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
-import { polygonArea } from "./polyOffset";
+import { polygonArea, pointInPoly } from "./polyOffset";
+import { cornerIndex, leadPoint } from "./plasmaCam";
 import {
   getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
@@ -81,15 +82,21 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     // ---- LINIE ----
     if (layerHasLine(layer)) {
       // kleine (innere) Konturen zuerst, offene Linien ganz am Anfang
-      const paths = [
-        ...open.map(pts => ({ pts, closed: false, area: 0 })),
-        ...closed.map(pts => ({ pts, closed: true, area: Math.abs(polygonArea(pts)) })).sort((a, b) => a.area - b.area)
+      const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null }[] = [
+        ...open.map(pts => ({ pts, closed: false, area: 0, lead: null })),
+        ...closed.map(pts => ({ ...withLeadIn(pts, closed, layer.leadIn), closed: true, area: Math.abs(polygonArea(pts)) })).sort((a, b) => a.area - b.area)
       ];
       for (let pass = 0; pass < layer.passes; pass++) {
         if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
         for (const p of paths) {
           const pts = p.pts;
-          g += `G0 X${n(pts[0].x)} Y${n(pts[0].y)} S0\n`;
+          // Freischnitt: im Abfall einstechen und zur Kontur fahren
+          if (p.lead) {
+            g += `G0 X${n(p.lead.x)} Y${n(p.lead.y)} S0 ${c("lgc.leadIn")}\n`;
+            g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)} S${S}\n`;
+          } else {
+            g += `G0 X${n(pts[0].x)} Y${n(pts[0].y)} S0\n`;
+          }
           g += `G1 X${n(pts[1].x)} Y${n(pts[1].y)} S${S}\n`;
           for (let i = 2; i < pts.length; i++) g += `G1 X${n(pts[i].x)} Y${n(pts[i].y)}\n`;
           if (p.closed) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)}\n`;
@@ -101,6 +108,24 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
 
   g += `\nS0\nM5 ${c("lgc.laserOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
   return { gcode: g, warnings };
+}
+
+/**
+ * Freischnitt (Lead-in) für eine geschlossene Kontur: Start an der schärfsten Ecke, Einstich
+ * "len" mm daneben im Abfall. Liegt die Kontur in einer ungeraden Anzahl anderer Konturen, ist sie
+ * ein Loch -> Einstich im Loch, sonst außerhalb des Teils.
+ */
+function withLeadIn(pts: Pt[], all: Pt[][], len: number): { pts: Pt[]; lead: Pt | null } {
+  if (!(len > 0) || pts.length < 3) return { pts, lead: null };
+  let loop = pts;
+  const a = loop[0], z = loop[loop.length - 1];
+  if (Math.hypot(a.x - z.x, a.y - z.y) < 1e-6) loop = loop.slice(0, -1);
+  if (loop.length < 3) return { pts, lead: null };
+  let depth = 0;
+  for (const o of all) if (o !== pts && pointInPoly(loop[0].x, loop[0].y, o)) depth++;
+  const si = cornerIndex(loop);
+  loop = loop.slice(si).concat(loop.slice(0, si));
+  return { pts: loop, lead: leadPoint(loop, depth % 2 === 0, len) };
 }
 
 /**

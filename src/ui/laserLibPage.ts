@@ -177,7 +177,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
   const used = new Set(getLayers().map(l => l.color));
   const src: LaserLayer = layer ? { ...layer } : {
     id: "", name: "", color: LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[0], mode: "line",
-    power: 50, speed: 1000, passes: 1, interval: 0.1, angle: 0, air: false, material: "", thickness: 0, notes: ""
+    power: 50, speed: 1000, passes: 1, interval: 0.1, angle: 0, air: false, leadIn: 0, material: "", thickness: 0, notes: ""
   };
   const num = (key: string, id: string, value: number, step: string, unit: string, cls = "", tipKey = "", min = "0") => `
     <label class="te-row ${cls}" ${tipKey ? `data-tip="${esc(t(tipKey))}"` : ""}><span>${esc(t(key))}</span>
@@ -206,6 +206,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
             ${num("laser.speed", "speed", src.speed, "100", "mm/min")}
             ${num("laser.passes", "passes", src.passes, "1", "×", "", "llib.passesTip", "1")}
             <label class="te-row"><span>${esc(t("laser.air"))}</span><input id="lp-air" type="checkbox" ${src.air ? "checked" : ""} style="width:auto;"></label>
+            ${num("laser.leadIn", "leadin", src.leadIn, "0.5", "mm", "llp-line", "laser.leadInTip")}
           </fieldset>
           <fieldset class="llp-fill"><legend>${esc(t("llib.fill"))}</legend>
             ${num("laser.interval", "interval", src.interval, "0.01", "mm", "", "llib.intervalTip")}
@@ -238,6 +239,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
   const refresh = () => {
     const fill = mode !== "line";
     root.querySelectorAll<HTMLElement>(".llp-fill").forEach(e => { e.style.display = fill ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".llp-line").forEach(e => { e.style.display = mode !== "fill" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".llp-mode").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
     const prev = { color, mode, interval: val("interval") || 0.1, angle: val("angle") || 0, power: val("power") || 0, passes: Math.max(1, Math.round(val("passes") || 1)), air: q("air").checked };
     q<HTMLElement>("preview").innerHTML = laserPreviewSvg(prev, 210);
@@ -265,7 +267,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
     const data: Partial<LaserLayer> = {
       name, color, mode,
       power: val("power"), speed: val("speed"), passes: val("passes"),
-      interval: val("interval"), angle: val("angle"), air: q("air").checked,
+      interval: val("interval"), angle: val("angle"), air: q("air").checked, leadIn: val("leadin") || 0,
       material: q("material").value.trim(), thickness: val("thick") || 0,
       notes: q<HTMLTextAreaElement>("notes").value
     };
