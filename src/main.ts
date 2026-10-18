@@ -3,7 +3,7 @@ import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
 import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
-import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings } from "./cam";
+import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings, noGcodeMessage } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
 import { streamState } from "./machineStream";
 import { drawEverything } from "./render";
@@ -185,7 +185,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const openSimTab = () => (document.querySelector('.tab-navigation [data-tab="tab-sim"]') as HTMLElement | null)?.click();
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
       const gcode = generateGcode(state.shapes);
-      if (!gcode) { appendToConsole(t("gcw.noObjects")); return; }
+      if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();

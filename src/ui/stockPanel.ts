@@ -14,7 +14,7 @@ import {
 } from "../stock";
 import { getMachineMode, MODE_CHANGED, MachineMode } from "../machineMode";
 import { translateShape } from "../shapeTransform";
-import { generateGcode } from "../cam";
+import { generateGcode, noGcodeMessage } from "../cam";
 import { icon } from "./icons";
 
 function state(): any { return (window as any).cncState; }
@@ -29,6 +29,7 @@ export function stockSectionHtml(): string {
       <div class="menu-body rp-box">
         <div id="stock-status" class="tool-info"></div>
         <label class="prop-row" style="cursor:pointer;"><span>${T("stock.show")}</span><input type="checkbox" id="stock-show" style="width:auto;"></label>
+        <label class="prop-row" style="cursor:pointer;" ${tip("stock.skipUsedTip")}><span>${T("stock.skipUsed")}</span><input type="checkbox" id="stock-skip-used" style="width:auto;"></label>
         <div class="prop-row">${T("stock.w")}<input type="number" id="stock-w" min="1" step="10" class="prop-input"></div>
         <div class="prop-row">${T("stock.h")}<input type="number" id="stock-h" min="1" step="10" class="prop-input"></div>
         <div class="prop-row" ${tip("stock.marginTip")}>${T("stock.margin")}<input type="number" id="stock-margin" min="0" step="0.5" class="prop-input"></div>
@@ -65,6 +66,7 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     if ($("stock-h") && document.activeElement !== $("stock-h")) $("stock-h")!.value = String(s.h);
     if ($("stock-margin")) $("stock-margin")!.value = String(stockOptions.margin);
     if ($("stock-show")) $("stock-show")!.checked = stockOptions.show;
+    if ($("stock-skip-used")) $("stock-skip-used")!.checked = stockOptions.skipUsed;
     const undo = $("stock-undo") as HTMLButtonElement | null;
     if (undo) undo.disabled = !s.undo;
   };
@@ -86,13 +88,14 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     saveStockOptions();
   });
   $("stock-show")?.addEventListener("change", () => { stockOptions.show = $("stock-show")!.checked; saveStockOptions(); });
+  $("stock-skip-used")?.addEventListener("change", () => { stockOptions.skipUsed = $("stock-skip-used")!.checked; saveStockOptions(); });
 
   // ---- Knöpfe ----
   document.getElementById("stock-mark")?.addEventListener("click", () => {
     const st = state();
     if (!st.shapes.length) { log(t("gcw.noObjects")); return; }
     const g = generateGcode(st.shapes);
-    if (!g) return;
+    if (!g) { log(noGcodeMessage()); return; }
     const added = markFromGcode(g.split("\n"), t("stock.designLabel"), cutWidthFor(st.shapes));
     log(t("stock.marked", { p: added.toFixed(1), total: usedPercent().toFixed(1) }));
   });

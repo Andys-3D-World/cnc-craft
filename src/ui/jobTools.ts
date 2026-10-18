@@ -11,7 +11,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n/i18n";
 import { machine, canCommand, sendAndWait, exportRd } from "../machine";
 import { streamState } from "../machineStream";
-import { generateGcode, lastGcodeWarnings } from "../cam";
+import { generateGcode, lastGcodeWarnings, noGcodeMessage } from "../cam";
 import { state } from "../main";
 
 export interface Bounds { x0: number; y0: number; x1: number; y1: number }
@@ -75,7 +75,7 @@ export async function runFrame(log: (s: string) => void) {
   if (!machine.connected) { log(t("conn.connectFirst")); return; }
   if (!canCommand()) { log(t("m.why.job running")); return; }
   const job = currentLines();
-  if (!job) { log(t("gcw.noObjects")); return; }
+  if (!job) { log(noGcodeMessage()); return; }
   const b = jobBounds(job.lines, true);
   if (!b) { log(t("frame.empty")); return; }
   log(t("frame.start", { w: r2(b.x1 - b.x0), h: r2(b.y1 - b.y0), label: job.label }));
@@ -90,7 +90,7 @@ export async function runFrame(log: (s: string) => void) {
 
 export async function saveRdFile(log: (s: string) => void) {
   const job = currentLines();
-  if (!job) { log(t("gcw.noObjects")); return; }
+  if (!job) { log(noGcodeMessage()); return; }
   if (!streamState.loadedLines.length) lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
   try {
     const path = await save({ title: t("rd.save"), defaultPath: "cnc-craft.rd", filters: [{ name: "Ruida (.rd)", extensions: ["rd"] }] });

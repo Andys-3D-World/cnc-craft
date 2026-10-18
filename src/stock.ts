@@ -35,7 +35,8 @@ export interface Stock {
   version: number;             // ändert sich bei jeder Änderung (für Zwischenspeicher)
 }
 
-export const stockOptions = { margin: 2, show: true };
+/** skipUsed: Formen auf verbrauchter Fläche nicht in den G-Code übernehmen */
+export const stockOptions = { margin: 2, show: true, skipUsed: true };
 const KEY_OPTIONS = "cnc_craft_stock_options";
 const keyFor = (m: MachineMode) => "cnc_craft_stock_" + m;
 const stocks = new Map<MachineMode, Stock>();
@@ -84,6 +85,7 @@ export function initStock() {
       const o = JSON.parse(raw);
       if (Number.isFinite(+o.margin) && +o.margin >= 0) stockOptions.margin = +o.margin;
       if (typeof o.show === "boolean") stockOptions.show = o.show;
+      if (typeof o.skipUsed === "boolean") stockOptions.skipUsed = o.skipUsed;
     }
   } catch { /* Standardwerte */ }
 }

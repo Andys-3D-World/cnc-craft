@@ -7,7 +7,7 @@ import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
-import { stockWarnings } from "./stock";
+import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -53,10 +53,30 @@ export function orderToolGroups(shapes: any[]): ToolGroup[] {
  * Zusätzlich: Warnung, wenn Formen auf bereits verbrauchter Fläche der Platte liegen.
  */
 export const generateGcode = (shapes: any): string | null => {
-  const g = generateGcodeInner(shapes);
-  if (g) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
+  // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
+  const skipped = usedAreaShapes(shapes);
+  allSkipped = skipped.size > 0 && skipped.size === shapes.length;
+  const g = generateGcodeInner(skipped.size ? shapes.filter((s: any) => !skipped.has(s)) : shapes);
+  if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
+  else if (g) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
   return g;
 };
+
+/** Alle Formen auf der verbrauchten Fläche lagen -> nichts zu schneiden */
+let allSkipped = false;
+
+/** Meldung, wenn generateGcode() nichts geliefert hat */
+export const noGcodeMessage = () => t(allSkipped ? "stock.allSkipped" : "gcw.noObjects");
+
+/** Formen, die wegen verbrauchter Fläche nicht geschnitten werden (ganze Gruppe, wenn ein Teil davon betroffen ist) */
+function usedAreaShapes(shapes: any[]): Set<any> {
+  const out = new Set<any>();
+  if (!stockOptions.skipUsed || !hasUsedArea()) return out;
+  const groups = new Set<string>();
+  for (const s of shapes) if (shapeOnUsedArea(s)) { out.add(s); if (s.groupId) groups.add(s.groupId); }
+  if (groups.size) for (const s of shapes) if (s.groupId && groups.has(s.groupId)) out.add(s);
+  return out;
+}
 
 const generateGcodeInner = (shapes: any): string | null => {
   lastGcodeWarnings = [];
@@ -326,7 +346,7 @@ function showWarnings(appendToConsole: (t: string) => void) {
  */
 export const handleGcodeGeneration = (shapes: any, appendToConsole: (t: string) => void) => {
   const gcode = generateGcode(shapes);
-  if (!gcode) { appendToConsole(t("gcw.noObjects")); return; }
+  if (!gcode) { appendToConsole(noGcodeMessage()); return; }
   appendToConsole(gcode);
   showWarnings(appendToConsole);
 };
@@ -336,7 +356,7 @@ export const handleGcodeGeneration = (shapes: any, appendToConsole: (t: string) 
  */
 export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string) => void) {
   const gcode = generateGcode(shapes);
-  if (!gcode) { appendToConsole(t("gcw.noObjects")); return; }
+  if (!gcode) { appendToConsole(noGcodeMessage()); return; }
   showWarnings(appendToConsole);
 
   try {
