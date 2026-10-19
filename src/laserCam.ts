@@ -14,7 +14,7 @@ import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
 import {
-  getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine, LaserLayer
+  getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine
 } from "./laserLayers";
 import { t, ascii } from "./i18n/i18n";
 
@@ -26,7 +26,7 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
 
   const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
   const n = (v: number) => String(+v.toFixed(3));
-  const sOf = (layer: LaserLayer) => Math.round((layer.power / 100) * laserSettings.sMax);
+  const sOf = (power: number) => Math.round((power / 100) * laserSettings.sMax);
 
   // ---- Formen nach Ebene sortieren (Reihenfolge wie in der Ebenen-Liste) ----
   const byLayer = new Map<string, any[]>();
@@ -46,7 +46,11 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
 
   order.forEach((layer, li) => {
     const list = byLayer.get(layer.id)!;
-    const S = sOf(layer);
+    // „Füllen + Linie“: Fläche und Linie haben eigene Leistung/Geschwindigkeit (z. B. leicht gravieren, kräftig schneiden)
+    const both = layer.mode === "fill+line";
+    const S = sOf(layer.power);
+    const fillS = both ? sOf(layer.fillPower) : S;
+    const fillF = both ? layer.fillSpeed : layer.speed;
     g += `\n${c("lgc.layer", { i: li + 1, name: layer.name, mode: t("laser.mode." + layer.mode), p: layer.power, f: layer.speed, x: layer.passes })}\n`;
     if (layer.air) g += `M8 ${c("lgc.airOn")}\n`;
     g += `F${n(layer.speed)}\n`;
@@ -71,9 +75,10 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
         for (let pass = 0; pass < layer.passes; pass++) {
           if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
           g += `${c("lgc.fill", { n: res.segs.length })}\n`;
+          if (both) g += `F${n(fillF)}\n`;
           for (const sg of res.segs) {
             g += `G0 X${n(sg[0])} Y${n(sg[1])} S0\n`;
-            g += `G1 X${n(sg[2])} Y${n(sg[3])} S${S}\n`;
+            g += `G1 X${n(sg[2])} Y${n(sg[3])} S${fillS}\n`;
           }
         }
       }
@@ -86,6 +91,7 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
         ...open.map(pts => ({ pts, closed: false, area: 0, lead: null })),
         ...closed.map(pts => ({ ...withLeadIn(pts, closed, layer.leadIn), closed: true, area: Math.abs(polygonArea(pts)) })).sort((a, b) => a.area - b.area)
       ];
+      if (both) g += `F${n(layer.speed)}\n`; // nach dem Füllen wieder die Linien-Geschwindigkeit
       for (let pass = 0; pass < layer.passes; pass++) {
         if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
         for (const p of paths) {

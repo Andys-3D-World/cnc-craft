@@ -20,8 +20,10 @@ export interface LaserLayer {
   name: string;
   color: string;
   mode: LaserMode;
-  power: number;      // Leistung in % (0–100)
-  speed: number;      // mm/min
+  power: number;      // Leistung in % (0–100) – bei „Füllen + Linie“ für die Linie
+  speed: number;      // mm/min – bei „Füllen + Linie“ für die Linie
+  fillPower: number;  // nur „Füllen + Linie“: Leistung % für die Fläche (meist weniger als für die Linie)
+  fillSpeed: number;  // nur „Füllen + Linie“: Geschwindigkeit mm/min für die Fläche
   passes: number;     // Durchgänge
   interval: number;   // Linienabstand beim Füllen in mm
   angle: number;      // Winkel der Füll-Linien in Grad
@@ -103,6 +105,9 @@ function sanitize(x: any): LaserLayer {
     mode,
     power: num(x.power, 50, 0, 100),
     speed: num(x.speed, 1000, 1, 100000),
+    // ältere Ebenen kennen das noch nicht -> wie bisher dieselben Werte wie die Linie
+    fillPower: num(x.fillPower, num(x.power, 50, 0, 100), 0, 100),
+    fillSpeed: num(x.fillSpeed, num(x.speed, 1000, 1, 100000), 1, 100000),
     passes: Math.round(num(x.passes, 1, 1, 100)),
     interval: num(x.interval, 0.1, 0.01, 10),
     angle: num(x.angle, 0, -180, 180),
@@ -263,6 +268,9 @@ export function layerHasLine(l: LaserLayer) {
 
 /** Kurzinfo: "Füllen · 50 % · 3000 mm/min" */
 export function layerInfo(l: LaserLayer): string {
+  if (l.mode === "fill+line" && (l.fillPower !== l.power || l.fillSpeed !== l.speed))
+    return t("laser.infoBoth", { mode: t("laser.mode." + l.mode), pf: l.fillPower, ff: l.fillSpeed, p: l.power, f: l.speed })
+      + (l.passes > 1 ? ` · ${l.passes}×` : "");
   return t("laser.info", { mode: t("laser.mode." + l.mode), p: l.power, f: l.speed })
     + (l.passes > 1 ? ` · ${l.passes}×` : "");
 }
@@ -308,6 +316,8 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       ${row("laser.passes", "ll-passes", src.passes, "1", "×")}
       ${row("laser.interval", "ll-interval", src.interval, "0.01", "mm", 'data-fill="1"')}
       ${row("laser.angle", "ll-angle", src.angle, "15", "°", 'data-fill="1"')}
+      ${row("laser.fillPower", "ll-fill-power", src.fillPower, "1", "%", 'data-both="1"')}
+      ${row("laser.fillSpeed", "ll-fill-speed", src.fillSpeed, "100", "mm/min", 'data-both="1"')}
       ${row("laser.leadIn", "ll-leadin", src.leadIn, "0.5", "mm", `data-line="1" data-tip="${esc(t("laser.leadInTip"))}"`)}
       <label class="dlg-row"><span>${t("laser.air")}</span><input id="ll-air" type="checkbox" ${src.air ? "checked" : ""} style="width:auto;"></label>
       <div class="dlg-hint">${t("laser.dlgHint")}</div>
@@ -327,6 +337,7 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
     const fill = q("ll-mode").value !== "line", line = q("ll-mode").value !== "fill";
     ov.querySelectorAll<HTMLElement>("[data-fill]").forEach(el => { el.style.display = fill ? "" : "none"; });
     ov.querySelectorAll<HTMLElement>("[data-line]").forEach(el => { el.style.display = line ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>("[data-both]").forEach(el => { el.style.display = fill && line ? "" : "none"; });
   };
   q("ll-mode").addEventListener("change", syncFill);
   syncFill();
@@ -361,6 +372,8 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       interval: parseFloat(q("ll-interval").value),
       angle: parseFloat(q("ll-angle").value),
       leadIn: parseFloat(q("ll-leadin").value) || 0,
+      fillPower: parseFloat(q("ll-fill-power").value),
+      fillSpeed: parseFloat(q("ll-fill-speed").value),
       air: (q("ll-air") as HTMLInputElement).checked
     };
     if (layer) { updateLayer(layer.id, data); close(getLayer(layer.id)); }
