@@ -55,9 +55,9 @@ pub async fn update_install(app: AppHandle, manifest: String) -> Result<String, 
     Ok(version)
 }
 
-/// Neu starten nach dem Update – vorher einen laufenden Job sicher anhalten
+/// Neu starten nach dem Update – vorher laufende Jobs aller Maschinen sicher anhalten
 #[tauri::command]
 pub fn update_restart(app: AppHandle) {
-    crate::close_current();
+    crate::close_all();
     app.restart();
 }

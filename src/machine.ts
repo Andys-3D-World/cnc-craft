@@ -15,6 +15,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { t } from "./i18n/i18n";
+import { getMachineMode, setMachineMode, MachineMode } from "./machineMode";
 
 export interface MachineStatus {
   state: string;          // Idle, Run, Hold, Jog, Alarm, Door, Check, Home, Sleep
@@ -221,6 +222,117 @@ function fire(type: string, data?: any) {
   window.dispatchEvent(new CustomEvent(MACHINE_EVENT, { detail: { type, data } }));
 }
 
+// ---------------------------------------------------------------------
+// MEHRERE MASCHINEN
+// Jede Verbindung hat eine Kennung ("m1", "m2" …), die die Oberfläche schon vor dem Verbinden
+// vergibt – so landet auch die allererste Meldung des Boards richtig. `machine` zeigt immer die
+// ausgewählte Maschine (dorthin gehen Befehle und Jobs); die anderen liegen in `others` und
+// laufen im Hintergrund weiter (Status, Job-Fortschritt, Alarme werden dort mitgeschrieben).
+// ---------------------------------------------------------------------
+
+type MachineState = Pick<typeof machine, "protocol" | "ruidaBed" | "connected" | "port" | "firmware" | "version" | "status" | "job" | "settings" | "lastAlarm" | "info">;
+interface Slot { id: string; mode: MachineMode; state: MachineState; infoRequested: boolean; espInfoRequested: boolean }
+
+/** Kurzinfo für die Maschinen-Liste */
+export interface SlotInfo {
+  id: string; active: boolean; mode: MachineMode; connected: boolean; port: string; firmware: string;
+  state: string; job: { active: boolean; acked: number; total: number; paused: boolean }; info: BoardInfo;
+}
+
+let activeId = "m1";
+let activeMode: MachineMode = "mill";
+let idCounter = 1;
+const others = new Map<string, Slot>();
+
+export function activeMachineId(): string { return activeId; }
+
+function emptyState(): MachineState {
+  return {
+    protocol: "grbl", ruidaBed: null, connected: false, port: "", firmware: "", version: "",
+    status: { state: "", sub: null, mpos: [0, 0, 0], wpos: [0, 0, 0], feed: 0, spindle: 0, ov: [100, 100, 100], pins: "", acc: null },
+    job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
+    settings: new Map(), lastAlarm: 0,
+    info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] }
+  };
+}
+function takeState(): MachineState {
+  const { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, info } = machine;
+  return { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, info };
+}
+
+/** Alle Maschinen (ausgewählte zuerst nicht nötig – Reihenfolge nach Kennung) */
+export function machineSlots(): SlotInfo[] {
+  const row = (id: string, mode: MachineMode, s: MachineState, active: boolean): SlotInfo => ({
+    id, active, mode, connected: s.connected, port: s.port, firmware: s.firmware, state: s.status.state,
+    job: { active: s.job.active, acked: s.job.acked, total: s.job.total, paused: s.job.paused }, info: s.info
+  });
+  const list = [row(activeId, activeMode, takeState(), true)];
+  for (const o of others.values()) list.push(row(o.id, o.mode, o.state, false));
+  return list.sort((a, b) => parseInt(a.id.slice(1), 10) - parseInt(b.id.slice(1), 10));
+}
+
+/** Zahl der verbundenen Maschinen */
+export function connectedCount(): number {
+  return (machine.connected ? 1 : 0) + [...others.values()].filter(o => o.state.connected).length;
+}
+
+/** Ausgewählte Maschine wegpacken (nur wenn verbunden – leere Plätze verschwinden) */
+function parkActive() {
+  if (machine.connected) others.set(activeId, { id: activeId, mode: getMachineMode(), state: takeState(), infoRequested, espInfoRequested });
+}
+
+async function activate(id: string, s: MachineState, mode: MachineMode | null, flags = { infoRequested: false, espInfoRequested: false }) {
+  flushAcks(false); // Antworten der alten Maschine nicht mehr abwarten
+  const from = activeId;
+  Object.assign(machine, s);
+  infoRequested = flags.infoRequested;
+  espInfoRequested = flags.espInfoRequested;
+  activeId = id;
+  try { await invoke("machine_select", { conn: id }); } catch { /* im Browser-Test ohne Tauri */ }
+  // gleiche Maschinenart (Fräse/Laser/Plasma) wie beim Verbinden -> Bett, Profil und Werkzeuge passen
+  if (mode && mode !== getMachineMode()) setMachineMode(mode);
+  activeMode = getMachineMode();
+  fire("switched", { id, from });
+  fire(machine.connected ? "connected" : "disconnected", { port: machine.port });
+  if (machine.connected) { fire("status", machine.status); fire("info", machine.info); }
+  fire("slots");
+}
+
+/** Andere (verbundene) Maschine auswählen */
+export async function selectMachine(id: string): Promise<void> {
+  if (id === activeId) return;
+  const o = others.get(id);
+  if (!o) return;
+  others.delete(id);
+  parkActive();
+  await activate(o.id, o.state, o.mode, o);
+}
+
+/** Leeren Platz für eine weitere Verbindung anlegen und auswählen */
+export async function newMachineSlot(): Promise<void> {
+  if (!machine.connected) return; // der ausgewählte Platz ist schon frei
+  parkActive();
+  let n = idCounter;
+  do n++; while (others.has("m" + n));
+  idCounter = n;
+  await activate("m" + n, emptyState(), null);
+}
+
+/** Not-Halt für alle Maschinen: laufende Jobs anhalten (Laser/Spindel aus). Rückgabe: Anzahl */
+export async function stopAllMachines(): Promise<number> {
+  try { return await invoke<number>("machine_stop_all"); } catch { return 0; }
+}
+
+/** Zustand, zu dem ein Ereignis gehört: die ausgewählte Maschine oder eine im Hintergrund */
+function route(p: any): { m: MachineState; own: boolean; tag: string } | null {
+  const c = p && typeof p.conn === "string" ? p.conn : activeId;
+  if (c === activeId) return { m: machine, own: true, tag: "" };
+  const o = others.get(c);
+  if (!o) return null;
+  const n = machineSlots().findIndex(x => x.id === c) + 1;
+  return { m: o.state, own: false, tag: `[${t("ms.machineN", { n })}] ` };
+}
+
 function flushAcks(ok: boolean) {
   for (const r of waiting.values()) r({ ok, code: -4 });
   waiting.clear();
@@ -255,8 +367,17 @@ export async function initMachine(logFn: (s: string) => void) {
   };
 
   await on("machine-welcome", (p) => {
-    machine.firmware = p.firmware || "";
-    machine.version = p.version || "";
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.firmware = p.firmware || "";
+    m.version = p.version || "";
+    if (m.firmware === "K40") m.protocol = "k40";
+    if (m.firmware === "Ruida") {
+      m.protocol = "ruida";
+      m.ruidaBed = p.bedX > 0 && p.bedY > 0 ? { w: p.bedX, h: p.bedY } : null;
+    }
+    fire("slots");
+    if (!own) { log(tag + t("m.welcome", { fw: m.firmware, v: m.version })); return; }
     flushAcks(false);
     resetInfo();
     if (machine.firmware === "Marlin" && machine.protocol === "marlin") {
@@ -265,14 +386,11 @@ export async function initMachine(logFn: (s: string) => void) {
       return;
     }
     if (machine.firmware === "K40") {
-      machine.protocol = "k40";
       log(t("m.k40Welcome", { board: p.version || "M2", raw: p.raw || "" }));
       fire("welcome", p);
       return;
     }
     if (machine.firmware === "Ruida") {
-      machine.protocol = "ruida";
-      machine.ruidaBed = p.bedX > 0 && p.bedY > 0 ? { w: p.bedX, h: p.bedY } : null;
       log(t("m.ruidaWelcome", { card: p.version || "?", raw: p.raw || "" }));
       fire("welcome", p);
       return;
@@ -285,7 +403,9 @@ export async function initMachine(logFn: (s: string) => void) {
   });
 
   await on("machine-status", (p) => {
-    const s = machine.status;
+    const r = route(p); if (!r) return;
+    const { m, own } = r;
+    const s = m.status;
     const prev = s.state;
     s.state = p.state || "";
     s.sub = p.sub ?? null;
@@ -296,6 +416,8 @@ export async function initMachine(logFn: (s: string) => void) {
     if (Array.isArray(p.ov)) s.ov = p.ov;
     if (typeof p.acc === "string") s.acc = p.acc;
     s.pins = p.pins || "";
+    if (prev !== s.state) fire("slots");
+    if (!own) return;
     if (!machine.firmware && s.state && machine.protocol === "grbl") {
       // Board lief schon (keine Startmeldung) – trotzdem Infos holen
       machine.firmware = "GRBL";
@@ -307,6 +429,14 @@ export async function initMachine(logFn: (s: string) => void) {
   });
 
   await on("machine-line", (p) => {
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    if (!own) {
+      // Hintergrund: nur Einstellungen mitschreiben und Fehler melden
+      if (p.kind === "setting") m.settings.set(p.key, p.value);
+      else if (p.kind === "error") log(tag + t("m.error", { code: p.code, text: errorText(p.code) }));
+      return;
+    }
     switch (p.kind) {
       case "ok":
         resolveAck(p.id, { ok: true });
@@ -331,43 +461,71 @@ export async function initMachine(logFn: (s: string) => void) {
   });
 
   await on("machine-alarm", (p) => {
-    machine.lastAlarm = p.code;
-    log(t("m.alarm", { code: p.code, text: alarmText(p.code) }));
-    fire("alarm", p);
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.lastAlarm = p.code;
+    log(tag + t("m.alarm", { code: p.code, text: alarmText(p.code) }));
+    fire("slots");
+    if (own) fire("alarm", p);
   });
 
   await on("machine-disconnected", (p) => {
-    machine.connected = false;
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.connected = false;
+    m.job.active = false;
+    log(tag + t("m.lost", { e: p.reason || "" }));
+    if (!own) {
+      const mode = others.get(p.conn)?.mode;
+      others.delete(p.conn);
+      fire("bg-job-done", { conn: p.conn, mode, data: { aborted: true, acked: m.job.acked, reason: "disconnected" }, gone: true });
+      fire("slots");
+      return;
+    }
     flushAcks(false);
-    log(t("m.lost", { e: p.reason || "" }));
     fire("disconnected", p);
+    fire("slots");
   });
 
   await on("machine-job-progress", (p) => {
-    Object.assign(machine.job, { active: true, sent: p.sent, acked: p.acked, total: p.total, paused: p.paused, toolChange: p.toolChange, stopping: p.stopping });
-    fire("job-progress", machine.job);
+    const r = route(p); if (!r) return;
+    const { m, own } = r;
+    const was = m.job.active;
+    Object.assign(m.job, { active: true, sent: p.sent, acked: p.acked, total: p.total, paused: p.paused, toolChange: p.toolChange, stopping: p.stopping });
+    if (!was || !own) fire("slots");
+    if (own) fire("job-progress", machine.job);
   });
 
   await on("machine-job-error", (p) => {
-    machine.job.paused = true;
-    log(t("m.jobError", { n: (p.index ?? 0) + 1, line: p.line || "", code: p.code, text: errorText(p.code) }));
-    fire("job-error", p);
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.job.paused = true;
+    log(tag + t("m.jobError", { n: (p.index ?? 0) + 1, line: p.line || "", code: p.code, text: errorText(p.code) }));
+    fire("slots");
+    if (own) fire("job-error", p);
   });
 
   await on("machine-job-toolchange", (p) => {
-    machine.job.paused = true;
-    machine.job.toolChange = true;
-    log(t("stream.toolChange", { note: p.note || "" }));
-    fire("job-toolchange", p);
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.job.paused = true;
+    m.job.toolChange = true;
+    log(tag + t("stream.toolChange", { note: p.note || "" }));
+    fire("slots");
+    if (own) fire("job-toolchange", p);
   });
 
   await on("machine-job-done", (p) => {
-    machine.job.active = false;
-    machine.job.paused = false;
-    machine.job.toolChange = false;
-    if (p.aborted) log(t("m.jobAborted", { reason: t("m.reason." + (p.reason || "stopped")), n: p.acked, total: p.total }));
-    else log(t("m.jobDone", { total: p.total, errors: p.errors }));
-    fire("job-done", p);
+    const r = route(p); if (!r) return;
+    const { m, own, tag } = r;
+    m.job.active = false;
+    m.job.paused = false;
+    m.job.toolChange = false;
+    if (p.aborted) log(tag + t("m.jobAborted", { reason: t("m.reason." + (p.reason || "stopped")), n: p.acked, total: p.total }));
+    else log(tag + t("m.jobDone", { total: p.total, errors: p.errors }));
+    fire("slots");
+    if (own) fire("job-done", p);
+    else fire("bg-job-done", { conn: p.conn, mode: others.get(p.conn)?.mode, data: p });
   });
 }
 
@@ -402,21 +560,27 @@ export async function connect(port: string, baud: number): Promise<void> {
   machine.settings.clear();
   flushAcks(false);
   resetInfo();
-  await invoke("machine_connect", { port, baud });
+  await invoke("machine_connect", { port, baud, conn: activeId });
   machine.connected = true;
   machine.port = port;
   machine.status.ov = [100, 100, 100]; machine.status.acc = null;
+  activeMode = getMachineMode();
   fire("connected", { port });
+  fire("slots");
   // Manche Boards melden sich nicht von selbst (oder liefen schon) -> nachfragen
   setTimeout(() => { if (machine.connected && machine.protocol === "grbl") requestInfo(); }, 2500);
 }
 
 export async function disconnect(): Promise<void> {
-  try { await invoke("machine_disconnect"); } catch { /* egal */ }
+  try { await invoke("machine_disconnect", { conn: activeId }); } catch { /* egal */ }
   machine.connected = false;
   machine.job.active = false;
   flushAcks(false);
   fire("disconnected", {});
+  // noch andere Maschinen verbunden? Dann die nächste auswählen
+  const next = [...others.values()].find(o => o.state.connected);
+  if (next) { others.delete(next.id); await activate(next.id, next.state, next.mode, next); }
+  else fire("slots");
 }
 
 /**
@@ -432,7 +596,7 @@ export async function connectRuida(target: string): Promise<void> {
   resetInfo();
   const o = ruidaOptions();
   try {
-    await invoke("ruida_connect", { target, bedW: o.bedW, bedH: o.bedH, origin: o.origin, sMax: o.sMax, magic: o.magic, minPower: o.minPower });
+    await invoke("ruida_connect", { target, bedW: o.bedW, bedH: o.bedH, origin: o.origin, sMax: o.sMax, magic: o.magic, minPower: o.minPower, conn: activeId });
   } catch (e) {
     machine.protocol = "grbl";
     throw e;
@@ -440,7 +604,9 @@ export async function connectRuida(target: string): Promise<void> {
   machine.connected = true;
   machine.port = target;
   machine.status.ov = [100, 100, 100]; machine.status.acc = null;
+  activeMode = getMachineMode();
   fire("connected", { port: target });
+  fire("slots");
 }
 
 /** Marlin-Maschine verbinden (Creality, Anycubic, MPCNC …). laser: bei Pause wird der Laser ausgeschaltet */
@@ -452,7 +618,7 @@ export async function connectMarlin(port: string, baud: number, laser: boolean):
   flushAcks(false);
   resetInfo();
   try {
-    await invoke("marlin_connect", { port, baud, laser });
+    await invoke("marlin_connect", { port, baud, laser, conn: activeId });
   } catch (e) {
     machine.protocol = "grbl";
     throw e;
@@ -460,7 +626,9 @@ export async function connectMarlin(port: string, baud: number, laser: boolean):
   machine.connected = true;
   machine.port = port;
   machine.status.ov = [100, 100, 100]; machine.status.acc = null;
+  activeMode = getMachineMode();
   fire("connected", { port });
+  fire("slots");
 }
 
 /** K40 mit Original-Board (USB, kein serieller Port) verbinden */
@@ -473,7 +641,7 @@ export async function connectK40(index: number): Promise<void> {
   resetInfo();
   const o = ruidaOptions();
   try {
-    await invoke("k40_connect", { index, bedW: o.bedW, bedH: o.bedH, board: o.board || "M2", sMax: o.sMax });
+    await invoke("k40_connect", { index, bedW: o.bedW, bedH: o.bedH, board: o.board || "M2", sMax: o.sMax, conn: activeId });
   } catch (e) {
     machine.protocol = "grbl";
     throw e;
@@ -481,7 +649,9 @@ export async function connectK40(index: number): Promise<void> {
   machine.connected = true;
   machine.port = "K40 USB";
   machine.status.ov = [100, 100, 100]; machine.status.acc = null;
+  activeMode = getMachineMode();
   fire("connected", { port: machine.port });
+  fire("slots");
 }
 
 /** Wie viele K40-Boards hängen am USB? */

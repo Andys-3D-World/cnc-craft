@@ -117,13 +117,13 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     const width = cutWidthFor(state()?.shapes || []);
     if (d.aborted) {
       if (d.line > 0 && window.confirm(t("stock.confirmPartial", { n: d.line, total: d.lines.length }))) {
-        const added = markFromGcode(d.lines, (d.label || "Job") + " (" + t("stock.partial") + ")", width, d.line);
-        log(t("stock.marked", { p: added.toFixed(1), total: usedPercent().toFixed(1) }));
+        const added = markFromGcode(d.lines, (d.label || "Job") + " (" + t("stock.partial") + ")", width, d.line, d.mode);
+        log(t("stock.marked", { p: added.toFixed(1), total: usedPercent(getStock(d.mode)).toFixed(1) }));
       }
       return;
     }
-    const added = markFromGcode(d.lines, d.label || "Job", width);
-    log(t("stock.markedJob", { p: added.toFixed(1), total: usedPercent().toFixed(1) }));
+    const added = markFromGcode(d.lines, d.label || "Job", width, Infinity, d.mode);
+    log(t("stock.markedJob", { p: added.toFixed(1), total: usedPercent(getStock(d.mode)).toFixed(1) }));
   });
 
   window.addEventListener(STOCK_CHANGED, refresh);

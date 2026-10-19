@@ -14,6 +14,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop } from "./machine";
+import { getMachineMode, MachineMode } from "./machineMode";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -77,20 +78,45 @@ function emitProgress() {
   updateJobDisplay();
 }
 
-function emitDone(aborted: boolean, simulated: boolean) {
+function emitDone(aborted: boolean, simulated: boolean, s: typeof streamState = streamState, mode: MachineMode = getMachineMode()) {
   window.dispatchEvent(new CustomEvent("cnc-job-done", {
     detail: {
-      aborted, line: streamState.currentLine, lines: streamState.loadedLines,
-      label: streamState.label, simulated
+      aborted, line: s.currentLine, lines: s.loadedLines,
+      label: s.label, simulated, mode
     }
   }));
 }
+
+// Mehrere Maschinen: Job-Zustand je Maschine (die ausgewählte steht in streamState)
+const parked = new Map<string, typeof streamState>();
 
 /** Ereignisse der echten Maschine an den Job-Zustand anbinden (einmal beim Start) */
 export function initStreamEvents(appendToConsole: (t: string) => void) {
   logFn = appendToConsole;
   window.addEventListener(MACHINE_EVENT, (e: Event) => {
     const { type, data } = (e as CustomEvent).detail || {};
+    if (type === "switched") {
+      // Job-Zustand der alten Maschine wegpacken, den der neuen holen
+      if (data.from) parked.set(data.from, { ...streamState });
+      const next = parked.get(data.id);
+      parked.delete(data.id);
+      if (next) Object.assign(streamState, next);
+      else Object.assign(streamState, { isRunning: false, isPaused: false, shouldStop: false, currentLine: 0, onMachine: false });
+      if (streamState.onMachine && machine.job.active) streamState.currentLine = machine.job.acked;
+      if (streamState.onMachine && !machine.job.active) { streamState.isRunning = false; streamState.onMachine = false; }
+      emitProgress();
+      return;
+    }
+    if (type === "bg-job-done") {
+      // Job einer Maschine im Hintergrund ist fertig: Platte für DEREN Maschinenart markieren
+      const s = parked.get(data.conn);
+      if (!s || !s.onMachine) return;
+      s.currentLine = data.data?.aborted ? (data.data.acked ?? 0) : s.totalLines;
+      s.isRunning = false; s.isPaused = false; s.onMachine = false;
+      emitDone(!!data.data?.aborted, false, s, data.mode || getMachineMode());
+      if (data.gone) parked.delete(data.conn);
+      return;
+    }
     if (!streamState.onMachine) return;
     if (type === "job-progress") {
       streamState.currentLine = data.acked;

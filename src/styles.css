@@ -1339,3 +1339,22 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .support-toast-btns button { flex: 1; font-size: 0.75rem; }
 .support-x { position: absolute; top: 8px; right: 8px; background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.85rem; }
 @keyframes supIn { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* Mehrere Maschinen: Liste im Reiter „Maschine“ */
+.m-slots { display: flex; flex-direction: column; gap: 4px; margin-bottom: 6px; }
+.m-slots-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted, #8a8aa0); }
+.m-slot { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; text-align: left;
+  background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-main); cursor: pointer; }
+.m-slot:hover { border-color: var(--accent-color); }
+.m-slot.active { border-color: var(--accent-color); background: rgba(109, 74, 255, 0.14); }
+.m-slot-dot { width: 10px; height: 10px; border-radius: 50%; padding: 0; flex-shrink: 0; }
+.m-slot-text { display: flex; flex-direction: column; min-width: 0; flex: 1; font-size: 0.78rem; }
+.m-slot-text small { opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-slot-job { font-size: 0.75rem; font-weight: 700; color: var(--accent-color); }
+.m-slots-btns { display: flex; gap: 4px; }
+.m-slots-btns button { flex: 1; }
+.m-slot-dot.m-state-off { background: #555; }
+.m-slot-dot.m-state-idle { background: #34d17b; }
+.m-slot-dot.m-state-run { background: #4aa3ff; }
+.m-slot-dot.m-state-hold { background: #f0b429; }
+.m-slot-dot.m-state-alarm { background: #ff5a5a; }

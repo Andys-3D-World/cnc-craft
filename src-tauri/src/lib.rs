@@ -83,33 +83,100 @@ impl Conn {
     }
 }
 
-/// Die aktuelle Verbindung (None = nicht verbunden)
-static MACHINE: Mutex<Option<Conn>> = Mutex::new(None);
+/// Eine Verbindung mit ihrer Kennung (vergibt die Oberfläche, z. B. "m2") und ihrem Ziel (Port, IP …)
+struct Slot {
+    id: String,
+    target: String,
+    conn: Conn,
+}
 
+/// Alle Verbindungen – mehrere Maschinen gleichzeitig. Befehle gehen an die ausgewählte (ACTIVE),
+/// die anderen laufen im Hintergrund weiter (Jobs, Statusberichte).
+static MACHINES: Mutex<Vec<Slot>> = Mutex::new(Vec::new());
+static ACTIVE: Mutex<String> = Mutex::new(String::new());
+
+const DEFAULT_ID: &str = "m1";
+
+fn active_id() -> String {
+    ACTIVE.lock().map(|a| if a.is_empty() { DEFAULT_ID.to_string() } else { a.clone() }).unwrap_or_else(|_| DEFAULT_ID.to_string())
+}
+
+fn set_active(id: &str) {
+    if let Ok(mut a) = ACTIVE.lock() { *a = id.to_string(); }
+}
+
+/// Die ausgewählte Verbindung
 fn current() -> Result<Conn, String> {
-    let guard = MACHINE.lock().map_err(|_| "lock".to_string())?;
-    match guard.as_ref() {
-        Some(m) if m.is_alive() => Ok(m.clone()),
+    let id = active_id();
+    let guard = MACHINES.lock().map_err(|_| "lock".to_string())?;
+    match guard.iter().find(|s| s.id == id) {
+        Some(s) if s.conn.is_alive() => Ok(s.conn.clone()),
         _ => Err("not connected".into()),
     }
 }
 
-fn close_current() {
-    // erst aus der Sperre nehmen, dann außerhalb anhalten (das Warten soll nichts blockieren)
-    let taken = MACHINE.lock().ok().and_then(|mut g| g.take());
-    if let Some(m) = taken {
-        if m.is_alive() {
-            let wait = m.stop_for_close();
-            if !wait.is_zero() { std::thread::sleep(wait); }
-        }
-        m.shutdown();
+/// Verbindungen sicher beenden: laufende Jobs vorher anhalten (Laser/Spindel aus), dann trennen.
+/// Erst aus der Sperre nehmen, dann außerhalb anhalten – das Warten soll nichts blockieren.
+fn close_slots(taken: Vec<Slot>) {
+    let mut wait = std::time::Duration::ZERO;
+    for s in &taken {
+        if s.conn.is_alive() { wait = wait.max(s.conn.stop_for_close()); }
     }
+    if !wait.is_zero() { std::thread::sleep(wait); }
+    for s in taken { s.conn.shutdown(); }
 }
 
-fn emitter(app: &AppHandle) -> Emit {
+fn close_id(id: &str) {
+    let taken: Vec<Slot> = match MACHINES.lock() {
+        Ok(mut g) => { let (out, keep): (Vec<Slot>, Vec<Slot>) = g.drain(..).partition(|s| s.id == id); *g = keep; out }
+        Err(_) => Vec::new(),
+    };
+    close_slots(taken);
+}
+
+/// Ausgewählte Verbindung trennen
+fn close_current() {
+    close_id(&active_id());
+}
+
+/// Alle Verbindungen trennen (Programm wird geschlossen / startet nach einem Update neu)
+pub(crate) fn close_all() {
+    let taken: Vec<Slot> = MACHINES.lock().map(|mut g| g.drain(..).collect()).unwrap_or_default();
+    close_slots(taken);
+}
+
+/// Vor dem Verbinden: dieselbe Kennung neu belegen (alte Verbindung schließen) und prüfen,
+/// dass das Ziel nicht schon von einer anderen Verbindung benutzt wird
+fn prepare_slot(id: &str, target: &str) -> Result<(), String> {
+    close_id(id);
+    let g = MACHINES.lock().map_err(|_| "lock".to_string())?;
+    if g.iter().any(|s| s.target == target && s.conn.is_alive()) { return Err("already-connected".into()); }
+    Ok(())
+}
+
+fn add_slot(id: String, target: String, conn: Conn) -> Result<(), String> {
+    let mut g = MACHINES.lock().map_err(|_| "lock".to_string())?;
+    g.retain(|s| s.id != id && s.conn.is_alive());
+    g.push(Slot { id: id.clone(), target, conn });
+    drop(g);
+    set_active(&id);
+    Ok(())
+}
+
+fn slot_id(conn: Option<String>) -> String {
+    conn.filter(|c| !c.is_empty() && c.len() <= 32 && c.chars().all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_'))
+        .unwrap_or_else(|| DEFAULT_ID.to_string())
+}
+
+/// Ereignisse einer Verbindung tragen deren Kennung ("conn"), damit die Oberfläche sie zuordnen kann
+fn emitter(app: &AppHandle, id: &str) -> Emit {
     let app2 = app.clone();
+    let id = id.to_string();
     Arc::new(move |name: &str, json: String| {
-        let value: serde_json::Value = serde_json::from_str(&json).unwrap_or(serde_json::Value::Null);
+        let mut value: serde_json::Value = serde_json::from_str(&json).unwrap_or(serde_json::Value::Null);
+        if let serde_json::Value::Object(map) = &mut value {
+            map.insert("conn".into(), serde_json::Value::String(id.clone()));
+        }
         let _ = app2.emit(name, value);
     })
 }
@@ -133,29 +200,27 @@ async fn list_ports() -> Vec<PortJson> {
 }
 
 #[tauri::command]
-async fn machine_connect(app: AppHandle, port: String, baud: u32) -> Result<(), String> {
-    close_current(); // alte Verbindung sauber beenden
+async fn machine_connect(app: AppHandle, port: String, baud: u32, conn: Option<String>) -> Result<(), String> {
+    let id = slot_id(conn);
+    prepare_slot(&id, &port)?; // gleiche Kennung: alte Verbindung sauber beenden
     // "tcp://host:port" = GRBL über Netzwerk (FluidNC, grblHAL, ESP32-Boards per WLAN, xTool F1)
     let m = if let Some(addr) = port.strip_prefix("tcp://") {
         let addr = addr.to_string();
-        let emit = emitter(&app);
+        let emit = emitter(&app, &id);
         tauri::async_runtime::spawn_blocking(move || serial::open_machine_tcp(&addr, emit)).await.map_err(|e| e.to_string())??
     } else {
-        serial::open_machine(&port, baud, emitter(&app))?
+        serial::open_machine(&port, baud, emitter(&app, &id))?
     };
-    let mut g = MACHINE.lock().map_err(|_| "lock".to_string())?;
-    *g = Some(Conn::Grbl(m));
-    Ok(())
+    add_slot(id, port, Conn::Grbl(m))
 }
 
 /// Marlin-Maschine verbinden (Creality, Anycubic, MPCNC …). laser = bei Pause Laser aus
 #[tauri::command]
-async fn marlin_connect(app: AppHandle, port: String, baud: u32, laser: bool) -> Result<(), String> {
-    close_current();
-    let m = serial::open_marlin(&port, baud, laser, emitter(&app))?;
-    let mut g = MACHINE.lock().map_err(|_| "lock".to_string())?;
-    *g = Some(Conn::Marlin(m));
-    Ok(())
+async fn marlin_connect(app: AppHandle, port: String, baud: u32, laser: bool, conn: Option<String>) -> Result<(), String> {
+    let id = slot_id(conn);
+    prepare_slot(&id, &port)?;
+    let m = serial::open_marlin(&port, baud, laser, emitter(&app, &id))?;
+    add_slot(id, port, Conn::Marlin(m))
 }
 
 fn k40_options(bed_w: f64, bed_h: f64, board: &str, s_max: f64) -> K40Options {
@@ -176,10 +241,12 @@ async fn k40_count() -> usize {
 
 /// K40 mit Original-Board verbinden (board = "M2", "M3", "B2" …)
 #[tauri::command]
-async fn k40_connect(app: AppHandle, index: usize, bed_w: f64, bed_h: f64, board: String, s_max: f64) -> Result<(), String> {
-    close_current();
+async fn k40_connect(app: AppHandle, index: usize, bed_w: f64, bed_h: f64, board: String, s_max: f64, conn: Option<String>) -> Result<(), String> {
+    let id = slot_id(conn);
+    let target = format!("k40:{}", index);
+    prepare_slot(&id, &target)?;
     let opt = k40_options(bed_w, bed_h, &board, s_max);
-    let emit = emitter(&app);
+    let emit = emitter(&app, &id);
     let k = tauri::async_runtime::spawn_blocking(move || -> Result<K40, String> {
         std::thread::sleep(std::time::Duration::from_millis(150));
         let usb = usb_k40::open(index)?;
@@ -187,9 +254,7 @@ async fn k40_connect(app: AppHandle, index: usize, bed_w: f64, bed_h: f64, board
     })
     .await
     .map_err(|e| e.to_string())??;
-    let mut g = MACHINE.lock().map_err(|_| "lock".to_string())?;
-    *g = Some(Conn::K40(k));
-    Ok(())
+    add_slot(id, target, Conn::K40(k))
 }
 
 #[tauri::command]
@@ -211,10 +276,12 @@ fn rd_options(bed_w: f64, bed_h: f64, origin: &str, s_max: f64, magic: u8, min_p
 
 /// Ruida verbinden. target = IP-Adresse (Netzwerk) oder Port-Name (USB)
 #[tauri::command]
-async fn ruida_connect(app: AppHandle, target: String, bed_w: f64, bed_h: f64, origin: String, s_max: f64, magic: u8, min_power: f64) -> Result<(), String> {
-    close_current();
+async fn ruida_connect(app: AppHandle, target: String, bed_w: f64, bed_h: f64, origin: String, s_max: f64, magic: u8, min_power: f64, conn: Option<String>) -> Result<(), String> {
+    let id = slot_id(conn);
+    let key = target.trim().to_string();
+    prepare_slot(&id, &key)?;
     let opt = rd_options(bed_w, bed_h, &origin, s_max, magic, min_power);
-    let emit = emitter(&app);
+    let emit = emitter(&app, &id);
     let r = tauri::async_runtime::spawn_blocking(move || -> Result<Ruida, String> {
         // kurz warten, falls eine alte Verbindung den UDP-Port / USB-Port noch hält
         std::thread::sleep(std::time::Duration::from_millis(150));
@@ -228,9 +295,7 @@ async fn ruida_connect(app: AppHandle, target: String, bed_w: f64, bed_h: f64, o
     })
     .await
     .map_err(|e| e.to_string())??;
-    let mut g = MACHINE.lock().map_err(|_| "lock".to_string())?;
-    *g = Some(Conn::Ruida(r));
-    Ok(())
+    add_slot(id, key, Conn::Ruida(r))
 }
 
 /// Bettgröße / Nullpunkt / S-Max ändern, während Ruida verbunden ist
@@ -270,9 +335,29 @@ async fn ruida_export(lines: Vec<String>, path: String, bed_w: f64, bed_h: f64, 
 }
 
 #[tauri::command]
-async fn machine_disconnect() -> Result<(), String> {
-    close_current();
+async fn machine_disconnect(conn: Option<String>) -> Result<(), String> {
+    match conn { Some(c) => close_id(&slot_id(Some(c))), None => close_current() }
     Ok(())
+}
+
+/// Maschine auswählen: ab jetzt gehen Befehle und Jobs an diese Verbindung
+#[tauri::command]
+async fn machine_select(conn: String) -> Result<(), String> {
+    set_active(&slot_id(Some(conn)));
+    Ok(())
+}
+
+/// Not-Halt für alle: laufende Jobs auf allen Maschinen sicher anhalten (Laser/Spindel aus).
+/// Rückgabe: Zahl der Verbindungen, an die der Halt ging
+#[tauri::command]
+async fn machine_stop_all() -> usize {
+    let all: Vec<Conn> = MACHINES.lock().map(|g| g.iter().filter(|s| s.conn.is_alive()).map(|s| s.conn.clone()).collect()).unwrap_or_default();
+    for c in &all {
+        let _ = c.stop_for_close();
+        // GRBL ohne Job: Jog-Fahrt abbrechen (schadet im Stillstand nicht)
+        if let Conn::Grbl(m) = c { let _ = m.realtime(0x85); }
+    }
+    all.len()
 }
 
 #[tauri::command]
@@ -511,6 +596,8 @@ pub fn run() {
             ruida_set_options,
             ruida_export,
             machine_disconnect,
+            machine_select,
+            machine_stop_all,
             machine_is_connected,
             machine_send,
             machine_realtime,
@@ -534,9 +621,28 @@ pub fn run() {
         // Fenster wird geschlossen: laufenden Job vorher sicher anhalten (Laser/Spindel aus)
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                close_current();
+                close_all();
             }
         })
         .run(tauri::generate_context!())
         .expect("error while running CNC Craft");
+}
+
+#[cfg(test)]
+mod multi_tests {
+    use super::slot_id;
+
+    #[test]
+    fn slot_id_accepts_simple_ids() {
+        assert_eq!(slot_id(Some("m2".into())), "m2");
+        assert_eq!(slot_id(Some("laser_1-a".into())), "laser_1-a");
+    }
+
+    #[test]
+    fn slot_id_falls_back_for_bad_ids() {
+        assert_eq!(slot_id(None), "m1");
+        assert_eq!(slot_id(Some("".into())), "m1");
+        assert_eq!(slot_id(Some("<script>".into())), "m1");
+        assert_eq!(slot_id(Some("x".repeat(40))), "m1");
+    }
 }

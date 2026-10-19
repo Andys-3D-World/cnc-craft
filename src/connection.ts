@@ -18,7 +18,8 @@ import { handleJogClick } from "./jogSimulator";
 import { t } from "./i18n/i18n";
 import {
   machine, MACHINE_EVENT, RT, listPorts, connect, connectMarlin, connectRuida, connectK40, k40Count, disconnect, send, sendAndWait, realtime,
-  alarmText, canCommand, PortInfo, fmtBuildDate, netScan, NetDevice
+  alarmText, canCommand, PortInfo, fmtBuildDate, netScan, NetDevice,
+  machineSlots, selectMachine, newMachineSlot, stopAllMachines, connectedCount
 } from "./machine";
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
 import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
@@ -37,6 +38,12 @@ const KEY_NET_FOUND = "cnc_craft_net_found"; // zuletzt gefundene Netzwerk-Masch
 const NET = "__net__"; // Eintrag „Netzwerk (IP)“ in der Port-Auswahl (Ruida und GRBL)
 
 /** Hinweis, welches Board hinter einem Chip typischerweise steckt */
+/** Fehler beim Verbinden verständlich machen (z. B. "already-connected") */
+function whyText(e: unknown): string {
+  const k = "m.why." + String(e);
+  return t(k) !== k ? t(k) : String(e);
+}
+
 function chipHint(p: PortInfo): string {
   switch (p.chip) {
     case "CH340": case "CH341": return t("m.hint.ch340");
@@ -240,7 +247,10 @@ export function initConnection(appendToConsole: (text: string) => void) {
     syncWifiBtn();
     const dot = $("header-conn-dot"), txt = $("header-conn-text");
     if (dot) dot.classList.toggle("online", on);
-    if (txt) txt.textContent = on ? (machine.firmware ? `${machine.firmware} ${machine.version}`.trim() : t("nav.online")) : t("nav.offline");
+    const others = connectedCount() - (on ? 1 : 0);
+    if (dot && others > 0) dot.classList.add("online");
+    if (txt) txt.textContent = (on ? (machine.firmware ? `${machine.firmware} ${machine.version}`.trim() : t("nav.online")) : others > 0 ? t("ms.notConnected") : t("nav.offline"))
+      + (others > 0 ? ` (+${others})` : "");
     if (!on) setStateBadge("Offline");
     showInfo();
     updateButtons();
@@ -251,7 +261,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
       if (machine.job.active && !window.confirm(t("m.confirmDisconnect"))) return;
       await disconnect();
       appendToConsole(t("m.disconnected"));
-      setConnectedUi(false);
+      setConnectedUi(machine.connected); // war noch eine andere Maschine verbunden, ist jetzt sie ausgewählt
       return;
     }
     if (isK40Machine()) {
@@ -283,7 +293,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
         } catch { /* egal */ }
         setConnectedUi(true);
       } catch (e) {
-        appendToConsole(t("m.connectFailed", { port: target, e: String(e) }));
+        appendToConsole(t("m.connectFailed", { port: target, e: whyText(e) }));
         appendToConsole(t("m.ruidaConnectHelp"));
         setConnectedUi(false);
       } finally {
@@ -352,7 +362,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
       setConnectedUi(true);
       return true;
     } catch (e) {
-      appendToConsole(t("m.connectFailed", { port, e: String(e) }));
+      appendToConsole(String(e) === "already-connected" ? `[${t("ms.title")}] ${whyText(e)}.` : t("m.connectFailed", { port, e: whyText(e) }));
       setConnectedUi(false);
       return false;
     }
@@ -423,6 +433,53 @@ export function initConnection(appendToConsole: (text: string) => void) {
     } else if (type === "job-progress" || type === "job-done" || type === "job-toolchange") {
       updateButtons();
       setStateBadge(machine.status.state || "Offline");
+    }
+  });
+
+  // ---------------- Mehrere Maschinen ----------------
+  // Liste aller Verbindungen: anklicken = auswählen (Befehle und Jobs gehen an die ausgewählte),
+  // „+“ = weiteren Platz zum Verbinden, „Alle stoppen“ = laufende Jobs überall anhalten
+  const MODE_ICON: Record<string, string> = { mill: "🛠️", laser: "🔦", plasma: "🔥" };
+  const shortPort = (p: string) => p.replace(/^tcp:\/\//, "").replace(/^\/dev\/(cu\.|tty\.?)?/, "");
+  const slotsBox = $("m-slots");
+  function renderSlots() {
+    if (!slotsBox) return;
+    const n = connectedCount();
+    if (n === 0) { slotsBox.style.display = "none"; slotsBox.innerHTML = ""; return; }
+    slotsBox.style.display = "";
+    const rows = machineSlots().map((s, i) => {
+      const st = s.connected ? (s.state || "Idle") : "Offline";
+      const pct = s.job.total ? Math.round((s.job.acked / s.job.total) * 100) : 0;
+      const sub = s.connected ? [s.info.host || s.info.name || s.firmware, shortPort(s.port)].filter(Boolean).join(" · ") : t("ms.notConnected");
+      return `<button type="button" class="m-slot${s.active ? " active" : ""}" data-id="${escHtml(s.id)}" data-tip="${escHtml(t("ms.selectTip"))}">
+          <span class="m-slot-dot ${stateClass(st)}"></span>
+          <span class="m-slot-text"><b>${MODE_ICON[s.mode] || ""} ${escHtml(t("ms.machineN", { n: i + 1 }))} · ${escHtml(t("mode." + s.mode))}</b>
+            <small>${escHtml(sub)}</small></span>
+          ${s.job.active ? `<span class="m-slot-job">${pct} %${s.job.paused ? " ⏸" : ""}</span>` : ""}
+        </button>`;
+    }).join("");
+    slotsBox.innerHTML = `<div class="m-slots-title">${escHtml(t("ms.title"))}</div>${rows}
+      <div class="m-slots-btns">
+        ${machine.connected ? `<button type="button" id="m-slot-add" class="btn-secondary btn-compact">➕ ${escHtml(t("ms.add"))}</button>` : ""}
+        ${n >= 2 ? `<button type="button" id="m-stop-all" class="btn-secondary btn-compact btn-danger-outline" data-tip="${escHtml(t("ms.stopAllTip"))}">⛔ ${escHtml(t("ms.stopAll"))}</button>` : ""}
+      </div>`;
+    slotsBox.querySelectorAll<HTMLButtonElement>(".m-slot").forEach(b => b.addEventListener("click", () => { void selectMachine(b.dataset.id!); }));
+    slotsBox.querySelector("#m-slot-add")?.addEventListener("click", async () => {
+      await newMachineSlot();
+      appendToConsole(t("ms.addHint"));
+      void scan();
+    });
+    slotsBox.querySelector("#m-stop-all")?.addEventListener("click", async () => {
+      const k = await stopAllMachines();
+      appendToConsole(t("ms.stopped", { n: k }));
+    });
+  }
+  window.addEventListener(MACHINE_EVENT, (e: Event) => {
+    const type = (e as CustomEvent).detail?.type;
+    if (type === "slots" || type === "switched") renderSlots();
+    if (type === "switched") {
+      setConnectedUi(machine.connected);
+      if (machine.connected) setStateBadge(machine.status.state || "Idle");
     }
   });
 

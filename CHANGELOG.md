@@ -1,5 +1,18 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Neu**
+- **Mehrere Maschinen gleichzeitig:** im Reiter „Maschine“ mit „➕ Weitere Maschine“ eine zweite (dritte …)
+  Maschine verbinden – z. B. Laser per USB und Fräse per WLAN. Die Liste zeigt alle Maschinen mit Status und
+  Job-Fortschritt; anklicken = auswählen. Befehle, Joggen, Konsole, $$ und Jobs gehen immer an die ausgewählte
+  Maschine, die anderen arbeiten im Hintergrund weiter. Beim Umschalten wechseln Maschinenart (Fräse/Laser/Plasma),
+  Zeichenfläche und Profil automatisch mit. Meldungen aus dem Hintergrund stehen mit „[Maschine 2]“ in der Konsole,
+  die Restplatte wird auch nach Hintergrund-Jobs eingetragen – bei der richtigen Maschinenart
+- **⛔ Alle stoppen:** hält laufende Jobs auf allen verbundenen Maschinen sofort an (Laser/Spindel aus).
+  Beim Schließen des Programms werden alle Maschinen sicher angehalten
+- Ein Anschluss kann nicht zweimal verbunden werden (Meldung statt Durcheinander)
+
 ## 0.2.6 Beta
 
 **Neu**

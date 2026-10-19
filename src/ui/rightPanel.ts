@@ -115,6 +115,7 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.connection")}</h3>
           <div class="menu-body rp-box">
+            <div id="m-slots" class="m-slots" style="display: none;"></div>
             <div style="display: flex; gap: 4px;">
               <select id="port-select" style="flex: 1; min-width: 0; font-size: 0.78rem; padding: 4px;" ${tip("m.portTip")}>
                 <option value="" data-i18n="rp.scanPorts">Ports scannen...</option>

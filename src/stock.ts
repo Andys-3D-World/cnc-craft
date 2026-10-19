@@ -193,8 +193,7 @@ export function cutWidthFor(shapes: any[], mode: MachineMode = getMachineMode())
  * upToLine: nur bis zu dieser Zeile (bei abgebrochenem Job); width: Schnittbreite in mm.
  * Rückgabe: neu verbrauchte Fläche in Prozent der Platte.
  */
-export function markFromGcode(lines: string[], label: string, width: number, upToLine = Infinity): number {
-  const mode = getMachineMode();
+export function markFromGcode(lines: string[], label: string, width: number, upToLine = Infinity, mode: MachineMode = getMachineMode()): number {
   const s = getStock(mode);
   const before = usedPercent(s);
   const prog = parseGcodeProgram(lines);
