@@ -27,3 +27,6 @@ CLAUDE.local.md
 *.njsproj
 *.sln
 *.sw?
+
+# graphify (Wissens-Graph, nur lokal)
+graphify-out/
