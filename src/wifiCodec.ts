@@ -101,10 +101,11 @@ export function hostSlug(name: string): string {
 }
 
 /** Befehl für den Namen je Firmware */
-export function hostLine(fw: WifiFw, host: string): string {
+/** halKey: grblHAL-Nummer für den Namen – ESP32 mit WLAN: $320 (Heimnetz), Ethernet-Boards: $300 */
+export function hostLine(fw: WifiFw, host: string, halKey = "$320"): string {
   if (!host) return "";
   if (fw === "fluidnc") return `$Hostname=${host}`;
-  if (fw === "grblhal") return `$300=${host}`;
+  if (fw === "grblhal") return `${halKey}=${host}`;
   if (fw === "esp32") return `[ESP112]${host}`;
   return "";
 }
@@ -114,9 +115,17 @@ export function isDefaultHost(h: string): boolean {
   return /^(mks[_-]?(grbl|dlc32?)?|grblesp|grbl|fluidnc|grblhal|esp3d|espressif|esp32[-_a-z0-9]*)$/i.test(h.trim());
 }
 
-export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false, host = ""): WifiPlan {
+export function planWifi(fw: WifiFw, mode: WifiMode, ssid: string, pw: string, canWeb: boolean, hal39: string | null = null, mks = false, host = "", hal70: string | null = null, halHostKey = "$320"): WifiPlan {
   const plan = planWifiCore(fw, mode, ssid, pw, canWeb, hal39, mks);
-  const hl = hostLine(fw, host);
+  // grblHAL: CNC Craft verbindet per Telnet ($70 Bit 0, Port $305 – meist 23). Ist Telnet aus, mit einschalten.
+  // Danach $REBOOT, damit WLAN und Telnet sofort gelten.
+  if (fw === "grblhal" && !plan.error && plan.lines.length) {
+    const v = hal70 !== null ? parseInt(hal70, 10) : NaN;
+    if (Number.isFinite(v) && !(v & 1)) { plan.lines.push(`$70=${v | 1}`); plan.notes.push("wifi.note.halTelnet"); }
+    else if (!Number.isFinite(v)) plan.notes.push("wifi.note.halNoTelnet");
+    plan.restart = "$REBOOT";
+  }
+  const hl = hostLine(fw, host, halHostKey);
   if (hl && !plan.error && plan.lines.length) {
     // gleich hinter das Passwort, vor das Umschalten
     const at = Math.max(...plan.secret, 1) + 1;

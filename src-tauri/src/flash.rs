@@ -382,9 +382,16 @@ pub struct EspOptions {
     pub flash_size: u32,    // Bytes (aus dem Datei-Kopf, sonst 4 MB)
 }
 
-/// ESP32 flashen. Gibt eine Zusammenfassung zurück.
+/// ESP32 flashen (eine Datei an opt.offset). Gibt eine Zusammenfassung zurück.
 pub fn flash_esp(port: &mut dyn FlashPort, image: &[u8], opt: &EspOptions, p: Progress, cancel: &AtomicBool) -> Result<String, String> {
-    if image.is_empty() { return Err("empty file".into()); }
+    flash_esp_parts(port, &[(opt.offset, image)], opt, p, cancel)
+}
+
+/// ESP32 flashen: mehrere Teile (Adresse, Inhalt) in EINER Sitzung – z. B. Bootloader, Partitionstabelle
+/// und Firmware aus einer ZIP vom grblHAL Web Builder (fwzip.rs). opt.offset wird hier nicht benutzt.
+pub fn flash_esp_parts(port: &mut dyn FlashPort, parts: &[(u32, &[u8])], opt: &EspOptions, p: Progress, cancel: &AtomicBool) -> Result<String, String> {
+    if parts.is_empty() || parts.iter().any(|(_, d)| d.is_empty()) { return Err("empty file".into()); }
+    let total: usize = parts.iter().map(|(_, d)| d.len()).sum();
     report(p, "connect", 0, 1, "");
 
     // ---- 1. Bootloader erreichen ----
@@ -404,11 +411,13 @@ pub fn flash_esp(port: &mut dyn FlashPort, image: &[u8], opt: &EspOptions, p: Pr
     let chip = Chip::from_magic(esp.read_reg(CHIP_MAGIC_REG)?);
     report(p, "chip", 0, 1, &chip.name());
 
-    // ---- 2. Passt die Datei zum Chip? ----
-    if let Some(img_id) = image_chip_id(image) {
-        if let Some(cid) = chip.image_id() {
-            if img_id != cid {
-                return Err(format!("wrong chip: file is for {}, board has {}", chip_name_from_image_id(img_id), chip.name()));
+    // ---- 2. Passen die Dateien zum Chip? (vor dem ersten Schreiben – nichts wird halb geflasht) ----
+    for (_, image) in parts {
+        if let Some(img_id) = image_chip_id(image) {
+            if let Some(cid) = chip.image_id() {
+                if img_id != cid {
+                    return Err(format!("wrong chip: file is for {}, board has {}", chip_name_from_image_id(img_id), chip.name()));
+                }
             }
         }
     }
@@ -428,49 +437,58 @@ pub fn flash_esp(port: &mut dyn FlashPort, image: &[u8], opt: &EspOptions, p: Pr
     esp.command(ESP_SPI_ATTACH, &words(&[0, 0]), 0, Duration::from_secs(3))?;
     esp.command(ESP_SPI_SET_PARAMS, &words(&[0, opt.flash_size, 64 * 1024, 4 * 1024, 256, 0xffff]), 0, Duration::from_secs(3))?;
 
-    // ---- 5. komprimiert schreiben ----
-    report(p, "compress", 0, 1, "");
-    let comp = zlib_compress(image);
-    let blocks = (comp.len() + ROM_BLOCK - 1) / ROM_BLOCK;
-    let write_size = ((image.len() + ROM_BLOCK - 1) / ROM_BLOCK * ROM_BLOCK) as u32;
-    let mb = (write_size as f64 / 1_048_576.0).max(1.0);
-    report(p, "erase", 0, image.len(), "");
-    let mut begin = vec![write_size, blocks as u32, ROM_BLOCK as u32, opt.offset];
-    if chip.begin_has_encrypt_word() { begin.push(0); }
-    esp.command(ESP_DEFL_BEGIN, &words(&begin), 0, Duration::from_secs_f64(10.0 + 30.0 * mb))?;
-
+    // ---- 5./6. jeden Teil komprimiert schreiben und prüfen ----
     let t0 = Instant::now();
-    let mut last = Instant::now() - Duration::from_secs(1);
-    for (seq, chunk) in comp.chunks(ROM_BLOCK).enumerate() {
-        if cancel.load(Ordering::SeqCst) { return Err("cancelled".into()); }
-        let mut data = words(&[chunk.len() as u32, seq as u32, 0, 0]);
-        data.extend_from_slice(chunk);
-        let checksum = chunk.iter().fold(0xEFu8, |a, &b| a ^ b) as u32;
-        // der ROM entpackt und schreibt – bei großen leeren Bereichen kann das dauern
-        esp.command(ESP_DEFL_DATA, &data, checksum, Duration::from_secs(20))?;
-        if last.elapsed() > Duration::from_millis(150) || seq + 1 == blocks {
-            last = Instant::now();
-            let done = ((seq + 1) as f64 / blocks as f64 * image.len() as f64) as usize;
-            report(p, "write", done, image.len(), "");
+    let mut done_before = 0usize;
+    let mut comp_total = 0usize;
+    let mut md5s = Vec::new();
+    for (offset, image) in parts {
+        let (offset, image) = (*offset, *image);
+        report(p, "compress", 0, 1, "");
+        let comp = zlib_compress(image);
+        comp_total += comp.len();
+        let blocks = (comp.len() + ROM_BLOCK - 1) / ROM_BLOCK;
+        let write_size = ((image.len() + ROM_BLOCK - 1) / ROM_BLOCK * ROM_BLOCK) as u32;
+        let mb = (write_size as f64 / 1_048_576.0).max(1.0);
+        report(p, "erase", done_before, total, "");
+        let mut begin = vec![write_size, blocks as u32, ROM_BLOCK as u32, offset];
+        if chip.begin_has_encrypt_word() { begin.push(0); }
+        esp.command(ESP_DEFL_BEGIN, &words(&begin), 0, Duration::from_secs_f64(10.0 + 30.0 * mb))?;
+
+        let mut last = Instant::now() - Duration::from_secs(1);
+        for (seq, chunk) in comp.chunks(ROM_BLOCK).enumerate() {
+            if cancel.load(Ordering::SeqCst) { return Err("cancelled".into()); }
+            let mut data = words(&[chunk.len() as u32, seq as u32, 0, 0]);
+            data.extend_from_slice(chunk);
+            let checksum = chunk.iter().fold(0xEFu8, |a, &b| a ^ b) as u32;
+            // der ROM entpackt und schreibt – bei großen leeren Bereichen kann das dauern
+            esp.command(ESP_DEFL_DATA, &data, checksum, Duration::from_secs(20))?;
+            if last.elapsed() > Duration::from_millis(150) || seq + 1 == blocks {
+                last = Instant::now();
+                let done = done_before + ((seq + 1) as f64 / blocks as f64 * image.len() as f64) as usize;
+                report(p, "write", done, total, "");
+            }
         }
+
+        // prüfen
+        report(p, "verify", 0, 1, "");
+        let (_, md5_raw) = esp.command(ESP_MD5, &words(&[offset, image.len() as u32, 0, 0]), 0, Duration::from_secs_f64(10.0 + 8.0 * mb))?;
+        let got = if md5_raw.len() >= 32 { String::from_utf8_lossy(&md5_raw[..32]).to_lowercase() }
+                  else { md5_raw.iter().map(|b| format!("{:02x}", b)).collect() };
+        let want = md5_hex(image);
+        if got != want { return Err(format!("verify failed at 0x{:x} (md5 {} != {})", offset, got, want)); }
+        md5s.push(want);
+        done_before += image.len();
     }
     let secs = t0.elapsed().as_secs_f64();
-
-    // ---- 6. prüfen ----
-    report(p, "verify", 0, 1, "");
-    let (_, md5_raw) = esp.command(ESP_MD5, &words(&[opt.offset, image.len() as u32, 0, 0]), 0, Duration::from_secs_f64(10.0 + 8.0 * mb))?;
-    let got = if md5_raw.len() >= 32 { String::from_utf8_lossy(&md5_raw[..32]).to_lowercase() }
-              else { md5_raw.iter().map(|b| format!("{:02x}", b)).collect() };
-    let want = md5_hex(image);
-    if got != want { return Err(format!("verify failed (md5 {} != {})", got, want)); }
 
     // ---- 7. fertig, Neustart ----
     let _ = esp.command(ESP_DEFL_END, &words(&[1]), 0, Duration::from_secs(2));
     esp.port.set_baud(115_200).ok();
     hard_reset(esp.port);
-    report(p, "done", image.len(), image.len(), "");
-    Ok(format!("{{\"chip\":{},\"bytes\":{},\"compressed\":{},\"seconds\":{:.1},\"md5\":{}}}",
-        jstr(&chip.name()), image.len(), comp.len(), secs, jstr(&want)))
+    report(p, "done", total, total, "");
+    Ok(format!("{{\"chip\":{},\"bytes\":{},\"compressed\":{},\"seconds\":{:.1},\"parts\":{},\"md5\":{}}}",
+        jstr(&chip.name()), total, comp_total, secs, parts.len(), jstr(&md5s.join(","))))
 }
 
 /// Chip-Kennung aus dem Kopf einer ESP-Firmware-Datei (App bei 0, Komplettdatei mit Bootloader bei 0 bzw. 0x1000)
@@ -834,6 +852,39 @@ mod tests {
         // nach dem Flashen: normaler Neustart (EN-Puls ohne IO0)
         let log = sh.log.lock().unwrap().join(",");
         assert!(log.ends_with("dtr=false,rts=true,rts=false"), "{}", log);
+        stop.store(true, Ordering::SeqCst);
+    }
+
+    /// grblHAL-ZIP (Bootloader 0x0, Partitionen 0x8000, Firmware 0x10000) in EINER Sitzung flashen –
+    /// jeder Teil landet an seiner Adresse; ein Teil für den falschen Chip stoppt VOR dem ersten Schreiben
+    #[test]
+    fn esp32s3_flash_three_parts() {
+        let sh = Shared::new();
+        let stop = Arc::new(AtomicBool::new(false));
+        let flash = spawn_esp(sh.clone(), 0x9, stop.clone());
+        let mut boot = test_image(19_504); boot[0] = 0xE9; boot[12] = 9; boot[13] = 0;
+        let table: Vec<u8> = (0..3072).map(|i| if i == 0 { 0xAA } else if i == 1 { 0x50 } else { (i % 251) as u8 }).collect();
+        let mut app = test_image(300_000); app[0] = 0xE9; app[12] = 9; app[13] = 0;
+        let mut port = HostPort(sh.clone());
+        let opt = EspOptions { offset: 0, baud: 921600, usb_jtag: false, flash_size: 8 << 20 };
+        let res = flash_esp_parts(&mut port, &[(0x0, &boot[..]), (0x8000, &table[..]), (0x10000, &app[..])], &opt, &quiet(), &AtomicBool::new(false)).unwrap();
+        assert!(res.contains("\"parts\":3"), "{}", res);
+        let fl = flash.lock().unwrap();
+        assert_eq!(&fl[..boot.len()], &boot[..]);
+        assert_eq!(&fl[0x8000..0x8000 + table.len()], &table[..]);
+        assert_eq!(&fl[0x10000..0x10000 + app.len()], &app[..]);
+        drop(fl);
+        stop.store(true, Ordering::SeqCst);
+
+        // falscher Chip in einem Teil: Abbruch, bevor irgendetwas geschrieben wird
+        let sh = Shared::new();
+        let stop = Arc::new(AtomicBool::new(false));
+        let flash = spawn_esp(sh.clone(), 0x9, stop.clone());
+        let mut wrong = app.clone(); wrong[12] = 0; // ESP32 statt S3
+        let mut port = HostPort(sh.clone());
+        let err = flash_esp_parts(&mut port, &[(0x0, &boot[..]), (0x10000, &wrong[..])], &opt, &quiet(), &AtomicBool::new(false)).unwrap_err();
+        assert!(err.starts_with("wrong chip"), "{}", err);
+        assert!(flash.lock().unwrap()[..64].iter().all(|&b| b == 0), "nichts darf geschrieben sein");
         stop.store(true, Ordering::SeqCst);
     }
 

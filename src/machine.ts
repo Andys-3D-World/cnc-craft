@@ -16,6 +16,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { t } from "./i18n/i18n";
 import { getMachineMode, setMachineMode, MachineMode } from "./machineMode";
+import { parseHalLine } from "./grblhalInfo";
 
 export interface MachineStatus {
   state: string;          // Idle, Run, Hold, Jog, Alarm, Door, Check, Home, Sleep
@@ -126,7 +127,7 @@ function parseInfoLine(text: string): boolean {
   if (mks && !info.name) { info.name = mks[0].replace(/_/g, " ").trim(); hit = true; }
   const fw = text.match(/FW version:\s*([^,#\]]+)/i);
   if (fw) { info.fw = fw[1].trim(); hit = true; }
-  const host = text.match(/hostname:\s*([A-Za-z0-9_.-]+)/i) || text.match(/^\$(?:System\/Hostname|ESP112|Hostname|300)=([A-Za-z0-9_.-]+)\s*$/);
+  const host = text.match(/hostname:\s*([A-Za-z0-9_.-]+)/i) || text.match(/^\$(?:System\/Hostname|ESP112|Hostname|300|320)=([A-Za-z0-9_.-]+)\s*$/);
   if (host) { info.host = host[1]; hit = true; }
   if (hit || /^\[(VER|OPT|ESP|MSG:.*(MKS|Version))/i.test(text) || /FW (version|target|HW)/i.test(text)) {
     if (!info.raw.includes(text) && info.raw.length < 40) info.raw.push(text);
@@ -136,7 +137,8 @@ function parseInfoLine(text: string): boolean {
       localStorage.setItem(INFO_KEY, JSON.stringify({ ...info, firmware: `${machine.firmware} ${machine.version}`.trim(), port: machine.port, seen: new Date().toISOString() }));
     } catch { /* egal */ }
     // ESP32-Boards (MKS, Grbl_ESP32, FluidNC) kennen zusätzlich [ESP800] mit Firmware-Details
-    const esp = /MKS/i.test(info.name) || machine.firmware === "Grbl_ESP32" || machine.firmware === "FluidNC";
+    // (nicht grblHAL: auch mit grblHAL heißt eine MKS-Platine noch „MKS DLC32 …“ – [ESP800] gäbe dort Fehler 1)
+    const esp = machine.firmware !== "grblHAL" && (/MKS/i.test(info.name) || machine.firmware === "Grbl_ESP32" || machine.firmware === "FluidNC");
     if (esp && !espInfoRequested && machine.connected) {
       espInfoRequested = true;
       setTimeout(() => send("[ESP800]", true).catch(() => {}), 100);
@@ -454,6 +456,8 @@ export async function initMachine(logFn: (s: string) => void) {
         fire("setting", p);
         break;
       default:
+        // grblHAL-Einstellungsbeschreibungen ($ES/$ESG/$EG): über 100 Zeilen – nicht in die Konsole
+        if (parseHalLine(String(p.text || ""))) { fire("text", p); break; }
         parseInfoLine(String(p.text || ""));
         log(`[${t("m.board")}] ${maskSecrets(String(p.text || ""))}`);
         fire("text", p);

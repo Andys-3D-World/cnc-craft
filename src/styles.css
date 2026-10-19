@@ -1360,3 +1360,13 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .m-slot-dot.m-state-alarm { background: #ff5a5a; }
 .net-find-item.busy { opacity: 0.6; cursor: default; }
 .net-find-item.busy .net-find-use { color: #34d17b; }
+/* $$-Seite: grblHAL */
+.sp-hal-note { margin: 6px 0 10px; padding: 8px 10px; border-left: 3px solid var(--accent-color); background: rgba(109, 74, 255, 0.08); border-radius: 6px; font-size: 0.8rem; }
+.sp-en { font-style: italic; opacity: 0.85; }
+.sp-range, .sp-reboot { display: inline-block; margin: 2px 8px 0 0; font-size: 0.7rem; opacity: 0.75; }
+.sp-reboot { color: #f0b429; opacity: 1; }
+.sp-bits { display: flex; flex-wrap: wrap; gap: 2px 10px; max-width: 360px; }
+.sp-bits label { white-space: nowrap; font-size: 0.75rem; }
+.sp-raw { width: 58px !important; margin-left: 8px; text-align: right; opacity: 0.85; }
+.fl-hal-h { margin: 12px 0 4px; font-size: 0.85rem; }
+.fl-hal button { margin-top: 6px; }

@@ -237,10 +237,14 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   h.motors = {
     comp: "motors",
     parts: motors,
-    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: motors.map(m => b.conns.find(c => c.id === m.wires[0].to.split(".")[0])!.label).join(", ") } }, { k: "wr.s.mot.3" }, { k: "wr.s.mot.4" }],
-    notes: isShield ? [{ k: "wr.n.shield.motA" }] : [{ k: "wr.n.dlc.y12" }],
-    pro: motorPro,
-    settings: ["$3", "$100 / $101 / $102", "$110 / $111 / $112"]
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: motors.map(m => b.conns.find(c => c.id === m.wires[0].to.split(".")[0])!.label).join(", ") } }, { k: "wr.s.mot.3" }, { k: "wr.s.mot.4" },
+      // Motor A als zweiter Motor einer Achse (X, Y oder Z)
+      ...(isShield ? [1, 2, 3, 4].map(i => ({ k: "wr.s.motA.sh." + i }))
+        : isMax ? [1, 2, 3, 4].map(i => ({ k: "wr.s.motA.max." + i })) : [])],
+    notes: isShield ? [{ k: "wr.n.shield.motA" }, { k: "wr.n.shield.motA2" }]
+      : isMax ? [{ k: "wr.n.dlc.y12" }, { k: "wr.n.max.grblhal" }] : [{ k: "wr.n.dlc.y12" }],
+    pro: isShield ? [...motorPro, { k: "wr.p.shield.square" }] : motorPro,
+    settings: isMax ? ["$3", "$100 / $101 / $102", "$110 / $111 / $112", "$8 (grblHAL)"] : ["$3", "$100 / $101 / $102", "$110 / $111 / $112"]
   };
 
   // ---- Endschalter ----

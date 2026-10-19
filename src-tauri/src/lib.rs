@@ -19,6 +19,7 @@
 
 mod elfimg;
 mod flash;
+mod fwzip;
 mod grbl;
 mod k40;
 mod machine;
@@ -562,7 +563,7 @@ static FLASH_CANCEL: AtomicBool = AtomicBool::new(false);
 /// Trennt vorher die Maschinen-Verbindung (der Port muss frei sein).
 #[tauri::command]
 async fn flash_firmware(app: AppHandle, port: String, path: String, kind: String, offset: u32, baud: u32, usb_jtag: bool, flash_size: u32) -> Result<String, String> {
-    close_current();
+    close_port(&port);
     FLASH_CANCEL.store(false, Ordering::SeqCst);
     // "bundled:grbl" = mitgelieferte GRBL-Datei
     let data = if path == "bundled:grbl" { GRBL_HEX.as_bytes().to_vec() } else { std::fs::read(&path).map_err(|e| e.to_string())? };
@@ -588,6 +589,62 @@ async fn flash_firmware(app: AppHandle, port: String, path: String, kind: String
             let opt = flash::EspOptions { offset, baud, usb_jtag, flash_size };
             flash::flash_esp(&mut p, &data, &opt, &prog, &FLASH_CANCEL)
         }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Verbindung(en) auf genau diesem Port trennen (Flashen braucht den Port; andere Maschinen bleiben verbunden)
+fn close_port(port: &str) {
+    let ids: Vec<String> = MACHINES.lock().map(|g| g.iter().filter(|s| s.target == port).map(|s| s.id.clone()).collect()).unwrap_or_default();
+    for id in ids { close_id(&id); }
+}
+
+/// Firmware-ZIP (grblHAL Web Builder) prüfen: Teile mit Adressen, Chip, nötige Flash-Größe, Version,
+/// und ob der erwartete Board-Name (z. B. "MKS DLC32 MAX") in der Firmware steht
+#[derive(Serialize)]
+struct ZipPartInfo { name: String, role: String, offset: u32, size: usize }
+#[derive(Serialize)]
+struct ZipInfo { parts: Vec<ZipPartInfo>, chip_id: Option<u16>, chip: String, needs_flash: u32, version: String, board_ok: Option<bool> }
+
+#[tauri::command]
+async fn fw_zip_inspect(path: String, expect: Option<String>) -> Result<ZipInfo, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+        let fw = fwzip::firmware_from_zip(&bytes)?;
+        let app = fw.parts.iter().find(|p| p.role == "app").map(|p| p.data.as_slice()).unwrap_or(&[]);
+        Ok(ZipInfo {
+            parts: fw.parts.iter().map(|p| ZipPartInfo { name: p.name.clone(), role: p.role.into(), offset: p.offset, size: p.data.len() }).collect(),
+            chip_id: fw.chip_id,
+            chip: fw.chip_id.map(|c| flash::chip_name_from_image_id(c).to_string()).unwrap_or_else(|| "?".into()),
+            needs_flash: fw.needs_flash,
+            version: fwzip::find_version(app),
+            board_ok: expect.filter(|e| !e.is_empty()).map(|e| fwzip::contains_text(app, &e)),
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Alle Teile einer Firmware-ZIP in einer Sitzung flashen
+#[tauri::command]
+async fn flash_zip(app: AppHandle, port: String, path: String, baud: u32, usb_jtag: bool, flash_size: u32) -> Result<String, String> {
+    close_port(&port);
+    FLASH_CANCEL.store(false, Ordering::SeqCst);
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let fw = fwzip::firmware_from_zip(&bytes)?;
+    if fw.needs_flash > flash_size { return Err(format!("too large: needs {} MB flash", fw.needs_flash >> 20)); }
+    let app2 = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        std::thread::sleep(std::time::Duration::from_millis(400));
+        let mut p = serial::open_flash_port(&port)?;
+        let prog = move |name: &str, json: String| {
+            let value: serde_json::Value = serde_json::from_str(&json).unwrap_or(serde_json::Value::Null);
+            let _ = app2.emit(name, value);
+        };
+        let parts: Vec<(u32, &[u8])> = fw.parts.iter().map(|p| (p.offset, p.data.as_slice())).collect();
+        let opt = flash::EspOptions { offset: 0, baud, usb_jtag, flash_size };
+        flash::flash_esp_parts(&mut p, &parts, &opt, &prog, &FLASH_CANCEL)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -629,6 +686,8 @@ pub fn run() {
             bundled_firmware,
             elf_inspect,
             flash_cancel,
+            fw_zip_inspect,
+            flash_zip,
             app_info,
             settings_store_read,
             settings_store_write,

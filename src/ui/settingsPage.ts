@@ -13,9 +13,10 @@
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeFile, readTextFile } from "@tauri-apps/plugin-fs";
 import { t, T, tip } from "../i18n/i18n";
-import { machine, MACHINE_EVENT, sendAndWait, send, errorText, canCommand, fmtBuildDate } from "../machine";
+import { machine, MACHINE_EVENT, sendAndWait, send, errorText, canCommand, fmtBuildDate, activeMachineId } from "../machine";
+import { hal, resetHal, flushHal, swapHal, HalSetting } from "../grblhalInfo";
 
-type Kind = "int" | "float" | "bool" | "mask" | "enum" | "text";
+type Kind = "int" | "float" | "bool" | "mask" | "enum" | "text" | "bits" | "radio" | "password";
 interface Def { n: number; kind: Kind; unit?: string; group: string; opts?: number[] }
 
 const DEFS: Def[] = [
@@ -79,6 +80,44 @@ function esc(s: string): string {
 }
 
 const known = new Set<string>([...DEFS.map(d => "$" + d.n), ...AXIS_BASE.flatMap(b => AXES.map((_, i) => "$" + (b + i)))]);
+const mksKeys = new Set<string>(DEFS.filter(d => d.group === "mks").map(d => "$" + d.n));
+
+// ---- grblHAL: Art, Name und Beschreibung kommen vom Board ($ES / $ESG, siehe grblhalInfo.ts) ----
+const isHal = () => machine.firmware === "grblHAL";
+/** Bei grblHAL bedeuten $40–$54 etwas anderes als bei der MKS-Firmware */
+const isKnown = (k: string) => known.has(k) && !(isHal() && mksKeys.has(k));
+
+function halKind(s: HalSetting): Kind {
+  switch (s.type) {
+    case 0: return "bool";
+    case 1: case 2: return "bits";
+    case 3: return "radio";
+    case 4: return "mask";
+    case 6: return "float";
+    case 7: case 9: return "text";
+    case 8: return "password";
+    default: return "int";
+  }
+}
+/** Eingabefeld-Art: bei grblHAL so, wie das Board es meldet (z. B. ist $4 dort eine Achsen-Maske) */
+function kindFor(n: number, fallback: Kind): Kind {
+  const s = isHal() ? hal.settings.get(n) : undefined;
+  return s ? halKind(s) : fallback;
+}
+/** WLAN-Passwörter nie offen zeigen: MKS $52/$54, grblHAL $75/$77 und alles, was grblHAL als Passwort meldet */
+function isSecret(key: string): boolean {
+  if (!isHal()) return key === "$52" || key === "$54";
+  return key === "$75" || key === "$77" || hal.settings.get(parseInt(key.slice(1), 10))?.type === 8;
+}
+
+/** grblHAL-Beschreibungen schon versucht zu laden (je Maschine, damit es nicht in Schleife fragt) */
+const halTried = new Set<string>();
+
+/** Eigene Übersetzung vorhanden? Sonst null */
+function own(key: string, p?: Record<string, string | number>): string | null {
+  const v = t(key, p);
+  return v === key ? null : v;
+}
 
 function cur(key: string): string {
   return edits.has(key) ? edits.get(key)! : (machine.settings.get(key) ?? "");
@@ -94,18 +133,41 @@ function axisCount(): number {
 // Darstellung
 // ---------------------------------------------------------------------
 
-function inputFor(key: string, kind: Kind, def?: Def): string {
+/** Gesamtwert eines Bitfelds/einer Maske als Zahl (zum Ansehen und direkt Eintippen) */
+function rawField(key: string, v: string): string {
+  return `<input type="text" inputmode="numeric" class="sp-input sp-raw" data-key="${key}" data-kind="int" value="${esc(v)}" ${tip("sp.rawTip")}>`;
+}
+
+function inputFor(key: string, kind: Kind, def?: Def, labels: string[] = []): string {
   const v = cur(key);
   const changed = edits.has(key) ? " sp-changed" : "";
   const has = machine.settings.has(key) || edits.has(key);
   if (!has) return `<span class="sp-na">–</span>`;
+  if (kind === "bits") {
+    // Bitfeld (grblHAL): ein Haken je Bit, Texte vom Board
+    const m = parseInt(v, 10) || 0;
+    const names = labels.length ? labels : ["0", "1", "2", "3", "4", "5", "6", "7"];
+    return `<span class="sp-mask sp-bits${changed}">${names.map((l, i) => l === "N/A" ? "" :
+      `<label><input type="checkbox" data-key="${key}" data-kind="mask" data-bit="${i}" ${m & (1 << i) ? "checked" : ""}>${esc(l)}</label>`).join("")}${rawField(key, v)}</span>`;
+  }
+  if (kind === "radio") {
+    const n = parseInt(v, 10);
+    const names = labels.length ? labels : [v];
+    return `<select class="sp-input sp-select${changed}" data-key="${key}" data-kind="enum">
+      ${names.map((l, i) => l === "N/A" ? "" : `<option value="${i}" ${i === n ? "selected" : ""}>${i} – ${esc(l)}</option>`).join("")}
+      ${n >= 0 && n < names.length ? "" : `<option value="${esc(v)}" selected>${esc(v)}</option>`}
+    </select>`;
+  }
+  if (kind === "password") {
+    return `<input type="password" class="sp-input sp-text${changed}" data-key="${key}" data-kind="text" value="${esc(v)}" spellcheck="false" autocomplete="off">`;
+  }
   if (kind === "bool") {
-    return `<label class="sp-bool${changed}"><input type="checkbox" data-key="${key}" data-kind="bool" ${v.trim() === "1" ? "checked" : ""}> ${t(v.trim() === "1" ? "sp.on" : "sp.off")}</label>`;
+    return `<label class="sp-bool${changed}"><input type="checkbox" data-key="${key}" data-kind="bool" ${v.trim() === "1" ? "checked" : ""}> ${t(v.trim() === "1" ? "set.on" : "set.off")}</label>`;
   }
   if (kind === "mask") {
     const m = parseInt(v, 10) || 0;
     return `<span class="sp-mask${changed}">${AXES.slice(0, Math.max(3, axisCount())).map((a, i) =>
-      `<label><input type="checkbox" data-key="${key}" data-kind="mask" data-bit="${i}" ${m & (1 << i) ? "checked" : ""}>${a}</label>`).join("")}</span>`;
+      `<label><input type="checkbox" data-key="${key}" data-kind="mask" data-bit="${i}" ${m & (1 << i) ? "checked" : ""}>${a}</label>`).join("")}${rawField(key, v)}</span>`;
   }
   if (kind === "enum" && def?.opts) {
     const n = parseInt(v, 10);
@@ -115,8 +177,8 @@ function inputFor(key: string, kind: Kind, def?: Def): string {
     </select>`;
   }
   if (kind === "text") {
-    // WLAN-Passwörter ($52/$54 bei MKS) nicht offen anzeigen
-    const secret = key === "$52" || key === "$54";
+    // WLAN-Passwörter nicht offen anzeigen
+    const secret = isSecret(key);
     return `<input type="${secret ? "password" : "text"}" class="sp-input sp-text${changed}" data-key="${key}" data-kind="text" value="${esc(v)}" spellcheck="false" autocomplete="off">`;
   }
   return `<input type="text" inputmode="decimal" class="sp-input${changed}" data-key="${key}" data-kind="${kind}" value="${esc(v)}">`;
@@ -158,6 +220,15 @@ function render() {
   }
   const connected = machine.connected;
   const haveData = machine.settings.size > 0;
+  // grblHAL ohne Beschreibungen (z. B. nach dem Umschalten von einer anderen Maschine): einmal selbst nachladen
+  if (isHal() && connected && haveData && !hal.loaded && !busy && !machine.job.active && !halTried.has(activeMachineId())) {
+    halTried.add(activeMachineId());
+    setTimeout(async () => {
+      if (busy || !machine.connected) return;
+      busy = true; render();
+      try { await loadHalDetails(); } finally { busy = false; render(); }
+    }, 50);
+  }
   const fluid = machine.firmware === "FluidNC";
   const axes = axisCount();
 
@@ -168,7 +239,7 @@ function render() {
     </table>
     <div class="sp-axis-help">${AXIS_BASE.map(b => `<p><b>${t("sp.axis." + b)}</b> ($${b}…): ${t("sp.axisHelp." + b)}</p>`).join("")}</div>`;
 
-  const groupHtml = (g: string) => (g === "mks" && !DEFS.some(d => d.group === "mks" && machine.settings.has("$" + d.n))) ? "" : `
+  const groupHtml = (g: string) => (g === "mks" && (isHal() || !DEFS.some(d => d.group === "mks" && machine.settings.has("$" + d.n)))) ? "" : `
     <section class="sp-card">
       <h3>${T("sp.group." + g)}</h3>
       ${DEFS.filter(d => d.group === g).map(d => {
@@ -179,17 +250,17 @@ function render() {
             <div class="sp-name">${t(`set.${d.n}.n`)}</div>
             <div class="sp-desc">${t(`set.${d.n}.d`)}</div>
           </div>
-          <div class="sp-val">${inputFor(key, d.kind, d)}${d.unit ? `<span class="sp-unit">${d.unit}</span>` : ""}</div>
+          <div class="sp-val">${inputFor(key, kindFor(d.n, d.kind), d, hal.settings.get(d.n)?.labels)}${d.unit ? `<span class="sp-unit">${d.unit}</span>` : ""}</div>
         </div>`;
       }).join("")}
     </section>`;
 
-  const others = [...machine.settings.keys()].filter(k => !known.has(k)).sort((a, b) => parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10));
-  const otherHtml = others.length ? `
+  const others = [...machine.settings.keys()].filter(k => !isKnown(k)).sort((a, b) => parseInt(a.slice(1), 10) - parseInt(b.slice(1), 10));
+  const otherHtml = isHal() && hal.loaded ? halSectionsHtml(others) : others.length ? `
     <section class="sp-card">
       <h3>${T("sp.group.other")} <small>(${others.length})</small></h3>
       <p class="sp-desc">${t("sp.otherDesc", { fw: esc(machine.firmware || "?") })}</p>
-      <div class="sp-other">${others.map(k => `<label class="sp-other-item${edits.has(k) ? " sp-row-changed" : ""}"><span class="sp-key">${k}</span>${inputFor(k, Number.isFinite(parseFloat(machine.settings.get(k) || "")) ? "float" : "text")}</label>`).join("")}</div>
+      <div class="sp-other">${others.map(k => `<label class="sp-other-item${edits.has(k) ? " sp-row-changed" : ""}"><span class="sp-key">${k}</span>${inputFor(k, isSecret(k) ? "password" : Number.isFinite(parseFloat(machine.settings.get(k) || "")) ? "float" : "text")}</label>`).join("")}</div>
     </section>` : "";
 
   const ax = ["X", "Y", "Z"].slice(0, Math.max(3, axes));
@@ -213,6 +284,7 @@ function render() {
       : t("sp.statusOffline")}</div>
     ${boardInfoHtml()}
     ${fluid ? `<div class="sp-warn">${t("sp.fluidnc")}</div>` : ""}
+    ${isHal() && haveData ? `<div class="sp-hal-note">${t(hal.loaded ? "sp.hal.note" : "sp.hal.notLoaded")}</div>` : ""}
     ${!haveData ? `<div class="sp-empty">${t(connected ? "sp.emptyConnected" : "sp.emptyOffline")}</div>` : `
     <section class="sp-card">
       <h3>${T("sp.group.axes")}</h3>
@@ -233,6 +305,63 @@ function render() {
     ${GROUPS.map(groupHtml).join("")}
     ${otherHtml}`}`;
   bind();
+}
+
+/**
+ * grblHAL: alle übrigen Einstellungen nach den Gruppen des Boards (Spindel, Netzwerk, Werkzeugwechsel …).
+ * Name/Erklärung: eigene Übersetzung (hal.<n>.n/.d), sonst der englische Text vom Board.
+ */
+function halSectionsHtml(keys: string[]): string {
+  if (!keys.length) return "";
+  const byGroup = new Map<number, string[]>();
+  for (const k of keys) {
+    const g = hal.settings.get(parseInt(k.slice(1), 10))?.group ?? -1;
+    if (!byGroup.has(g)) byGroup.set(g, []);
+    byGroup.get(g)!.push(k);
+  }
+  const groups = [...byGroup.keys()].sort((a, b) => a - b);
+  return groups.map(g => {
+    const title = g >= 0 && hal.groups.get(g) ? esc(hal.groups.get(g)!) : T("sp.group.other");
+    return `
+    <section class="sp-card">
+      <h3>${title} <small>(${byGroup.get(g)!.length})</small></h3>
+      ${byGroup.get(g)!.map(key => {
+        const n = parseInt(key.slice(1), 10);
+        const s = hal.settings.get(n);
+        // Referenzfahrt-Schritte $44–$49 und WLAN $74–$77 teilen sich Texte
+        const cycle = n >= 44 && n <= 49 ? { n: n - 43 } : undefined;
+        // Name im Netz: $300 (Ethernet), $310 (eigenes WLAN), $320 (Heimnetz, ESP32) – dieselbe Erklärung
+        const tn = n === 310 || n === 320 ? 300 : n;
+        const name = own(cycle ? "hal.homeCycle.n" : `hal.${tn}.n`, cycle) ?? esc(s?.name || key);
+        const ownDesc = own(cycle ? "hal.homeCycle.d" : `hal.${tn}.d`);
+        const desc = ownDesc ?? (s?.desc ? `<span class="sp-en">${esc(s.desc).replace(/\n/g, "<br>")}</span>` : "");
+        const range = s && (s.min || s.max) ? `<small class="sp-range">${esc(t("sp.hal.range", { min: s.min || "–", max: s.max || "–" }))}</small>` : "";
+        const reboot = s?.reboot ? `<small class="sp-reboot">↻ ${esc(t("sp.hal.reboot"))}</small>` : "";
+        const kind: Kind = s ? halKind(s) : (Number.isFinite(parseFloat(machine.settings.get(key) || "")) ? "float" : "text");
+        return `<div class="sp-row${edits.has(key) ? " sp-row-changed" : ""}">
+          <div class="sp-key">${key}</div>
+          <div class="sp-main">
+            <div class="sp-name">${name}</div>
+            ${desc ? `<div class="sp-desc">${desc}</div>` : ""}
+            ${range}${reboot}
+          </div>
+          <div class="sp-val">${inputFor(key, kind, undefined, s?.labels)}${s?.unit ? `<span class="sp-unit">${esc(s.unit)}</span>` : ""}</div>
+        </div>`;
+      }).join("")}
+    </section>`;
+  }).join("");
+}
+
+/** grblHAL nach seinen Einstellungen fragen (Gruppen, Arten, Beschreibungen) */
+async function loadHalDetails() {
+  resetHal();
+  for (const cmd of ["$EG", "$ES", "$ESG"]) {
+    const r = await sendAndWait(cmd, 10000, true);
+    if (!r.ok && cmd === "$ES" && hal.settings.size === 0) break; // ältere grblHAL-Version ohne $ES
+  }
+  flushHal();
+  hal.loaded = hal.settings.size > 0;
+  log(hal.loaded ? t("sp.hal.loaded", { n: hal.settings.size }) : t("sp.hal.failed"));
 }
 
 /** Karte "Board-Info": Name, Firmware-Version, Datum, GRBL-Optionen, Puffer, ESP-Firmware */
@@ -352,9 +481,11 @@ async function readAll() {
   if (!machine.connected) return;
   busy = true; render();
   const res = await sendAndWait("$$", 8000);
-  busy = false;
   if (res.ok || machine.settings.size > 0) log(t("sp.readOk", { n: machine.settings.size }));
   else log(t("sp.readFailed"));
+  // grblHAL: einmal je Verbindung die Beschreibungen holen
+  if (isHal() && !hal.loaded && machine.settings.size > 0) await loadHalDetails();
+  busy = false;
   render();
 }
 
@@ -509,12 +640,19 @@ export function initSettingsPage(logFn: (s: string) => void) {
   let pending = 0;
   let autoReadAt = 0; // Board meldet sich evtl. zweimal (Status + Startmeldung) -> nur einmal lesen
   window.addEventListener(MACHINE_EVENT, (e: Event) => {
-    const { type } = (e as CustomEvent).detail || {};
+    const { type, data } = (e as CustomEvent).detail || {};
     if (type === "setting") {
       // viele Zeilen hintereinander -> nur einmal neu zeichnen
       clearTimeout(pending);
       pending = window.setTimeout(render, 120);
+    } else if (type === "switched") {
+      // andere Maschine ausgewählt: Änderungen und grblHAL-Infos gehörten zur alten
+      edits.clear();
+      swapHal(data?.from, data?.id || activeMachineId());
+      render();
     } else if (type === "welcome") {
+      resetHal();
+      halTried.delete(activeMachineId()); // neue Verbindung: Beschreibungen neu holen
       // Beim Verbinden gleich lesen (kurz warten, bis $I durch ist)
       if (machine.protocol === "grbl" && Date.now() - autoReadAt > 5000) {
         autoReadAt = Date.now();
@@ -525,7 +663,7 @@ export function initSettingsPage(logFn: (s: string) => void) {
       clearTimeout(pending);
       pending = window.setTimeout(render, 150);
     } else if (type === "connected" || type === "disconnected") {
-      if (type === "disconnected") edits.clear();
+      if (type === "disconnected") { edits.clear(); resetHal(); }
       render();
     }
   });

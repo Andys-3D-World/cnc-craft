@@ -485,6 +485,7 @@ dependencies = [
 name = "cnc-craft"
 version = "0.2.7"
 dependencies = [
+ "flate2",
  "rusb",
  "serde",
  "serde_json",

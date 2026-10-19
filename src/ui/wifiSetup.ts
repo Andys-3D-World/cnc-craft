@@ -61,7 +61,8 @@ export function isMksWifi(): boolean {
  * Das Board nach WLANs in der Nähe suchen lassen ([ESP410]).
  * Der erste Aufruf startet oft erst die Suche und liefert eine leere Liste – dann kurz warten und nochmal.
  */
-export async function scanBoardNetworks(cancelled: () => boolean = () => false): Promise<ApInfo[]> {
+export async function scanBoardNetworks(cancelled: () => boolean = () => false, fw: WifiFw = wifiFirmware()): Promise<ApInfo[]> {
+  if (fw === "grblhal") return scanHalNetworks(cancelled);
   for (let attempt = 0; attempt < 4; attempt++) {
     if (cancelled() || !machine.connected) return [];
     const lines: string[] = [];
@@ -83,6 +84,39 @@ export async function scanBoardNetworks(cancelled: () => boolean = () => false):
     await new Promise(r => setTimeout(r, 2500));
   }
   return [];
+}
+
+/**
+ * grblHAL: [ESP410] versteht nur die Weboberfläche (Plugin WebUI), über USB/Telnet kommt „Fehler 1“.
+ * Darum die Liste per HTTP holen: http://IP/command?plain=[ESP410] – Antwort ist JSON wie bei ESP3D.
+ * Die IP: von der WLAN-Verbindung, sonst aus „$I“ ([IP:…] o. Ä.).
+ */
+async function scanHalNetworks(cancelled: () => boolean): Promise<ApInfo[]> {
+  const host = tcpHost() || halIp(await ask("$I"));
+  if (!host) throw new Error("hal-no-ip");
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (cancelled()) return [];
+    let body: string;
+    try { body = await invoke<string>("esp_web_command", { host, command: "[ESP410]" }); }
+    catch (e) { throw new Error(String(e).includes("auth") ? "hal-auth" : "hal-web"); }
+    const aps = parseApList([body]);
+    if (aps.length) return aps;
+    // erster Aufruf startet oft erst die Suche
+    await new Promise(r => setTimeout(r, 2500));
+  }
+  return [];
+}
+
+/** IP aus der $I-Antwort von grblHAL (Heimnetz-IP bevorzugt, 0.0.0.0 = noch keine) */
+export function halIp(lines: string[]): string {
+  let ap = "";
+  for (const l of lines) {
+    const m = l.match(/\b(AP\s*)?IP\s*[:=]\s*(\d{1,3}(?:\.\d{1,3}){3})/i);
+    if (!m || m[2] === "0.0.0.0") continue;
+    if (m[1] || m[2] === BOARD_AP_IP) ap = ap || m[2];
+    else return m[2];
+  }
+  return ap;
 }
 
 /** Adresse, unter der das Board sein eigenes WLAN aufmacht (ESP32-Boards, solange sie kein Heimnetz kennen) */
@@ -305,7 +339,7 @@ export function openWifiSetup(log: (s: string) => void) {
     apBox.style.display = "";
     apBox.innerHTML = `<div class="net-find-busy"><span class="net-spin"></span>${esc(t("wifi.scanning"))}</div>`;
     try {
-      const aps = await scanBoardNetworks(() => !document.body.contains(ov));
+      const aps = await scanBoardNetworks(() => !document.body.contains(ov), fw);
       apBox.innerHTML = aps.length
         ? aps.map(a => `<button type="button" class="wifi-ap" data-ssid="${esc(a.ssid)}">
             <span class="wifi-ap-bars" title="${a.signal} %">${signalBars(a.signal)}</span>
@@ -319,8 +353,10 @@ export function openWifiSetup(log: (s: string) => void) {
         refresh();
         q("wifi-pw").focus();
       }));
-    } catch {
-      apBox.innerHTML = `<div class="wifi-note">${esc(t("wifi.scanFailed"))}</div>`;
+    } catch (e) {
+      const why = String((e as Error)?.message || "");
+      const key = why === "hal-no-ip" ? "wifi.scanHalNoIp" : why === "hal-auth" ? "wifi.scanHalAuth" : why === "hal-web" ? "wifi.scanHalWeb" : "wifi.scanFailed";
+      apBox.innerHTML = `<div class="wifi-note">${esc(t(key))}</div>`;
     } finally {
       scanBtn.disabled = false;
     }
@@ -335,10 +371,12 @@ export function openWifiSetup(log: (s: string) => void) {
     // Weboberfläche zunächst als möglich annehmen, damit der Weg dorthin angezeigt wird
     const slug = hostSlug(q("wifi-name").value);
     const newHost = slug && slug !== oldHost && slug !== hostSlug(oldHost) ? slug : "";
-    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, mks, newHost);
+    // grblHAL: Name im Heimnetz steht bei ESP32-Boards in $320, bei Ethernet-Boards in $300
+    const halHostKey = machine.settings.has("$320") ? "$320" : machine.settings.has("$300") ? "$300" : "$320";
+    plan = planWifi(fw, mode(), ssid, pw, true, machine.settings.get("$39") ?? null, mks, newHost, machine.settings.get("$70") ?? null, halHostKey);
     // nur umbenennen (ohne WLAN-Daten): nur den Namen schicken
     const nameOnly = !ssid && !!newHost && fw !== "none";
-    if (nameOnly) plan = { route: "serial", lines: [hostLine(fw, newHost)], secret: [], restart: fw === "fluidnc" ? "$Bye" : fw === "esp32" ? "[ESP444]RESTART" : "", notes: ["wifi.note.nameOnly"], error: "" };
+    if (nameOnly) plan = { route: "serial", lines: [hostLine(fw, newHost, halHostKey)], secret: [], restart: fw === "fluidnc" ? "$Bye" : fw === "esp32" ? "[ESP444]RESTART" : fw === "grblhal" ? "$REBOOT" : "", notes: ["wifi.note.nameOnly"], error: "" };
     const nh = q("wifi-name-hint");
     nh.className = "wifi-note";
     nh.textContent = slug

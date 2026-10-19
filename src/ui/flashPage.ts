@@ -14,6 +14,10 @@
  *     Beim Flashen prüft der Rust-Teil zusätzlich den ECHTEN Chip am Board und bricht bei
  *     falschem Chip ab (ESP-Chipkennung bzw. AVR-Signatur).
  *  5. Danach: Einstellungen auf Wunsch zurückspielen
+ *     (nach einem Firmware-Wechsel, z. B. MKS -> grblHAL, nur die Werte, die bei beiden dasselbe bedeuten)
+ *
+ *  grblHAL: Der Web Builder liefert eine .zip (Bootloader, Partitionen, Firmware). Sie wird im Rust-Teil
+ *  geprüft (fwzip.rs: Adressen, Chip, Flash-Größe, Board-Name in der Firmware) und in EINEM Durchgang geflasht.
  *
  * Kein esptool, kein avrdude, keine Arduino-IDE nötig.
  */
@@ -28,7 +32,7 @@ import { machine, MACHINE_EVENT, listPorts, connect, disconnect, sendAndWait, Po
 interface FileInfo {
   path: string;
   name: string;
-  kind: "esp" | "avr" | "elf";
+  kind: "esp" | "avr" | "elf" | "zip";
   size: number;
   chip: string;          // "ESP32-S3", "ESP32", … bzw. "ATmega328P (Arduino)"
   chipId: number | null; // ESP-Chipkennung aus dem Datei-Kopf (null = unbekannt)
@@ -37,6 +41,8 @@ interface FileInfo {
   flashSize: number;     // Bytes
   version: string;
   warnings: string[];
+  parts?: { name: string; role: string; offset: number; size: number }[]; // nur ZIP
+  boardOk?: boolean | null;  // ZIP: steht der Board-Name in der Firmware? (null = nicht prüfbar)
 }
 
 /** Boards, die man auswählen kann – nur dafür passende Dateien werden angenommen */
@@ -51,11 +57,19 @@ interface Board {
   maxHex?: number;       // AVR: größte erlaubte Programmgröße
   max?: boolean | null;  // MKS DLC32: true = MAX, false = normales DLC32
   links: string[];       // Schlüssel aus LINKS
+  fwExpect?: string;     // dieser Text steht in einer grblHAL-Firmware für genau dieses Board
+  /** Eigene grblHAL-Anleitung dieses Boards: Texte fl.hal.<halGuide>.howto / .after / .web.
+   *  Jedes Board bekommt seine eigene – ohne Eintrag wird keine Anleitung gezeigt. */
+  halGuide?: string;
+  /** Eigene Anleitung „Original-Firmware aufspielen“: Texte fl.orig.<origGuide>.howto / .after */
+  origGuide?: string;
 }
 
 const BOARDS: Board[] = [
-  { id: "mks-dlc32-max", name: "MKS DLC32 MAX (V1.0 / V1.2)", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, max: true, links: ["fl.link.mksMax"] },
-  { id: "mks-dlc32", name: "MKS DLC32 (V2.0 / V2.1)", kind: "esp", chipId: 0, chip: "ESP32", max: false, links: ["fl.link.mks", "fl.link.fluidnc"] },
+  { id: "mks-dlc32-max", name: "MKS DLC32 MAX (V1.0 / V1.2)", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, max: true, links: ["fl.link.mksMax", "fl.link.grblhal"],
+    fwExpect: "MKS DLC32 MAX", halGuide: "max", origGuide: "max" },
+  { id: "mks-dlc32", name: "MKS DLC32 (V2.0 / V2.1)", kind: "esp", chipId: 0, chip: "ESP32", max: false, links: ["fl.link.mks", "fl.link.fluidnc", "fl.link.grblhal"],
+    fwExpect: "MKS DLC32 2." },
   { id: "esp32", nameKey: "fl.board.esp32", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "esp32s3", nameKey: "fl.board.esp32s3", kind: "esp", chipId: 9, chip: "ESP32-S3", links: ["fl.link.grblhal"] },
   { id: "arduino-uno", nameKey: "fl.board.uno", kind: "avr", chip: "ATmega328P", maxHex: 32256, links: ["fl.link.grbl"] },
@@ -69,7 +83,9 @@ const LINKS: Record<string, string> = {
   "fl.link.mks": "https://github.com/makerbase-mks/MKS-DLC32/tree/main/MKS-DLC32-main",
   "fl.link.grbl": "https://github.com/gnea/grbl/releases",
   "fl.link.fluidnc": "https://github.com/bdring/FluidNC/releases",
-  "fl.link.grblhal": "https://webbuilder.grblhal.org/"
+  "fl.link.grblhal": "https://webbuilder.grblhal.org/",
+  // Weboberfläche für grblHAL (ESP3D-WebUI v3) – muss nach jedem Flashen neu aufs Board
+  "fl.link.webuiFile": "https://github.com/luc-github/ESP3D-WEBUI/tree/3.0/dist/CNC/GRBLHal"
 };
 
 let board: Board | null = null;
@@ -165,6 +181,16 @@ async function inspectElf(path: string, name: string): Promise<FileInfo> {
   };
 }
 
+/** grblHAL-ZIP prüfen (der Rust-Teil liest sie: Teile, Adressen, Chip, Flash-Größe, Board-Name) */
+async function inspectZip(path: string, name: string): Promise<FileInfo> {
+  const z = await invoke<any>("fw_zip_inspect", { path, expect: board?.fwExpect || null });
+  const parts = (z.parts || []) as FileInfo["parts"];
+  return {
+    path, name, kind: "zip", size: parts!.reduce((a, p) => a + p.size, 0), chip: z.chip, chipId: z.chip_id ?? null,
+    merged: true, offset: 0, flashSize: z.needs_flash, version: z.version || "", warnings: [], parts, boardOk: z.board_ok ?? null
+  };
+}
+
 /**
  * Passt die Datei zum gewählten Board?
  * blocks = Flashen gesperrt, warns = Hinweise (mit „auf eigene Gefahr“ bestätigen)
@@ -175,10 +201,16 @@ export function checkFile(b: Board | null, f: FileInfo | null): { blocks: string
   if (!f) return { blocks, warns };
   if (b.kind === "avr" && f.kind !== "avr") blocks.push(t("fl.chk.needHex", { board: boardName(b) }));
   if (b.kind === "esp" && f.kind === "avr") blocks.push(t("fl.chk.needBin", { board: boardName(b) }));
+  if (b.kind === "avr" && f.kind === "zip") blocks.push(t("fl.chk.needHex", { board: boardName(b) }));
   if (b.kind === "esp" && f.kind !== "avr") {
     if (f.chipId === null) warns.push(t("fl.chk.chipUnknown", { chip: b.chip }));
     else if (f.chipId !== b.chipId) blocks.push(t("fl.chk.wrongChip", { file: ESP_CHIPS[f.chipId] || f.chip, board: boardName(b), chip: b.chip }));
     if (b.flash && f.size + f.offset > b.flash) blocks.push(t("fl.chk.tooBig", { s: mb(b.flash) }));
+    if (f.kind === "zip") {
+      if (b.flash && f.flashSize > b.flash) blocks.push(t("fl.chk.zipFlash", { need: mb(f.flashSize), have: mb(b.flash) }));
+      // grblHAL-Firmware für ein anderes Board? (der Board-Name steht in der Firmware)
+      if (f.boardOk === false) (/grblhal/i.test(f.version) ? blocks : warns).push(t("fl.chk.zipBoard", { board: boardName(b) }));
+    }
     // MKS: Datei für das andere Modell (MAX ↔ normal)?
     if (b.max !== undefined && b.max !== null && /DLC32/i.test(`${f.name} ${f.version}`)) {
       const fileMax = /MAX/i.test(`${f.name} ${f.version}`);
@@ -261,7 +293,7 @@ function render() {
   const jtagPort = ports.find(p => p.name === sel)?.chip?.startsWith("ESP32-S3/C3");
   const chk = checkFile(board, file);
   const canFlash = !!board && !!file && !busy && chk.blocks.length === 0 && riskOk;
-  const accept = board ? (board.kind === "avr" ? ".hex" : ".bin / .elf") : "";
+  const accept = board ? (board.kind === "avr" ? ".hex" : ".bin / .elf / .zip") : "";
   const links = board ? board.links : Object.keys(LINKS);
   root.innerHTML = `
     <h2>⚡ ${T("fl.title")}</h2>
@@ -291,15 +323,32 @@ function render() {
       ${file ? `
       <div class="fl-info">
         <div><span>${t("fl.info.chip")}</span><b>${esc(file.chip)}</b></div>
-        <div><span>${t("fl.info.type")}</span><b>${file.kind === "avr" ? t("fl.type.hex") : file.kind === "elf" ? t("fl.type.elf") : file.merged ? t("fl.type.merged") : t("fl.type.app")}</b></div>
+        <div><span>${t("fl.info.type")}</span><b>${file.kind === "avr" ? t("fl.type.hex") : file.kind === "elf" ? t("fl.type.elf") : file.kind === "zip" ? t("fl.type.zip") : file.merged ? t("fl.type.merged") : t("fl.type.app")}</b></div>
         <div><span>${t("fl.info.size")}</span><b>${mb(file.size)}</b></div>
-        ${file.kind !== "avr" ? `<div><span>${t("fl.info.offset")}</span><b><input id="fl-offset" class="sp-input" value="${hex(file.offset)}" ${tip("fl.offsetTip")}></b></div>
+        ${file.kind === "zip" ? `<div><span>${t("fl.info.flash")}</span><b>${mb(file.flashSize)}</b></div>
+        <div class="fl-wide"><span>${t("fl.info.parts")}</span><b>${(file.parts || []).map(p => `${esc(p.name)} → ${hex(p.offset)}`).join(" · ")}</b></div>` : ""}
+        ${file.kind !== "avr" && file.kind !== "zip" ? `<div><span>${t("fl.info.offset")}</span><b><input id="fl-offset" class="sp-input" value="${hex(file.offset)}" ${tip("fl.offsetTip")}></b></div>
         <div><span>${t("fl.info.flash")}</span><b>${mb(file.flashSize)}</b></div>` : ""}
         ${file.version ? `<div class="fl-wide"><span>${t("fl.info.version")}</span><b>${esc(file.version)}</b></div>` : ""}
       </div>
       ${chk.blocks.map(w => `<div class="fl-block">⛔ ${esc(w)}</div>`).join("")}
       ${file.warnings.concat(chk.warns).map(w => `<div class="sp-warn">⚠ ${esc(w)}</div>`).join("")}
       ${file.kind === "esp" && file.merged ? `<div class="sp-warn">⚠ ${t("fl.warn.mergedResets")}</div>` : ""}` : ""}
+      ${board?.origGuide ? `<details class="fl-help fl-hal"><summary>🏭 ${t("fl.orig.title")}</summary>
+        <div>${t(`fl.orig.${board.origGuide}.howto`)}</div>
+        ${board.links[0] ? `<button class="btn-secondary btn-compact" data-url="${LINKS[board.links[0]]}">🌐 ${t("fl.orig.open")}</button>` : ""}
+        <h4 class="fl-hal-h">${t("fl.hal.afterTitle")}</h4>
+        <div>${t(`fl.orig.${board.origGuide}.after`)}</div>
+      </details>` : ""}
+      ${board?.halGuide ? `<details class="fl-help fl-hal"><summary>🧩 ${t("fl.hal.title")}</summary>
+        <div>${t(`fl.hal.${board.halGuide}.howto`)}</div>
+        <button class="btn-secondary btn-compact" data-url="${LINKS["fl.link.grblhal"]}">🌐 ${t("fl.hal.open")}</button>
+        <h4 class="fl-hal-h">${t("fl.hal.afterTitle")}</h4>
+        <div>${t(`fl.hal.${board.halGuide}.after`)}</div>
+        <h4 class="fl-hal-h">${t("fl.hal.webTitle")}</h4>
+        <div>${t(`fl.hal.${board.halGuide}.web`)}</div>
+        <button class="btn-secondary btn-compact" data-url="${LINKS["fl.link.webuiFile"]}">⬇ ${t("fl.hal.webuiFile")}</button>
+      </details>` : ""}
       <div class="fl-links">${t("fl.where")} ${links.map(k => `<a href="#" data-url="${LINKS[k]}">${t(k)}</a>`).join(" · ")}</div>
     </section>
 
@@ -394,12 +443,15 @@ export async function selectBundledGrbl(boardId?: "arduino-uno" | "arduino-nano"
 async function pickFile() {
   if (!board) { log(t("fl.chk.noBoard")); return; }
   try {
-    const ext = board.kind === "avr" ? ["hex"] : ["bin", "elf"];
+    const ext = board.kind === "avr" ? ["hex"] : ["bin", "elf", "zip"];
     const p = await open({ multiple: false, directory: false, title: t("fl.pick"), filters: [{ name: `Firmware (${ext.map(e => "." + e).join(", ")})`, extensions: ext }] });
     if (!p) return;
     const path = String(typeof p === "object" && p !== null ? (p as any).path : p);
     const name = path.split(/[\\/]/).pop() || path;
-    if (/\.elf$/i.test(name)) {
+    if (/\.zip$/i.test(name)) {
+      try { file = await inspectZip(path, name); }
+      catch (e) { file = null; log(t("fl.zipFailed", { e: String(e) })); render(); return; }
+    } else if (/\.elf$/i.test(name)) {
       try { file = await inspectElf(path, name); }
       catch (e) { file = null; log(t("fl.elfFailed", { e: String(e) })); render(); return; }
     } else {
@@ -450,15 +502,17 @@ async function startFlash() {
   if (machine.connected) await disconnect();
 
   try {
-    const res = await invoke<string>("flash_firmware", {
-      port, path: file.path, kind: file.kind, offset: file.offset, baud, usbJtag, flashSize: board.flash || file.flashSize
-    });
+    const res = file.kind === "zip"
+      ? await invoke<string>("flash_zip", { port, path: file.path, baud, usbJtag, flashSize: board.flash || file.flashSize })
+      : await invoke<string>("flash_firmware", {
+        port, path: file.path, kind: file.kind, offset: file.offset, baud, usbJtag, flashSize: board.flash || file.flashSize
+      });
     let info: any = {};
     try { info = JSON.parse(res); } catch { /* egal */ }
     pct = 100;
     stage = t("fl.stage.done");
     resultHtml = `<div class="fl-ok">✔ ${t("fl.success", { chip: info.chip || file.chip, kb: Math.round((info.bytes || file.size) / 1024), s: info.seconds ?? "–" })}</div>
-      <div class="tool-scope">${t("fl.afterHint")}</div>`;
+      <div class="tool-scope">${t(/grblhal/i.test(file.version) ? "fl.hal.after" : "fl.afterHint")}</div>`;
     log(t("fl.successLog", { file: file.name }));
   } catch (e) {
     const msg = String(e);
@@ -479,11 +533,20 @@ function errorHelp(msg: string): string {
   if (msg.includes("too large")) return t("fl.err.tooLarge", { m: msg });
   if (msg.startsWith("verify")) return t("fl.err.verify");
   if (msg.startsWith("elf:")) return t("fl.elfFailed", { e: msg });
+  if (msg.startsWith("zip:")) return t("fl.zipFailed", { e: msg });
   if (/busy|denied|Permission|in use|Access/i.test(msg)) return t("fl.err.portBusy", { m: msg });
   return t("fl.err.other", { m: msg });
 }
 
 /** Gesicherte Einstellungen zurück aufs Board (verbindet bei Bedarf selbst) */
+/** Firmware-Familie: grblHAL / FluidNC / GRBL (inkl. Grbl_ESP32, MKS) */
+function fwFamily(fw: string): string {
+  return /grblhal/i.test(fw) ? "hal" : /fluidnc/i.test(fw) ? "fluid" : "grbl";
+}
+/** $-Werte, die bei allen GRBL-Abkömmlingen dasselbe bedeuten (Achsen-Werte und Grundeinstellungen) */
+const COMMON_KEYS = new Set<string>([0, 1, 2, 3, 11, 12, 13, 20, 23, 24, 25, 26, 27, 30, 31,
+  100, 101, 102, 103, 110, 111, 112, 113, 120, 121, 122, 123, 130, 131, 132, 133].map(n => "$" + n));
+
 async function restoreSettings() {
   const b = loadBackup();
   if (!b || busy) return;
@@ -498,7 +561,12 @@ async function restoreSettings() {
       while (!machine.firmware && Date.now() - t0 < 10000) await new Promise(r => setTimeout(r, 200));
     }
     await sendAndWait("$$", 8000, true);
-    const keys = Object.keys(b.settings).filter(k => machine.settings.has(k) && machine.settings.get(k) !== b.settings[k]);
+    // Andere Firmware als beim Sichern (z. B. MKS -> grblHAL)? Dann bedeuten viele Nummern etwas anderes –
+    // nur die Werte zurückspielen, die bei GRBL, grblHAL, Grbl_ESP32/MKS gleich sind
+    const changedFw = fwFamily(b.firmware) !== fwFamily(`${machine.firmware} ${machine.version}`);
+    if (changedFw) log(t("fl.restoreCommonOnly", { from: b.firmware || "?", to: `${machine.firmware} ${machine.version}`.trim() }));
+    const keys = Object.keys(b.settings).filter(k => machine.settings.has(k) && machine.settings.get(k) !== b.settings[k]
+      && (!changedFw || COMMON_KEYS.has(k)));
     let ok = 0, fail = 0;
     for (let i = 0; i < keys.length; i++) {
       const r = await sendAndWait(`${keys[i]}=${b.settings[keys[i]]}`, 4000, true);
