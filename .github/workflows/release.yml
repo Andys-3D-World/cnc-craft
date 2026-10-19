@@ -60,7 +60,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           # latest.json ins Release legen (die App liest daraus Version, Dateien und Unterschriften)
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           tagName: v__VERSION__-beta
           releaseName: "CNC Craft v__VERSION__ Beta"
