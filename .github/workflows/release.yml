@@ -66,6 +66,7 @@ jobs:
           releaseName: "CNC Craft v__VERSION__ Beta"
           releaseBody: |
             Beta von CNC Craft – bitte testen und Fehler melden. Was neu ist: siehe CHANGELOG.md im Repository.
+            Schon Version 0.2.6 oder neuer installiert? Einfach in CNC Craft oben rechts ⓘ → „Jetzt aktualisieren“ – kein Download nötig.
             Kostenlos & Open Source (GPL-3.0). Windows: Free code signing provided by SignPath.io, certificate by SignPath Foundation.
             Code Signing Policy: https://github.com/Andys-3D-World/cnc-craft#code-signing-policy · Privacy: https://github.com/Andys-3D-World/cnc-craft/blob/main/PRIVACY.md
 

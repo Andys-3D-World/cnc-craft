@@ -1,6 +1,6 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.7 Beta
 
 **Neu**
 - **Mehrere Maschinen gleichzeitig:** im Reiter „Maschine“ mit „➕ Weitere Maschine“ eine zweite (dritte …)
