@@ -208,6 +208,23 @@ export function initConnection(appendToConsole: (text: string) => void) {
     syncIpField();
     showInfo();
   };
+  /** Mehrere Maschinen: Port-Feld zeigt den Anschluss der ausgewählten Maschine (WLAN: „Netzwerk“ + IP) */
+  const showActivePort = () => {
+    if (!machine.connected || !machine.port || machine.protocol === "k40") return;
+    const p = machine.port;
+    const has = (v: string) => [...portSelect.options].some(o => o.value === v);
+    const isNet = p.startsWith("tcp://") || (machine.protocol === "ruida" && !p.startsWith("/dev/") && !/^COM\d/i.test(p));
+    if (isNet) {
+      if (!has(NET)) portSelect.insertAdjacentHTML("afterbegin", `<option value="${NET}">🌐 ${escHtml(t("m.ruidaNet"))}</option>`);
+      portSelect.value = NET;
+      syncIpField();
+      if (ipInput) { ipInput.value = p.replace(/^tcp:\/\//, ""); ipInput.style.display = ""; }
+    } else {
+      if (!has(p)) portSelect.insertAdjacentHTML("beforeend", `<option value="${escHtml(p)}">${escHtml(p)}</option>`);
+      portSelect.value = p;
+      syncIpField();
+    }
+  };
   window.addEventListener("cnc-protocol-changed", () => { if (!machine.connected) scan(); });
   $("scan-btn")?.addEventListener("click", scan);
   portSelect?.addEventListener("focus", () => { if (!machine.connected) scan(); });
@@ -483,6 +500,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
     const type = (e as CustomEvent).detail?.type;
     if (type === "slots" || type === "switched") renderSlots();
     if (type === "switched") {
+      showActivePort();
       setConnectedUi(machine.connected);
       if (machine.connected) setStateBadge(machine.status.state || "Idle");
     }
