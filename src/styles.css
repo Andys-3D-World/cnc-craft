@@ -1358,3 +1358,5 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .m-slot-dot.m-state-run { background: #4aa3ff; }
 .m-slot-dot.m-state-hold { background: #f0b429; }
 .m-slot-dot.m-state-alarm { background: #ff5a5a; }
+.net-find-item.busy { opacity: 0.6; cursor: default; }
+.net-find-item.busy .net-find-use { color: #34d17b; }

@@ -1430,6 +1430,8 @@
   "net.foundIn": "Sieć {net}: znaleziono {n}",
   "net.found": "Znaleziono {n}",
   "net.use": "Użyj",
+  "net.connectedAs": "połączona jako maszyna {n}",
+  "net.connectedShort": "już połączona",
   "net.grblUnknown": "odpowiada jak GRBL",
   "net.openPort": "port otwarty – nieznane urządzenie",
   "net.none": "Nic nie znaleziono. Czy maszyna jest włączona i w tej samej sieci Wi-Fi co komputer? Na Macu przy pierwszym razie zezwól CNC Craft na „Sieć lokalna” (Ustawienia → Prywatność i ochrona). Możesz też wpisać IP odczytane z wyświetlacza/routera.",

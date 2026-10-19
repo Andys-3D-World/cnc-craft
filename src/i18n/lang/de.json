@@ -1605,6 +1605,8 @@
   "net.foundIn": "Im Netz {net}: {n} gefunden",
   "net.found": "{n} gefunden",
   "net.use": "Nehmen",
+  "net.connectedAs": "verbunden als Maschine {n}",
+  "net.connectedShort": "schon verbunden",
   "net.grblUnknown": "antwortet wie GRBL",
   "net.openPort": "Port offen – Gerät unbekannt",
   "net.none": "Nichts gefunden. Ist die Maschine eingeschaltet und im selben WLAN wie der Rechner? Am Mac beim ersten Mal „Lokales Netzwerk“ für CNC Craft erlauben (Systemeinstellungen → Datenschutz & Sicherheit). Du kannst die IP-Adresse auch vom Display/Router abschreiben und eintragen.",

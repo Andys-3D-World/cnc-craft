@@ -368,10 +368,18 @@ pub fn hostname_of(text: &str) -> String {
 }
 
 /// Ganze Suche. `hints` = zuletzt benutzte/gefundene Adressen aus der Oberfläche.
-pub fn scan_network(hints: &[String]) -> (Option<Ipv4Addr>, Vec<Found>) {
+/// `busy` = Maschinen, die gerade verbunden sind: dort wird NICHT angeklopft – ESP32-Boards (MKS DLC32,
+/// Grbl_ESP32) erlauben nur eine Verbindung und würden die bestehende sonst trennen. Sie kommen als
+/// kind = "connected" in die Liste.
+pub fn scan_network(hints: &[String], busy: &[SocketAddr]) -> (Option<Ipv4Addr>, Vec<Found>) {
     let own = local_ipv4();
     let mut all: Vec<Found> = Vec::new();
     let mut done: HashSet<SocketAddr> = HashSet::new();
+    let busy_ips: HashSet<IpAddr> = busy.iter().map(|a| a.ip()).collect();
+    for ip in &busy_ips {
+        for p in PORTS { done.insert(SocketAddr::new(*ip, p)); }
+    }
+    for a in busy { done.insert(*a); }
     let slow = Duration::from_millis(1800);
 
     // ---- Runde 1: bekannte Adressen gründlich ----
@@ -391,6 +399,7 @@ pub fn scan_network(hints: &[String]) -> (Option<Ipv4Addr>, Vec<Found>) {
         for p in PORTS { push(SocketAddr::new(IpAddr::V4(ip), p), &mut first); }
     }
     push(SocketAddr::new(IpAddr::V4(XTOOL), 8780), &mut first);
+    first.retain(|a| !busy_ips.contains(&a.ip()));
     done.extend(first.iter().copied());
     let (f1, _) = run_round(first, slow, Duration::from_millis(900), 48);
     all.extend(f1);
@@ -411,13 +420,19 @@ pub fn scan_network(hints: &[String]) -> (Option<Ipv4Addr>, Vec<Found>) {
     let alive: HashSet<Ipv4Addr> = arp_hosts().into_iter().collect();
     let again: Vec<SocketAddr> = silent
         .into_iter()
-        .filter(|a| matches!(a.ip(), IpAddr::V4(v4) if alive.contains(&v4)))
+        .filter(|a| matches!(a.ip(), IpAddr::V4(v4) if alive.contains(&v4)) && !busy_ips.contains(&a.ip()))
         .collect();
     if !again.is_empty() {
         let (f3, _) = run_round(again, slow, Duration::from_millis(900), 48);
         all.extend(f3);
     }
 
+    // schon verbundene Maschinen: nicht angeklopft, aber in der Liste (Titel der Weboberfläche stört nicht)
+    for a in busy {
+        if !all.iter().any(|f| f.ip == a.ip().to_string() && f.port == a.port()) {
+            all.push(Found { ip: a.ip().to_string(), port: a.port(), kind: "connected".into(), firmware: String::new(), name: String::new(), host: String::new() });
+        }
+    }
     let mut v = merge(all);
     add_titles(&mut v);
     (own, v)

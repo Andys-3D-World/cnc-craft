@@ -139,19 +139,24 @@ export function initConnection(appendToConsole: (text: string) => void) {
       };
       const label = (d: NetDevice) => {
         const parts = [d.firmware, d.name, d.host && isDefaultHost(d.host) ? d.host : ""].filter(Boolean);
-        return parts.length ? parts.join(" · ") : t(d.kind === "grbl" ? "net.grblUnknown" : "net.openPort");
+        return parts.length ? parts.join(" · ") : t(d.kind === "grbl" ? "net.grblUnknown" : d.kind === "connected" ? "net.connectedShort" : "net.openPort");
+      };
+      // schon verbunden (die Suche hat dort nicht angeklopft): welche Maschine ist es?
+      const busyLabel = (d: NetDevice) => {
+        const i = machineSlots().findIndex(m => m.connected && m.port.includes(d.ip));
+        return i >= 0 ? t("net.connectedAs", { n: i + 1 }) : t("net.connectedShort");
       };
       const portHint = (p: number) => p === 23 ? "Telnet" : p === 8080 ? "MKS" : p === 8780 ? "xTool" : "";
       findList.innerHTML = `
         <div class="net-find-head"><span>${esc(net ? t("net.foundIn", { net, n: devs.length }) : t("net.found", { n: devs.length }))}</span>
           <button class="net-find-x" data-tip="${esc(t("upd.close"))}">✕</button></div>
         ${devs.length ? devs.map(d => `
-          <button class="net-find-item${d.kind === "grbl" ? " grbl" : ""}" data-addr="${esc(d.ip + ":" + d.port)}">
+          <button class="net-find-item${d.kind === "grbl" ? " grbl" : ""}${d.kind === "connected" ? " busy" : ""}" data-addr="${esc(d.ip + ":" + d.port)}"${d.kind === "connected" ? " disabled" : ""}>
             <span class="net-find-dot"></span>
             <span class="net-find-txt">${d.host && !isDefaultHost(d.host)
               ? `<b><span class="net-host">${esc(d.host)}</span><span class="net-ipline">${esc(d.ip)}:${d.port}</span></b>`
               : `<b>${esc(d.ip)}<em>:${d.port}</em></b>`}<small>${esc(label(d))}${portHint(d.port) ? " · " + portHint(d.port) : ""}</small></span>
-            <span class="net-find-use">${esc(t("net.use"))}</span>
+            <span class="net-find-use">${esc(d.kind === "connected" ? busyLabel(d) : t("net.use"))}</span>
           </button>`).join("") : `<div class="net-find-none">${esc(t("net.none"))}</div>`}
         ${dupHint(devs)}`;
       findList.querySelector(".net-find-x")?.addEventListener("click", hideFind);

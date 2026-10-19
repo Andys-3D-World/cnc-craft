@@ -149,9 +149,24 @@ pub(crate) fn close_all() {
 /// dass das Ziel nicht schon von einer anderen Verbindung benutzt wird
 fn prepare_slot(id: &str, target: &str) -> Result<(), String> {
     close_id(id);
-    let g = MACHINES.lock().map_err(|_| "lock".to_string())?;
-    if g.iter().any(|s| s.target == target && s.conn.is_alive()) { return Err("already-connected".into()); }
+    let others: Vec<String> = MACHINES.lock().map_err(|_| "lock".to_string())?
+        .iter().filter(|s| s.conn.is_alive()).map(|s| s.target.clone()).collect();
+    if others.iter().any(|t| t == target) { return Err("already-connected".into()); }
+    // Netzwerk: dieselbe Maschine unter anderem Namen (cnc-fraese.local vs. IP) erkennen
+    let mine = tcp_addrs(target);
+    if !mine.is_empty() && others.iter().any(|t| tcp_addrs(t).iter().any(|a| mine.contains(a))) {
+        return Err("already-connected".into());
+    }
     Ok(())
+}
+
+/// "tcp://host:port" -> Adressen (leer bei USB-Ports und wenn der Name nicht aufgelöst werden kann)
+fn tcp_addrs(target: &str) -> Vec<std::net::SocketAddr> {
+    use std::net::ToSocketAddrs;
+    match target.strip_prefix("tcp://") {
+        Some(hp) => hp.to_socket_addrs().map(|i| i.collect()).unwrap_or_default(),
+        None => Vec::new(),
+    }
 }
 
 fn add_slot(id: String, target: String, conn: Conn) -> Result<(), String> {
@@ -437,7 +452,12 @@ struct NetScan {
 #[tauri::command]
 async fn net_scan(hints: Option<Vec<String>>) -> Result<NetScan, String> {
     let hints = hints.unwrap_or_default();
-    let (own, found) = tauri::async_runtime::spawn_blocking(move || netscan::scan_network(&hints)).await.map_err(|e| e.to_string())?;
+    // verbundene Netzwerk-Maschinen nicht anklopfen (ESP32-Boards würden die Verbindung sonst trennen)
+    let busy_targets: Vec<String> = MACHINES.lock().map(|g| g.iter().filter(|s| s.conn.is_alive()).map(|s| s.target.clone()).collect()).unwrap_or_default();
+    let (own, found) = tauri::async_runtime::spawn_blocking(move || {
+        let busy: Vec<std::net::SocketAddr> = busy_targets.iter().flat_map(|t| tcp_addrs(t)).collect();
+        netscan::scan_network(&hints, &busy)
+    }).await.map_err(|e| e.to_string())?;
     Ok(NetScan {
         own: own.map(|ip| ip.to_string()).unwrap_or_default(),
         devices: found
@@ -630,7 +650,16 @@ pub fn run() {
 
 #[cfg(test)]
 mod multi_tests {
-    use super::slot_id;
+    use super::{slot_id, tcp_addrs};
+
+    #[test]
+    fn tcp_addrs_only_for_network_targets() {
+        let a = tcp_addrs("tcp://127.0.0.1:8080");
+        assert_eq!(a.len(), 1);
+        assert_eq!(a[0].port(), 8080);
+        assert!(tcp_addrs("/dev/cu.usbserial-110").is_empty());
+        assert!(tcp_addrs("k40:0").is_empty());
+    }
 
     #[test]
     fn slot_id_accepts_simple_ids() {

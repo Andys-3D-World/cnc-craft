@@ -1430,6 +1430,8 @@
   "net.foundIn": "Red {net}: {n} encontrado(s)",
   "net.found": "{n} encontrado(s)",
   "net.use": "Usar",
+  "net.connectedAs": "conectada como máquina {n}",
+  "net.connectedShort": "ya conectada",
   "net.grblUnknown": "responde como GRBL",
   "net.openPort": "puerto abierto: dispositivo desconocido",
   "net.none": "No se encontró nada. ¿Está la máquina encendida y en la misma Wi-Fi que el ordenador? En Mac, permite «Red local» para CNC Craft la primera vez (Ajustes → Privacidad y seguridad). También puedes copiar la IP de la pantalla o del router.",

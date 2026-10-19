@@ -1430,6 +1430,8 @@
   "net.foundIn": "Netwerk {net}: {n} gevonden",
   "net.found": "{n} gevonden",
   "net.use": "Gebruiken",
+  "net.connectedAs": "verbonden als machine {n}",
+  "net.connectedShort": "al verbonden",
   "net.grblUnknown": "antwoordt als GRBL",
   "net.openPort": "poort open – onbekend apparaat",
   "net.none": "Niets gevonden. Staat de machine aan en in hetzelfde wifi-netwerk als de computer? Sta op een Mac de eerste keer „Lokaal netwerk“ toe voor CNC Craft (Systeeminstellingen → Privacy en beveiliging). Je kunt het IP-adres ook van het display/de router overnemen.",
