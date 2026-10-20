@@ -66,6 +66,16 @@ und das Programm weitererzählen – z. B. über meine Videos auf YouTube, TikTo
 
 Unterstützung ist freiwillig – alle Funktionen sind für alle frei, es gibt keine Bezahl-Version.
 
+## 🤝 Mitwirken
+
+Jede Hilfe ist willkommen: Fehler melden und Ideen vorschlagen unter [Issues](https://github.com/Andys-3D-World/cnc-craft/issues),
+Übersetzungen verbessern (`src/i18n/lang/*.json`) oder neue Boards und Maschinen testen.
+
+**Mit KI entwickelt:** CNC Craft wird von Andreas Piaszek (Andys 3D World) entwickelt. Beim Programmieren hilft das
+KI-Werkzeug [Claude Code](https://claude.com/claude-code) von Anthropic – ohne diese Hilfe wäre CNC Craft nicht so weit.
+Ideen, Planung und Entscheidungen kommen von mir. Jede Änderung wird von mir geprüft und an echten Maschinen und Boards
+getestet. Commits, an denen die KI mitgeschrieben hat, sind mit „Co-Authored-By: Claude“ gekennzeichnet.
+
 ## Selbst bauen
 
 Voraussetzungen: [Node.js](https://nodejs.org) (LTS), [Rust](https://rustup.rs) und die
