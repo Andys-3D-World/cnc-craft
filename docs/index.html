@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNC Craft – free software for laser engravers, CNC routers & plasma cutters</title>
+<meta name="description" content="Free, open-source alternative to LightBurn, Estlcam and OpenBuilds: design, CAM and machine control for laser, CNC router and plasma in one app. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.">
+<link rel="canonical" href="https://andys-3d-world.github.io/cnc-craft/">
+<link rel="alternate" hreflang="en" href="https://andys-3d-world.github.io/cnc-craft/">
+<link rel="alternate" hreflang="de" href="https://andys-3d-world.github.io/cnc-craft/de/">
+<link rel="alternate" hreflang="x-default" href="https://andys-3d-world.github.io/cnc-craft/">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<meta name="theme-color" content="#111019">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="CNC Craft">
+<meta property="og:title" content="CNC Craft – free software for laser engravers, CNC routers & plasma cutters">
+<meta property="og:description" content="Free, open-source alternative to LightBurn, Estlcam and OpenBuilds: design, CAM and machine control for laser, CNC router and plasma in one app. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.">
+<meta property="og:url" content="https://andys-3d-world.github.io/cnc-craft/">
+<meta property="og:image" content="https://andys-3d-world.github.io/cnc-craft/assets/og-en.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="assets/site.css">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "CNC Craft", "applicationCategory": "DesignApplication", "operatingSystem": "macOS, Windows, Linux", "description": "Free, open-source alternative to LightBurn, Estlcam and OpenBuilds: design, CAM and machine control for laser, CNC router and plasma in one app. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.", "url": "https://andys-3d-world.github.io/cnc-craft/", "downloadUrl": "https://github.com/Andys-3D-World/cnc-craft/releases", "license": "https://www.gnu.org/licenses/gpl-3.0.html", "image": "https://andys-3d-world.github.io/cnc-craft/assets/og-en.png", "author": {"@type": "Person", "name": "Andreas Piaszek"}, "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}}</script>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [{"@type": "Question", "name": "Is CNC Craft really free?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. CNC Craft is open source under the GPL-3.0 license. All features are free, there is no paid version and no subscription."}}, {"@type": "Question", "name": "Which machines and controllers are supported?", "acceptedAnswer": {"@type": "Answer", "text": "Laser engravers, CNC routers and plasma cutters with GRBL, grblHAL, FluidNC or Grbl_ESP32 (USB and Wi-Fi), Marlin, Ruida CO₂ controllers and K40 lasers (M2 Nano). Boards like the MKS DLC32 and Arduino with CNC Shield are well tested."}}, {"@type": "Question", "name": "Is it a replacement for LightBurn or Estlcam?", "acceptedAnswer": {"@type": "Answer", "text": "CNC Craft is a free alternative with a similar workflow: laser layers like in LightBurn, router toolpaths like in Estlcam and machine control like in OpenBuilds. It is not affiliated with these products."}}, {"@type": "Question", "name": "Does it run on Mac and Linux?", "acceptedAnswer": {"@type": "Answer", "text": "Yes – macOS (Apple chip and Intel), Windows 10/11 and Linux (AppImage, .deb, .rpm)."}}, {"@type": "Question", "name": "Is it still in development?", "acceptedAnswer": {"@type": "Answer", "text": "Yes, CNC Craft is in beta and gets new features regularly. Bug reports and ideas are welcome on GitHub."}}]}</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="assets/icon.png" alt="" width="34" height="34">CNC <b>Craft</b></a>
+    <nav class="nav">
+      <a class="hide-sm" href="#features">Features</a>
+      <a class="hide-sm" href="#screenshots">Screenshots</a>
+      <a href="#download">Download</a>
+      <a class="hide-sm" href="#faq">FAQ</a>
+      <a class="hide-sm" href="https://github.com/Andys-3D-World/cnc-craft">GitHub</a>
+      <a class="lang" href="de/" hreflang="de">Deutsch</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+<div class="hero">
+  <div class="wrap">
+    <h1>Laser, CNC router &amp; plasma.<br><span>One free app.</span></h1>
+    <p class="sub">Design, CAM and machine control in one program – like LightBurn, Estlcam and OpenBuilds together. Open source, no subscription, no account.</p>
+    <div class="chips"><span class="chip">100 % free</span><span class="chip">Open source (GPL-3.0)</span><span class="chip">macOS · Windows · Linux</span><span class="chip">7 languages</span></div>
+    <div class="cta">
+      <a id="dl-main" class="btn primary" href="#download" data-mac="Download for Mac" data-win="Download for Windows" data-linux="Download for Linux (AppImage)">⬇ <span>Download</span></a>
+      <a class="btn" href="https://github.com/Andys-3D-World/cnc-craft">★ Star on GitHub</a>
+    </div>
+    <div class="dl-note">Version <span data-version>0.2.7</span> <span id="dl-os-note" data-mac="Mac with Apple chip (M1–M4). Intel Mac: see Download below." data-win="Windows 10/11, 64-bit" data-linux="Other formats (.deb, .rpm): see Download below."></span></div>
+    <img class="hero-shot" src="assets/shots/en/01-design-router.jpg" alt="CNC Craft with a drawing and router toolpaths" width="1800" height="1125">
+  </div>
+</div>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Everything from drawing to the finished part</h2>
+    <p class="lead">Draw or import, create toolpaths, check the simulation and send the job – without switching between programs.</p>
+    <div class="grid">
+      <div class="card"><div class="ico">✏️</div><h3>Design &amp; import</h3><p>Draw shapes and text or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP).</p></div>
+      <div class="card"><div class="ico">🛠️</div><h3>CAM for CNC routers</h3><p>Outside, inside, pocket and engrave with a tool library – as simple as in Estlcam.</p></div>
+      <div class="card"><div class="ico">🔦</div><h3>Laser layers</h3><p>Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn.</p></div>
+      <div class="card"><div class="ico">🔥</div><h3>Plasma cutting</h3><p>Kerf compensation, lead-ins, pierce points, sheet height probing and torch height control (THC).</p></div>
+      <div class="card"><div class="ico">🎬</div><h3>3D simulation</h3><p>See every move, the time and the G-code before the machine starts.</p></div>
+      <div class="card"><div class="ico">🔌</div><h3>Machine control</h3><p>GRBL, grblHAL, FluidNC, Grbl_ESP32 via USB or Wi-Fi, Marlin, Ruida (CO₂) and K40. Several machines at once.</p></div>
+      <div class="card"><div class="ico">📷</div><h3>Camera</h3><p>USB or IP camera: watch the job and place your design on the live image of the workpiece.</p></div>
+      <div class="card"><div class="ico">📶</div><h3>Wi-Fi setup</h3><p>Find machines on the network and set up the board's Wi-Fi right from the app.</p></div>
+      <div class="card"><div class="ico">⚙️</div><h3>Board tools</h3><p>Machine settings ($$) explained in plain words, flash firmware (ESP32, Arduino, grblHAL) and wiring diagrams.</p></div>
+      <div class="card"><div class="ico">♻️</div><h3>Remnant sheets</h3><p>Used areas are remembered – parts placed on them are not cut again.</p></div>
+      <div class="card"><div class="ico">🔒</div><h3>Private</h3><p>No telemetry, no account, no cloud. Your drawings stay on your computer.</p></div>
+      <div class="card"><div class="ico">🔄</div><h3>Updates in the app</h3><p>One click to update – signed updates straight from GitHub.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Built for makers</h2>
+    <p class="lead">CNC Craft combines what usually needs three programs:</p>
+    <div class="compare"><span class="box">LightBurn</span><span class="op">+</span><span class="box">Estlcam</span><span class="op">+</span><span class="box">OpenBuilds</span><span class="op">=</span><span class="box res">CNC Craft</span></div>
+  </div>
+</section>
+
+<section id="screenshots">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="lead">Click a picture to enlarge it.</p>
+    <div class="shots">
+      <figure><img src="assets/shots/en/02-simulation.jpg" alt="CNC Craft – Simulation: toolpaths in 3D with time and G-code" width="1800" height="1125" loading="lazy"><figcaption><b>Simulation</b> – toolpaths in 3D with time and G-code</figcaption></figure>
+      <figure><img src="assets/shots/en/03-laser.jpg" alt="CNC Craft – Laser: layers for engraving and cutting" width="1800" height="1125" loading="lazy"><figcaption><b>Laser</b> – layers for engraving and cutting</figcaption></figure>
+      <figure><img src="assets/shots/en/04-plasma.jpg" alt="CNC Craft – Plasma: cuts, pierce points and lead-ins" width="1800" height="1125" loading="lazy"><figcaption><b>Plasma</b> – cuts, pierce points and lead-ins</figcaption></figure>
+      <figure><img src="assets/shots/en/05-wiring.jpg" alt="CNC Craft – Wiring diagram: how to wire the board" width="1800" height="1125" loading="lazy"><figcaption><b>Wiring diagram</b> – how to wire the board</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="download" class="alt">
+  <div class="wrap">
+    <h2>Download</h2>
+    <p class="lead">Free for everyone. Latest version: <b data-version>see GitHub</b>. All files and older versions are on <a href="https://github.com/Andys-3D-World/cnc-craft/releases">GitHub Releases</a>.</p>
+    <div class="dl-grid">
+      <div class="card"><h3>🍎 macOS</h3><a data-asset="mac-arm" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Apple chip (M1–M4) · .dmg</a><a data-asset="mac-intel" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Intel · .dmg</a><div class="hint">Not signed by Apple yet: on first start right-click the app → “Open”, or System Settings → Privacy &amp; Security → “Open Anyway”.</div></div>
+      <div class="card"><h3>🪟 Windows</h3><a data-asset="win" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Installer · .exe</a><a data-asset="win-msi" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Installer · .msi</a><div class="hint">If Windows SmartScreen warns: “More info” → “Run anyway”.</div></div>
+      <div class="card"><h3>🐧 Linux</h3><a data-asset="appimage" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ AppImage</a><a data-asset="deb" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Debian/Ubuntu · .deb</a><a data-asset="rpm" href="https://github.com/Andys-3D-World/cnc-craft/releases/latest">⬇ Fedora/openSUSE · .rpm</a><div class="hint">AppImage: make it executable and start it.</div></div>
+    </div>
+    <div class="warn" style="margin-top:28px">
+      <h3>⚠️ Safety first</h3>
+      <ul><li>Never leave a laser running unattended – wear laser safety glasses and keep a fire extinguisher ready.</li><li>Every machine needs a real hardware emergency stop. The stop buttons in the software do not replace it.</li><li>Test new jobs without a workpiece or at low power first. CNC Craft is beta software and comes without warranty.</li></ul>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Frequently asked questions</h2>
+    <div class="grid" style="grid-template-columns:1fr">
+      <details class="card"><summary><b>Is CNC Craft really free?</b></summary><p style="margin-top:8px">Yes. CNC Craft is open source under the GPL-3.0 license. All features are free, there is no paid version and no subscription.</p></details>
+      <details class="card"><summary><b>Which machines and controllers are supported?</b></summary><p style="margin-top:8px">Laser engravers, CNC routers and plasma cutters with GRBL, grblHAL, FluidNC or Grbl_ESP32 (USB and Wi-Fi), Marlin, Ruida CO₂ controllers and K40 lasers (M2 Nano). Boards like the MKS DLC32 and Arduino with CNC Shield are well tested.</p></details>
+      <details class="card"><summary><b>Is it a replacement for LightBurn or Estlcam?</b></summary><p style="margin-top:8px">CNC Craft is a free alternative with a similar workflow: laser layers like in LightBurn, router toolpaths like in Estlcam and machine control like in OpenBuilds. It is not affiliated with these products.</p></details>
+      <details class="card"><summary><b>Does it run on Mac and Linux?</b></summary><p style="margin-top:8px">Yes – macOS (Apple chip and Intel), Windows 10/11 and Linux (AppImage, .deb, .rpm).</p></details>
+      <details class="card"><summary><b>Is it still in development?</b></summary><p style="margin-top:8px">Yes, CNC Craft is in beta and gets new features regularly. Bug reports and ideas are welcome on GitHub.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="alt">
+  <div class="wrap">
+    <h2>Support CNC Craft</h2>
+    <p class="lead">CNC Craft is free and stays free. If it helps you, you can support the development – or simply give it a star and tell others about it.</p>
+    <div class="cta" style="justify-content:flex-start">
+      <a class="btn" href="https://ko-fi.com/andys3dworld">☕ Ko-fi</a>
+      <a class="btn" href="https://github.com/sponsors/Andys-3D-World">💜 GitHub Sponsors</a>
+      <a class="btn" href="https://github.com/Andys-3D-World/cnc-craft">★ Star on GitHub</a>
+      <a class="btn" href="https://github.com/Andys-3D-World/cnc-craft/issues">🐞 Report a bug</a>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Made by Andreas Piaszek – <a href="https://www.youtube.com/results?search_query=Andys+3D+World">Andys 3D World</a> on YouTube, TikTok and Instagram.</p>
+    <p>Developed with the help of the AI tool <a href="https://claude.com/claude-code">Claude Code</a> by Anthropic; every change is reviewed and tested on real machines.</p>
+    <p>Free software under the <a href="https://github.com/Andys-3D-World/cnc-craft/blob/main/LICENSE">GNU GPL v3</a>. <a href="https://github.com/Andys-3D-World/cnc-craft/blob/main/PRIVACY.md">Privacy</a>: no tracking and no cookies on this page.</p>
+    <p>Product names (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) belong to their owners and are only used for comparison. CNC Craft is not affiliated with them.</p>
+  </div>
+</footer>
+<script src="assets/site.js"></script>
+</body>
+</html>
