@@ -4,9 +4,15 @@
 
 **Neu**
 - **Verschachteln (wie „Nest“ in LightBurn):** neues Symbol links unter „Messen“ – legt die Teile (Auswahl, sonst alles)
-  automatisch eng aufs Bett. Einstellbar: Abstand zwischen den Teilen, Abstand zum Rand, Drehen (aus / 90° / 45°) und ob
-  kleine Teile in Löcher großer Teile dürfen. Teile werden nach ihrer echten Form gesetzt, Gruppen und Löcher bleiben
+  automatisch eng aufs Bett. Einstellbar: Abstand zwischen den Teilen, Abstand zum Rand, Drehen (aus / 90° / 45° / automatisch – probiert jeden 15°-Schritt und den Winkel mit dem kleinsten Kasten, dreht
+  aber nur, wenn es Platz spart) und ob
+  kleine Teile in Löcher großer Teile dürfen, **Startpunkt** (oben/Mitte/unten × links/Mitte/rechts) und **Richtung**
+  (nach rechts, links, oben oder unten – bei „Mitte“ wird der fertige Block mittig geschoben). Teile werden nach ihrer echten Form gesetzt, Gruppen und Löcher bleiben
   beim Teil, nicht ausgewählte Formen bleiben liegen und werden umfahren. Rückgängig mit Strg+Z
+- **Duplizieren mit Anzahl oder „Bett voll“:** der Duplizieren-Knopf oben öffnet jetzt ein Fenster – Anzahl Kopien
+  eingeben oder „So viele, bis das Bett voll ist“, auf Wunsch gleich verschachtelt (Abstand und Rand im Fenster, Drehen,
+  Startpunkt und Richtung wie beim Verschachteln). Kopien, die nicht mehr passen, werden weggelassen. Strg+D macht wie
+  bisher schnell eine einzelne Kopie
 
 **Verbessert**
 - **Webseite schneller:** Bilder als WebP in drei Größen (Handy 480 px, 960 px, groß nur beim Vergrößern), Titelbild

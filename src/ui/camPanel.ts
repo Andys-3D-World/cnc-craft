@@ -61,7 +61,7 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${cmd("copy", "copy", "tip.cmd.copy")}
       ${cmd("paste", "paste", "tip.cmd.paste")}
-      ${cmd("duplicate", "duplicate", "tip.cmd.duplicate")}
+      ${cmd("duplicateDialog", "duplicate", "tip.cmd.duplicateDialog")}
       ${cmd("delete", "delete", "tip.cmd.delete")}
       ${cmd("selectAll", "selectAll", "tip.cmd.selectAll")}
     </div>

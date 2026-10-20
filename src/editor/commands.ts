@@ -24,7 +24,7 @@ import {
   shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath
 } from "../shapeTransform";
 import { offsetPolygon } from "../polyOffset";
-import { nestShapes, NestOptions } from "./nest";
+import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
@@ -128,6 +128,7 @@ export const commands: Record<string, () => void> = {
 
   offset: () => openOffsetDialog(),
   nest: () => openNestDialog(),
+  duplicateDialog: () => openDuplicateDialog(),
   importFile: () => { importWithDialog(); },
   openProject: () => { openProjectWithDialog(); },
   saveProject: () => { saveProject(false); },
@@ -145,10 +146,10 @@ export const commands: Record<string, () => void> = {
   toolMeasure: () => setTool("measure")
 };
 
-function insertCopies(source: any[], offsetPx: number) {
-  const st = app();
+/** Kopien mit neuen IDs und eigenen Gruppen, um offsetPx nach rechts unten versetzt */
+function makeCopies(source: any[], offsetPx: number): any[] {
   const groupMap = new Map<string, string>();
-  const copies = source.map(s => {
+  return source.map(s => {
     const c = cloneShape(s);
     c.id = newId();
     if (c.groupId) {
@@ -158,6 +159,11 @@ function insertCopies(source: any[], offsetPx: number) {
     translateShape(c, offsetPx, -offsetPx);
     return c;
   });
+}
+
+function insertCopies(source: any[], offsetPx: number) {
+  const st = app();
+  const copies = makeCopies(source, offsetPx);
   st.shapes = [...st.shapes, ...copies];
   st.selectedShapeIds = copies.map(c => c.id);
   log(t("edit.pasted", { n: copies.length }));
@@ -311,17 +317,21 @@ function makeOffsets(sel: any[], d: number, dir: string, deleteOriginal: boolean
 // =====================================================================
 
 const NEST_KEY = "cnc_craft_nest";
+const NEST_DIRS: NestDir[] = ["left", "up", "down", "right"];
+const NEST_ARROW: Record<NestDir, string> = { left: "←", up: "↑", down: "↓", right: "→" };
 
 function loadNestOptions(): NestOptions {
-  const def: NestOptions = { gapMm: 3, marginMm: 3, rotate: "90", holes: false };
+  const def: NestOptions = { gapMm: 3, marginMm: 3, rotate: "90", holes: false, anchor: "bl", dir: "right" };
   try {
     const s = JSON.parse(localStorage.getItem(NEST_KEY) || "{}");
     const num = (v: any, d: number) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
     return {
       gapMm: num(s.gapMm, def.gapMm),
       marginMm: num(s.marginMm, def.marginMm),
-      rotate: ["none", "90", "45"].includes(s.rotate) ? s.rotate : def.rotate,
-      holes: !!s.holes
+      rotate: ["none", "90", "45", "auto"].includes(s.rotate) ? s.rotate : def.rotate,
+      holes: !!s.holes,
+      anchor: NEST_ANCHORS.includes(s.anchor) ? s.anchor : def.anchor,
+      dir: NEST_DIRS.includes(s.dir) ? s.dir : def.dir
     };
   } catch { return def; }
 }
@@ -346,12 +356,26 @@ function openNestDialog() {
       <label style="${row}">${t("nest.margin")}
         <input id="nest-margin" type="number" value="${o.marginMm}" min="0" step="0.5" style="width:90px;"></label>
       <label style="${row}">${t("nest.rotate")}
-        <select id="nest-rot" style="width:120px;">
+        <select id="nest-rot" style="width:150px;">
           <option value="none">${t("nest.rotNone")}</option>
           <option value="90">90°</option>
           <option value="45">45°</option>
+          <option value="auto">${t("nest.rotAuto")}</option>
         </select></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="nest-holes" type="checkbox" ${o.holes ? "checked" : ""}> ${t("nest.holes")}</label>
+      <div style="display:flex;justify-content:space-between;gap:12px;font-size:0.85rem;">
+        <div style="display:flex;flex-direction:column;gap:6px;">${t("nest.start")}
+          <div style="display:grid;grid-template-columns:repeat(3,28px);gap:4px;padding:5px;border:1px dashed var(--border-color);border-radius:6px;width:max-content;">
+            ${NEST_ANCHORS.map(a => `<button type="button" class="nest-pick" data-anchor="${a}" title="${t("nest.a." + a)}" aria-label="${t("nest.a." + a)}">●</button>`).join("")}
+          </div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;">${t("nest.dir")}
+          <div style="display:grid;grid-template-columns:repeat(3,28px);grid-template-rows:repeat(2,28px);gap:4px;">
+            <span></span><button type="button" class="nest-pick" data-dir="up" title="${t("nest.d.up")}" aria-label="${t("nest.d.up")}">${NEST_ARROW.up}</button><span></span>
+            <button type="button" class="nest-pick" data-dir="left" title="${t("nest.d.left")}" aria-label="${t("nest.d.left")}">${NEST_ARROW.left}</button>
+            <button type="button" class="nest-pick" data-dir="down" title="${t("nest.d.down")}" aria-label="${t("nest.d.down")}">${NEST_ARROW.down}</button>
+            <button type="button" class="nest-pick" data-dir="right" title="${t("nest.d.right")}" aria-label="${t("nest.d.right")}">${NEST_ARROW.right}</button>
+          </div></div>
+      </div>
       <div class="only-mill" style="font-size:0.78rem;color:var(--text-muted);">${t("nest.millHint")}</div>
       <div style="display:flex;gap:8px;">
         <button id="nest-cancel" class="btn-secondary" style="flex:1;">${t("dlg.cancel")}</button>
@@ -360,6 +384,23 @@ function openNestDialog() {
     </div>`;
   document.body.appendChild(ov);
   (ov.querySelector("#nest-rot") as HTMLSelectElement).value = o.rotate;
+  // Startpunkt + Richtung: gewählter Knopf leuchtet, Pfeile in die Wand sind gesperrt
+  let anchor: NestAnchor = o.anchor, dir: NestDir = o.dir;
+  const paint = () => {
+    if (!nestDirAllowed(anchor, dir)) dir = NEST_DIRS.find(d => nestDirAllowed(anchor, d) && (d === "right" || d === "left"))!;
+    ov.querySelectorAll<HTMLButtonElement>(".nest-pick").forEach(b => {
+      const on = b.dataset.anchor ? b.dataset.anchor === anchor : b.dataset.dir === dir;
+      b.disabled = !!b.dataset.dir && !nestDirAllowed(anchor, b.dataset.dir as NestDir);
+      b.style.cssText = `width:28px;height:28px;padding:0;border-radius:5px;cursor:pointer;font-size:${b.dataset.anchor ? "0.6rem" : "0.95rem"};`
+        + `border:1px solid ${on ? "var(--accent-color)" : "var(--border-color)"};background:${on ? "var(--accent-color)" : "transparent"};`
+        + `color:${on ? "#fff" : "var(--text-muted)"};opacity:${b.disabled ? 0.25 : 1};`;
+    });
+  };
+  ov.querySelectorAll<HTMLButtonElement>(".nest-pick").forEach(b => b.addEventListener("click", () => {
+    if (b.dataset.anchor) anchor = b.dataset.anchor as NestAnchor; else dir = b.dataset.dir as NestDir;
+    paint();
+  }));
+  paint();
   const close = () => ov.remove();
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") (ov.querySelector("#nest-ok") as HTMLElement).click(); });
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
@@ -370,7 +411,8 @@ function openNestDialog() {
       gapMm: num("#nest-gap"),
       marginMm: num("#nest-margin"),
       rotate: (ov.querySelector("#nest-rot") as HTMLSelectElement).value as NestOptions["rotate"],
-      holes: (ov.querySelector("#nest-holes") as HTMLInputElement).checked
+      holes: (ov.querySelector("#nest-holes") as HTMLInputElement).checked,
+      anchor, dir
     };
     try { localStorage.setItem(NEST_KEY, JSON.stringify(opts)); } catch { /* egal */ }
     close();
@@ -382,6 +424,121 @@ function openNestDialog() {
     checkpoint();
   };
   setTimeout(() => (ov.querySelector("#nest-gap") as HTMLInputElement).select(), 0);
+}
+
+// =====================================================================
+// DUPLIZIEREN-DIALOG: Anzahl Kopien oder Bett voll, auf Wunsch gleich verschachtelt
+// =====================================================================
+
+/** Fläche, die ein Satz der Auswahl mindestens belegt (Löcher abgezogen, plus etwas Abstand) – zum Schätzen */
+function occupiedArea(sel: any[], gapPx: number): number {
+  const paths = sel.flatMap(s => shapeToPaths(s));
+  const closed = paths.filter(p => p.closed && p.pts.length >= 3);
+  let area = 0, perim = 0;
+  closed.forEach((p, i) => {
+    const depth = closed.filter((q, j) => j !== i && pointInPath(p.pts[0].x, p.pts[0].y, q.pts)).length;
+    area += (depth % 2 ? -1 : 1) * Math.abs(pathArea(p.pts));
+  });
+  for (const p of paths) for (let i = 1; i < p.pts.length; i++) perim += Math.hypot(p.pts[i].x - p.pts[i - 1].x, p.pts[i].y - p.pts[i - 1].y);
+  return Math.max(0, area) + (perim * gapPx) / 4;
+}
+
+function openDuplicateDialog() {
+  const sel = selectedShapes();
+  if (!sel.length) { log(t("dup.selectFirst")); return; }
+  const o = loadNestOptions();
+
+  document.getElementById("dup-dialog-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "dup-dialog-overlay";
+  ov.style.cssText = "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+  const row = "display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.85rem;";
+  ov.innerHTML = `
+    <div style="background:var(--bg-panel);border:1px solid var(--border-color);border-radius:12px;padding:18px;width:360px;color:var(--text-main);display:flex;flex-direction:column;gap:10px;font-family:var(--font-ui);">
+      <h3 style="margin:0;font-size:1rem;">⧉ ${t("dup.title")}</h3>
+      <div style="font-size:0.8rem;color:var(--text-muted);">${t("dup.scope", { n: sel.length })}</div>
+      <label style="${row}"><span><input type="radio" name="dup-mode" value="count" checked> ${t("dup.count")}</span>
+        <input id="dup-count" type="number" value="1" min="1" max="999" step="1" style="width:90px;"></label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input type="radio" name="dup-mode" value="fill"> ${t("dup.fill")}</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="dup-nest" type="checkbox" checked> ${t("dup.nest")}</label>
+      <div id="dup-nest-opts" style="display:flex;flex-direction:column;gap:8px;padding-left:22px;">
+        <label style="${row}">${t("nest.gap")}
+          <input id="dup-gap" type="number" value="${o.gapMm}" min="0" step="0.5" style="width:90px;"></label>
+        <label style="${row}">${t("nest.margin")}
+          <input id="dup-margin" type="number" value="${o.marginMm}" min="0" step="0.5" style="width:90px;"></label>
+        <div style="font-size:0.78rem;color:var(--text-muted);">${t("dup.nestHint")}</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button id="dup-cancel" class="btn-secondary" style="flex:1;">${t("dlg.cancel")}</button>
+        <button id="dup-ok" class="btn-primary" style="flex:2;">✔ ${t("dup.run")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const $ = <T extends HTMLElement>(q: string) => ov.querySelector(q) as T;
+  const mode = () => (ov.querySelector('input[name="dup-mode"]:checked') as HTMLInputElement).value;
+  // „Bett voll“ geht nur mit Verschachteln
+  const sync = () => {
+    const fill = mode() === "fill";
+    if (fill) $<HTMLInputElement>("#dup-nest").checked = true;
+    $<HTMLInputElement>("#dup-nest").disabled = fill;
+    $<HTMLInputElement>("#dup-count").disabled = fill;
+    $<HTMLElement>("#dup-nest-opts").style.opacity = $<HTMLInputElement>("#dup-nest").checked ? "1" : "0.4";
+  };
+  ov.querySelectorAll("input").forEach(i => i.addEventListener("change", sync));
+  $<HTMLInputElement>("#dup-count").addEventListener("focus", () => { ($<HTMLInputElement>('input[value="count"]')).checked = true; sync(); });
+  sync();
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") $<HTMLElement>("#dup-ok").click(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  $<HTMLElement>("#dup-cancel").onclick = close;
+  $<HTMLElement>("#dup-ok").onclick = () => {
+    const num = (id: string) => Math.max(0, parseFloat($<HTMLInputElement>(id).value) || 0);
+    const fill = mode() === "fill";
+    const nest = $<HTMLInputElement>("#dup-nest").checked;
+    const opts: NestOptions = { ...loadNestOptions(), gapMm: num("#dup-gap"), marginMm: num("#dup-margin") };
+    close();
+    if (nest) { try { localStorage.setItem(NEST_KEY, JSON.stringify(opts)); } catch { /* egal */ } }
+    duplicateMany(sel, fill, Math.min(999, Math.max(1, Math.round(num("#dup-count")))), nest, opts);
+  };
+  setTimeout(() => $<HTMLInputElement>("#dup-count").select(), 0);
+}
+
+function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, opts: NestOptions) {
+  const st = app();
+  let want = count;
+  if (fill) {
+    // Obergrenze schätzen: freie Fläche ÷ Fläche eines Satzes (zu viele Kopien werden danach wieder entfernt)
+    const bed = bedSizeMm();
+    const m = 2 * opts.marginMm;
+    const free = Math.max(0, bed.w - m) * Math.max(0, bed.h - m) * MM_TO_PIXEL * MM_TO_PIXEL;
+    const one = occupiedArea(sel, opts.gapMm * MM_TO_PIXEL);
+    want = Math.min(999, one > 0 ? Math.floor(free / one) : 999);
+  }
+  const sets: any[][] = [sel];
+  for (let i = 1; i <= want; i++) sets.push(makeCopies(sel, nest ? 0 : 5 * MM_TO_PIXEL * i));
+  const copies = sets.slice(1).flat();
+  st.shapes = [...st.shapes, ...copies];
+
+  let made = want;
+  if (nest && copies.length) {
+    const r = nestShapes(opts, undefined, sets);
+    // Kopien, die nicht mehr aufs Bett passen, wieder weg (die Originale bleiben immer)
+    const failed = new Set(r.failedIds);
+    const gone = copies.filter(c => failed.has(c.id));
+    if (gone.length) {
+      const goneIds = new Set(gone.map(c => c.id));
+      st.shapes = st.shapes.filter((s: any) => !goneIds.has(s.id));
+      made = Math.max(0, Math.round(want - gone.length / sel.length));
+    }
+  }
+  const kept = new Set(st.shapes.map((s: any) => s.id));
+  st.selectedShapeIds = [...sel.map(s => s.id), ...copies.map(c => c.id).filter(id => kept.has(id))];
+  if (!made) log(t("dup.none"));
+  else if (fill) log(t("dup.full", { n: made }));
+  else if (made < count) log(t("dup.partial", { n: made, want: count }));
+  else log(t("dup.done", { n: made }));
+  done();
+  checkpoint();
 }
 
 // =====================================================================
@@ -410,7 +567,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
-    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
+    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");
     if (camTab && !camTab.classList.contains("active")) return;
