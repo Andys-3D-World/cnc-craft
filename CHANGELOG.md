@@ -3,6 +3,14 @@
 ## Nächste Version (noch nicht veröffentlicht)
 
 **Neu**
+- **Anschlussplan – Mikroschritte:** in „Schrittmotoren“ Treiber (A4988, DRV8825, TMC2208, TMC2209) und Mikroschritte wählen –
+  die Zeichnung zeigt die Jumper M0/M1/M2 unter jedem Treiber (CNC Shield) bzw. die DIP-Schalter (MKS DLC32 / MAX),
+  dazu die passenden Schritte pro mm für Zahnriemen und T8-Spindel
+- **Anschlussplan – A-Achse klonen (CNC Shield):** „A-Achse klont X/Y/Z“ zeigt, wo die zwei Jumper für einen zweiten
+  Motor (X2, Y2, Z2) hingehören (links A.STP, rechts A.DIR)
+- **Anschlussplan – Externe Treiber:** neuer Bereich für TB6600/DM542 an allen Boards – Steuerleitungen (PUL/DIR/ENA mit
+  gemeinsamer Masse) an die STEP/DIR-Leiste des Shields bzw. „E S D G“ der MKS-Boards, Motor und eigenes Netzteil am
+  Treiber, DIP-Schalter, $0 und Schritte pro mm
 - **Webseite** (GitHub Pages, Ordner `docs/`): Englisch und Deutsch, Download-Knopf mit der passenden Datei für
   Mac, Windows oder Linux, Funktionen, Bilder und häufige Fragen; ohne Tracking und ohne Cookies
 - **grblHAL flashen:** im Reiter „Board flashen“ kann jetzt direkt die **.zip vom grblHAL Web Builder** gewählt werden.
@@ -32,6 +40,15 @@
   Auto-Squaring) grblHAL über den grblHAL Web Builder (Board „MKS DLC32 MAX v1“, noch experimentell), Richtung mit $8
 
 **Verbessert**
+- **Anschlussplan:** MKS DLC32 V2.1 und MKS DLC32 MAX sehen jetzt aus wie das echte Board – schwarze Platine,
+  Stecker an derselben Stelle wie im Makerbase-Pinplan, beim MAX in den Original-Farben (X rot, Y blau, Z grün,
+  A lila …), Treibersockel mit DIP-Schaltern, Funkmodul, USB, SD und Hohlstecker. Die Farbmarkierung je Bauteil
+  liegt als Rahmen außen herum, damit die Steckerfarbe erkennbar bleibt
+- **Anschlussplan:** Maus über ein Kabel oder einen Pin hebt das Kabel hervor (dick und leuchtend, die anderen werden
+  blass) – der Tooltip zeigt, von wo nach wo es geht (z. B. „Motor Y2 · 2B → Y2-Motor · 2B“)
+- **Anschlussplan CNC Shield V3:** sieht jetzt aus wie das echte Shield (Plan „CNC Shield V3.00“, rote Nachbauten wie
+  Osoyoo) – Arduino-Form, blaue Schraubklemme, gelbe Treiber-Sockel mit M0/M1/M2, Endschalter-Leiste rechts, SCL oben
+  rechts, echte Pin-Abstände. Motoren Z und A werden unten angeschlossen gezeigt (weniger Kabelsalat)
 - README jetzt auf Englisch (Startseite bei GitHub, besser über Google zu finden), deutsche Fassung in `README.de.md`;
   englische README mit englischen Screenshots (`docs/screenshots/en/`);
   GitHub-Projekt mit Beschreibung, Themen (Topics) und Discussions

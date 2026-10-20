@@ -11,22 +11,27 @@
  * Daten: src/wiring/boards.ts
  */
 import { t } from "../i18n/i18n";
-import { BOARDS, COMPS, CompId, Board, BConn, Part, Hookup, getBoard } from "../wiring/boards";
+import { BOARDS, COMPS, CompId, Board, BConn, Deco, Part, Hookup, getBoard } from "../wiring/boards";
+import { DRIVERS, getDriver, msFor, Ms } from "../wiring/drivers";
 
 const KEY_BOARD = "cnc_craft_wiring_board";
 const KEY_LEVEL = "cnc_craft_wiring_level";
 const KEY_COMP = "cnc_craft_wiring_comp";
+const KEY_MS = "cnc_craft_wiring_ms";   // Treiber, Mikroschritte, A-Klon (Shield) – {drv, div, clone}
+
+/** Ansicht „Schrittmotoren“: Jumper/DIP-Stellung und A-Klon, die gezeichnet werden (sonst null) */
+let msView: { m: Ms; clone: string } | null = null;
 
 const BX = 260, BY = 170;   // linke obere Ecke der Board-Fläche in der Zeichnung (Größe: board.w × board.h)
 const GAP = 86;             // Abstand Bauteile <-> Board
 const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
-  psu: "#e5484d", motors: "#3e7bfa", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1",
+  psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1",
   spindle: "#9b5de5", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪"
 };
 
 function esc(s: string): string {
@@ -63,7 +68,8 @@ function guessBoard(): string {
 // ---------------------------------------------------------------------
 
 function pinPos(c: BConn, i: number): { x: number; y: number } {
-  return c.dir === "h" ? { x: BX + c.x + i * PIN, y: BY + c.y } : { x: BX + c.x, y: BY + c.y + i * PIN };
+  const p = c.pitch ?? PIN;
+  return c.dir === "h" ? { x: BX + c.x + i * p, y: BY + c.y } : { x: BX + c.x, y: BY + c.y + i * p };
 }
 function boardPin(b: Board, ref: string): { x: number; y: number; c: BConn; i: number } | null {
   const [cid, pk] = ref.split(".");
@@ -80,6 +86,7 @@ interface Box { x0: number; y0: number; x1: number; y1: number }
 /** Zusatz-Pins auf der Außenseite (Relais-Kontakte) */
 function outerPins(p: Part): string[] {
   if (p.kind === "relay") return ["COM", "NO"];
+  if (p.kind === "extdrv") return ["A+", "A−", "B+", "B−", "VCC", "GND"];
   return [];
 }
 
@@ -170,41 +177,184 @@ function partGlyph(pl: Placed): string {
   }
 }
 
+/** Gehäuse-Rand eines Steckers je Bauform (Schraubklemme, Hohlstecker … sind größer als die Pins) */
+function connPad(c: BConn): { px: number; py: number } {
+  const across = c.style === "screw" ? 11 : c.style === "barrel" ? 22 : c.style === "xt" ? 6 : 0;
+  const along = c.style === "screw" || c.style === "xt" ? 4 : c.style === "barrel" ? 12 : 0;
+  return c.dir === "h" ? { px: along, py: across } : { px: across, py: along };
+}
+
+/** Platinen-Optik (Treibersockel, Funkmodul, USB …) – nur Zeichnung, ohne Funktion */
+function decoSvg(d: Deco): string {
+  const x = BX + d.x, y = BY + d.y, w = d.w, h = d.h;
+  const label = (cls = "wr-deco-t", dy = 0) => d.label ? `<text x="${n(x + w / 2)}" y="${n(y + h / 2 + 4 + dy)}" text-anchor="middle" class="${cls}">${esc(d.label)}</text>` : "";
+  switch (d.kind) {
+    case "socket": {
+      // grüne Stiftleiste links, schwarze rechts, Kondensator, rote DIP-Schalter, Achsbuchstabe
+      let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="#0d0e10" stroke="#2a2d33"/>`;
+      s += `<rect x="${x + 1}" y="${y + 1}" width="11" height="${h - 2}" fill="#3fcf7a"/><rect x="${x + w - 12}" y="${y + 1}" width="11" height="${h - 2}" fill="#1b1d21"/>`;
+      for (let py = y + 9; py < y + h - 4; py += 13) {
+        s += `<rect x="${x + 4}" y="${py - 2.5}" width="5" height="5" fill="#0d0e10"/><circle cx="${x + w - 6.5}" cy="${py}" r="2.4" fill="#8a8f96"/>`;
+      }
+      s += `<circle cx="${n(x + w * 0.38)}" cy="${y + 26}" r="13" fill="#c9ccd1" stroke="#7d828a"/><path d="M${n(x + w * 0.38 - 13)},${y + 31} A13,13 0 0,0 ${n(x + w * 0.38 + 13)},${y + 31} Z" fill="#2f9e8f"/>`;
+      const dw = w - 38, dx = x + 19, dy = y + h - 52;
+      s += `<rect x="${n(dx)}" y="${n(dy)}" width="${n(dw)}" height="38" rx="2" fill="#d23a3f"/>`;
+      for (let k = 0; k < 3; k++) {
+        const sx = dx + 6 + k * (dw - 12) / 3, sw = (dw - 12) / 3 - 5;
+        if (!msView) { s += `<rect x="${n(sx)}" y="${n(dy + 7)}" width="${n(sw)}" height="16" rx="1.5" fill="#f4f4f4"/>`; continue; }
+        // Schlitz + weißer Schieber: oben = ON
+        s += `<rect x="${n(sx)}" y="${n(dy + 7)}" width="${n(sw)}" height="16" rx="1.5" fill="#7a1418"/>`;
+        s += `<rect x="${n(sx)}" y="${n(msView.m[k] ? dy + 7 : dy + 16)}" width="${n(sw)}" height="7" rx="1.5" class="wr-dip${msView.m[k] ? " on" : ""}"/>`;
+      }
+      s += `<text x="${n(dx + dw / 2)}" y="${n(dy + 34)}" text-anchor="middle" class="wr-silk" style="font-size:8px">ON  1 2 3</text>`;
+      s += `<text x="${x + w - 24}" y="${y + 24}" text-anchor="middle" class="wr-silk" style="font-size:19px">${esc(d.label)}</text>`;
+      return s;
+    }
+    case "esp": {
+      // Funkmodul: silberne Abschirmung, Antenne oben
+      let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#0f1012" stroke="#3a3e45"/>`;
+      s += `<rect x="${x + 6}" y="${n(y + h * 0.24)}" width="${w - 12}" height="${n(h * 0.72)}" rx="3" fill="#b8bdc4" stroke="#8b9097"/>`;
+      s += `<path d="M${x + 10},${y + 14} h${w - 30} v8 h-${w - 38} v8 h${w - 38}" fill="none" stroke="#c9a33a" stroke-width="2"/>`;
+      s += `<text x="${n(x + w / 2)}" y="${n(y + h * 0.62)}" text-anchor="middle" class="wr-esp-t">${esc(d.label)}</text>`;
+      return s;
+    }
+    case "usb":
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#c3c7cd" stroke="#858a92"/><rect x="${x + w * 0.22}" y="${y + h * 0.3}" width="${w * 0.56}" height="${h * 0.42}" rx="3" fill="#3b3f45"/>` + label("wr-metal-t", -h * 0.3);
+    case "sd":
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#c3c7cd" stroke="#858a92"/><rect x="${x + 8}" y="${y + 6}" width="${w - 16}" height="10" rx="2" fill="#6d727a"/>` + label("wr-metal-t", 8);
+    case "fuse":
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="#d8343a" opacity="0.85"/><rect x="${x + 7}" y="${y + 10}" width="${w - 14}" height="${h - 20}" rx="2" fill="#f07a7e" opacity="0.7"/>`;
+    case "exp": {
+      let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#0d0e10" stroke="#3a3e45"/><rect x="${n(x + w / 2 - 10)}" y="${y + h - 5}" width="20" height="5" fill="#2a2d33"/>`;
+      for (let r = 0; r < 2; r++) for (let k = 0; k < 5; k++) s += `<circle cx="${n(x + 28 + k * (w - 56) / 4)}" cy="${n(y + h * 0.36 + r * 16)}" r="3" fill="#c9a33a"/>`;
+      return s + `<text x="${x + w - 4}" y="${y - 4}" text-anchor="end" class="wr-silk" style="font-size:9px">${esc(d.label)}</text>`;
+    }
+    case "rj":
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#0d0e10" stroke="#4a4e55"/><rect x="${x + 8}" y="${y + 6}" width="${w - 16}" height="12" fill="#8b9097"/>` + label("wr-silk", 10);
+    case "text": {
+      const tx = d.align === "start" ? x : d.align === "end" ? x + w : x + w / 2;
+      const ty = y + h / 2 + (d.size || 12) * 0.35;
+      const rot = d.rot ? ` transform="rotate(-90 ${n(tx)} ${n(y + h / 2)})"` : "";
+      return `<text x="${n(tx)}" y="${n(ty)}" text-anchor="${d.align || "middle"}"${rot} class="wr-silk" style="font-size:${d.size || 12}px">${esc(d.label)}</text>`;
+    }
+    case "pins": {
+      // Raster aus Stiften (nur Optik), oval = Lötaugen
+      let s = "";
+      const g = d.gap ?? PIN;
+      for (let r = 0; r < (d.rows ?? 1); r++) for (let k = 0; k < (d.cols ?? 1); k++) {
+        const cx = x + k * g, cy = y + r * g;
+        s += d.oval
+          ? `<ellipse cx="${n(cx)}" cy="${n(cy)}" rx="6" ry="9.5" fill="#e3c25a" stroke="#8a6d1c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="2.6" fill="#3a2a10"/>`
+          : `<rect x="${n(cx - 6)}" y="${n(cy - 6)}" width="12" height="12" fill="#1b1b1d"/><rect x="${n(cx - 2.6)}" y="${n(cy - 2.6)}" width="5.2" height="5.2" fill="#d4af37"/>`;
+      }
+      return s;
+    }
+    case "button":
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#e9e9e9" stroke="#999"/><rect x="${x + w * 0.22}" y="${y + h * 0.18}" width="${w * 0.56}" height="${h * 0.64}" rx="3" fill="#2b2b2d"/><circle cx="${n(x + w / 2)}" cy="${n(y + h / 2)}" r="${n(Math.min(w, h) * 0.2)}" fill="#111"/>`;
+    case "shsock": {
+      // Treiber-Steckplatz auf dem Shield: gelbe Buchsenleisten, Mikroschritt-Brücken M0 M1 M2
+      let s = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="none" stroke="#f5f5f5" stroke-width="2"/>`;
+      s += `<rect x="${x + 6}" y="${y + 6}" width="14" height="${h - 12}" fill="#f2cf1d"/><rect x="${x + w - 20}" y="${y + 6}" width="14" height="${h - 12}" fill="#f2cf1d"/>`;
+      for (let k = 0; k < 8; k++) {
+        const py = y + 16 + k * ((h - 32) / 7);
+        s += `<rect x="${x + 10}" y="${n(py - 3)}" width="6" height="6" fill="#222"/><rect x="${x + w - 16}" y="${n(py - 3)}" width="6" height="6" fill="#222"/>`;
+      }
+      const jx = x + w / 2 - 34, jy = y + h - 58;
+      for (let k = 0; k < 3; k++) {
+        s += `<rect x="${n(jx + k * 24)}" y="${n(jy)}" width="22" height="44" fill="none" stroke="#ffd2d2" stroke-width="1.6"/>`;
+        s += `<rect x="${n(jx + k * 24 + 7)}" y="${n(jy + 6)}" width="8" height="8" fill="#d4af37"/><rect x="${n(jx + k * 24 + 7)}" y="${n(jy + 28)}" width="8" height="8" fill="#d4af37"/>`;
+        s += `<text x="${n(jx + k * 24 + 11)}" y="${n(jy - 4)}" text-anchor="middle" class="wr-silk" style="font-size:9px">M${k}</text>`;
+        if (msView?.m[k]) s += `<rect x="${n(jx + k * 24 + 3)}" y="${n(jy + 3)}" width="16" height="36" rx="3" class="wr-jumper"/>`;
+      }
+      return s + `<text x="${x + 28}" y="${y + 20}" class="wr-silk" style="font-size:9px">EN</text>`;
+    }
+    default:
+      return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" class="wr-deco wr-deco-${d.kind}"/>` + label();
+  }
+}
+
+/** Gehäuse eines Steckers je Bauform */
+function connBody(c: BConn, x0: number, y0: number, w: number, h: number, stroke: string, sw: number): string {
+  if (c.style === "barrel") {
+    // Hohlstecker-Buchse: schwarzer Block mit runder Öffnung, Pins darin
+    return `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="4" fill="#111214" stroke="${stroke}" stroke-width="${sw}"/><circle cx="${n(x0 + w / 2)}" cy="${n(y0 + h * 0.3)}" r="9" fill="#2a2d32" stroke="#555a61"/>`;
+  }
+  if (c.style === "screw") {
+    return `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="3" fill="${c.body || "#1c1e22"}" stroke="${stroke}" stroke-width="${sw}"/>`;
+  }
+  if (c.style === "pads") return `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="7" fill="none" stroke="${stroke}" stroke-width="${sw}" stroke-dasharray="3 2"/>`;
+  const fill = c.style === "xt" ? "#e0a21e" : c.body || "#15181c";
+  return `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="3" fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>`;
+}
+
 function boardSvg(b: Board, active: Set<string>, connComp: Map<string, CompId> | null): string {
-  let s = `<rect x="${BX - 8}" y="${BY - 8}" width="${b.w + 16}" height="${b.h + 16}" rx="14" class="wr-board"/>`;
+  const pcb = b.pcb;
+  let s = pcb && b.outline
+    ? `<path d="M${b.outline.map(([px, py]) => `${BX + px},${BY + py}`).join(" L")} Z" fill="${pcb.fill}" stroke="${pcb.edge}" stroke-width="2" stroke-linejoin="round"/>`
+    : pcb
+      ? `<rect x="${BX - 8}" y="${BY - 8}" width="${b.w + 16}" height="${b.h + 16}" rx="16" fill="${pcb.fill}" stroke="${pcb.edge}" stroke-width="2"/>`
+      : `<rect x="${BX - 8}" y="${BY - 8}" width="${b.w + 16}" height="${b.h + 16}" rx="14" class="wr-board"/>`;
   s += `<text x="${BX + b.w / 2}" y="${BY + b.h + 34}" text-anchor="middle" class="wr-board-name">${esc(b.name)}</text>`;
-  for (const d of b.deco) {
-    s += `<rect x="${BX + d.x}" y="${BY + d.y}" width="${d.w}" height="${d.h}" rx="4" class="wr-deco wr-deco-${d.kind}"/>`;
-    s += `<text x="${BX + d.x + d.w / 2}" y="${BY + d.y + d.h / 2 + 5}" text-anchor="middle" class="wr-deco-t">${esc(d.label)}</text>`;
+  for (const hl of b.holes || []) {
+    s += `<circle cx="${BX + hl.x}" cy="${BY + hl.y}" r="${hl.r}" fill="#d5d8dc"/><circle cx="${BX + hl.x}" cy="${BY + hl.y}" r="${n(hl.r * 0.55)}" fill="#0f1215"/>`;
+  }
+  for (const d of b.deco) s += decoSvg(d);
+  // Shield: Jumper für die A-Achse (klont X/Y/Z): in der Reihe der Achse links A.STP, rechts A.DIR
+  if (msView?.clone && b.id === "cnc-shield-v3") {
+    const blk = b.deco.find(d => d.kind === "pins" && d.cols === 4 && d.rows === 4);
+    const r = "XYZ".indexOf(msView.clone);
+    if (blk && r >= 0) {
+      const g = blk.gap ?? PIN, y = BY + blk.y + r * g;
+      for (const c0 of [0, 2]) s += `<rect x="${n(BX + blk.x + c0 * g - 9)}" y="${n(y - 8)}" width="${n(g + 18)}" height="16" rx="4" class="wr-jumper"/>`;
+    }
   }
   for (const c of b.conns) {
     const on = active.has(c.id);
     const cc = connComp?.get(c.id);
-    const len = (c.pins.length - 1) * PIN;
-    const x0 = BX + c.x - 7, y0 = BY + c.y - 7;
-    const w = c.dir === "h" ? len + 14 : 14, h = c.dir === "h" ? 14 : len + 14;
-    const stroke = cc ? COMP_COLOR[cc] : on ? "var(--accent-color)" : "#56606b";
+    const len = (c.pins.length - 1) * (c.pitch ?? PIN);
+    const pad = connPad(c);
+    const x0 = BX + c.x - 7 - pad.px, y0 = BY + c.y - 7 - pad.py;
+    const w = (c.dir === "h" ? len + 14 : 14) + 2 * pad.px, h = (c.dir === "h" ? 14 : len + 14) + 2 * pad.py;
+    const mark = cc ? COMP_COLOR[cc] : on ? "var(--accent-color)" : "";
+    // Stecker mit echter Gehäusefarbe: Markierung als Rahmen außen herum, damit die Farbe erkennbar bleibt
+    const real = !!(c.body || c.style);
+    const stroke = real ? "#000a" : mark || "#56606b";
+    const sw = !real && mark ? 2 : 1;
     s += `<g class="wr-conn${on ? " on" : ""}${connComp ? " pick" : ""}" data-conn="${c.id}"${cc ? ` data-comp="${cc}"` : ""}>`;
-    s += `<rect x="${x0}" y="${y0}" width="${w}" height="${h}" rx="3" fill="#15181c" stroke="${stroke}" stroke-width="${on || cc ? 2 : 1}"/>`;
+    if (real && mark) s += `<rect x="${x0 - 3.5}" y="${y0 - 3.5}" width="${w + 7}" height="${h + 7}" rx="5" fill="none" stroke="${mark}" stroke-width="2.2" class="wr-mark"/>`;
+    s += connBody(c, x0, y0, w, h, stroke, sw);
     c.pins.forEach((p, i) => {
       const pp = pinPos(c, i);
       const tipTxt = `${c.label} · ${p.label}${p.mcu ? " · " + p.mcu : ""}${p.fn ? " · " + fnText(p.fn) : ""}`;
-      s += `<circle cx="${pp.x}" cy="${pp.y}" r="4.3" class="wr-pin"><title>${esc(tipTxt)}</title></circle>`;
+      const screw = c.style === "screw";
+      s += `<circle cx="${pp.x}" cy="${pp.y}" r="${screw ? 5.6 : 4.3}" class="wr-pin${screw ? " wr-pin-screw" : ""}" data-end="b:${esc(c.id)}.${esc(p.k)}"><title>${esc(tipTxt)}</title></circle>`;
+      if (screw) s += `<line x1="${pp.x - 3.5}" y1="${pp.y}" x2="${pp.x + 3.5}" y2="${pp.y}" stroke="#555" stroke-width="1.4" pointer-events="none"/>`;
+      if (c.pinLbl === false) return;
       // Pin-Beschriftung
-      if (c.dir === "h") s += `<text x="${pp.x}" y="${c.labelPos === "above" ? pp.y + 18 : pp.y - 10}" text-anchor="middle" class="wr-pinlbl">${esc(p.label)}</text>`;
+      if (c.dir === "h") s += `<text x="${pp.x}" y="${c.labelPos === "above" ? pp.y + 18 + pad.py : pp.y - 10 - pad.py}" text-anchor="middle" class="wr-pinlbl">${esc(p.label)}</text>`;
       else {
-        const right = c.labelPos !== "left" && c.x < b.w / 2;
-        s += `<text x="${right ? pp.x + 11 : pp.x - 11}" y="${pp.y + 3.5}" text-anchor="${right ? "start" : "end"}" class="wr-pinlbl">${esc(p.label)}</text>`;
+        const right = c.pinSide ? c.pinSide === "right" : c.labelPos !== "left" && c.x < b.w / 2;
+        const off = 11 + pad.px;
+        s += `<text x="${right ? pp.x + off : pp.x - off}" y="${pp.y + 3.5}" text-anchor="${right ? "start" : "end"}" class="wr-pinlbl">${esc(p.label)}</text>`;
       }
     });
     // Stecker-Name
     const lp = c.labelPos || "above";
-    if (c.dir === "h") {
-      const ty = lp === "below" ? y0 + h + 22 : y0 - 6;
+    if (c.rot) {
+      // senkrecht am Platinenrand, wie der Aufdruck auf dem Board
+      const tx = x0 - 7, ty = y0 + h / 2;
+      s += `<text x="${n(tx)}" y="${n(ty)}" text-anchor="middle" transform="rotate(-90 ${n(tx)} ${n(ty)})" class="wr-connlbl wr-connlbl-rot">${esc(c.label)}</text>`;
+    } else if (!c.label) {
+      // kein Name (Beschriftung steht an den Pins)
+    } else if (c.dir === "h" && (lp === "left" || lp === "right")) {
+      s += `<text x="${n(lp === "left" ? x0 - 6 : x0 + w + 6)}" y="${n(y0 + h / 2 + 4)}" text-anchor="${lp === "left" ? "end" : "start"}" class="wr-connlbl">${esc(c.label)}</text>`;
+    } else if (c.dir === "h") {
+      const ty = lp === "below" ? y0 + h + (c.pinLbl === false ? 14 : 22) : y0 - 6;
       s += `<text x="${x0 + w / 2}" y="${ty}" text-anchor="middle" class="wr-connlbl">${esc(c.label)}</text>`;
     } else {
       const right = c.x < b.w / 2;
       if (lp === "above") s += `<text x="${x0 + w / 2}" y="${y0 - 6}" text-anchor="middle" class="wr-connlbl">${esc(c.label)}</text>`;
+      else if (lp === "below") s += `<text x="${x0 + w / 2}" y="${y0 + h + 14}" text-anchor="middle" class="wr-connlbl">${esc(c.label)}</text>`;
       else {
         // Abstand nach der längsten Pin-Beschriftung, damit nichts übereinander liegt
         const off = 20 + Math.max(...c.pins.map(p => p.label.length)) * 5.8;
@@ -239,27 +389,41 @@ function drawHookup(b: Board, hk: Hookup, box: Box): string {
     const c2 = v ? { x: z.x - sx * 0.6, y: z.y } : { x: z.x, y: z.y - sy * 0.6 };
     return `M${n(a.x)},${n(a.y)} C${n(c1.x)},${n(c1.y)} ${n(c2.x)},${n(c2.y)} ${n(z.x)},${n(z.y)}`;
   };
-  const wire = (d: string, color: string) =>
-    `<path d="${d}" stroke="#0008" stroke-width="5" fill="none"/><path d="${d}" stroke="${color}" stroke-width="3" fill="none" class="wr-wire"/>`;
+  /**
+   * Ein Kabel als Gruppe: unsichtbare breite Linie zum leichteren Treffen mit der Maus, Schatten, Farbe, Tooltip.
+   * data-ends = beide Enden („p:teil.pin“ / „b:stecker.pin“) – Maus über Kabel oder Pin hebt es hervor (initWiringPage)
+   */
+  const wire = (d: string, color: string, ends: string, tip: string, dot = "") =>
+    `<g class="wr-w" data-ends="${esc(ends)}"><title>${esc(tip)}</title><path d="${d}" stroke="transparent" stroke-width="14" fill="none" pointer-events="stroke"/>` +
+    `<path d="${d}" stroke="#0008" stroke-width="5" fill="none" class="wr-wire-sh"/><path d="${d}" stroke="${color}" stroke-width="3" fill="none" class="wr-wire" style="--wc:${color}"/>${dot}</g>`;
   for (const pl of placed) {
     for (const w of pl.part.wires) {
       const a = pl.pins[w.from];
       if (!a) continue;
       let z: { x: number; y: number } | null = null;
+      let endKey = "", endName = "";
       if (w.to.startsWith("@")) {
         const [pid, pn] = w.to.slice(1).split(".");
-        z = byId.get(pid)?.pins[pn] || null;
-      } else z = boardPin(b, w.to);
+        const other = byId.get(pid);
+        z = other?.pins[pn] || null;
+        endKey = `p:${pid}.${pn}`; endName = other ? `${partName(other.part)} · ${pn}` : pn;
+      } else {
+        const bp = boardPin(b, w.to);
+        z = bp;
+        endKey = `b:${w.to}`; endName = bp ? `${bp.c.label || bp.c.pins[bp.i].label} · ${bp.c.pins[bp.i].label}` : w.to;
+      }
       if (!z) continue;
+      const ends = `p:${pl.part.id}.${w.from} ${endKey}`;
+      const tip = `${partName(pl.part)} · ${w.from}  →  ${endName}`;
       if (w.to.startsWith("@") && pl.part.outer) {
         // zwischen zwei Bauteilen außen herum (z. B. Plasmaschneider/Pumpe an den Relais-Kontakt)
         const side = pl.part.side, o = 46;
         const ox = side === "left" ? -o : side === "right" ? o : 0, oy = side === "top" ? -o : side === "bottom" ? o : 0;
-        wires += wire(`M${n(a.x)},${n(a.y)} C${n(a.x + ox)},${n(a.y + oy)} ${n(z.x + ox)},${n(z.y + oy)} ${n(z.x)},${n(z.y)}`, w.color);
+        wires += wire(`M${n(a.x)},${n(a.y)} C${n(a.x + ox)},${n(a.y + oy)} ${n(z.x + ox)},${n(z.y + oy)} ${n(z.x)},${n(z.y)}`, w.color, ends, tip);
         continue;
       }
-      wires += wire(curve(a, z, pl.part.side), w.color);
-      if (!w.to.startsWith("@")) wires += `<circle cx="${n(z.x)}" cy="${n(z.y)}" r="3.4" fill="${w.color}"/>`;
+      const dot = w.to.startsWith("@") ? "" : `<circle cx="${n(z.x)}" cy="${n(z.y)}" r="3.4" fill="${w.color}"/>`;
+      wires += wire(curve(a, z, pl.part.side), w.color, ends, tip, dot);
     }
   }
   for (const pl of placed) {
@@ -267,7 +431,7 @@ function drawHookup(b: Board, hk: Hookup, box: Box): string {
     parts += `<text x="${n(pl.x + pl.w / 2)}" y="${pl.y + 15}" text-anchor="middle" class="wr-partname">${esc(partName(pl.part))}</text>`;
     parts += partGlyph(pl);
     for (const [nm, p] of Object.entries(pl.pins)) {
-      parts += `<circle cx="${n(p.x)}" cy="${n(p.y)}" r="4" class="wr-ppin"/>`;
+      parts += `<circle cx="${n(p.x)}" cy="${n(p.y)}" r="4" class="wr-ppin" data-end="p:${esc(pl.part.id)}.${esc(nm)}"/>`;
       const side = pl.part.side;
       const outer = outerPins(pl.part).includes(nm) || !!pl.part.outer;
       let tx = p.x, ty = p.y, anchor = "middle";
@@ -289,6 +453,25 @@ function drawHookup(b: Board, hk: Hookup, box: Box): string {
 // Seite
 // ---------------------------------------------------------------------
 
+/** Kasten „Mikroschritte einstellen“ (Treiber, Teiler, A-Klon) mit Ergebnis-Text */
+function msPanel(drv: ReturnType<typeof getDriver>, st: { div: number; m: Ms }, isShield: boolean, clone: string): string {
+  const on = [0, 1, 2].filter(k => st.m[k]);
+  const list = on.map(k => isShield ? "M" + k : String(k + 1)).join(" + ");
+  const res = isShield
+    ? (on.length ? t("wr.ms.jumpers", { list }) : t("wr.ms.noJumpers"))
+    : (on.length ? t("wr.ms.dip", { list }) : t("wr.ms.noDip"));
+  const divName = (d: number) => d === 1 ? t("wr.ms.full") : `1/${d}`;
+  let h = `<div class="wr-ms"><h4>${esc(t("wr.ms.title"))}</h4><div class="wr-ms-row">`;
+  h += `<label>${esc(t("wr.ms.driver"))}<select id="wr-drv">${DRIVERS.map(d => `<option value="${d.id}"${d.id === drv.id ? " selected" : ""}>${esc(d.name)}</option>`).join("")}</select></label>`;
+  h += `<label>${esc(t("wr.ms.div"))}<select id="wr-div">${drv.steps.map(x => x.div).sort((a, c) => a - c).map(d => `<option value="${d}"${d === st.div ? " selected" : ""}>${esc(divName(d))}</option>`).join("")}</select></label>`;
+  if (isShield) h += `<label>${esc(t("wr.ms.clone"))}<select id="wr-clone">${["", "X", "Y", "Z"].map(a => `<option value="${a}"${a === clone ? " selected" : ""}>${esc(a ? t("wr.ms.cloneAxis", { axis: a }) : t("wr.ms.cloneOff"))}</option>`).join("")}</select></label>`;
+  h += `</div><div class="wr-ms-res">🔧 ${esc(res)}</div>`;
+  if (drv.tmc) h += `<div class="wr-p">${esc(t("wr.ms.tmc"))}</div>`;
+  if (isShield && clone) h += `<div class="wr-ms-res">🔀 ${esc(t("wr.ms.cloneOn", { axis: clone }))}</div>`;
+  h += `<div class="wr-p">${esc(t("wr.ms.steps", { div: String(st.div), belt: String(200 * st.div / 40), screw: String(200 * st.div / 8) }))}</div></div>`;
+  return h;
+}
+
 export function initWiringPage() {
   const root = document.getElementById("wiring-page");
   if (!root) return;
@@ -297,10 +480,18 @@ export function initWiringPage() {
   let level = get(KEY_LEVEL, "beginner") === "pro" ? "pro" : "beginner";
   let comp = get(KEY_COMP, "overview") as CompId | "overview";
 
+  let ms = { drv: "a4988", div: 16, clone: "" };
+  try { ms = { ...ms, ...JSON.parse(get(KEY_MS, "{}")) }; } catch { /* egal */ }
+
   const render = () => {
     const b = getBoard(boardId);
     if (comp !== "overview" && !COMPS.includes(comp)) comp = "overview";
     const hk = comp === "overview" ? null : b.hookups[comp] || null;
+    // Mikroschritte / A-Klon nur in der Ansicht „Schrittmotoren“ zeichnen
+    const drv = getDriver(ms.drv), st = msFor(drv, ms.div);
+    const isShield = b.id === "cnc-shield-v3";
+    const hasSockets = b.deco.some(d => d.kind === "shsock" || d.kind === "socket");
+    msView = comp === "motors" && hasSockets ? { m: st.m, clone: isShield ? ms.clone : "" } : null;
 
     // aktive Stecker
     const active = new Set<string>();
@@ -351,6 +542,7 @@ export function initWiringPage() {
     } else {
       side += `<h3>${COMP_ICON[hk.comp]} ${esc(t("wr.comp." + hk.comp))}</h3>`;
       if (hk.notes.length) side += hk.notes.map(s => `<div class="wr-note">⚠ ${tx(s)}</div>`).join("");
+      if (msView) side += msPanel(drv, st, isShield, ms.clone);
       if (level === "beginner") {
         side += `<h4>${esc(t("wr.steps"))}</h4><ol class="wr-steps">${hk.steps.map(s => `<li>${tx(s)}</li>`).join("")}</ol>`;
       } else {
@@ -391,6 +583,13 @@ export function initWiringPage() {
   root.addEventListener("change", (e) => {
     const el = e.target as HTMLSelectElement;
     if (el.id === "wr-board") { boardId = el.value; put(KEY_BOARD, boardId); render(); }
+    if (el.id === "wr-drv" || el.id === "wr-div" || el.id === "wr-clone") {
+      if (el.id === "wr-drv") { ms.drv = el.value; ms.div = getDriver(el.value).std; }
+      if (el.id === "wr-div") ms.div = parseInt(el.value, 10) || 16;
+      if (el.id === "wr-clone") ms.clone = el.value;
+      put(KEY_MS, JSON.stringify(ms));
+      render();
+    }
   });
   root.addEventListener("click", (e) => {
     const el = e.target as Element;
@@ -399,6 +598,34 @@ export function initWiringPage() {
     const cc = el.closest("[data-comp]") as HTMLElement | null;
     if (cc) { comp = cc.dataset.comp as any; put(KEY_COMP, comp); render(); return; }
   });
+  // Kabel hervorheben: Maus über ein Kabel oder einen Pin -> dieses Kabel dick und leuchtend, die anderen blass
+  let hlKey = "";
+  const clearHl = () => {
+    hlKey = "";
+    root.querySelector(".wr-svg")?.classList.remove("wr-hl");
+    root.querySelectorAll(".wr-w.hl, [data-end].hl").forEach(x => x.classList.remove("hl"));
+  };
+  root.addEventListener("mouseover", (e) => {
+    const el = e.target as Element;
+    const w = el.closest(".wr-w") as SVGGElement | null;
+    const end = w ? null : el.closest("[data-end]") as Element | null;
+    const key = w ? "w:" + (w.getAttribute("data-ends") || "") : end ? "e:" + end.getAttribute("data-end") : "";
+    if (key === hlKey) return;
+    clearHl();
+    if (!key) return;
+    const svg = root.querySelector(".wr-svg");
+    const groups = w ? [w] : [...root.querySelectorAll<SVGGElement>(".wr-w")].filter(g => (g.getAttribute("data-ends") || "").split(" ").includes(end!.getAttribute("data-end") || ""));
+    if (!groups.length || !svg) return;
+    hlKey = key;
+    svg.classList.add("wr-hl");
+    for (const g of groups) {
+      g.classList.add("hl");
+      g.parentNode?.appendChild(g);   // nach vorne holen
+      for (const k of (g.getAttribute("data-ends") || "").split(" ")) root.querySelectorAll(`[data-end="${CSS.escape(k)}"]`).forEach(x => x.classList.add("hl"));
+    }
+  });
+  root.addEventListener("mouseleave", clearHl);
+
   window.addEventListener("cnc-language-changed", render);
   render();
 }

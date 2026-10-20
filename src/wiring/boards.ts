@@ -18,19 +18,33 @@
  *        id, name, maker (Hersteller = Gruppe in der Auswahlliste), mcu, volt, w/h,
  *        conns  = Stecker mit Pins (Beschriftung wie auf der Platine, mcu = Controller-Pin, fn = Funktion),
  *        deco   = Treiber-Steckplätze, Chip, USB … (nur Optik)
+ *        Damit es wie das echte Board aussieht: pcb (Platinenfarbe), holes (Befestigungslöcher),
+ *        je Stecker body (Gehäusefarbe) / style (Schraubklemme, Hohlstecker …). Lage aus dem Pinplan
+ *        des Herstellers abmessen (Board 640 Einheiten breit, Höhe im gleichen Verhältnis)
  *        fw / source = i18n-Schlüssel für Firmware und Herkunft der Zeichnung
  *   2. In hookupsFor() steht, welches Bauteil an welchen Stecker kommt. Neue Boards brauchen dort
  *      einen eigenen Zweig (wie isShield / isMax) – Stecker-IDs wie "lx", "probe", "ttl", "spin", "pwr"
  *      wiederzuverwenden spart Arbeit.
- *   3. Unten in BOARDS eintragen (und ggf. shiftRight aufrufen). Die Auswahlliste sortiert sich selbst.
+ *   3. Unten in BOARDS eintragen. Die Auswahlliste sortiert sich selbst.
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "limits" | "probe" | "laser" | "spindle" | "plasma" | "air" | "estop" | "door";
-export const COMPS: CompId[] = ["psu", "motors", "limits", "probe", "laser", "spindle", "plasma", "air", "estop", "door"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "plasma" | "air" | "estop" | "door";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "plasma", "air", "estop", "door"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
-export interface BConn { id: string; label: string; x: number; y: number; dir: "h" | "v"; pins: BPin[]; labelPos?: "above" | "below" | "left" | "right" }
+/**
+ * body  = Farbe des Steckergehäuses wie auf dem echten Board (z. B. farbige XH-Stecker beim MKS MAX)
+ * style = Bauform: Schraubklemme, Hohlstecker-Buchse, XT30, Lötaugen (Schalter), Stiftleiste
+ * pinLbl = false: keine Pin-Beschriftung (steht dann z. B. als Aufdruck daneben), Pins im Tooltip
+ * rot = Stecker-Name senkrecht am Platinenrand (wie der Aufdruck „-VIN+“ auf dem Board)
+ */
+export interface BConn {
+  id: string; label: string; x: number; y: number; dir: "h" | "v"; pins: BPin[]; labelPos?: "above" | "below" | "left" | "right";
+  body?: string; style?: "screw" | "barrel" | "xt" | "pads" | "header"; pinLbl?: boolean; rot?: boolean;
+  pitch?: number;              // Pin-Abstand (Standard 13); echte 2,54-mm-Leisten auf dem Shield sind breiter
+  pinSide?: "left" | "right";  // senkrechte Stecker: Seite der Pin-Beschriftung (sonst nach labelPos)
+}
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
 export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv";
@@ -49,6 +63,22 @@ export interface Hookup {
   unavailable?: string; // Schlüssel: gibt es auf diesem Board nicht
 }
 
+/**
+ * Optik auf der Platine (ohne Funktion):
+ *   driver = einfacher Treiber-Steckplatz, socket = MKS-Treibersockel (grüne Leiste, rote DIP-Schalter),
+ *   chip, esp = Funkmodul (silbern), usb, sd, barrel = Hohlstecker-Buchse, fuse = Sicherung,
+ *   exp = Wannenstecker (Display), rj = Display-Buchse, text = Aufdruck (label, size = Schriftgröße)
+ */
+export interface Deco {
+  x: number; y: number; w: number; h: number; label: string;
+  kind: "driver" | "socket" | "shsock" | "chip" | "esp" | "usb" | "sd" | "barrel" | "fuse" | "exp" | "rj" | "hole" | "text" | "pins" | "button";
+  size?: number;
+  /** pins: Raster ab (x, y) = erster Pin, cols × rows im Abstand gap; oval = Lötaugen der Arduino-Leisten */
+  cols?: number; rows?: number; gap?: number; oval?: boolean;
+  /** text: Ausrichtung (Standard Mitte) und senkrecht */
+  align?: "start" | "end"; rot?: boolean;
+}
+
 export interface Board {
   id: string;
   name: string;
@@ -59,21 +89,17 @@ export interface Board {
   volt: string;
   w: number; h: number;  // Größe der Board-Fläche in der Zeichnung
   conns: BConn[];
-  deco: { x: number; y: number; w: number; h: number; label: string; kind: "driver" | "chip" | "usb" | "sd" | "hole" }[];
+  deco: Deco[];
+  /** Aussehen wie das echte Board: Platinenfarbe, Befestigungslöcher */
+  pcb?: { fill: string; edge: string };
+  outline?: [number, number][];   // Umriss der Platine (sonst Rechteck), z. B. Arduino-Form
+  holes?: { x: number; y: number; r: number }[];
   hookups: Partial<Record<CompId, Hookup>>;
 }
 
 // Kabelfarben
 const RED = "#e5484d", BLACK = "#2b2b2b", YEL = "#f5c518", GRN = "#30a46c", BLU = "#3e7bfa", WHT = "#d9d9d9", ORG = "#f08c00", VIO = "#9b5de5";
 
-const mot = (id: string, label: string, x: number, mcu = ""): BConn => ({
-  id, label, x, y: 16, dir: "h", labelPos: "below",
-  pins: [{ k: "2B", label: "2B", fn: mcu }, { k: "2A", label: "2A", fn: mcu }, { k: "1A", label: "1A", fn: mcu }, { k: "1B", label: "1B", fn: mcu }]
-});
-/** 2-polig Signal + GND (CNC Shield) */
-const sg = (id: string, label: string, x: number, y: number, mcu: string, fn: string, dir: "h" | "v" = "v", labelPos: BConn["labelPos"] = "left"): BConn => ({
-  id, label, x, y, dir, labelPos, pins: [{ k: "S", label: "S", mcu, fn }, { k: "G", label: "GND" }]
-});
 /** 3-polig 5V / GND / S (MKS) */
 const vgs = (id: string, label: string, x: number, y: number, mcu: string, fn: string): BConn => ({
   id, label, x, y, dir: "v", labelPos: "above",
@@ -90,7 +116,24 @@ const switchPart = (axis: string, conn: string, sig = "S", gnd = "G", side: Part
 
 // =====================================================================
 // Arduino UNO + CNC Shield V3 (GRBL 1.1h)
+// Lage wie Protoneer „CNC Shield V3.00“ (die verbreiteten roten Nachbauten, z. B. Osoyoo), echte 2,54-mm-Abstände
 // =====================================================================
+const SP = 23.7;   // 2,54 mm in Zeichnungs-Einheiten (Shield 68,6 mm = 640)
+/** Zweier-Stiftleiste Signal + GND waagerecht, Name links wie auf dem Shield */
+const sgRow = (id: string, label: string, y: number, mcu: string, fn: string): BConn => ({
+  id, label, x: 592, y, dir: "h", labelPos: "left", pitch: SP, pinLbl: false, style: "header", body: "#1b1b1d",
+  pins: [{ k: "S", label: "S", mcu, fn }, { k: "G", label: "GND" }]
+});
+/** STEP/DIR-Paar der linken Leiste (STEP links, DIR rechts) */
+const sdRow = (id: string, axis: string, y: number, step: string, dir: string): BConn => ({
+  id, label: axis + ".STEP/DIR", x: 105, y, dir: "h", labelPos: "left", pitch: SP, pinLbl: false, style: "header", body: "#1b1b1d",
+  pins: [{ k: "S", label: "STEP", mcu: step, fn: "Step" }, { k: "D", label: "DIR", mcu: dir, fn: "Dir" }]
+});
+/** Motorstecker senkrecht rechts neben dem Treiber (B2 B1 A1 A2 wie aufgedruckt) */
+const shMot = (id: string, label: string, x: number, y: number): BConn => ({
+  id, label, x, y, dir: "v", labelPos: "below", pinSide: "left", pitch: SP, style: "header", body: "#1b1b1d",
+  pins: [{ k: "2B", label: "B2" }, { k: "2A", label: "B1" }, { k: "1A", label: "A1" }, { k: "1B", label: "A2" }]
+});
 const shield: Board = {
   id: "cnc-shield-v3",
   maker: "Arduino",
@@ -99,39 +142,97 @@ const shield: Board = {
   fw: "wr.fw.shield",
   source: "wr.src.shield",
   volt: "12–36 V",
-  w: 560, h: 400,
+  w: 640, h: 497,
+  pcb: { fill: "#c3161d", edge: "#7a0b10" },
+  outline: [[0, 0], [607, 0], [617, 10], [617, 138], [640, 161], [640, 455], [617, 478], [617, 497], [0, 497]],
+  holes: [{ x: 137, y: 23, r: 12 }, { x: 130, y: 474, r: 12 }],
   conns: [
-    { id: "pwr", label: "12-36V", x: 16, y: 50, dir: "v", labelPos: "right", pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
-    mot("mx", "X", 90), mot("my", "Y", 190), mot("mz", "Z", 290), mot("ma", "A", 390),
-    sg("lx", "X−/X+", 544, 110, "D9", "X-Limit"),
-    sg("ly", "Y−/Y+", 544, 150, "D10", "Y-Limit"),
-    sg("lz", "Z−/Z+", 544, 190, "D11", "Spindel/Laser PWM (GRBL 1.1)"),
-    sg("spe", "SpnEn", 544, 230, "D12", "Z-Limit (GRBL 1.1)"),
-    sg("spd", "SpnDir", 544, 270, "D13", "Spindel-Richtung"),
-    sg("abort", "Abort", 90, 372, "A0", "Reset/Abbruch", "h", "below"),
-    sg("hold", "Hold", 150, 372, "A1", "Feed Hold", "h", "below"),
-    sg("resume", "Resume", 210, 372, "A2", "Cycle Start", "h", "below"),
-    sg("cool", "CoolEn", 270, 372, "A3", "Kühlung M8", "h", "below"),
-    sg("sda", "SDA", 330, 372, "A4", "Nebel M7 (Option)", "h", "below"),
-    sg("scl", "SCL", 390, 372, "A5", "Taster (Probe)", "h", "below"),
-    { id: "v5", label: "5V/GND", x: 460, y: 372, dir: "h", labelPos: "below", pins: [{ k: "5V", label: "5V" }, { k: "G", label: "GND" }] },
-    { id: "estop", label: "E-STOP", x: 16, y: 300, dir: "v", labelPos: "right", pins: [{ k: "1", label: "RST", mcu: "RESET", fn: "Arduino-Reset" }, { k: "2", label: "GND" }] }
+    { id: "pwr", label: "12-36V", x: 30, y: 373, dir: "h", labelPos: "below", pitch: 48, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "-", label: "−" }, { k: "+", label: "+" }] },
+    shMot("mx", "X", 308, 102), shMot("my", "Y", 502, 102), shMot("mz", "Z", 308, 329), shMot("ma", "A", 502, 329),
+    sgRow("lz", "Z−", 179, "D11", "Spindel/Laser PWM (GRBL 1.1)"),
+    sgRow("ly", "Y−", 226, "D10", "Y-Limit"),
+    sgRow("lx", "X−", 274, "D9", "X-Limit"),
+    sgRow("spe", "SpnEn", 298, "D12", "Z-Limit (GRBL 1.1)"),
+    sgRow("spd", "SpnDir", 321, "D13", "Spindel-Richtung"),
+    sgRow("cool", "CoolEn", 344, "A3", "Kühlung M8"),
+    sgRow("abort", "Abort", 368, "A0", "Reset/Abbruch"),
+    sgRow("hold", "Hold", 392, "A1", "Feed Hold"),
+    sgRow("resume", "Resume", 415, "A2", "Cycle Start"),
+    { ...sgRow("estop", "E-STOP", 440, "RESET", "Arduino-Reset"), pins: [{ k: "1", label: "RST", mcu: "RESET", fn: "Arduino-Reset" }, { k: "2", label: "GND" }] },
+    { id: "scl", label: "", x: 580, y: 61, dir: "v", pinSide: "right", pitch: SP, style: "header", body: "#1b1b1d",
+      pins: [{ k: "S", label: "SCL", mcu: "A5", fn: "Taster (Probe)" }, { k: "SDA", label: "SDA", mcu: "A4", fn: "Nebel M7 (Option)" }, { k: "G", label: "GND" }, { k: "RST", label: "RST", mcu: "RESET" }] },
+    { id: "v5", label: "5V/GND", x: 105, y: 211, dir: "h", labelPos: "left", pitch: SP, pinLbl: false, style: "header", body: "#1b1b1d",
+      pins: [{ k: "5V", label: "5V" }, { k: "G", label: "GND" }] },
+    // STEP/DIR-Leiste links (für externe Treiber wie TB6600/DM542)
+    { id: "eng", label: "EN/GND", x: 105, y: 93, dir: "h", labelPos: "left", pitch: SP, pinLbl: false, style: "header", body: "#1b1b1d",
+      pins: [{ k: "E", label: "EN", mcu: "D8", fn: "Enable" }, { k: "G", label: "GND" }] },
+    sdRow("xsd", "X", 117, "D2", "D5"), sdRow("ysd", "Y", 140, "D3", "D6"), sdRow("zsd", "Z", 164, "D4", "D7"), sdRow("asd", "A", 187, "", "")
   ],
   deco: [
-    { x: 76, y: 52, w: 68, h: 96, label: "X", kind: "driver" }, { x: 176, y: 52, w: 68, h: 96, label: "Y", kind: "driver" },
-    { x: 276, y: 52, w: 68, h: 96, label: "Z", kind: "driver" }, { x: 376, y: 52, w: 68, h: 96, label: "A", kind: "driver" },
-    { x: 150, y: 196, w: 240, h: 110, label: "Arduino UNO", kind: "chip" }
+    { x: 7, y: 6, w: 94, h: 71, label: "RST", kind: "button" },
+    // Arduino-Leisten (Lötaugen oben und unten)
+    { x: 226, y: 23, w: 0, h: 0, label: "", kind: "pins", cols: 8, rows: 1, gap: SP, oval: true },
+    { x: 427, y: 23, w: 0, h: 0, label: "", kind: "pins", cols: 8, rows: 1, gap: SP, oval: true },
+    { x: 310, y: 478, w: 0, h: 0, label: "", kind: "pins", cols: 6, rows: 1, gap: SP, oval: true },
+    { x: 475, y: 478, w: 0, h: 0, label: "", kind: "pins", cols: 6, rows: 1, gap: SP, oval: true },
+    // Treiber-Sockel
+    { x: 143, y: 42, w: 142, h: 190, label: "", kind: "shsock" }, { x: 337, y: 42, w: 142, h: 190, label: "", kind: "shsock" },
+    { x: 143, y: 267, w: 142, h: 190, label: "", kind: "shsock" }, { x: 337, y: 267, w: 142, h: 190, label: "", kind: "shsock" },
+    // Brücken für die A-Achse (klont X, Y oder Z – oder D12/D13)
+    { x: 37, y: 238, w: 0, h: 0, label: "", kind: "pins", cols: 4, rows: 4, gap: SP },
+    { x: 4, y: 232, w: 20, h: 12, label: "X", kind: "text", size: 10 }, { x: 4, y: 256, w: 20, h: 12, label: "Y", kind: "text", size: 10 },
+    { x: 4, y: 279, w: 20, h: 12, label: "Z", kind: "text", size: 10 }, { x: 4, y: 303, w: 20, h: 12, label: "D12", kind: "text", size: 8 },
+    { x: 118, y: 303, w: 24, h: 12, label: "D13", kind: "text", size: 8 },
+    { x: 8, y: 323, w: 40, h: 12, label: "A.STP", kind: "text", size: 9 }, { x: 98, y: 323, w: 40, h: 12, label: "A.DIR", kind: "text", size: 9 },
+    { x: 170, y: 238, w: 134, h: 23, label: "FUSE", kind: "chip" },
+    { x: 333, y: 242, w: 167, h: 14, label: "VER 3.00", kind: "text", size: 10 },
+    // UART/I2C-Leiste oben rechts (linke Reihe), Endschalter-Plus-Reihen, Beschriftung
+    { x: 556, y: 61, w: 0, h: 0, label: "", kind: "pins", cols: 1, rows: 4, gap: SP },
+    { x: 500, y: 55, w: 46, h: 12, label: "RX", kind: "text", size: 9, align: "end" },
+    { x: 500, y: 78, w: 46, h: 12, label: "TX", kind: "text", size: 9, align: "end" },
+    { x: 500, y: 101, w: 46, h: 12, label: "5V", kind: "text", size: 9, align: "end" },
+    { x: 500, y: 125, w: 46, h: 12, label: "3V3", kind: "text", size: 9, align: "end" },
+    { x: 592, y: 155, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
+    { x: 592, y: 203, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
+    { x: 592, y: 250, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
+    { x: 550, y: 149, w: 30, h: 12, label: "Z+", kind: "text", size: 10, align: "end" },
+    { x: 550, y: 197, w: 30, h: 12, label: "Y+", kind: "text", size: 10, align: "end" },
+    { x: 550, y: 244, w: 30, h: 12, label: "X+", kind: "text", size: 10, align: "end" },
+    { x: 548, y: 160, w: 0, h: 100, label: "END STOPS", kind: "text", size: 9, rot: true },
+    { x: 580, y: 140, w: 24, h: 10, label: "S", kind: "text", size: 8 }, { x: 604, y: 140, w: 24, h: 10, label: "GND", kind: "text", size: 7 },
+    { x: 140, y: 470, w: 180, h: 18, label: "CNC SHIELD", kind: "text", size: 15 }
   ],
   hookups: {}
 };
 
 // =====================================================================
-// MKS DLC32 V2.1 (ESP32, MKS-Firmware / Grbl_ESP32)
+// MKS-Boards: Lage und Farben wie auf dem echten Board
+// (Makerbase-Pinpläne „… PIN.pdf“ und Fotos aus den Handbüchern; Board 640 Einheiten breit)
 // =====================================================================
+const MKS_PCB = { fill: "#141619", edge: "#2d3137" };
+const XH_BLACK = "#202226";
+/** XH-Motorstecker (4-polig), Beschriftung wie auf dem Board darüber */
+const xhMot = (id: string, label: string, x: number, y: number, body: string, mcu = ""): BConn => ({
+  id, label, x, y, dir: "h", labelPos: "above", body,
+  pins: [{ k: "2B", label: "2B", fn: mcu }, { k: "2A", label: "2A", fn: mcu }, { k: "1A", label: "1A", fn: mcu }, { k: "1B", label: "1B", fn: mcu }]
+});
+/** 3-polig 5V / GND / S (MKS-Endschalter, Taster …) */
+const xh3 = (id: string, label: string, x: number, y: number, mcu: string, fn: string, body: string, labelPos: BConn["labelPos"] = "above"): BConn => ({
+  ...vgs(id, label, x, y, mcu, fn), body, labelPos
+});
+/** Treiber-Anschluss E S D G unter dem Sockel (nur Optik + Tooltip) */
+const esdRow = (axis: string, x: number, y: number, mcu = ""): BConn => ({
+  ...esd(axis, x, mcu), y, label: "E S D G", pinLbl: false, style: "header", body: XH_BLACK
+});
 const esd = (axis: string, x: number, mcu = ""): BConn => ({
   id: "esd_" + axis.toLowerCase(), label: axis + ": E S D G", x, y: 186, dir: "h", labelPos: "below",
   pins: [{ k: "E", label: "E", mcu, fn: "Enable" }, { k: "S", label: "S", fn: "Step" }, { k: "D", label: "D", fn: "Dir" }, { k: "G", label: "G" }]
 });
+
+// ---------------------------------------------------------------------
+// MKS DLC32 V2.1 (ESP32, MKS-Firmware / Grbl_ESP32) – schwarze Platine, schwarze Stecker
+// ---------------------------------------------------------------------
 const dlc21: Board = {
   id: "mks-dlc32-v21",
   maker: "Makerbase (MKS)",
@@ -140,36 +241,44 @@ const dlc21: Board = {
   fw: "wr.fw.dlc32",
   source: "wr.src.dlc21",
   volt: "12–24 V",
-  w: 640, h: 420,
+  w: 640, h: 497,
+  pcb: MKS_PCB,
+  holes: [{ x: 28, y: 26, r: 22 }, { x: 612, y: 26, r: 22 }, { x: 28, y: 469, r: 22 }, { x: 612, y: 469, r: 22 }],
   conns: [
-    mot("mx", "X-Motor", 50), mot("my1", "Y1-Motor", 130), mot("my2", "Y2-Motor", 210), mot("mz", "Z-Motor", 290),
-    { id: "out", label: "+12/24V−", x: 380, y: 16, dir: "h", labelPos: "below", pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
-    { id: "ttl", label: "Laser (S-TTL-V)", x: 466, y: 16, dir: "h", labelPos: "below", pins: [{ k: "S", label: "S", mcu: "IO32", fn: "Laser PWM" }, { k: "G", label: "G" }, { k: "V", label: "V", fn: "12/24V" }] },
-    { id: "i2c", label: "I2C", x: 390, y: 90, dir: "v", labelPos: "above", pins: [{ k: "3V3", label: "3V3" }, { k: "G", label: "GND" }, { k: "SDA", label: "SDA", mcu: "IO0" }, { k: "SCL", label: "SCL", mcu: "IO4", fn: "Kühlung M8" }] },
-    vgs("probe", "Probe", 456, 90, "IO22", "Taster"),
-    vgs("lz", "Z", 514, 90, "IO34", "Z-Limit"),
-    vgs("ly", "Y", 572, 90, "IO35", "Y-Limit"),
-    vgs("lx", "X", 628, 90, "IO36", "X-Limit"),
-    { id: "vout", label: "-12/24V+", x: 16, y: 80, dir: "v", labelPos: "right", pins: [{ k: "-", label: "GND" }, { k: "+", label: "12/24V" }] },
-    { id: "beep", label: "-BEEPER+", x: 16, y: 140, dir: "v", labelPos: "right", pins: [{ k: "-", label: "S" }, { k: "+", label: "12/24V" }] },
-    { id: "spin", label: "-SPINDLE+", x: 16, y: 230, dir: "v", labelPos: "right", pins: [{ k: "-", label: "−", mcu: "IO32", fn: "Spindel (MOSFET)" }, { k: "+", label: "+12/24V" }] },
-    { id: "sw", label: "SWITCH", x: 16, y: 300, dir: "v", labelPos: "right", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
-    { id: "pwr", label: "POWER 12-24V", x: 90, y: 404, dir: "h", labelPos: "above", pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
-    { id: "rst", label: "RESET", x: 540, y: 404, dir: "h", labelPos: "above", pins: [{ k: "G", label: "G" }, { k: "S", label: "S", mcu: "EN", fn: "Reset" }] },
-    esd("X", 46), esd("Y", 126), esd("Z", 206)
+    xhMot("mx", "X-Motor", 83, 30, XH_BLACK), xhMot("my1", "Y1-Motor", 180, 30, XH_BLACK),
+    xhMot("my2", "Y2-Motor", 277, 30, XH_BLACK), xhMot("mz", "Z-Motor", 374, 30, XH_BLACK),
+    { id: "out", label: "+12/24V−", x: 466, y: 30, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    { id: "ttl", label: "S-TTL-V", x: 529, y: 30, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "S", label: "S", mcu: "IO32", fn: "Laser PWM" }, { k: "G", label: "G" }, { k: "V", label: "V", fn: "12/24V" }] },
+    { id: "i2c", label: "I2C", x: 437, y: 68, dir: "v", labelPos: "below", style: "header", body: XH_BLACK, pins: [{ k: "3V3", label: "3V3" }, { k: "G", label: "GND" }, { k: "SDA", label: "SDA", mcu: "IO0" }, { k: "SCL", label: "SCL", mcu: "IO4", fn: "Kühlung M8" }] },
+    xh3("probe", "Probe", 478, 79, "IO22", "Taster", XH_BLACK, "below"),
+    xh3("lz", "Z", 524, 79, "IO34", "Z-Limit", XH_BLACK, "below"),
+    xh3("ly", "Y", 569, 79, "IO35", "Y-Limit", XH_BLACK, "below"),
+    xh3("lx", "X", 615, 79, "IO36", "X-Limit", XH_BLACK, "below"),
+    { id: "vout", label: "-12/24V+", x: 33, y: 120, dir: "v", labelPos: "right", rot: true, body: XH_BLACK, pins: [{ k: "-", label: "−", fn: "GND" }, { k: "+", label: "+", fn: "12/24V" }] },
+    { id: "beep", label: "-BEEPER+", x: 33, y: 178, dir: "v", labelPos: "right", rot: true, body: XH_BLACK, pins: [{ k: "-", label: "−", fn: "S" }, { k: "+", label: "+", fn: "12/24V" }] },
+    { id: "spin", label: "-SPINDLE+", x: 40, y: 250, dir: "v", labelPos: "right", rot: true, style: "screw", pins: [{ k: "-", label: "−", mcu: "IO32", fn: "Spindel (MOSFET)" }, { k: "+", label: "+", fn: "12/24V" }] },
+    { id: "sw", label: "SWITCH", x: 35, y: 401, dir: "v", labelPos: "right", rot: true, style: "pads", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
+    { id: "pwr", label: "POWER 12-24V", x: 138, y: 466, dir: "h", labelPos: "above", style: "barrel", pinLbl: false, pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    { id: "rst", label: "RESET", x: 536, y: 468, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "G", label: "G" }, { k: "S", label: "S", mcu: "EN", fn: "Reset" }] },
+    esdRow("X", 95, 217), esdRow("Y", 209, 217), esdRow("Z", 324, 217)
   ],
   deco: [
-    { x: 40, y: 56, w: 64, h: 100, label: "X", kind: "driver" }, { x: 120, y: 56, w: 64, h: 100, label: "Y", kind: "driver" },
-    { x: 200, y: 56, w: 64, h: 100, label: "Z", kind: "driver" },
-    { x: 400, y: 240, w: 150, h: 90, label: "ESP32", kind: "chip" },
-    { x: 190, y: 300, w: 70, h: 56, label: "USB", kind: "usb" }, { x: 280, y: 300, w: 70, h: 56, label: "SD", kind: "sd" }
+    { x: 63, y: 61, w: 97, h: 143, label: "X", kind: "socket" }, { x: 177, y: 61, w: 97, h: 143, label: "Y", kind: "socket" },
+    { x: 292, y: 61, w: 97, h: 143, label: "Z", kind: "socket" },
+    { x: 498, y: 156, w: 135, h: 135, label: "ESP32", kind: "esp" },
+    { x: 495, y: 307, w: 141, h: 63, label: "EXP1", kind: "exp" }, { x: 495, y: 374, w: 141, h: 63, label: "EXP2", kind: "exp" },
+    { x: 360, y: 290, w: 130, h: 22, label: "Makerbase", kind: "text", size: 17 },
+    { x: 360, y: 312, w: 130, h: 18, label: "MKS DLC32 V2.1", kind: "text", size: 11 },
+    { x: 68, y: 392, w: 30, h: 98, label: "", kind: "fuse" },
+    { x: 212, y: 400, w: 86, h: 97, label: "USB", kind: "usb" }, { x: 387, y: 404, w: 106, h: 93, label: "TF", kind: "sd" }
   ],
   hookups: {}
 };
 
-// =====================================================================
-// MKS DLC32 MAX V1.0 (ESP32-S3)
-// =====================================================================
+// ---------------------------------------------------------------------
+// MKS DLC32 MAX V1.0 (ESP32-S3) – schwarze Platine, farbige Stecker
+// ---------------------------------------------------------------------
+const C_RED = "#d9452f", C_BLUE = "#2f6fd1", C_GREEN = "#2f9e57", C_PURPLE = "#94307f", C_WHITE = "#e6e6e3", C_YEL = "#e8be2a";
 const dlcMax: Board = {
   id: "mks-dlc32-max",
   maker: "Makerbase (MKS)",
@@ -178,29 +287,36 @@ const dlcMax: Board = {
   fw: "wr.fw.dlcmax",
   source: "wr.src.dlcmax",
   volt: "12–24 V",
-  w: 640, h: 440,
+  w: 640, h: 450,
+  pcb: MKS_PCB,
+  holes: [{ x: 24, y: 25, r: 20 }, { x: 614, y: 25, r: 20 }, { x: 24, y: 424, r: 20 }, { x: 614, y: 424, r: 20 }],
   conns: [
-    mot("mx", "X-Motor", 50, "STEP IO16 · DIR IO15"), mot("my1", "Y1-Motor", 130, "STEP IO7 · DIR IO6"), mot("my2", "Y2-Motor", 210, "STEP IO7 · DIR IO6"),
-    mot("mz", "Z-Motor", 290, "STEP IO5 · DIR IO4"), mot("ma", "A-Motor", 370, "STEP IO20 · DIR IO19"),
-    { id: "air", label: "+AIR−", x: 460, y: 16, dir: "h", labelPos: "below", pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "IO1", fn: "Air (MOSFET)" }] },
-    { id: "beep", label: "+BEEPER−", x: 530, y: 16, dir: "h", labelPos: "below", pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "IO42" }] },
-    vgs("lz", "Z−", 494, 84, "IO41", "Z-Limit"), vgs("ly", "Y−", 554, 84, "IO40", "Y-Limit"), vgs("lx", "X−", 614, 84, "IO39", "X-Limit"),
-    vgs("door", "Door", 434, 196, "IO38", "Tür"), vgs("flame", "Flame", 494, 196, "IO36", "Flammen-Sensor"),
-    vgs("probe", "Probe", 554, 196, "IO37", "Taster"), vgs("la", "A−", 614, 196, "IO48", "A-Limit"),
-    { id: "vout", label: "-VIN+", x: 16, y: 74, dir: "v", labelPos: "right", pins: [{ k: "-", label: "GND" }, { k: "+", label: "12-24V" }] },
-    { id: "ttl", label: "Laser", x: 16, y: 140, dir: "v", labelPos: "right", pins: [{ k: "S", label: "TTL", mcu: "IO2", fn: "Laser PWM" }, { k: "G", label: "GND" }, { k: "V", label: "VIN" }] },
-    { id: "ttl2", label: "Laser 2", x: 16, y: 210, dir: "v", labelPos: "right", pins: [{ k: "S", label: "TTL", mcu: "IO2", fn: "Laser PWM" }, { k: "G", label: "GND" }, { k: "V", label: "VIN" }] },
-    { id: "spin", label: "-SPINDLE+", x: 16, y: 284, dir: "v", labelPos: "right", pins: [{ k: "-", label: "−", mcu: "IO35", fn: "Spindel (MOSFET)" }, { k: "+", label: "+" }] },
-    { id: "sw", label: "SWITCH", x: 16, y: 344, dir: "v", labelPos: "right", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
-    { id: "pwr", label: "POWER DC12V/24V", x: 110, y: 424, dir: "h", labelPos: "above", pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
-    { id: "rst", label: "RESET", x: 560, y: 424, dir: "h", labelPos: "above", pins: [{ k: "G", label: "GND" }, { k: "S", label: "RESET", fn: "Reset" }] },
-    esd("X", 46, "IO8"), esd("Y", 126, "IO8"), esd("Z", 206, "IO8"), esd("A", 286, "IO8")
+    xhMot("mx", "X-Motor", 73, 28, C_RED, "STEP IO16 · DIR IO15"), xhMot("my1", "Y1-Motor", 156, 28, C_BLUE, "STEP IO7 · DIR IO6"),
+    xhMot("my2", "Y2-Motor", 239, 28, C_BLUE, "STEP IO7 · DIR IO6"), xhMot("mz", "Z-Motor", 322, 28, C_GREEN, "STEP IO5 · DIR IO4"),
+    xhMot("ma", "A-Motor", 405, 28, C_PURPLE, "STEP IO20 · DIR IO19"),
+    { id: "air", label: "+AIR−", x: 485, y: 28, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "IO1", fn: "Air (MOSFET)" }] },
+    { id: "beep", label: "+BEEPER−", x: 559, y: 28, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "IO42" }] },
+    xh3("lz", "Z−", 537, 84, "IO41", "Z-Limit", C_GREEN), xh3("ly", "Y−", 578, 84, "IO40", "Y-Limit", C_BLUE), xh3("lx", "X−", 618, 84, "IO39", "X-Limit", C_RED),
+    xh3("door", "Door", 495, 162, "IO38", "Tür", C_WHITE), xh3("flame", "Flame", 536, 162, "IO36", "Flammen-Sensor", C_WHITE),
+    xh3("probe", "Probe", 577, 162, "IO37", "Taster", C_WHITE), xh3("la", "A−", 618, 162, "IO48", "A-Limit", C_PURPLE),
+    { id: "vout", label: "-VIN+", x: 26, y: 90, dir: "v", labelPos: "right", rot: true, body: C_RED, pins: [{ k: "-", label: "−", fn: "GND" }, { k: "+", label: "+", fn: "12-24V" }] },
+    { id: "ttl", label: "Laser", x: 26, y: 140, dir: "v", labelPos: "right", rot: true, body: C_YEL, pins: [{ k: "S", label: "TTL", mcu: "IO2", fn: "Laser PWM" }, { k: "G", label: "GND" }, { k: "V", label: "VIN" }] },
+    { id: "ttl2", label: "Laser 2", x: 26, y: 215, dir: "v", labelPos: "right", rot: true, style: "xt", pins: [{ k: "S", label: "TTL", mcu: "IO2", fn: "Laser PWM" }, { k: "G", label: "GND" }, { k: "V", label: "VIN" }] },
+    { id: "spin", label: "-SPINDLE+", x: 30, y: 296, dir: "v", labelPos: "right", rot: true, style: "screw", pins: [{ k: "-", label: "−", mcu: "IO35", fn: "Spindel (MOSFET)" }, { k: "+", label: "+" }] },
+    { id: "sw", label: "SWITCH", x: 27, y: 362, dir: "v", labelPos: "right", rot: true, style: "pads", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
+    { id: "pwr", label: "POWER 12-24V", x: 120, y: 418, dir: "h", labelPos: "above", style: "barrel", pinLbl: false, pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    { id: "rst", label: "RESET", x: 600, y: 378, dir: "h", labelPos: "above", body: C_RED, pins: [{ k: "G", label: "G", fn: "GND" }, { k: "S", label: "RST", fn: "Reset" }] },
+    esdRow("X", 84, 196, "IO8"), esdRow("Y", 187, 196, "IO8"), esdRow("Z", 290, 196, "IO8"), esdRow("A", 393, 196, "IO8")
   ],
   deco: [
-    { x: 40, y: 56, w: 64, h: 100, label: "X", kind: "driver" }, { x: 120, y: 56, w: 64, h: 100, label: "Y", kind: "driver" },
-    { x: 200, y: 56, w: 64, h: 100, label: "Z", kind: "driver" }, { x: 280, y: 56, w: 64, h: 100, label: "A", kind: "driver" },
-    { x: 430, y: 290, w: 150, h: 90, label: "ESP32-S3", kind: "chip" },
-    { x: 200, y: 320, w: 70, h: 56, label: "USB", kind: "usb" }, { x: 290, y: 320, w: 70, h: 56, label: "SD", kind: "sd" }
+    { x: 62, y: 56, w: 88, h: 129, label: "X", kind: "socket" }, { x: 165, y: 56, w: 88, h: 129, label: "Y", kind: "socket" },
+    { x: 268, y: 56, w: 88, h: 129, label: "Z", kind: "socket" }, { x: 371, y: 56, w: 88, h: 129, label: "A", kind: "socket" },
+    { x: 514, y: 233, w: 120, h: 120, label: "ESP32-S3", kind: "esp" },
+    { x: 330, y: 238, w: 170, h: 24, label: "Makerbase", kind: "text", size: 17 },
+    { x: 330, y: 305, w: 170, h: 18, label: "MKS DLC32 MAX V1.0", kind: "text", size: 11 },
+    { x: 60, y: 354, w: 28, h: 92, label: "", kind: "fuse" },
+    { x: 191, y: 362, w: 77, h: 88, label: "USB", kind: "usb" }, { x: 346, y: 367, w: 101, h: 83, label: "TF", kind: "sd" },
+    { x: 514, y: 380, w: 64, h: 70, label: "LCD", kind: "rj" }
   ],
   hookups: {}
 };
@@ -228,7 +344,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 
   // ---- Motoren ----
   const motors: Part[] = isShield
-    ? [motorPart("X", "mx"), motorPart("Y", "my"), motorPart("Z", "mz"), motorPart("A", "ma")]
+    ? [motorPart("X", "mx"), motorPart("Y", "my"), motorPart("Z", "mz", "bottom"), motorPart("A", "ma", "bottom")]
     : isMax
       ? [motorPart("X", "mx"), motorPart("Y1", "my1"), motorPart("Y2", "my2"), motorPart("Z", "mz"), motorPart("A", "ma")]
       : [motorPart("X", "mx"), motorPart("Y1", "my1"), motorPart("Y2", "my2"), motorPart("Z", "mz")];
@@ -245,6 +361,30 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
       : isMax ? [{ k: "wr.n.dlc.y12" }, { k: "wr.n.max.grblhal" }] : [{ k: "wr.n.dlc.y12" }],
     pro: isShield ? [...motorPro, { k: "wr.p.shield.square" }] : motorPro,
     settings: isMax ? ["$3", "$100 / $101 / $102", "$110 / $111 / $112", "$8 (grblHAL)"] : ["$3", "$100 / $101 / $102", "$110 / $111 / $112"]
+  };
+
+  // ---- Externe Treiber (TB6600, DM542 …) – Beispiel X-Achse, gemeinsame Masse (PUL−/DIR−/ENA− an GND) ----
+  // Shield: Leiste links (X.STEP/DIR, EN/GND), MKS: Leiste „E S D G“ unter dem Treiber-Steckplatz
+  const ex = isShield ? { pul: "xsd.S", dir: "xsd.D", ena: "eng.E", gnd: "eng.G" } : { pul: "esd_x.S", dir: "esd_x.D", ena: "esd_x.E", gnd: "esd_x.G" };
+  h.extdrv = {
+    comp: "extdrv",
+    parts: [
+      { id: "drv", kind: "extdrv", name: "X", side: "left", pins: ["PUL+", "PUL−", "DIR+", "DIR−", "ENA+", "ENA−"],
+        wires: [{ from: "PUL+", to: ex.pul, color: YEL }, { from: "PUL−", to: ex.gnd, color: BLACK }, { from: "DIR+", to: ex.dir, color: GRN },
+          { from: "DIR−", to: ex.gnd, color: BLACK }, { from: "ENA+", to: ex.ena, color: VIO }, { from: "ENA−", to: ex.gnd, color: BLACK }] },
+      { id: "mX", kind: "motor", name: "X", side: "left", outer: true, pins: ["1A", "1B", "2A", "2B"],
+        wires: [{ from: "1A", to: "@drv.A+", color: BLACK }, { from: "1B", to: "@drv.A−", color: GRN }, { from: "2A", to: "@drv.B+", color: RED }, { from: "2B", to: "@drv.B−", color: BLU }] },
+      { id: "psu", kind: "psu", name: "", side: "left", outer: true, pins: ["+", "-"],
+        wires: [{ from: "+", to: "@drv.VCC", color: RED }, { from: "-", to: "@drv.GND", color: BLACK }] }
+    ],
+    steps: [
+      { k: "wr.s.ext.1" },
+      { k: isShield ? "wr.s.ext.2.sh" : "wr.s.ext.2.mks" },
+      { k: "wr.s.ext.3" }, { k: "wr.s.ext.4" }, { k: "wr.s.ext.5" }, { k: "wr.s.ext.6" }
+    ],
+    notes: isShield ? [{ k: "wr.n.ext.sh" }] : [{ k: "wr.n.ext.mks" }],
+    pro: [{ k: isShield ? "wr.p.ext.sh" : "wr.p.ext.mks" }, { k: "wr.p.ext.anode" }],
+    settings: ["$0=10", "$100 / $101 / $102", "$4"]
   };
 
   // ---- Endschalter ----
@@ -267,12 +407,12 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   h.probe = {
     comp: "probe",
     parts: [
-      { id: "probe", kind: "probe", name: "", side: isShield ? "bottom" : "right", pins: ["S", "G"],
+      { id: "probe", kind: "probe", name: "", side: "right", pins: ["S", "G"],
         wires: [{ from: "S", to: `${pc}.S`, color: YEL }, { from: "G", to: `${pc}.G`, color: BLACK }] },
-      { id: "wls", kind: "wls", name: "", side: isShield ? "bottom" : "right", pins: ["S", "G"],
+      { id: "wls", kind: "wls", name: "", side: "right", pins: ["S", "G"],
         wires: [{ from: "S", to: `${pc}.S`, color: ORG }, { from: "G", to: `${pc}.G`, color: BLACK }] }
     ],
-    steps: [{ k: "wr.s.probe.1", p: { sig: P(pc, "S"), gnd: P(pc, "GND") } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
+    steps: [{ k: "wr.s.probe.1", p: isShield ? { sig: "SCL (A5)", gnd: "GND" } : { sig: P(pc, "S"), gnd: P(pc, "GND") } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
     notes: isShield ? [{ k: "wr.n.shield.probe" }] : [{ k: "wr.n.dlc.3pin" }],
     pro: [{ k: "wr.p.probe" }],
     settings: ["$6"]
@@ -381,15 +521,6 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   return h;
 }
 
-/** Board-Inhalt rechts neben der linken Stecker-Spalte nach rechts schieben (Platz für deren Beschriftung) */
-function shiftRight(b: Board, dx: number) {
-  for (const c of b.conns) if (c.x > 30) c.x += dx;
-  for (const d of b.deco) d.x += dx;
-  b.w += dx;
-}
-shiftRight(shield, 50);
-shiftRight(dlc21, 100);
-shiftRight(dlcMax, 80);
 
 export const BOARDS: Board[] = [shield, dlc21, dlcMax];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
