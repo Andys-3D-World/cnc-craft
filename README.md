@@ -1,142 +1,145 @@
 # CNC Craft
 
-Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
-(Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
+🇬🇧 **English** · 🇩🇪 [Deutsch](README.de.md)
 
-**Status: 0.2.7 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
+in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Windows and Linux.
 
-![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
+**Status: 0.2.7 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
-## Was es kann
+![CNC Craft – drawing and toolpaths](docs/screenshots/01-design-fraese.png)
 
-- Zeichnen, Import (SVG, DXF, PDF, PLT, Bilder, 3D-Modelle als STL, 3MF und STEP), Fräsbahnen mit Werkzeug-Bibliothek wie in Estlcam
-- Laser-Ebenen wie in LightBurn (Gravieren, Linie, Schneiden mit Freischnitt), Plasma mit Schnittspalt, Anfahrbahn,
-  Blechhöhe abtasten und Höhenregelung (THC)
-- Restplatten-Verwaltung: verbrauchte Fläche wird gemerkt, Teile darauf werden nicht geschnitten
-- 3D-Simulation mit Zeit, Weg und G-Code vor jedem Job
-- Bibliotheken für Fräswerkzeuge, Laser-Ebenen und Plasma-Schnitte – mit Export/Import und Komplett-Sicherung;
-  alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates
-- Steuerungen: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB und WLAN), Marlin, Ruida (CO₂), K40 (M2 Nano)
-- Mehrere Maschinen gleichzeitig verbinden (z. B. Laser per USB und Fräse per WLAN): auswählen, Jobs laufen im
-  Hintergrund weiter, „Alle stoppen“ für alle
-- Spindel, Laser-Testschuss, Overrides 10–200 %, Eingangs-Lämpchen für Endschalter und Taster
-- Kamera (USB-Webcam oder IP-Kamera): zuschauen, Foto/Video, entzerrtes Kamerabild unter der Zeichnung, Ausrichten mit 4 Laser-Kreuzen
-- Netzwerk-Suche für Maschinen im WLAN/LAN (FluidNC, grblHAL, MKS DLC32 …)
-- WLAN einrichten direkt aus der App – Netze in der Nähe auswählen, Sonderzeichen im Passwort, Erst-Einrichtung über das WLAN des Boards (inkl. MKS DLC32 MAX), eigener Name je Maschine
-- Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung
-- Board flashen (ESP32/ESP32-S3 inkl. .elf, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
-- Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX
-- Update direkt aus der App („Jetzt aktualisieren“ im ⓘ-Fenster, signiert)
-- 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
+## Features
 
-## Bilder
+- Drawing and import (SVG, DXF, PDF, PLT, images, 3D models as STL, 3MF and STEP), router toolpaths with a tool library like in Estlcam
+- Laser layers like in LightBurn (engrave/fill, line, cut with lead-in), plasma with kerf compensation, lead-ins,
+  sheet height probing and torch height control (THC)
+- Remnant sheet management: used areas are remembered, parts placed on them are not cut
+- 3D simulation with time, distance and G-code before every job
+- Libraries for router tools, laser layers and plasma cuts – with export/import and full backup;
+  all settings are also saved to a file and survive updates
+- Controllers: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB and Wi-Fi), Marlin, Ruida (CO₂), K40 (M2 Nano)
+- Connect several machines at once (e.g. laser via USB and router via Wi-Fi): switch between them, jobs keep running in
+  the background, “Stop all” stops every machine
+- Spindle, laser test fire, overrides 10–200 %, input indicators for limit switches and probes
+- Camera (USB webcam or IP camera): watch, photo/video, undistorted camera image under the drawing, alignment with 4 laser crosses
+- Network search for machines on Wi-Fi/LAN (FluidNC, grblHAL, MKS DLC32 …)
+- Set up Wi-Fi right from the app – pick nearby networks, special characters in passwords, first setup through the
+  board's own Wi-Fi (incl. MKS DLC32 MAX), custom name per machine
+- Machine settings ($$) explained in plain words, with backup/restore and factory reset
+- Flash boards (ESP32/ESP32-S3 incl. .elf, Arduino UNO/Nano with bundled GRBL 1.1h)
+- Wiring diagrams for CNC Shield V3, MKS DLC32 V2.1 and MKS DLC32 MAX
+- Update right from the app (“Update now” in the ⓘ window, signed)
+- 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
+
+## Screenshots
 
 | | |
 |---|---|
-| ![3D-Simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – Fräsbahnen in 3D, Zeit und G-Code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – Ebenen: Gravieren (Fläche) und Schneiden |
-| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – Schnitte, Einstichpunkte und Anfahrbahnen | ![Anschlussplan](docs/screenshots/05-anschluesse.png) <br> **Anschlussplan** – so wird das Board verkabelt |
+| ![3D simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – toolpaths in 3D, time and G-code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – layers: engrave (fill) and cut |
+| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/05-anschluesse.png) <br> **Wiring diagram** – how to wire the board |
 
-Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
+Download (Windows version signed via the [SignPath Foundation](https://signpath.org), see [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · What changed: [CHANGELOG.md](CHANGELOG.md) (German)
 
-## ⚠️ Sicherheit und Haftung
+## ⚠️ Safety and liability
 
-CNC-Maschinen, Laser und Plasmaschneider können schwere Verletzungen, Brände und Sachschäden verursachen.
+CNC machines, lasers and plasma cutters can cause serious injuries, fires and property damage.
 
-- **Laser nie unbeaufsichtigt laufen lassen**, passende Laserschutzbrille tragen, Feuerlöscher griffbereit, gut lüften
-  (Rauch von Kunststoffen kann giftig sein – PVC/Vinyl niemals lasern).
-- Jede Maschine braucht einen **echten Not-Aus-Schalter** (Hardware). Die Stopp-Knöpfe im Programm ersetzen ihn nicht –
-  eine abbrechende USB- oder WLAN-Verbindung kann jederzeit passieren.
-- Neue Jobs zuerst **ohne Werkstück bzw. mit wenig Leistung** testen, Simulation und Rahmen-Fahrt nutzen.
-- Einstellungen der Steuerung (Schritte/mm, Endschalter, Leistung) vor dem ersten Job prüfen.
+- **Never leave a laser running unattended**, wear suitable laser safety glasses, keep a fire extinguisher at hand,
+  ventilate well (fumes from plastics can be toxic – never laser PVC/vinyl).
+- Every machine needs a **real emergency stop switch** (hardware). The stop buttons in the software do not replace it –
+  a USB or Wi-Fi connection can drop at any time.
+- Test new jobs **without a workpiece or at low power** first, use the simulation and the frame run.
+- Check the controller settings (steps/mm, limit switches, power) before the first job.
 
-CNC Craft ist eine Beta-Version und wird **ohne jede Gewährleistung** bereitgestellt, so weit es das Gesetz erlaubt
-(siehe Abschnitte 15 und 16 der [GPLv3](LICENSE)). Die Verantwortung für den sicheren Betrieb der Maschine liegt beim
-Betreiber.
+CNC Craft is beta software and is provided **without any warranty**, to the extent permitted by law
+(see sections 15 and 16 of the [GPLv3](LICENSE)). The operator is responsible for running the machine safely.
 
-## ❤️ CNC Craft unterstützen
+## ❤️ Support CNC Craft
 
-CNC Craft ist kostenlos und bleibt es auch. Wenn dir das Programm hilft und du die Weiterentwicklung
-unterstützen möchtest, freue ich mich über einen Kaffee:
+CNC Craft is free and will stay free. If the software helps you and you'd like to support its development,
+I'd be happy about a coffee:
 
-[![Ko-fi](https://img.shields.io/badge/Ko--fi-CNC%20Craft%20unterst%C3%BCtzen-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/andys3dworld)
+[![Ko-fi](https://img.shields.io/badge/Ko--fi-Support%20CNC%20Craft-ff5e5b?logo=ko-fi&logoColor=white)](https://ko-fi.com/andys3dworld)
 [![GitHub Sponsors](https://img.shields.io/badge/GitHub%20Sponsors-Andys--3D--World-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/Andys-3D-World)
 
-Genauso hilfreich und kostenlos: ⭐ Stern auf GitHub vergeben, Fehler melden ([Issues](https://github.com/Andys-3D-World/cnc-craft/issues))
-und das Programm weitererzählen – z. B. über meine Videos auf YouTube, TikTok und Instagram („Andys 3D World“).
+Just as helpful and free: give it a ⭐ on GitHub, report bugs ([Issues](https://github.com/Andys-3D-World/cnc-craft/issues))
+and tell others about it – e.g. through my videos on YouTube, TikTok and Instagram (“Andys 3D World”).
 
-Unterstützung ist freiwillig – alle Funktionen sind für alle frei, es gibt keine Bezahl-Version.
+Support is voluntary – all features are free for everyone, there is no paid version.
 
-## 🤝 Mitwirken
+## 🤝 Contributing
 
-Jede Hilfe ist willkommen: Fehler melden und Ideen vorschlagen unter [Issues](https://github.com/Andys-3D-World/cnc-craft/issues),
-Übersetzungen verbessern (`src/i18n/lang/*.json`) oder neue Boards und Maschinen testen.
+Any help is welcome: report bugs and suggest ideas in [Issues](https://github.com/Andys-3D-World/cnc-craft/issues)
+or [Discussions](https://github.com/Andys-3D-World/cnc-craft/discussions), improve translations
+(`src/i18n/lang/*.json`) or test new boards and machines.
 
-**Mit KI entwickelt:** CNC Craft wird von Andreas Piaszek (Andys 3D World) entwickelt. Beim Programmieren hilft das
-KI-Werkzeug [Claude Code](https://claude.com/claude-code) von Anthropic – ohne diese Hilfe wäre CNC Craft nicht so weit.
-Ideen, Planung und Entscheidungen kommen von mir. Jede Änderung wird von mir geprüft und an echten Maschinen und Boards
-getestet. Commits, an denen die KI mitgeschrieben hat, sind mit „Co-Authored-By: Claude“ gekennzeichnet.
+**Developed with AI:** CNC Craft is developed by Andreas Piaszek (Andys 3D World). The AI tool
+[Claude Code](https://claude.com/claude-code) by Anthropic helps with the programming – CNC Craft wouldn't be this far
+without it. Ideas, planning and decisions are mine. Every change is reviewed by me and tested on real machines and
+boards. Commits co-written by the AI are marked with “Co-Authored-By: Claude”.
 
-## Selbst bauen
+## Building from source
 
-Voraussetzungen: [Node.js](https://nodejs.org) (LTS), [Rust](https://rustup.rs) und die
-[Tauri-Voraussetzungen](https://v2.tauri.app/start/prerequisites/) für dein System.
+Requirements: [Node.js](https://nodejs.org) (LTS), [Rust](https://rustup.rs) and the
+[Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for your system.
 
 ```bash
-npm install            # einmalig
-npm run tauri dev      # zum Entwickeln (Fenster mit Live-Neuladen)
-npm run tauri build    # Installationsdatei bauen
+npm install            # once
+npm run tauri dev      # for development (window with live reload)
+npm run tauri build    # build the installer
 ```
 
-Die fertigen Dateien liegen danach in `src-tauri/target/release/bundle/`
-(macOS: `dmg/` und `macos/`, Windows: `nsis/` und `msi/`, Linux: `appimage/`, `deb/`, `rpm/`).
+The finished files end up in `src-tauri/target/release/bundle/`
+(macOS: `dmg/` and `macos/`, Windows: `nsis/` and `msi/`, Linux: `appimage/`, `deb/`, `rpm/`).
 
-Installationsdateien für alle Systeme baut die GitHub-Action `.github/workflows/release.yml`
-(Reiter „Actions“ → „Release bauen“ → „Run workflow“). Das Ergebnis landet als Entwurf unter „Releases“.
+Installers for all systems are built by the GitHub Action `.github/workflows/release.yml`
+(“Actions” tab → “Release bauen” → “Run workflow”). The result appears as a draft under “Releases”.
 
-## Lizenz
+## License
 
-CNC Craft ist freie Software: Du darfst es benutzen, weitergeben und verändern – unter den Bedingungen der
-**GNU General Public License Version 3** (oder einer späteren Version), siehe [LICENSE](LICENSE).
+CNC Craft is free software: you may use, share and modify it under the terms of the
+**GNU General Public License version 3** (or any later version), see [LICENSE](LICENSE).
 Copyright © 2026 Andys 3D World.
 
-Mitgelieferte Teile anderer Projekte (alle Open Source) stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md):
-die GRBL-Firmware (`src-tauri/firmware/`, GPLv3) und der STEP-Import mit
-[occt-import-js](https://github.com/kovacsv/occt-import-js) und [Open CASCADE Technology](https://www.opencascade.com)
+Bundled parts of other projects (all open source) are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md):
+the GRBL firmware (`src-tauri/firmware/`, GPLv3) and the STEP import with
+[occt-import-js](https://github.com/kovacsv/occt-import-js) and [Open CASCADE Technology](https://www.opencascade.com)
 (`public/occt/`, LGPL 2.1).
 
-Genannte Produkt- und Firmennamen (z. B. LightBurn, Estlcam, OpenBuilds, MKS, xTool, Ruida) gehören ihren
-jeweiligen Inhabern und dienen nur zur Beschreibung, mit welchen Programmen und Maschinen CNC Craft vergleichbar
-bzw. kompatibel ist. CNC Craft ist mit keinem dieser Hersteller verbunden.
+Product and company names mentioned (e.g. LightBurn, Estlcam, OpenBuilds, MKS, xTool, Ruida) belong to their
+respective owners and are only used to describe which programs and machines CNC Craft is comparable or compatible
+with. CNC Craft is not affiliated with any of these manufacturers.
 
-## Datenschutz
+## Privacy
 
-CNC Craft sammelt keine Daten und hat keine Telemetrie. Es gibt nur diese Netzwerk-Verbindungen:
+CNC Craft collects no data and has no telemetry. These are the only network connections:
 
-- **Update-Prüfung:** einmal am Tag eine Anfrage an die GitHub-API (`api.github.com`), welche Version die neueste
-  ist. Dabei werden keine Daten über dich, deine Zeichnungen oder Maschinen gesendet – GitHub sieht nur die
-  üblichen Verbindungsdaten (IP-Adresse). Abschalten: ⓘ oben rechts → „Automatisch nach Updates suchen“.
-- **Deine eigenen Geräte im Heimnetz:** Maschinen (Telnet/WLAN), Kameras und die 📡-Suche verbinden sich nur mit
-  Geräten in deinem lokalen Netzwerk und nur, wenn du das auslöst.
-- **Links** (Firmware-Downloads, Hilfe) öffnen sich nur auf Klick in deinem Browser.
+- **Update check:** once a day a request to the GitHub API (`api.github.com`) asking which version is the newest.
+  No data about you, your drawings or machines is sent – GitHub only sees the usual connection data (IP address).
+  Turn off: ⓘ top right → “Automatically check for updates”.
+- **Your own devices on your home network:** machines (Telnet/Wi-Fi), cameras and the 📡 search only connect to
+  devices on your local network and only when you start it.
+- **Links** (firmware downloads, help) only open in your browser when you click them.
 
-Einstellungen und Bibliotheken bleiben auf deinem Rechner (App-Datenordner, siehe ⓘ).
+Settings and libraries stay on your computer (app data folder, see ⓘ).
 
-Ausführlich (Deutsch/English): [PRIVACY.md](PRIVACY.md)
+Details (German/English): [PRIVACY.md](PRIVACY.md)
 
 ## Code Signing Policy
 
-Die Windows-Installationsdateien werden signiert.
+The Windows installers are signed.
 
 *Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by
 [SignPath Foundation](https://signpath.org).*
 
 - **Committers and reviewers:** [Andys-3D-World](https://github.com/Andys-3D-World) (Andreas Piaszek)
 - **Approvers:** [Andys-3D-World](https://github.com/Andys-3D-World) (Andreas Piaszek)
-- Signiert werden nur Programme, die automatisch aus dem Quellcode dieses Repositorys gebaut wurden
-  (GitHub Actions, `.github/workflows/release.yml`). Jede Veröffentlichung wird vorher von Hand freigegeben.
-- Alle Beteiligten nutzen Zwei-Faktor-Anmeldung bei GitHub und SignPath.
+- Only programs built automatically from the source code of this repository are signed
+  (GitHub Actions, `.github/workflows/release.yml`). Every release is approved by hand beforehand.
+- Everyone involved uses two-factor authentication on GitHub and SignPath.
 
-**Privacy policy (English):** This program will not transfer any information to other networked systems unless
+**Privacy policy:** This program will not transfer any information to other networked systems unless
 specifically requested by the user or the person installing or operating it. The only automatic connection is a
 daily update check against the public GitHub API, which can be turned off in the app (ⓘ → “Automatically check
 for updates”). Connections to machines, cameras and the 📡 network search only go to devices in the user's local
