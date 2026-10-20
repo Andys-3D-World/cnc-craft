@@ -102,3 +102,6 @@ h2 { font-size: clamp(26px, 3.6vw, 36px); margin: 0 0 10px; letter-spacing: -.01
 
 footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
 footer p { margin: 6px 0; }
+
+/* Links im Fließtext unterstreichen (nicht nur an der Farbe erkennbar) */
+.lead a, footer a, details p a, .dl-grid .hint a { text-decoration: underline; text-underline-offset: 2px; }

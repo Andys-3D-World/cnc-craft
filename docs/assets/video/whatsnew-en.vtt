@@ -1,0 +1,22 @@
+WEBVTT
+
+00:00:00.000 --> 00:00:02.400
+New in CNC Craft 0.2.8
+Wiring diagram · grblHAL · board flashing
+
+00:00:02.400 --> 00:00:06.600
+Jumpers in the picture
+Microsteps and motor A as Y2 – exactly where they go
+
+00:00:06.600 --> 00:00:10.600
+Looks like the real board
+MKS DLC32 / MAX and CNC Shield in original colors
+
+00:00:10.600 --> 00:00:14.600
+External drivers
+TB6600 / DM542 – hover a wire and it lights up
+
+00:00:14.600 --> 00:00:17.800
+Free & open source
+andys-3d-world.github.io/cnc-craft
+

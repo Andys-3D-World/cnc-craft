@@ -3,8 +3,10 @@
 ## Nächste Version (noch nicht veröffentlicht)
 
 **Verbessert**
-- **Webseite schneller:** kleinere Bilder (960 px) mit großer Version nur bei Bedarf, Titelbild wird zuerst geladen,
-  das Video erst beim Hinscrollen – beim Öffnen ca. 0,75 MB statt 6,2 MB
+- **Webseite schneller:** Bilder als WebP in drei Größen (Handy 480 px, 960 px, groß nur beim Vergrößern), Titelbild
+  wird zuerst geladen, das Video erst beim Hinscrollen, CSS direkt in der Seite, kleines Logo – Titelbild 58 KB statt
+  262 KB, auf dem Handy 8 KB. Links im Text unterstrichen, Untertitel-Spur fürs Video (Barrierefreiheit).
+  Die Seite wird mit `tools/website/build.py` erzeugt
 
 ## 0.2.8 Beta
 
