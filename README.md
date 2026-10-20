@@ -1,6 +1,6 @@
 # CNC Craft
 
-🇬🇧 **English** · 🇩🇪 [Deutsch](README.de.md)
+🇬🇧 **English** · 🇩🇪 [Deutsch](README.de.md) · 🌐 **Website: [andys-3d-world.github.io/cnc-craft](https://andys-3d-world.github.io/cnc-craft/)**
 
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Windows and Linux.
