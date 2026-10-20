@@ -2,6 +2,12 @@
 
 ## Nächste Version (noch nicht veröffentlicht)
 
+**Neu**
+- **Verschachteln (wie „Nest“ in LightBurn):** neues Symbol links unter „Messen“ – legt die Teile (Auswahl, sonst alles)
+  automatisch eng aufs Bett. Einstellbar: Abstand zwischen den Teilen, Abstand zum Rand, Drehen (aus / 90° / 45°) und ob
+  kleine Teile in Löcher großer Teile dürfen. Teile werden nach ihrer echten Form gesetzt, Gruppen und Löcher bleiben
+  beim Teil, nicht ausgewählte Formen bleiben liegen und werden umfahren. Rückgängig mit Strg+Z
+
 **Verbessert**
 - **Webseite schneller:** Bilder als WebP in drei Größen (Handy 480 px, 960 px, groß nur beim Vergrößern), Titelbild
   wird zuerst geladen, das Video erst beim Hinscrollen, CSS direkt in der Seite, kleines Logo – Titelbild 58 KB statt

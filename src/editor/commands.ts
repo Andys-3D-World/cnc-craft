@@ -24,6 +24,7 @@ import {
   shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath
 } from "../shapeTransform";
 import { offsetPolygon } from "../polyOffset";
+import { nestShapes, NestOptions } from "./nest";
 import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
@@ -126,6 +127,7 @@ export const commands: Record<string, () => void> = {
   alignBottom: () => align("bottom"),
 
   offset: () => openOffsetDialog(),
+  nest: () => openNestDialog(),
   importFile: () => { importWithDialog(); },
   openProject: () => { openProjectWithDialog(); },
   saveProject: () => { saveProject(false); },
@@ -305,6 +307,84 @@ function makeOffsets(sel: any[], d: number, dir: string, deleteOriginal: boolean
 }
 
 // =====================================================================
+// VERSCHACHTELN-DIALOG: Teile eng aufs Bett legen (Abstand einstellbar)
+// =====================================================================
+
+const NEST_KEY = "cnc_craft_nest";
+
+function loadNestOptions(): NestOptions {
+  const def: NestOptions = { gapMm: 3, marginMm: 3, rotate: "90", holes: false };
+  try {
+    const s = JSON.parse(localStorage.getItem(NEST_KEY) || "{}");
+    const num = (v: any, d: number) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : d);
+    return {
+      gapMm: num(s.gapMm, def.gapMm),
+      marginMm: num(s.marginMm, def.marginMm),
+      rotate: ["none", "90", "45"].includes(s.rotate) ? s.rotate : def.rotate,
+      holes: !!s.holes
+    };
+  } catch { return def; }
+}
+
+function openNestDialog() {
+  const st = app();
+  if (!st.shapes.length) { log(t("nest.empty")); return; }
+  const o = loadNestOptions();
+  const n = st.selectedShapeIds.length;
+
+  document.getElementById("nest-dialog-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "nest-dialog-overlay";
+  ov.style.cssText = "position:fixed;inset:0;z-index:5000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;";
+  const row = "display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:0.85rem;";
+  ov.innerHTML = `
+    <div style="background:var(--bg-panel);border:1px solid var(--border-color);border-radius:12px;padding:18px;width:360px;color:var(--text-main);display:flex;flex-direction:column;gap:10px;font-family:var(--font-ui);">
+      <h3 style="margin:0;font-size:1rem;">▦ ${t("nest.title")}</h3>
+      <div style="font-size:0.8rem;color:var(--text-muted);">${n ? t("nest.scopeSel", { n }) : t("nest.scopeAll")}</div>
+      <label style="${row}">${t("nest.gap")}
+        <input id="nest-gap" type="number" value="${o.gapMm}" min="0" step="0.5" style="width:90px;"></label>
+      <label style="${row}">${t("nest.margin")}
+        <input id="nest-margin" type="number" value="${o.marginMm}" min="0" step="0.5" style="width:90px;"></label>
+      <label style="${row}">${t("nest.rotate")}
+        <select id="nest-rot" style="width:120px;">
+          <option value="none">${t("nest.rotNone")}</option>
+          <option value="90">90°</option>
+          <option value="45">45°</option>
+        </select></label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="nest-holes" type="checkbox" ${o.holes ? "checked" : ""}> ${t("nest.holes")}</label>
+      <div class="only-mill" style="font-size:0.78rem;color:var(--text-muted);">${t("nest.millHint")}</div>
+      <div style="display:flex;gap:8px;">
+        <button id="nest-cancel" class="btn-secondary" style="flex:1;">${t("dlg.cancel")}</button>
+        <button id="nest-ok" class="btn-primary" style="flex:2;">✔ ${t("nest.run")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  (ov.querySelector("#nest-rot") as HTMLSelectElement).value = o.rotate;
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") (ov.querySelector("#nest-ok") as HTMLElement).click(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  (ov.querySelector("#nest-cancel") as HTMLElement).onclick = close;
+  (ov.querySelector("#nest-ok") as HTMLElement).onclick = () => {
+    const num = (id: string) => Math.max(0, parseFloat((ov.querySelector(id) as HTMLInputElement).value) || 0);
+    const opts: NestOptions = {
+      gapMm: num("#nest-gap"),
+      marginMm: num("#nest-margin"),
+      rotate: (ov.querySelector("#nest-rot") as HTMLSelectElement).value as NestOptions["rotate"],
+      holes: (ov.querySelector("#nest-holes") as HTMLInputElement).checked
+    };
+    try { localStorage.setItem(NEST_KEY, JSON.stringify(opts)); } catch { /* egal */ }
+    close();
+    const r = nestShapes(opts);
+    if (!r.total) log(t("nest.empty"));
+    else if (r.failed) log(t("nest.partial", { n: r.placed, total: r.total, failed: r.failed }));
+    else log(t("nest.done", { n: r.placed }));
+    done();
+    checkpoint();
+  };
+  setTimeout(() => (ov.querySelector("#nest-gap") as HTMLInputElement).select(), 0);
+}
+
+// =====================================================================
 // INITIALISIERUNG: Knöpfe + Tastatur
 // =====================================================================
 
@@ -330,7 +410,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
-    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
+    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");
     if (camTab && !camTab.classList.contains("active")) return;

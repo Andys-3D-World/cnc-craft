@@ -35,6 +35,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("text", "text", "tip.tool.text")}
     <div class="strip-sep"></div>
     ${tool("measure", "measure", "tip.tool.measure")}
+    <button data-cmd="nest" class="btn-tool-icon" ${tip("tip.cmd.nest")}>${icon("nest", 20)}</button>
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
