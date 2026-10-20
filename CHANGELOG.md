@@ -31,6 +31,7 @@
 
 **Verbessert**
 - README jetzt auf Englisch (Startseite bei GitHub, besser über Google zu finden), deutsche Fassung in `README.de.md`;
+  englische README mit englischen Screenshots (`docs/screenshots/en/`);
   GitHub-Projekt mit Beschreibung, Themen (Topics) und Discussions
 - README: neuer Abschnitt „Mitwirken“ – wie man helfen kann und offener Hinweis, dass beim Programmieren das
   KI-Werkzeug Claude Code hilft

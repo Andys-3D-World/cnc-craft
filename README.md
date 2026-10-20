@@ -7,7 +7,7 @@ in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Win
 
 **Status: 0.2.7 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
-![CNC Craft – drawing and toolpaths](docs/screenshots/01-design-fraese.png)
+![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
 ## Features
 
@@ -36,8 +36,8 @@ in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Win
 
 | | |
 |---|---|
-| ![3D simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – toolpaths in 3D, time and G-code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – layers: engrave (fill) and cut |
-| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/05-anschluesse.png) <br> **Wiring diagram** – how to wire the board |
+| ![3D simulation](docs/screenshots/en/02-simulation.png) <br> **Simulation** – toolpaths in 3D, time and G-code | ![Laser](docs/screenshots/en/03-laser.png) <br> **Laser** – layers: engrave (fill) and cut |
+| ![Plasma](docs/screenshots/en/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/en/05-wiring.png) <br> **Wiring diagram** – how to wire the board |
 
 Download (Windows version signed via the [SignPath Foundation](https://signpath.org), see [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · What changed: [CHANGELOG.md](CHANGELOG.md) (German)
 
