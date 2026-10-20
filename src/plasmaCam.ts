@@ -27,6 +27,7 @@ import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { offsetPolygon, polygonArea, pointInPoly } from "./polyOffset";
 import { getCuts, cutForShape, plasmaSettings, PlasmaCut } from "./plasmaCuts";
 import { t, ascii } from "./i18n/i18n";
+import { tabRuns } from "./tabs";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
@@ -39,6 +40,7 @@ export interface PlasmaPlan {
   area: number;
   hole: boolean;      // Innenkontur (Loch)
   size: number;       // größte Ausdehnung der Kontur in mm
+  runs: Pt[][] | null; // mit Haltestegen: Schneid-Stücke (dazwischen Brenner aus, neu einstechen)
 }
 
 interface ShapePlan { plans: PlasmaPlan[]; tooSmall: boolean; leadShort: boolean }
@@ -54,7 +56,8 @@ function sigOf(shape: any, cut: PlasmaCut): string {
   const pts = shape.points || [];
   for (let i = 0; i < pts.length; i++) { a += pts[i].x * (i % 7 + 1); b += pts[i].y * (i % 5 + 1); }
   return [shape.type, shape.millingMode, shape.x, shape.y, shape.w, shape.h, shape.midX, shape.midY, pts.length,
-    a.toFixed(3), b.toFixed(3), cut.kerf, cut.leadIn, plasmaSettings.overcut].join("|");
+    a.toFixed(3), b.toFixed(3), cut.kerf, cut.leadIn, plasmaSettings.overcut,
+    shape.tabMode, shape.tabN, shape.tabLen, JSON.stringify(shape.tabPts || [])].join("|");
 }
 
 export function planShape(shape: any, cut: PlasmaCut): ShapePlan {
@@ -74,7 +77,7 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
     const pts = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL, y: p.y / MM_TO_PIXEL }));
 
     if (!path.closed || mode === "on-line") {
-      res.plans.push({ pts, closed: path.closed, lead: null, over: [], area: 0, hole: false, size: extent(pts) });
+      res.plans.push({ pts, closed: path.closed, lead: null, over: [], area: 0, hole: false, size: extent(pts), runs: null });
       continue;
     }
     const outside = mode === "outside";
@@ -93,9 +96,12 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
       // Startpunkt an der schärfsten Ecke
       const si = cornerIndex(loop);
       loop = loop.slice(si).concat(loop.slice(0, si));
-      const lead = leadPoint(loop, outside, cut.leadIn);
+      let lead = leadPoint(loop, outside, cut.leadIn);
       if (cut.leadIn > 0 && !lead) res.leadShort = true;
-      res.plans.push({ pts: loop, closed: true, lead, over: overcutPoints(loop, plasmaSettings.overcut), area: Math.abs(polygonArea(loop)), hole: !outside, size: extent(loop) });
+      // Haltestege: Lücke auf der Bahn = Steglänge + Schnittspalt; kein Überlauf (der liefe in einen Steg)
+      const tr = tabRuns(shape, loop, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), (Number(shape.tabLen) || 0) + cut.kerf);
+      if (tr?.rotated) lead = null;
+      res.plans.push({ pts: loop, closed: true, lead, over: tr ? [] : overcutPoints(loop, plasmaSettings.overcut), area: Math.abs(polygonArea(loop)), hole: !outside, size: extent(loop), runs: tr ? tr.runs : null });
     }
   }
   return res;
@@ -282,40 +288,49 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
     plans.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || a.area - b.area);
 
     for (const p of plans) {
-      const start = p.lead || p.pts[0];
       const small = isSmallHole(p);
       if (small) smallHoles++;
       const thc = !!thcOn && !small;
-      pierces++;
-      g += `${c("pgc.pierce", { n: pierces })}${small ? " " + c("pgc.smallHole", { d: n(p.size), p: S.holeSpeed }) : ""}\n`;
-      g += `G0 X${n(start.x)} Y${n(start.y)}\n`;
-      if (S.useZ) {
-        if (S.probe) {
-          g += `G38.2 Z${n(-(S.safeZ + 50))} F${PROBE_FEED} ${c("pgc.probe")}\n`;
-          g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
-        }
-        g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;
+      // Stücke zum Schneiden: normal eins; mit Haltestegen eins pro Abschnitt zwischen den Stegen
+      const pieces: { start: Pt; targets: Pt[] }[] = [];
+      if (p.runs) {
+        p.runs.forEach((run, ri) => pieces.push(ri === 0 && p.lead ? { start: p.lead, targets: run } : { start: run[0], targets: run.slice(1) }));
+      } else {
+        const targets: Pt[] = [];
+        if (p.lead) targets.push(p.pts[0]);
+        for (let i = 1; i < p.pts.length; i++) targets.push(p.pts[i]);
+        if (p.closed) { targets.push(p.pts[0]); targets.push(...p.over); }
+        pieces.push({ start: p.lead || p.pts[0], targets });
       }
-      g += `M3 S1000 ${c("pgc.torchOn")}\n`;
-      if (cut.pierceDelay > 0) g += `G4 P${n(cut.pierceDelay)} ${c("pgc.pierceDelay")}\n`;
-      if (S.useZ) g += `G1 Z${n(cut.cutHeight)} F${Z_FEED} ${c("pgc.cutHeight")}\n`;
-      // THC erst freigeben, wenn die Maschine auf Schneidhöhe steht (vor der ersten Bewegung)
-      if (thc) g += `${thcOn}\n`;
-      g += `G1 F${n(small ? cut.speed * S.holeSpeed / 100 : cut.speed)}\n`;
+      pieces.forEach((pc, k) => {
+        const start = pc.start;
+        pierces++;
+        g += `${c("pgc.pierce", { n: pierces })}${small ? " " + c("pgc.smallHole", { d: n(p.size), p: S.holeSpeed }) : ""}${k > 0 ? " " + c("gc.tab") : ""}\n`;
+        g += `G0 X${n(start.x)} Y${n(start.y)}\n`;
+        if (S.useZ) {
+          if (S.probe) {
+            g += `G38.2 Z${n(-(S.safeZ + 50))} F${PROBE_FEED} ${c("pgc.probe")}\n`;
+            g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
+          }
+          g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;
+        }
+        g += `M3 S1000 ${c("pgc.torchOn")}\n`;
+        if (cut.pierceDelay > 0) g += `G4 P${n(cut.pierceDelay)} ${c("pgc.pierceDelay")}\n`;
+        if (S.useZ) g += `G1 Z${n(cut.cutHeight)} F${Z_FEED} ${c("pgc.cutHeight")}\n`;
+        // THC erst freigeben, wenn die Maschine auf Schneidhöhe steht (vor der ersten Bewegung)
+        if (thc) g += `${thcOn}\n`;
+        g += `G1 F${n(small ? cut.speed * S.holeSpeed / 100 : cut.speed)}\n`;
 
-      const targets: Pt[] = [];
-      if (p.lead) targets.push(p.pts[0]);
-      for (let i = 1; i < p.pts.length; i++) targets.push(p.pts[i]);
-      if (p.closed) { targets.push(p.pts[0]); targets.push(...p.over); }
-      // Anti-Dive: nur grblHAL kann mitten in der Bewegung ohne Anhalten sperren
-      const sp = thc && S.thc === "grblhal" ? splitBeforeEnd(start, targets, S.antiDive) : { pts: targets, at: -1 };
-      sp.pts.forEach((q, i) => {
-        if (i === sp.at) g += `M62 P2 ${c("pgc.antiDive")}\n`;
-        g += `G1 X${n(q.x)} Y${n(q.y)}\n`;
+        // Anti-Dive: nur grblHAL kann mitten in der Bewegung ohne Anhalten sperren
+        const sp = thc && S.thc === "grblhal" ? splitBeforeEnd(start, pc.targets, S.antiDive) : { pts: pc.targets, at: -1 };
+        sp.pts.forEach((q, i) => {
+          if (i === sp.at) g += `M62 P2 ${c("pgc.antiDive")}\n`;
+          g += `G1 X${n(q.x)} Y${n(q.y)}\n`;
+        });
+        g += `M5 ${c("pgc.torchOff")}\n`;
+        if (thc && sp.at < 0) g += `${thcOff}\n`;
+        if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
       });
-      g += `M5 ${c("pgc.torchOff")}\n`;
-      if (thc && sp.at < 0) g += `${thcOff}\n`;
-      if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
     }
   });
 

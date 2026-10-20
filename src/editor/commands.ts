@@ -550,6 +550,9 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
   redrawFn = redraw;
   log = appendToConsole;
 
+  // „Stege setzen“ im Panel (Fräs-Parameter) schaltet das Werkzeug ein
+  document.getElementById("btn-tab-tool")?.addEventListener("click", () => setTool("tab"));
+
   // Alle Knöpfe mit data-cmd="..." verbinden
   document.querySelectorAll<HTMLElement>("[data-cmd]").forEach(btn => {
     const name = btn.dataset.cmd!;

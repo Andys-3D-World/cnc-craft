@@ -2,7 +2,10 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { activeTool, toolForShape, getTools, MillingTool, DEFAULT_PLUNGE } from "./toolLibrary";
 import { berechne3PunktBogen } from "./arcEngine";
-import { offsetPolygon, polygonArea, P } from "./polyOffset";
+import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
+import { pocketPaths, PocketStrategy } from "./pocket";
+import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
+import { makeEllipsePoints } from "./shapeTransform";
 import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
@@ -112,8 +115,10 @@ const generateGcodeInner = (shapes: any): string | null => {
   // Frästiefe kommt aus der Form; nur alte Formen ohne Tiefe nehmen den Wert aus dem Eingabefeld
   const depthInput = document.getElementById("dim-depth") as HTMLInputElement;
   const fallbackDepth = depthInput && Number.isFinite(parseFloat(depthInput.value)) ? parseFloat(depthInput.value) : -2.0;
-  const tabInput = document.getElementById("dim-tab-w") as HTMLInputElement;
-  const tabLength = tabInput ? Math.abs(parseFloat(tabInput.value)) || 0 : 0;
+  const pocketSel = document.getElementById("dim-pocket-strategy") as HTMLSelectElement | null;
+  const pocketStrategy: PocketStrategy = pocketSel?.value === "spiral" ? "spiral" : "linear";
+  /** seitliche Zustellung in der Tasche: 40 % des Fräserdurchmessers */
+  const STEPOVER = 0.4;
 
   // Weltkoordinate -> Maschinen-mm.
   // FIX: Y zeigt im Speicher schon nach oben (wie an der Maschine). Vorher wurde hier
@@ -153,38 +158,54 @@ const generateGcodeInner = (shapes: any): string | null => {
     groups.forEach((g, i) => { gcode += `${c("gc.toolListItem", { i: i + 1, name: g.tool ? g.tool.name : "Standard", d: (g.tool ? g.tool.diameter : 3).toFixed(1) })}\n`; });
   }
 
-  // Hilfsfunktion: Eine Bahn (Start->Ende, evtl. mit Haltestegen) fräsen
-  const millSegment = (
-    sx: number, sy: number, ex: number, ey: number,
-    zDepth: number, allowTabs: boolean
-  ) => {
-    const s = toMachine(sx, sy);
-    const e = toMachine(ex, ey);
-    const length = Math.hypot(e.x - s.x, e.y - s.y);
-
-    if (allowTabs && tabLength > 0 && length > tabLength * 2.5) {
-      const tabCount = Math.max(1, Math.floor(length / 60));
-      const segment = length / (tabCount * 2);
-      const dx = (e.x - s.x) / length;
-      const dy = (e.y - s.y) / length;
-      let pos = 0;
-      let cutting = true;
-      while (pos < length) {
-        const segLen = Math.min(segment, length - pos);
-        if (cutting) {
-          gcode += `G1 X${(s.x + dx * (pos + segLen)).toFixed(3)} Y${(s.y + dy * (pos + segLen)).toFixed(3)}\n`;
-        } else {
-          gcode += `G0 Z${SAFE_Z.toFixed(2)} (Haltesteg ${tabLength.toFixed(1)}mm)\n`;
-          gcode += `G0 X${(s.x + dx * (pos + segLen)).toFixed(3)} Y${(s.y + dy * (pos + segLen)).toFixed(3)}\n`;
-          gcode += `G1 Z${zDepth.toFixed(2)} F${PLUNGE_FEED}\n`;
-          gcode += `F${feedXY}\n`;
-        }
-        pos += segLen;
-        cutting = !cutting;
+  /**
+   * HALTESTEGE (wie in Estlcam): Beim Ausschneiden bleiben kleine Stege stehen, damit das Teil nicht lose wird.
+   * Lage der Stege: automatisch (Anzahl) oder selbst gesetzt – siehe tabs.ts. tabLen = Länge, tabH = Höhe ab Boden.
+   * Nur die Durchgänge, die tiefer als die Steg-Oberkante gehen, fahren über dem Steg auf Steg-Höhe.
+   */
+  /** Geschlossene Kontur mit Haltestegen fräsen; false = ging nicht (dann normal fräsen, Hinweis steht schon da) */
+  const millTabbed = (loop: P[], shape: any, tab: TabSettings): boolean => {
+    const target = passes[passes.length - 1];
+    const zTab = target + tab.h;
+    if (zTab >= -0.001) { lastGcodeWarnings.push(t("gcw.tabsTooHigh", { n: formCounter, h: tab.h })); return false; }
+    const cum = cumulative(loop);
+    const L = cum[cum.length - 1];
+    // Fräserbahn über dem Steg = Steglänge + Fräserdurchmesser (der Fräser nimmt links und rechts den Radius weg)
+    const half = tab.len / 2 + toolRadius;
+    const centers = tabCenters(shape, loop, cum, p => toMachine(p.x, p.y), toolRadius * 1.5 + 1).sort((x, y) => x - y);
+    if (!centers.length) return false;
+    // Anfangen in der Mitte der größten Lücke – so taucht der Fräser nie in einem Steg ein
+    let s0 = 0, gap = -1;
+    centers.forEach((c, i) => {
+      const next = i + 1 < centers.length ? centers[i + 1] : centers[0] + L;
+      if (next - c > gap) { gap = next - c; s0 = (c + next) / 2; }
+    });
+    const tooMany = shape.tabMode === "manual" ? gap <= 2 * half : L / centers.length < 3 * half;
+    if (tooMany) { lastGcodeWarnings.push(t("gcw.tabsTooMany", { n: formCounter, k: centers.length })); return false; }
+    const rel = (x: number) => (((x - s0) % L) + L) % L;
+    const spans = centers.map(c => [rel(c) - half, rel(c) + half]);
+    // Punkte der Bahn ab s0 + Anfang/Ende jedes Stegs, nach Länge sortiert
+    const start = pointAt(loop, cum, s0);
+    const seq: { p: P; s: number }[] = [
+      { p: start, s: 0 },
+      ...loop.map((p, i) => ({ p, s: rel(cum[i]) })).filter(q => q.s > 1e-9),
+      ...spans.flat().map(m => ({ p: pointAt(loop, cum, s0 + m), s: m })),
+      { p: start, s: L }
+    ].sort((u, v) => u.s - v.s);
+    const inTab = (x: number) => spans.some(([a, b]) => x > a && x < b);
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
+    passes.forEach(z => {
+      gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+      let up = false;
+      for (let j = 1; j < seq.length; j++) {
+        const want = z < zTab - 1e-6 && inTab((seq[j - 1].s + seq[j].s) / 2);
+        if (want && !up) { gcode += `G1 Z${zTab.toFixed(3)} ${c("gc.tab")}\n`; up = true; }
+        else if (!want && up) { gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`; up = false; }
+        gcode += `G1 X${seq[j].p.x.toFixed(3)} Y${seq[j].p.y.toFixed(3)}\n`;
       }
-    } else {
-      gcode += `G1 X${e.x.toFixed(3)} Y${e.y.toFixed(3)}\n`;
-    }
+    });
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+    return true;
   };
 
   /**
@@ -207,6 +228,45 @@ const generateGcodeInner = (shapes: any): string | null => {
         gcode += `G1 X${pts[i].x.toFixed(3)} Y${pts[i].y.toFixed(3)}\n`;
       }
       if (closed) gcode += `G1 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
+    });
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+  };
+
+  // ---- TASCHE: Kontur in mm (Kreise als Vieleck) und die Inseln darin ----
+  const closedMm = (s: any): P[] | null => {
+    if (s.type === "circle") return makeEllipsePoints(s.x, s.y, Math.abs(s.w), Math.abs(s.w)).map(p => toMachine(p.x, p.y));
+    if (s.type === "polyline" && s.closed && s.points?.length >= 3) return s.points.map((p: any) => toMachine(p.x, p.y));
+    return null;
+  };
+  /** Inseln = geschlossene Formen direkt in der Tasche (was in einer Insel liegt, zählt nicht extra) */
+  const islandsOf = (shape: any, outer: P[]): P[][] => {
+    const area = Math.abs(polygonArea(outer));
+    const cand: { pts: P[]; area: number }[] = [];
+    for (const s of shapes) {
+      if (s === shape) continue;
+      const pts = closedMm(s);
+      if (!pts) continue;
+      const a = Math.abs(polygonArea(pts));
+      if (a < area && pointInPoly(pts[0].x, pts[0].y, outer)) cand.push({ pts, area: a });
+    }
+    return cand.filter(c => !cand.some(o => o !== c && o.area > c.area && pointInPoly(c.pts[0].x, c.pts[0].y, o.pts))).map(c => c.pts);
+  };
+  const millPocket = (shape: any, outer: P[]) => {
+    const { paths, tooBig } = pocketPaths(outer, islandsOf(shape, outer), toolRadius, Math.max(0.05, toolDiameter * STEPOVER), pocketStrategy);
+    if (tooBig || !paths.length) {
+      gcode += `${c("gc.toolTooBig")}\n`;
+      lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter }));
+      return;
+    }
+    // je Tiefe alle Bahnen; zwischen den Bahnen abheben (sonst ginge es quer durchs Material)
+    passes.forEach(z => {
+      for (const p of paths) {
+        const s = p.pts[0];
+        gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
+        gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+        for (let i = 1; i < p.pts.length; i++) gcode += `G1 X${p.pts[i].x.toFixed(3)} Y${p.pts[i].y.toFixed(3)}\n`;
+        if (p.closed) gcode += `G1 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
+      }
     });
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
   };
@@ -247,12 +307,18 @@ const generateGcodeInner = (shapes: any): string | null => {
 
     gcode += `\n${c("gc.shape", { n: formCounter, type: shape.type.toUpperCase(), mode })}\n`;
 
-    if (shape.type === "line") {
+    const pocketOuter = mode === "pocket" ? closedMm(shape) : null;
+    if (pocketOuter) {
+      millPocket(shape, pocketOuter);
+    }
+    else if (shape.type === "line") {
       const s0 = toMachine(shape.x, shape.y);
       gcode += `G0 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
+      const e0 = toMachine(shape.x + shape.w, shape.y + shape.h);
       passes.forEach((z) => {
         gcode += `G1 Z${z.toFixed(2)} F${PLUNGE_FEED}\nF${feedXY}\n`;
-        millSegment(shape.x, shape.y, shape.x + shape.w, shape.y + shape.h, z, true);
+        gcode += `G1 X${e0.x.toFixed(3)} Y${e0.y.toFixed(3)}\n`;
+        if (z !== passes[passes.length - 1]) gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
       });
       gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
     }
@@ -260,7 +326,12 @@ const generateGcodeInner = (shapes: any): string | null => {
       const center = toMachine(shape.x, shape.y);
       const radiusPx = Math.abs(shape.w);
       const radiusMm = radiusPx / MM_TO_PIXEL + offset;
-      if (radiusMm > 0.05) {
+      const tab = mode !== "on-line" ? tabSettings(shape) : null;
+      // mit Haltestegen: Kreis als Vieleck (außen gegen, innen im Uhrzeigersinn – wie bei den Konturen)
+      let ring = tab && radiusMm > 0.05 ? makeEllipsePoints(center.x, center.y, radiusMm, radiusMm) : null;
+      if (ring && mode === "inside") ring = [ring[0], ...ring.slice(1).reverse()];
+      if (ring && millTabbed(ring, shape, tab!)) { /* fertig */ }
+      else if (radiusMm > 0.05) {
         passes.forEach((z) => {
           const entryX = center.x;
           const entryY = center.y + radiusMm;
@@ -276,10 +347,18 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
     else if (shape.type === "arc") {
       const bogen = berechne3PunktBogen(shape.x, shape.y, shape.x + shape.w, shape.y + shape.h, shape.midX, shape.midY);
-      if (bogen) {
-        const startM = toMachine(shape.x, shape.y);
-        const endM = toMachine(shape.x + shape.w, shape.y + shape.h);
-        const centerM = toMachine(bogen.cx, bogen.cy);
+      // Außen/Innen: Fräser um den Radius weg vom Mittelpunkt bzw. zum Mittelpunkt hin (gleicher Mittelpunkt)
+      const centerM = bogen ? toMachine(bogen.cx, bogen.cy) : null;
+      const rMm = bogen ? bogen.r / MM_TO_PIXEL : 0;
+      const rNew = rMm + (mode === "outside" ? toolRadius : mode === "inside" ? -toolRadius : 0);
+      if (bogen && rNew <= 0.05) {
+        gcode += `${c("gc.toolTooBig")}\n`;
+        lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter }));
+      } else if (bogen && centerM) {
+        const k = rNew / rMm;
+        const radial = (p: { x: number; y: number }) => ({ x: centerM.x + (p.x - centerM.x) * k, y: centerM.y + (p.y - centerM.y) * k });
+        const startM = radial(toMachine(shape.x, shape.y));
+        const endM = radial(toMachine(shape.x + shape.w, shape.y + shape.h));
         const iVal = centerM.x - startM.x;
         const jVal = centerM.y - startM.y;
         // FIX: Liegt der Mittelpunkt links der Sehne Start->Ende, läuft der Bogen im Uhrzeigersinn (G2).
@@ -300,11 +379,9 @@ const generateGcodeInner = (shapes: any): string | null => {
       // KONTUR AUS VIELEN PUNKTEN (z.B. STL-Import) - mit echter Radius-Korrektur
       const pts: P[] = shape.points.map((p: any) => toMachine(p.x, p.y));
 
-      if (!shape.closed || mode === "on-line") {
+      // (Tasche bei geschlossenen Polylinien: siehe millPocket oben)
+      if (!shape.closed || mode === "on-line" || mode === "pocket") {
         millPath(pts, !!shape.closed);
-      } else if (mode === "pocket") {
-        gcode += `${c("gc.pocketTodo")}\n`;
-        lastGcodeWarnings.push(t("gcw.pocketTodo", { n: formCounter }));
       } else {
         const loops = offsetPolygon(pts, offset);
         if (loops.length === 0) {
@@ -319,8 +396,10 @@ const generateGcodeInner = (shapes: any): string | null => {
           // außen gegen den Uhrzeigersinn, innen im Uhrzeigersinn
           let path = loop;
           const ccw = polygonArea(path) > 0;
-          if ((mode === "outside") !== ccw) path = path.slice().reverse();
-          millPath(path, true);
+          // umdrehen, aber am selben Punkt anfangen (dann liegen die Haltestege wie in der Vorschau)
+          if ((mode === "outside") !== ccw) path = [path[0], ...path.slice(1).reverse()];
+          const tab = tabSettings(shape);
+          if (!tab || !millTabbed(path, shape, tab)) millPath(path, true);
         });
       }
     }

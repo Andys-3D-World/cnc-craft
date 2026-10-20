@@ -10,7 +10,7 @@
  */
 import { arcGeometry } from "./shapeTransform";
 import { options } from "./editor/editorState";
-import { drawToolBands, drawToolBadges } from "./toolView";
+import { drawToolBands, drawToolBadges, drawLaserTabs } from "./toolView";
 import { isLaser, isPlasma } from "./machineMode";
 import { cutForShape } from "./plasmaCuts";
 import { drawPlasmaLeads } from "./plasmaCam";
@@ -172,6 +172,8 @@ export function drawEverything(
   if (options.showTools && !laser && !plasma) drawToolBadges(ctx, shapes, sx, sy);
   // Plasma: Anfahrbahnen, Einstichpunkte, Schneidrichtung
   if (plasma) drawPlasmaLeads(ctx, shapes, sx, sy);
+  // Laser: Haltestege (gelb) auf der Kontur
+  if (laser) drawLaserTabs(ctx, shapes, sx, sy);
 
   // 7. Maschinen-Fadenkreuz
   const mx = sx(liveMachinePos.x * MM_TO_PIXEL);

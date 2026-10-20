@@ -59,13 +59,29 @@ export function renderRightPanel(container: HTMLElement) {
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
-            <div class="prop-row">${T("rp.tabs")}<input type="number" id="dim-tab-w" value="1.5" step="0.5" class="prop-input"></div>
             <div class="prop-row">${T("rp.pocketStrategy")}
               <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
                 <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
                 <option value="spiral" data-i18n="rp.pocketContour">Kontur</option>
               </select>
             </div>
+          </div>
+        </div>
+
+        <!-- Haltestege: Fräse (mit Höhe), Laser und Plasma (Werkzeug über dem Steg aus) -->
+        <div class="menu-section-unified">
+          <h3 class="menu-trigger">${T("rp.tabsTitle")}</h3>
+          <div class="menu-body rp-box">
+            <div class="prop-row" ${tip("rp.tabsModeTip")}>${T("rp.tabsMode")}
+              <select id="dim-tab-mode" class="prop-input" style="width: 110px;">
+                <option value="auto">${T("rp.tabsAuto")}</option>
+                <option value="manual">${T("rp.tabsManual")}</option>
+              </select>
+            </div>
+            <div class="prop-row" ${tip("rp.tabsTip")}>${T("rp.tabsN")}<input type="number" id="dim-tab-n" value="0" min="0" max="50" step="1" class="prop-input"></div>
+            <button id="btn-tab-tool" class="btn-secondary" style="width:100%;margin:4px 0;" ${tip("rp.tabsToolTip")}>✋ ${T("rp.tabsTool")}</button>
+            <div class="prop-row" ${tip("rp.tabsTip")}>${T("rp.tabsLen")}<input type="number" id="dim-tab-w" value="5" min="0.5" step="0.5" class="prop-input"></div>
+            <div class="prop-row only-mill" ${tip("rp.tabsTip")}>${T("rp.tabsH")}<input type="number" id="dim-tab-h" value="1.5" min="0.1" step="0.5" class="prop-input"></div>
           </div>
         </div>
       </div>

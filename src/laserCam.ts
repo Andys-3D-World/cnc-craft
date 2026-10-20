@@ -13,6 +13,7 @@
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
+import { tabRuns } from "./tabs";
 import {
   getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine
 } from "./laserLayers";
@@ -57,12 +58,14 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
 
     // Pfade in mm
     const closed: Pt[][] = [];
+    const closedShape = new Map<Pt[], any>(); // zu welcher Form gehört die Kontur (für Haltestege)
     const open: Pt[][] = [];
     for (const s of list) {
       for (const p of shapeToPaths(s)) {
         if (p.pts.length < 2) continue;
         const pts = p.pts.map(q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }));
         (p.closed ? closed : open).push(pts);
+        if (p.closed) closedShape.set(pts, s);
       }
     }
 
@@ -87,14 +90,34 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     // ---- LINIE ----
     if (layerHasLine(layer)) {
       // kleine (innere) Konturen zuerst, offene Linien ganz am Anfang
-      const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null }[] = [
-        ...open.map(pts => ({ pts, closed: false, area: 0, lead: null })),
-        ...closed.map(pts => ({ ...withLeadIn(pts, closed, layer.leadIn), closed: true, area: Math.abs(polygonArea(pts)) })).sort((a, b) => a.area - b.area)
+      // Haltestege: Kontur in Stücke, dazwischen Laser aus (das Teil bleibt im Blech hängen)
+      const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null; runs: Pt[][] | null }[] = [
+        ...open.map(pts => ({ pts, closed: false, area: 0, lead: null, runs: null })),
+        ...closed.map(pts => {
+          const lp = withLeadIn(pts, closed, layer.leadIn);
+          const shape = closedShape.get(pts);
+          const tr = shape ? tabRuns(shape, lp.pts, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), Number(shape.tabLen) || 0) : null;
+          return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)) };
+        }).sort((a, b) => a.area - b.area)
       ];
       if (both) g += `F${n(layer.speed)}\n`; // nach dem Füllen wieder die Linien-Geschwindigkeit
       for (let pass = 0; pass < layer.passes; pass++) {
         if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
         for (const p of paths) {
+          if (p.runs) {
+            // mit Haltestegen: jedes Stück schneiden, über den Steg mit Laser aus springen
+            p.runs.forEach((run, ri) => {
+              if (ri === 0 && p.lead) {
+                g += `G0 X${n(p.lead.x)} Y${n(p.lead.y)} S0 ${c("lgc.leadIn")}\n`;
+                g += `G1 X${n(run[0].x)} Y${n(run[0].y)} S${S}\n`;
+              } else {
+                g += `G0 X${n(run[0].x)} Y${n(run[0].y)} S0${ri > 0 ? " " + c("gc.tab") : ""}\n`;
+              }
+              g += `G1 X${n(run[1].x)} Y${n(run[1].y)} S${S}\n`;
+              for (let i = 2; i < run.length; i++) g += `G1 X${n(run[i].x)} Y${n(run[i].y)}\n`;
+            });
+            continue;
+          }
           const pts = p.pts;
           // Freischnitt: im Abfall einstechen und zur Kontur fahren
           if (p.lead) {

@@ -1,24 +1,53 @@
-# Änderungen
+# Changelog
 
-## Nächste Version (noch nicht veröffentlicht)
+## Next version (unreleased)
 
-**Neu**
-- **Verschachteln (wie „Nest“ in LightBurn):** neues Symbol links unter „Messen“ – legt die Teile (Auswahl, sonst alles)
-  automatisch eng aufs Bett. Einstellbar: Abstand zwischen den Teilen, Abstand zum Rand, Drehen (aus / 90° / 45° / automatisch – probiert jeden 15°-Schritt und den Winkel mit dem kleinsten Kasten, dreht
-  aber nur, wenn es Platz spart) und ob
-  kleine Teile in Löcher großer Teile dürfen, **Startpunkt** (oben/Mitte/unten × links/Mitte/rechts) und **Richtung**
-  (nach rechts, links, oben oder unten – bei „Mitte“ wird der fertige Block mittig geschoben). Teile werden nach ihrer echten Form gesetzt, Gruppen und Löcher bleiben
-  beim Teil, nicht ausgewählte Formen bleiben liegen und werden umfahren. Rückgängig mit Strg+Z
-- **Duplizieren mit Anzahl oder „Bett voll“:** der Duplizieren-Knopf oben öffnet jetzt ein Fenster – Anzahl Kopien
-  eingeben oder „So viele, bis das Bett voll ist“, auf Wunsch gleich verschachtelt (Abstand und Rand im Fenster, Drehen,
-  Startpunkt und Richtung wie beim Verschachteln). Kopien, die nicht mehr passen, werden weggelassen. Strg+D macht wie
-  bisher schnell eine einzelne Kopie
+**New**
+- **Nesting (like “Nest” in LightBurn):** new icon on the left below “Measure” – packs the parts (selection, otherwise
+  everything) tightly on the bed. Settings: spacing between parts, distance to the bed edge, rotation (off / 90° / 45° /
+  automatic – tries every 15° step and the angle with the smallest bounding box, but only rotates when it saves space),
+  small parts inside holes of large parts, **start point** (top/middle/bottom × left/center/right) and **direction**
+  (right, left, up or down – for “center” the finished block is moved to the middle). Parts are placed by their real
+  shape, groups and holes stay with their part, unselected shapes stay in place and are avoided. Undo with Ctrl+Z
+- **Duplicate with a count or “fill the bed”:** the duplicate button in the toolbar now opens a dialog – enter the number
+  of copies or choose “As many as fit on the bed”, optionally nested right away (spacing and edge distance in the dialog,
+  rotation, start point and direction as in Nesting). Copies that no longer fit are left out. Ctrl+D still makes one
+  quick copy
 
-**Verbessert**
-- **Webseite schneller:** Bilder als WebP in drei Größen (Handy 480 px, 960 px, groß nur beim Vergrößern), Titelbild
-  wird zuerst geladen, das Video erst beim Hinscrollen, CSS direkt in der Seite, kleines Logo – Titelbild 58 KB statt
-  262 KB, auf dem Handy 8 KB. Links im Text unterstrichen, Untertitel-Spur fürs Video (Barrierefreiheit).
-  Die Seite wird mit `tools/website/build.py` erzeugt
+- **Pocket milling:** “Pocket” now really clears the area (before, the shape was skipped with a warning). Both
+  modes from “Pocket mode”: *Parallel* = zigzag passes, *Contour* = rings from the inside out; each finished with a
+  clean pass along the wall. Shapes inside the pocket (e.g. text, circles) stay standing as islands. Works for closed
+  polylines and circles; stepover 40 % of the bit diameter. The canvas shows the pocket area filled in tool colour
+
+- **Holding tabs (like Estlcam):** under “Milling parameters” set the number of tabs, tab length and tab height for the
+  selected shapes. When cutting out (Outside/Inside, closed contours and circles) the tabs are spread evenly; only the
+  passes deeper than the tab top move up to tab height over the tab (not all the way up). Tabs are shown as yellow
+  marks on the canvas. **Automatic or placed by hand:** “Tabs: Automatic” spreads the count evenly; with “Place tabs”
+  you click on a contour to add a tab and on a yellow tab to remove it (automatic tabs are taken over first). Tabs
+  placed by hand stay on the contour when the part is moved, rotated or scaled; cutting always starts in the largest
+  gap between tabs, never on a tab. **Laser and plasma too:** there the tab has no height – the laser switches off
+  (S0) and jumps over the tab; the plasma torch switches off and pierces again after the tab (full pierce sequence,
+  no overcut into a tab). The gap on the path is tab length + kerf. Tab settings now have their own panel section
+  in all three modes (height only for the mill).
+  Warnings if the tabs are higher than the cut depth or do not fit on the contour. The old
+  “Holding tabs (mm)” field only worked for single lines and lifted to safe height
+
+**Improved**
+- **Single arcs outside/inside:** an arc on its own can now be milled outside (away from its centre) or inside
+  (towards its centre) – still as a true G2/G3 arc. The tool band on the canvas follows
+- **Outside/Inside/Pocket for lines and arcs:** separate lines and arcs whose ends meet are now joined into one closed
+  contour when you choose Outside, Inside or Pocket – so a shape drawn from single arcs and lines can be milled outside
+  or inside. Segments that do not close stay “on the line”, and the console says so (before, the console said
+  “Outside” but they were silently cut on the line)
+- **Faster website:** images as WebP in three sizes (phone 480 px, 960 px, large only when zoomed), hero image loads
+  first, the video only when scrolled into view, CSS inlined, small logo – hero image 58 KB instead of 262 KB, 8 KB on
+  phones. Links in text underlined, subtitle track for the video (accessibility).
+  The site is generated with `tools/website/build.py`
+
+**Fixed**
+- **Inside offset failed on curved shapes:** for shapes made of many short segments (arcs, circles from polylines)
+  the inside offset sometimes returned nothing at certain tool radii (e.g. exactly 1.5 mm = 3 mm bit), so “Inside”
+  or a pocket was skipped with “tool does not fit”. Also removed occasional duplicate contours
 
 ## 0.2.8 Beta
 

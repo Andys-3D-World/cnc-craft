@@ -40,6 +40,18 @@ export function pointInPoly(px: number, py: number, poly: P[]): boolean {
  * @returns Konturen, gegen den Uhrzeigersinn orientiert
  */
 export function offsetPolygon(polygon: P[], d: number, arcTol = 0.01): P[][] {
+  const res = offsetOnce(polygon, d, arcTol);
+  if (res.length || Math.abs(d) < 1e-9) return res;
+  // Sonderfall: liegt ein Kreuzungspunkt genau auf einem Streckenende, wird er übersehen und die Kontur
+  // schließt sich nicht (z. B. Halbkreis mit genau 1,5 mm nach innen). Mit winzig anderem Abstand nochmal.
+  for (const f of [1 + 1e-6, 1 - 1e-6]) {
+    const again = offsetOnce(polygon, d * f, arcTol);
+    if (again.length) return again;
+  }
+  return res;
+}
+
+function offsetOnce(polygon: P[], d: number, arcTol: number): P[][] {
   let pts = cleanPolygon(polygon);
   if (pts.length < 3) return [];
   if (polygonArea(pts) < 0) pts = pts.slice().reverse();
@@ -57,12 +69,17 @@ export function offsetPolygon(polygon: P[], d: number, arcTol = 0.01): P[][] {
   });
 
   // Eine fertige Kontur liegt komplett auf einer Seite -> ein Test pro Kontur reicht
-  return chainPieces(kept).filter(loop => {
+  const loops = chainPieces(kept, Math.max(arcTol * 4, Math.abs(d) * 0.05)).filter(loop => {
     if (loop.length < 3 || polygonArea(loop) <= 1e-6) return false;
     const mx = (loop[0].x + loop[1].x) / 2, my = (loop[0].y + loop[1].y) / 2;
     const inside = pointInPoly(mx, my, pts);
     return d > 0 ? !inside : inside;
   });
+  // Der Versatz EINER Kontur liefert nie ineinanderliegende Konturen – liegt eine in einer anderen,
+  // ist sie eine (fast) doppelte Kopie und fliegt raus
+  loops.sort((a, b) => polygonArea(b) - polygonArea(a));
+  const centre = (l: P[]) => ({ x: l.reduce((s, p) => s + p.x, 0) / l.length, y: l.reduce((s, p) => s + p.y, 0) / l.length });
+  return loops.filter((l, i) => { const c = centre(l); return !loops.some((o, j) => j < i && pointInPoly(c.x, c.y, o)); });
 }
 
 // ---------------------------------------------------------------------
@@ -167,8 +184,12 @@ function segIntersect(a: P, b: P, c: P, d: P): { t: number; u: number; p: P } | 
   return { t, u, p: { x: a.x + t * rx, y: a.y + t * ry } };
 }
 
-/** Behaltene Stücke wieder zu geschlossenen Konturen verbinden */
-function chainPieces(pieces: Piece[]): P[][] {
+/**
+ * Behaltene Stücke wieder zu geschlossenen Konturen verbinden.
+ * tol: liegen zwei Kreuzungspunkte fast aufeinander (z. B. an der Ecke Bogen/Gerade), fällt das winzige
+ * Stück dazwischen weg – dann darf am nächsten Stück weitergemacht werden, das höchstens tol entfernt beginnt.
+ */
+function chainPieces(pieces: Piece[], tol = 0): P[][] {
   const byStart = new Map<number, number[]>();
   pieces.forEach((pc, i) => {
     const l = byStart.get(pc.aId);
@@ -186,11 +207,20 @@ function chainPieces(pieces: Piece[]): P[][] {
     while (cur >= 0 && !used[cur]) {
       used[cur] = 1;
       loop.push(pieces[cur].a);
-      const endId = pieces[cur].bId;
+      const endId = pieces[cur].bId, endP = pieces[cur].b;
       if (endId === startId) { ok = true; break; }
       const next = byStart.get(endId);
       cur = -1;
       if (next) for (const k of next) if (!used[k]) { cur = k; break; }
+      if (cur < 0 && tol > 0) {
+        if (loop.length > 2 && Math.hypot(endP.x - pieces[s].a.x, endP.y - pieces[s].a.y) <= tol) { ok = true; break; }
+        let best = tol;
+        for (let k = 0; k < pieces.length; k++) {
+          if (used[k]) continue;
+          const dd = Math.hypot(pieces[k].a.x - endP.x, pieces[k].a.y - endP.y);
+          if (dd <= best) { best = dd; cur = k; }
+        }
+      }
     }
     if (ok) loops.push(cleanPolygon(loop));
   }

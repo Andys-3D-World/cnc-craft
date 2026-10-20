@@ -10,6 +10,7 @@
  *  Bogen (A)     Start, Ende, Wölbung
  *  Text (T)      klicken -> Text-Dialog
  *  Messen (M)    ziehen -> Abstand und Winkel
+ *  Stege setzen  Klick auf eine Kontur setzt einen Haltesteg, Klick auf einen Steg entfernt ihn
  */
 import { app, options, ToolName, toWorld, screenDist, fmtMm } from "./editorState";
 import { snapPoint, snapAngle, SnapResult } from "./snap";
@@ -24,6 +25,7 @@ import {
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
 import { t } from "../i18n/i18n";
+import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 
 type Mode =
   | "idle" | "panning" | "pressSelect" | "moving" | "scaling" | "rotating" | "boxselect"
@@ -189,10 +191,42 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
       live.dragStart = { ...live.world };
       live.mode = "dragDraw";
       break;
+    case "tab":
+      placeTab();
+      break;
     default:
       break;
   }
   redrawFn();
+}
+
+/**
+ * Haltesteg setzen/entfernen: Klick auf eine geschlossene Kontur. Hatte die Form automatische Stege,
+ * werden die zuerst als selbst gesetzte übernommen – dann kann man sie einzeln wegklicken oder ergänzen.
+ */
+function placeTab() {
+  const hit = hitTest(live.raw.x, live.raw.y, 10);
+  const ring = hit ? outline(hit) : null;
+  if (!hit || !ring) return;
+  const num = (id: string, d: number) => { const v = parseFloat((document.getElementById(id) as HTMLInputElement | null)?.value || ""); return Number.isFinite(v) && v > 0 ? v : d; };
+  if (!(Number(hit.tabLen) > 0)) hit.tabLen = num("dim-tab-w", 5);
+  if (!(Number(hit.tabH) > 0)) hit.tabH = num("dim-tab-h", 1.5);
+  if (hit.tabMode !== "manual") {
+    hit.tabPts = autoFractions(Math.round(Number(hit.tabN) || 0));
+    hit.tabMode = "manual";
+  }
+  const fr = outlineFraction(hit, live.raw);
+  if (!fr) return;
+  const cum = cumulative(ring);
+  const L = cum[cum.length - 1];
+  // Klick auf einen vorhandenen Steg (halbe Steglänge + etwas Luft) entfernt ihn
+  const tol = (hit.tabLen * MM_TO_PIXEL / 2 + screenDist(8)) / L;
+  const pts: number[] = hit.tabPts || [];
+  const near = pts.findIndex(f => { const d = Math.abs(f - fr.f); return Math.min(d, 1 - d) <= tol; });
+  if (near >= 0) pts.splice(near, 1); else pts.push(fr.f);
+  hit.tabPts = pts;
+  app().selectedShapeIds = [hit.id];
+  finishChange();
 }
 
 function startHandleDrag(name: HandleName) {

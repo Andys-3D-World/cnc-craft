@@ -11,8 +11,9 @@
  * die Form, der Modus oder der Werkzeugdurchmesser ändert.
  */
 import { toolForShape, toolNumber, toolColor, MillingTool } from "./toolLibrary";
-import { arcGeometry, shapeBounds, MM_TO_PIXEL, Pt } from "./shapeTransform";
+import { arcGeometry, shapeBounds, makeEllipsePoints, MM_TO_PIXEL, Pt } from "./shapeTransform";
 import { offsetPolygon } from "./polyOffset";
+import { tabSettings, tabCenters, cumulative, pointAt, outline } from "./tabs";
 
 type SX = (x: number) => number;
 
@@ -67,11 +68,14 @@ export function drawToolBands(
     ctx.lineWidth = widthScreen;
     const sign = mode === "outside" ? 1 : (mode === "inside" || mode === "pocket") ? -1 : 0;
 
+    // Haltestege: Lage auf der Fräserbahn merken, gelb über den Streifen zeichnen
+    let tabRing: Pt[] | null = null;
     ctx.beginPath();
     if (shape.type === "circle") {
       const r = Math.abs(shape.w) + sign * rPx;
       if (r > 0.01) ctx.arc(sx(shape.x), sy(shape.y), r * scale, 0, Math.PI * 2);
       else tooBig.push(shape);
+      if (r > 0.01 && sign !== 0 && mode !== "pocket") tabRing = makeEllipsePoints(shape.x, shape.y, r, r);
     } else if (shape.type === "polyline" && shape.points?.length > 1) {
       if (!shape.closed || sign === 0) {
         tracePts(ctx, shape.points, !!shape.closed, sx, sy);
@@ -79,17 +83,60 @@ export function drawToolBands(
         const c = offsetLoops(shape, sign * rPx);
         if (c.tooBig) tooBig.push(shape);
         for (const loop of c.loops) tracePts(ctx, loop, true, sx, sy);
+        if (mode !== "pocket" && c.loops.length) tabRing = c.loops[0];
       }
     } else if (shape.type === "line") {
       ctx.moveTo(sx(shape.x), sy(shape.y));
       ctx.lineTo(sx(shape.x + shape.w), sy(shape.y + shape.h));
     } else if (shape.type === "arc") {
       const g = arcGeometry(shape);
-      if (g) ctx.arc(sx(g.cx), sy(g.cy), g.r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
+      // Bogen außen/innen: Fräser weg vom bzw. hin zum Mittelpunkt (Tasche geht bei offenen Bögen nicht)
+      const r = g ? g.r + (mode === "pocket" ? 0 : sign * rPx) : 0;
+      if (g && r > 0.01) ctx.arc(sx(g.cx), sy(g.cy), r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
+      else if (g) tooBig.push(shape);
     }
+    ctx.stroke();
+    // Plasma (resolve gesetzt): Stege ohne Höhe
+    if (tabRing) drawTabs(ctx, shape, tabRing, sx, sy, widthScreen, rPx, !resolve);
+    // Tasche: die ganze Fläche wird abgetragen → Fläche füllen
+    if (mode === "pocket" && (shape.type === "circle" || (shape.type === "polyline" && shape.closed && shape.points?.length > 2))) {
+      ctx.fillStyle = tool.color;
+      ctx.beginPath();
+      if (shape.type === "circle") ctx.arc(sx(shape.x), sy(shape.y), Math.abs(shape.w) * scale, 0, Math.PI * 2);
+      else tracePts(ctx, shape.points, true, sx, sy);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** Haltestege als gelbe Stücke auf der Fräserbahn (gleiche Lage wie im G-Code, siehe tabs.ts) */
+function drawTabs(ctx: CanvasRenderingContext2D, shape: any, loop: Pt[], sx: SX, sy: SX, width: number, rPx: number, needHeight = true) {
+  const tab = tabSettings(shape, needHeight);
+  if (!tab || loop.length < 3) return;
+  const cum = cumulative(loop);
+  const len = tab.len * MM_TO_PIXEL;
+  const centers = tabCenters(shape, loop, cum, p => p, rPx * 1.5 + 2);
+  if (shape.tabMode !== "manual" && cum[cum.length - 1] / Math.max(1, centers.length) < 3 * (len / 2 + rPx)) return; // zu viele – der G-Code meldet das
+  ctx.save();
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = "#ffd23f";
+  ctx.lineWidth = Math.max(width, 5); // bei dünnem Schnittspalt (Plasma) trotzdem gut sichtbar
+  ctx.lineCap = "butt";
+  for (const c of centers) {
+    ctx.beginPath();
+    for (let j = 0; j <= 6; j++) { const p = pointAt(loop, cum, c - len / 2 + (len * j) / 6); j ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y)); }
     ctx.stroke();
   }
   ctx.restore();
+}
+
+/** Laser: Stege direkt auf der Kontur (dort ist der Laser aus) */
+export function drawLaserTabs(ctx: CanvasRenderingContext2D, shapes: any[], sx: SX, sy: SX) {
+  for (const s of shapes) {
+    const ring = tabSettings(s, false) ? outline(s) : null;
+    if (ring) drawTabs(ctx, s, ring, sx, sy, 5, 0, false);
+  }
 }
 
 function tracePts(ctx: CanvasRenderingContext2D, pts: Pt[], closed: boolean, sx: SX, sy: SX) {
@@ -107,6 +154,10 @@ function markTooBig(ctx: CanvasRenderingContext2D, shape: any, sx: SX, sy: SX, s
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
   if (shape.type === "circle") ctx.arc(sx(shape.x), sy(shape.y), Math.abs(shape.w) * scale, 0, Math.PI * 2);
+  else if (shape.type === "arc") {
+    const g = arcGeometry(shape);
+    if (g) ctx.arc(sx(g.cx), sy(g.cy), g.r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
+  }
   else tracePts(ctx, shape.points, true, sx, sy);
   ctx.stroke();
   ctx.restore();
