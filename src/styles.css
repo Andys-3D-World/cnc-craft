@@ -706,6 +706,20 @@ input:not([type]) {
 .dlg-num input { width: 90px; text-align: right; }
 .dlg-num em { font-style: normal; font-size: 0.72rem; color: var(--text-muted); width: 46px; }
 .dlg-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
+/* Material erkennen (Beta) – camera/materialDialog.ts */
+.mat-beta { font-size: 0.78rem; line-height: 1.4; padding: 8px 10px; border-radius: 8px; background: rgba(255, 176, 32, 0.12); border: 1px solid rgba(255, 176, 32, 0.55); color: #ffcf70; }
+.mat-steps { margin: 0; padding-left: 20px; font-size: 0.8rem; line-height: 1.5; display: flex; flex-direction: column; gap: 4px; }
+.mat-steps .btn-compact { margin-left: 4px; }
+.mat-ok { color: #34d17b; font-size: 0.75rem; }
+.mat-bad { color: #ff6b6b; font-size: 0.75rem; }
+.mat-view { position: relative; background: #0d0d12; border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; }
+.mat-view canvas { display: block; width: 100%; height: auto; touch-action: none; }
+.mat-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; font-size: 0.78rem; color: var(--text-muted); }
+.mat-row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 0.78rem; }
+.mat-row label { display: flex; align-items: center; gap: 6px; }
+.mat-tips { font-size: 0.76rem; color: var(--text-muted); }
+.mat-tips summary { cursor: pointer; color: var(--text-main); }
+.mat-tips ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.45; }
 .dlg-buttons { display: flex; gap: 8px; margin-top: 4px; }
 .dlg-danger { flex: 0 0 auto; color: #ff6b6b !important; }
 .dlg-invalid { outline: 2px solid #ff4d4d !important; }

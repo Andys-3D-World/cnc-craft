@@ -32,7 +32,18 @@
   Warnings if the tabs are higher than the cut depth or do not fit on the contour. The old
   “Holding tabs (mm)” field only worked for single lines and lifted to safe height
 
+- **Detect material with the camera (beta):** new button “🧱 Material (beta)” in the camera window. Works with a
+  normal USB webcam once the camera is aligned (🎯): capture the empty bed, put the material on, detect. The sheet
+  (also rotated) and its holes/offcuts are found by comparing with the empty bed (fallback without empty-bed image:
+  brightness). Preview with green = material, red = holes; drag the four corners to correct by hand; sensitivity and
+  minimum hole size adjustable. “Apply” marks everything without material as used in the material sheet. Clearly
+  marked as beta with step-by-step guide and tips (light, move the head out of the picture …). It only detects where
+  material lies, not which material – that stays the user’s choice (safety, e.g. PVC). Tested with synthetic camera
+  images, not yet with a real camera
+
 **Improved**
+- **Nesting uses only free material:** used area of the material sheet (from jobs or the camera) and everything
+  outside the sheet is avoided, with the same clearance as “lies on used area” (tool width + safety distance)
 - **Single arcs outside/inside:** an arc on its own can now be milled outside (away from its centre) or inside
   (towards its centre) – still as a true G2/G3 arc. The tool band on the canvas follows
 - **Outside/Inside/Pocket for lines and arcs:** separate lines and arcs whose ends meet are now joined into one closed

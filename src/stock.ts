@@ -158,6 +158,34 @@ export function newPlate(w?: number, h?: number) {
   save(mode);
 }
 
+/**
+ * Platte aus der Kamera-Erkennung (Beta): Platte = ganzes Bett, alles ohne Material ist „verbraucht“
+ * (außerhalb der erkannten Platte und ihre Löcher). isUsed(x, y) in mm. Mit „Letzte Markierung zurück“
+ * rückgängig, solange die Bettgröße gleich bleibt.
+ */
+export function applyPlateFromCamera(w: number, h: number, isUsed: (x: number, y: number) => boolean, label: string): number {
+  const mode = getMachineMode();
+  const old = getStock(mode);
+  const s = blank(w, h);
+  if (old.w === w && old.h === h && old.cell === s.cell) { s.undo = encode(old.used); s.jobs = old.jobs.slice(); }
+  for (let r = 0; r < s.rows; r++) for (let c = 0; c < s.cols; c++) {
+    if (isUsed((c + 0.5) * s.cell, (r + 0.5) * s.cell)) s.used[r * s.cols + c] = 1;
+  }
+  const percent = usedPercent(s);
+  s.jobs.push({ date: new Date().toISOString(), label, percent });
+  s.jobs = s.jobs.slice(-50);
+  stocks.set(mode, s);
+  save(mode);
+  return percent;
+}
+
+/** Ist diese Stelle (mm) frei – auf der Platte und nicht verbraucht? (für das Verschachteln) */
+export function stockFreeAt(x: number, y: number, s: Stock = getStock()): boolean {
+  if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
+  const c = Math.floor(x / s.cell), r = Math.floor(y / s.cell);
+  return !s.used[r * s.cols + c];
+}
+
 /** Letzte Markierung zurücknehmen */
 export function undoLastMark(): boolean {
   const s = getStock();
@@ -277,6 +305,13 @@ function shapeToolRadius(shape: any): number {
   if (mode === "laser") return 0.15;
   if (mode === "plasma") return (cutForShape(shape)?.kerf || 1.5) / 2;
   return (toolForShape(shape)?.diameter || 3) / 2;
+}
+
+/** Abstand (mm), den Formen zur verbrauchten Fläche halten – wie bei „liegt auf verbrauchter Fläche“ (Verschachteln) */
+export function stockClearance(shapes: any[]): number {
+  let r = 0;
+  for (const sh of shapes) r = Math.max(r, shapeToolRadius(sh));
+  return 2 * r + stockOptions.margin;
 }
 
 interface Footprint { cells: number[]; minC: number; minR: number; maxC: number; maxR: number }

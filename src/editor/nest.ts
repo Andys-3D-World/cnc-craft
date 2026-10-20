@@ -11,6 +11,7 @@
  * Formen, die nicht verschachtelt werden, bleiben liegen und sind Hindernisse.
  */
 import { app, bedSizeMm } from "./editorState";
+import { getStock, hasUsedArea, stockFreeAt, stockClearance } from "../stock";
 import {
   MM_TO_PIXEL, Bounds, Pt, groupBounds, translateShape, rotateShape, shapeToPaths, shapeBounds, pointInPath, pathArea
 } from "../shapeTransform";
@@ -212,6 +213,24 @@ function minBoxAngle(paths: Paths): number {
   return bestA;
 }
 
+/** Maske um r Zellen dicker machen (quadratisch, getrennt nach Zeilen und Spalten) */
+function dilate(m: Uint8Array, cols: number, rows: number, r: number): Uint8Array {
+  const tmp = new Uint8Array(m.length), out = new Uint8Array(m.length);
+  for (let y = 0; y < rows; y++) {
+    let last = -Infinity;
+    for (let x = 0; x < cols; x++) { if (m[y * cols + x]) last = x; if (x - last <= r) tmp[y * cols + x] = 1; }
+    last = Infinity;
+    for (let x = cols - 1; x >= 0; x--) { if (m[y * cols + x]) last = x; if (last - x <= r) tmp[y * cols + x] = 1; }
+  }
+  for (let x = 0; x < cols; x++) {
+    let last = -Infinity;
+    for (let y = 0; y < rows; y++) { if (tmp[y * cols + x]) last = y; if (y - last <= r) out[y * cols + x] = 1; }
+    last = Infinity;
+    for (let y = rows - 1; y >= 0; y--) { if (tmp[y * cols + x]) last = y; if (last - y <= r) out[y * cols + x] = 1; }
+  }
+  return out;
+}
+
 /** Belegtes Bett: je Zeile Summen (schnelle Prüfung) und „letzte belegte Zelle“ (schnell weiterspringen) */
 class Bed {
   occ: Uint8Array; pre: Int32Array[] = []; last: Int32Array[] = [];
@@ -219,6 +238,7 @@ class Bed {
     this.occ = new Uint8Array(cols * rows);
     for (let r = 0; r < rows; r++) { this.pre.push(new Int32Array(cols + 1)); this.last.push(new Int32Array(cols).fill(-1)); }
   }
+  rebuildAll() { for (let r = 0; r < this.rows; r++) this.rebuild(r); }
   private rebuild(r: number) {
     const pre = this.pre[r], last = this.last[r], base = r * this.cols;
     let lastOn = -1;
@@ -341,6 +361,25 @@ export function nestShapes(opts: NestOptions, only?: any[], sets?: any[][]): Nes
     // liegt nicht genau auf dem Raster → auf beiden Nachbarzellen eintragen (lieber etwas zu viel Abstand)
     const gx = Math.floor(m.ox / cell), gy = Math.floor(m.oy / cell);
     for (const [ax, ay] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { grid.mark(m, gx + ax, gy + ay); obst.mark(m, gx + ax, gy + ay); }
+  }
+
+  // Material-Platte: verbrauchte Fläche (Jobs, Kamera-Erkennung) und alles außerhalb der Platte meiden
+  const stock = getStock();
+  const bedMm = bedSizeMm();
+  if (hasUsedArea() || stock.w < bedMm.w - 0.01 || stock.h < bedMm.h - 0.01) {
+    let used: Uint8Array = new Uint8Array(grid.cols * grid.rows);
+    for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) {
+      const vx = (c + 0.5) * cell, vy = (r + 0.5) * cell;
+      const [px, py] = tr ? [vy, vx] : [vx, vy];
+      const x = (mx ? BW - px : px) / MM_TO_PIXEL, y = (my ? BH - py : py) / MM_TO_PIXEL;
+      if (!stockFreeAt(x, y, stock)) used[r * grid.cols + c] = 1;
+    }
+    // Abstand wie bei der Material-Platte einhalten (die Teile sind schon um den halben Abstand dicker)
+    const clear = stockClearance(units.flatMap(u => u.members)); // Werkzeug + Sicherheitsabstand
+    const grow = Math.ceil((clear * MM_TO_PIXEL - half) / cell);
+    if (grow > 0) used = dilate(used, grid.cols, grid.rows, grow);
+    for (let i = 0; i < used.length; i++) if (used[i]) { grid.occ[i] = 1; obst.occ[i] = 1; }
+    grid.rebuildAll(); obst.rebuildAll();
   }
 
   const steps = opts.rotate === "auto" ? 24 : opts.rotate === "45" ? 8 : opts.rotate === "90" ? 4 : 1;

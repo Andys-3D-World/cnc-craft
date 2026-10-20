@@ -9,6 +9,7 @@
  *     aufs Material/Reststück. Live oder als Standbild, Deckkraft einstellbar
  *   - 🎯 Ausrichten: Assistent (cameraAlign.ts) – Linse entzerren, dann 4 Punkte anklicken
  *     (Laser brennt dafür 4 Kreuze, oder eigene Punkte wie die Bettecken)
+ *   - 🧱 Material (Beta): Platte + Reste erkennen → Material-Platte (materialDialog.ts)
  *
  * Fenster-Lage, Quelle und Ausrichtung werden gemerkt (localStorage → auch in der
  * Einstellungs-Datei, siehe settingsStore.ts).
@@ -23,6 +24,7 @@ import { Mat3 } from "./cameraMath";
 import { Warper } from "./cameraWarp";
 import { cameraUnderlay } from "./cameraOverlay";
 import { openAlignWizard } from "./cameraAlign";
+import { openMaterialDialog } from "./materialDialog";
 
 export interface CamCalib {
   k1: number;
@@ -483,6 +485,7 @@ function buildWindow() {
       <span class="cam-sp"></span>
       <button id="cam-ovl" class="btn-secondary cam-tg" data-tip="${esc(t("cam.ovlTip"))}">▦ ${esc(t("cam.ovl"))}</button>
       <button id="cam-align" class="btn-secondary" data-tip="${esc(t("cam.alignTip"))}">🎯 ${esc(t("cam.align"))}</button>
+      <button id="cam-mat" class="btn-secondary" data-tip="${esc(t("mat.btnTip"))}">🧱 ${esc(t("mat.btn"))}</button>
     </div>
     <div class="cam-bar cam-ovl-row" id="cam-ovl-row" style="display:none;">
       <span class="cam-lbl">${esc(t("cam.opacity"))}</span>
@@ -531,6 +534,7 @@ function buildWindow() {
   $("cam-mir")!.onclick = () => { cam.mirror = !cam.mirror; saveCam(); showView(); syncWindow(); if (cam.overlay) void renderOverlay(); };
   $("cam-ovl")!.onclick = () => setOverlay(!cam.overlay);
   $("cam-align")!.onclick = () => openAlign();
+  $("cam-mat")!.onclick = () => openMaterialDialog(log);
   const op = $<HTMLInputElement>("cam-opacity")!;
   op.addEventListener("input", () => { cam.opacity = parseInt(op.value, 10) / 100; cameraUnderlay.opacity = cam.opacity; saveCam(); window.dispatchEvent(new Event("cnc-redraw")); });
   $("cam-live")!.onclick = () => { cam.live = !cam.live; saveCam(); syncWindow(); if (cam.live) startOverlayLoop(); else stopOverlayLoop(); };
