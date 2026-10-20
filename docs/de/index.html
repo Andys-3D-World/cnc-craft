@@ -50,7 +50,7 @@
       <a id="dl-main" class="btn primary" href="#download" data-mac="Für Mac herunterladen" data-win="Für Windows herunterladen" data-linux="Für Linux herunterladen (AppImage)">⬇ <span>Herunterladen</span></a>
       <a class="btn" href="https://github.com/Andys-3D-World/cnc-craft">★ Stern auf GitHub</a>
     </div>
-    <div class="dl-note">Version <span data-version>0.2.7</span> <span id="dl-os-note" data-mac="Mac mit Apple-Chip (M1–M4). Intel-Mac: siehe Download weiter unten." data-win="Windows 10/11, 64 Bit" data-linux="Andere Formate (.deb, .rpm): siehe Download weiter unten."></span></div>
+    <div class="dl-note">Version <span data-version>0.2.8</span> <span id="dl-os-note" data-mac="Mac mit Apple-Chip (M1–M4). Intel-Mac: siehe Download weiter unten." data-win="Windows 10/11, 64 Bit" data-linux="Andere Formate (.deb, .rpm): siehe Download weiter unten."></span></div>
     <img class="hero-shot" src="../assets/shots/de/01-design-fraese.jpg" alt="CNC Craft mit Zeichnung und Fräsbahnen" width="1800" height="1125">
   </div>
 </div>
@@ -68,7 +68,7 @@
       <div class="card"><div class="ico">🔌</div><h3>Maschinensteuerung</h3><p>GRBL, grblHAL, FluidNC, Grbl_ESP32 per USB oder WLAN, Marlin, Ruida (CO₂) und K40. Mehrere Maschinen gleichzeitig.</p></div>
       <div class="card"><div class="ico">📷</div><h3>Kamera</h3><p>USB- oder IP-Kamera: Job beobachten und die Zeichnung auf dem Livebild des Werkstücks platzieren.</p></div>
       <div class="card"><div class="ico">📶</div><h3>WLAN einrichten</h3><p>Maschinen im Netzwerk finden und das WLAN des Boards direkt aus dem Programm einrichten.</p></div>
-      <div class="card"><div class="ico">⚙️</div><h3>Board-Werkzeuge</h3><p>Maschinen-Einstellungen ($$) verständlich erklärt, Firmware flashen (ESP32, Arduino, grblHAL) und Anschlusspläne.</p></div>
+      <div class="card"><div class="ico">⚙️</div><h3>Board-Werkzeuge</h3><p>Maschinen-Einstellungen ($$) verständlich erklärt, Firmware flashen (ESP32, Arduino, grblHAL-.zip) und Anschlusspläne mit Jumpern, DIP-Schaltern und externen Treibern.</p></div>
       <div class="card"><div class="ico">♻️</div><h3>Restplatten</h3><p>Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten.</p></div>
       <div class="card"><div class="ico">🔒</div><h3>Privat</h3><p>Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner.</p></div>
       <div class="card"><div class="ico">🔄</div><h3>Updates im Programm</h3><p>Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.</p></div>
@@ -76,7 +76,15 @@
   </div>
 </section>
 
-<section class="alt">
+<section id="new" class="alt">
+  <div class="wrap">
+    <h2>Neu in 0.2.8</h2>
+    <p class="lead">Anschlusspläne, die wie dein echtes Board aussehen, Jumper und DIP-Schalter für Mikroschritte, externe Treiber (TB6600), grblHAL-Flasher und mehr. <a href="https://github.com/Andys-3D-World/cnc-craft/blob/main/CHANGELOG.md">Alle Änderungen →</a></p>
+    <video class="hero-shot" style="margin-top:0" src="../assets/video/whatsnew-de.mp4" poster="../assets/shots/de/05-anschluesse.jpg" autoplay muted loop playsinline controls preload="metadata" width="1280" height="720"></video>
+  </div>
+</section>
+
+<section>
   <div class="wrap">
     <h2>Für Maker gebaut</h2>
     <p class="lead">CNC Craft vereint, wofür man sonst drei Programme braucht:</p>
@@ -92,7 +100,9 @@
       <figure><img src="../assets/shots/de/02-simulation.jpg" alt="CNC Craft – Simulation: Fräsbahnen in 3D mit Zeit und G-Code" width="1800" height="1125" loading="lazy"><figcaption><b>Simulation</b> – Fräsbahnen in 3D mit Zeit und G-Code</figcaption></figure>
       <figure><img src="../assets/shots/de/03-laser.jpg" alt="CNC Craft – Laser: Ebenen zum Gravieren und Schneiden" width="1800" height="1125" loading="lazy"><figcaption><b>Laser</b> – Ebenen zum Gravieren und Schneiden</figcaption></figure>
       <figure><img src="../assets/shots/de/04-plasma.jpg" alt="CNC Craft – Plasma: Schnitte, Einstichpunkte und Anfahrbahnen" width="1800" height="1125" loading="lazy"><figcaption><b>Plasma</b> – Schnitte, Einstichpunkte und Anfahrbahnen</figcaption></figure>
-      <figure><img src="../assets/shots/de/05-anschluesse.jpg" alt="CNC Craft – Anschlussplan: so wird das Board verkabelt" width="1800" height="1125" loading="lazy"><figcaption><b>Anschlussplan</b> – so wird das Board verkabelt</figcaption></figure>
+      <figure><img src="../assets/shots/de/05-anschluesse.jpg" alt="CNC Craft – Anschlussplan: Jumper für Mikroschritte und zweiten Y-Motor" width="1800" height="1125" loading="lazy"><figcaption><b>Anschlussplan</b> – Jumper für Mikroschritte und zweiten Y-Motor</figcaption></figure>
+      <figure><img src="../assets/shots/de/06-mks-max.jpg" alt="CNC Craft – MKS DLC32 MAX: wie das echte Board, Stecker in Original-Farben" width="1800" height="1125" loading="lazy"><figcaption><b>MKS DLC32 MAX</b> – wie das echte Board, Stecker in Original-Farben</figcaption></figure>
+      <figure><img src="../assets/shots/de/07-extern.jpg" alt="CNC Craft – Externe Treiber: TB6600 / DM542 anschließen – Maus aufs Kabel hebt es hervor" width="1800" height="1125" loading="lazy"><figcaption><b>Externe Treiber</b> – TB6600 / DM542 anschließen – Maus aufs Kabel hebt es hervor</figcaption></figure>
     </div>
   </div>
 </section>

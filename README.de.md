@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.2.7 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.2.8 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -25,9 +25,11 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Kamera (USB-Webcam oder IP-Kamera): zuschauen, Foto/Video, entzerrtes Kamerabild unter der Zeichnung, Ausrichten mit 4 Laser-Kreuzen
 - Netzwerk-Suche für Maschinen im WLAN/LAN (FluidNC, grblHAL, MKS DLC32 …)
 - WLAN einrichten direkt aus der App – Netze in der Nähe auswählen, Sonderzeichen im Passwort, Erst-Einrichtung über das WLAN des Boards (inkl. MKS DLC32 MAX), eigener Name je Maschine
-- Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung
-- Board flashen (ESP32/ESP32-S3 inkl. .elf, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
-- Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX
+- Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung – bei grblHAL mit den
+  Beschreibungen direkt vom Board
+- Board flashen (ESP32/ESP32-S3 inkl. .elf und grblHAL-Web-Builder-.zip, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
+- Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX – wie die echten Boards gezeichnet, mit Jumpern /
+  DIP-Schaltern für Mikroschritte, Motor A als zweitem Motor, externen Treibern (TB6600, DM542); Maus aufs Kabel hebt es hervor
 - Update direkt aus der App („Jetzt aktualisieren“ im ⓘ-Fenster, signiert)
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 
@@ -36,7 +38,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 | | |
 |---|---|
 | ![3D-Simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – Fräsbahnen in 3D, Zeit und G-Code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – Ebenen: Gravieren (Fläche) und Schneiden |
-| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – Schnitte, Einstichpunkte und Anfahrbahnen | ![Anschlussplan](docs/screenshots/05-anschluesse.png) <br> **Anschlussplan** – so wird das Board verkabelt |
+| ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – Schnitte, Einstichpunkte und Anfahrbahnen | ![Anschlussplan](docs/screenshots/05-anschluesse.png) <br> **Anschlussplan** – Jumper für Mikroschritte und zweiten Y-Motor |
+| ![MKS DLC32 MAX](docs/screenshots/06-mks-max.png) <br> **MKS DLC32 MAX** – wie das echte Board | ![Externe Treiber](docs/screenshots/07-extern.png) <br> **Externe Treiber** – TB6600 / DM542, Maus aufs Kabel hebt es hervor |
 
 Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 

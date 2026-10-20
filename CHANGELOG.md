@@ -1,6 +1,6 @@
 # Änderungen
 
-## Nächste Version (noch nicht veröffentlicht)
+## 0.2.8 Beta
 
 **Neu**
 - **Anschlussplan – Mikroschritte:** in „Schrittmotoren“ Treiber (A4988, DRV8825, TMC2208, TMC2209) und Mikroschritte wählen –

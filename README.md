@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Windows and Linux.
 
-**Status: 0.2.7 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.2.8 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -26,9 +26,11 @@ in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Win
 - Network search for machines on Wi-Fi/LAN (FluidNC, grblHAL, MKS DLC32 …)
 - Set up Wi-Fi right from the app – pick nearby networks, special characters in passwords, first setup through the
   board's own Wi-Fi (incl. MKS DLC32 MAX), custom name per machine
-- Machine settings ($$) explained in plain words, with backup/restore and factory reset
-- Flash boards (ESP32/ESP32-S3 incl. .elf, Arduino UNO/Nano with bundled GRBL 1.1h)
-- Wiring diagrams for CNC Shield V3, MKS DLC32 V2.1 and MKS DLC32 MAX
+- Machine settings ($$) explained in plain words, with backup/restore and factory reset – for grblHAL with the
+  descriptions straight from the board
+- Flash boards (ESP32/ESP32-S3 incl. .elf and grblHAL Web Builder .zip, Arduino UNO/Nano with bundled GRBL 1.1h)
+- Wiring diagrams for CNC Shield V3, MKS DLC32 V2.1 and MKS DLC32 MAX – drawn like the real boards, with jumpers / DIP switches
+  for microsteps, motor A as second motor, external drivers (TB6600, DM542); hover a wire to highlight it
 - Update right from the app (“Update now” in the ⓘ window, signed)
 - 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 
@@ -37,7 +39,8 @@ in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Win
 | | |
 |---|---|
 | ![3D simulation](docs/screenshots/en/02-simulation.png) <br> **Simulation** – toolpaths in 3D, time and G-code | ![Laser](docs/screenshots/en/03-laser.png) <br> **Laser** – layers: engrave (fill) and cut |
-| ![Plasma](docs/screenshots/en/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/en/05-wiring.png) <br> **Wiring diagram** – how to wire the board |
+| ![Plasma](docs/screenshots/en/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/en/05-wiring.png) <br> **Wiring diagram** – jumpers for microsteps and a second Y motor |
+| ![MKS DLC32 MAX](docs/screenshots/en/06-mks-max.png) <br> **MKS DLC32 MAX** – drawn like the real board | ![External drivers](docs/screenshots/en/07-external-drivers.png) <br> **External drivers** – TB6600 / DM542, hover a wire to highlight it |
 
 Download (Windows version signed via the [SignPath Foundation](https://signpath.org), see [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · What changed: [CHANGELOG.md](CHANGELOG.md) (German)
 
