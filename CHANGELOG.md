@@ -1,5 +1,11 @@
 # Änderungen
 
+## Nächste Version (noch nicht veröffentlicht)
+
+**Verbessert**
+- **Webseite schneller:** kleinere Bilder (960 px) mit großer Version nur bei Bedarf, Titelbild wird zuerst geladen,
+  das Video erst beim Hinscrollen – beim Öffnen ca. 0,75 MB statt 6,2 MB
+
 ## 0.2.8 Beta
 
 **Neu**

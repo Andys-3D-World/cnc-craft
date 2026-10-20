@@ -62,9 +62,22 @@
   document.addEventListener("keydown", function (e) { if (e.key === "Escape") zoom.classList.remove("on"); });
   document.querySelectorAll(".shots img").forEach(function (img) {
     img.addEventListener("click", function () {
-      zoom.firstChild.src = img.src;
+      zoom.firstChild.src = img.getAttribute("data-full") || img.currentSrc || img.src;
       zoom.firstChild.alt = img.alt;
       zoom.classList.add("on");
     });
   });
+
+  // Video erst laden und abspielen, wenn es zu sehen ist (spart beim Öffnen der Seite ~5 MB)
+  var vids = document.querySelectorAll("video[data-autoplay]");
+  if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        var v = e.target;
+        if (e.isIntersecting) { var p = v.play(); if (p && p.catch) p.catch(function () { /* Autoplay gesperrt */ }); }
+        else v.pause();
+      });
+    }, { threshold: 0.35 });
+    vids.forEach(function (v) { io.observe(v); });
+  }
 })();
