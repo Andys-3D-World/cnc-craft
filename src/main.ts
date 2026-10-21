@@ -38,6 +38,7 @@ import { bindOffsetModes } from "./offsetModes";
 import { loadGcodeFromFile, startStreaming, pauseStreaming, stopStreaming } from "./machineStream";
 import { drawOverlay } from "./editor/overlay";
 import { initHistory } from "./editor/history";
+import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
 import { initImports, importBytes } from "./importers/importManager";
@@ -116,10 +117,12 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (dirty && ctx && canvas) {
         dirty = false;
         drawEverything(ctx, canvas, state.shapes, state.selectedShapeIds, state.offsetX, state.offsetY, state.scale);
+        drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
         refreshLaserPanel(); // Laser-Ebenen ebenso
         refreshPlasmaPanel(); // und Plasma-Schnitte
+        refreshBeds();        // Reiter der Betten (Anzahl Teile)
       }
       requestAnimationFrame(paint);
     };
@@ -138,6 +141,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       initCommands(canvas, redraw, appendToConsole);
     }
     initHistory();
+    initBeds(redraw, appendToConsole, () => zoomFit()); // mehrere Betten: Reiter über der Zeichenfläche
 
     if (clearBtn) clearBtn.addEventListener("click", () => {
       if (!state.shapes.length) return;
@@ -145,7 +149,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       state.shapes = []; state.selectedShapeIds = []; redraw();
     });
     if (generateGcodeBtn) generateGcodeBtn.addEventListener("click", () => handleGcodeGeneration(state.shapes, appendToConsole));
-    if (saveGcodeBtn) saveGcodeBtn.addEventListener("click", () => exportGcodeToFile(state.shapes, appendToConsole));
+    if (saveGcodeBtn) saveGcodeBtn.addEventListener("click", () => exportGcodeToFile(state.shapes, appendToConsole, gcodeFileName()));
 
     if (loadGcodeBtn) loadGcodeBtn.addEventListener("click", () => loadGcodeFromFile(appendToConsole));
     if (jobStartBtn) jobStartBtn.addEventListener("click", () => startStreaming(() => state.isDeviceConnected, appendToConsole));
@@ -197,7 +201,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       setSimProgram(streamState.loadedLines, t("sim.loadedJob"), "job");
       openSimTab();
     });
-    window.addEventListener("cnc-language-changed", () => { renderToolTable(); redraw(); });
+    window.addEventListener("cnc-language-changed", () => { renderToolTable(); relabelBeds(); redraw(); });
     initCollapsibleMenus();
     initLightBurnTooltips();
     initToolLibrary();

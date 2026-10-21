@@ -68,3 +68,19 @@ export function redo(): boolean {
 
 export function canUndo() { return undoStack.length > 0; }
 export function canRedo() { return redoStack.length > 0; }
+
+/** Verlauf eines Bettes (beim Wechseln mitnehmen, damit Rückgängig nur im eigenen Bett wirkt) */
+export interface HistoryState { committed: string | null; undo: string[]; redo: string[] }
+
+export function takeHistory(): HistoryState {
+  checkpoint();
+  return { committed, undo: undoStack.splice(0), redo: redoStack.splice(0) };
+}
+
+/** Verlauf übernehmen – ohne (oder wenn er nicht mehr zum Stand passt) neu beginnen */
+export function putHistory(h?: HistoryState | null) {
+  const now = JSON.stringify(app().shapes);
+  undoStack.length = 0; redoStack.length = 0;
+  if (h && h.committed === now) { undoStack.push(...h.undo); redoStack.push(...h.redo); }
+  committed = now;
+}

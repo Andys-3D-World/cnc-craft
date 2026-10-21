@@ -712,6 +712,7 @@ input:not([type]) {
 .box-prev { background: #0d0d12; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-height: 220px; display: flex; flex-direction: column; gap: 6px; }
 .box-prev svg { width: 100%; height: 230px; }
 .box-panel { fill: rgba(240, 140, 0, 0.12); stroke: #f08c00; stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+.box-cut { fill: none; stroke: #4dabf7; stroke-width: 0.5; vector-effect: non-scaling-stroke; }
 .box-lbl { fill: #c9ced6; text-anchor: middle; dominant-baseline: middle; font-family: var(--font-ui); }
 @media (max-width: 620px) { .box-grid { grid-template-columns: 1fr; } }
 .mat-beta { font-size: 0.78rem; line-height: 1.4; padding: 8px 10px; border-radius: 8px; background: rgba(255, 176, 32, 0.12); border: 1px solid rgba(255, 176, 32, 0.55); color: #ffcf70; }
@@ -1418,3 +1419,18 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .sp-raw { width: 58px !important; margin-left: 8px; text-align: right; opacity: 0.85; }
 .fl-hal-h { margin: 12px 0 4px; font-size: 0.85rem; }
 .fl-hal button { margin-top: 6px; }
+
+/* ---- Mehrere Betten: Reiter über der Zeichenfläche ---- */
+.bed-tabs { display: flex; align-items: center; gap: 4px; padding: 4px 8px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); flex-shrink: 0; overflow-x: auto; font-size: 0.78rem; }
+.bed-tab { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; white-space: nowrap; font-size: 0.78rem; }
+.bed-tab:hover { color: var(--text-main); }
+.bed-tab.active { border-color: var(--accent-color); color: var(--text-main); box-shadow: 0 0 0 1px var(--accent-color) inset; }
+.bed-tab.done { color: #34d17b; }
+.bed-n { font-family: var(--font-mono); font-size: 0.7rem; padding: 0 5px; border-radius: 8px; background: rgba(255, 255, 255, 0.08); }
+.bed-btn { padding: 3px 9px; border: 1px solid var(--border-color); border-radius: 6px; background: transparent; color: var(--text-muted); cursor: pointer; white-space: nowrap; font-size: 0.78rem; }
+.bed-btn:hover { color: var(--text-main); border-color: var(--accent-color); }
+.bed-btn.on { color: #34d17b; border-color: #34d17b; }
+.bed-del:hover { border-color: var(--color-danger); }
+.bed-space { flex: 1; }
+.bed-move { font-size: 0.76rem; padding: 2px 4px; max-width: 170px; }
+.bed-rename { width: 120px; font-size: 0.78rem; padding: 2px 6px; }

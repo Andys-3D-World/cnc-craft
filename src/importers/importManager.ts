@@ -32,6 +32,7 @@ import { toolsUsedBy, mergeProjectTools } from "../toolLibrary";
 import { getMachineMode, setMachineMode } from "../machineMode";
 import { layersUsedBy, mergeProjectLayers } from "../laserLayers";
 import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
+import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
@@ -211,7 +212,7 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
 // =====================================================================
 
 export async function saveProject(saveAs: boolean) {
-  const { state, log } = ctx;
+  const { log } = ctx;
   let p = saveAs ? null : lastProjectPath;
   if (!p) {
     const sel = await save({ title: t("proj.saveTitle"), defaultPath: t("proj.defaultName") + ".cncc", filters: [{ name: t("imp.fProject"), extensions: ["cncc"] }] });
@@ -221,8 +222,10 @@ export async function saveProject(saveAs: boolean) {
     p = String(sel);
   }
   const bed = bedSizeMm();
-  const data = { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: state.shapes, tools: toolsUsedBy(state.shapes),
-    machineMode: getMachineMode(), laserLayers: layersUsedBy(state.shapes), plasmaCuts: cutsUsedBy(state.shapes) };
+  // Alle Betten: Formen hintereinander, `beds` sagt, wie viele zu welchem Bett gehören
+  const beds = bedsForSave(), all = allShapes();
+  const data = { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: all, tools: toolsUsedBy(all),
+    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed() };
   try {
     await writeFile(p, new TextEncoder().encode(JSON.stringify(data)));
     lastProjectPath = p;
@@ -245,11 +248,11 @@ export async function openProjectWithDialog() {
 }
 
 function loadProjectText(text: string, name: string, fullPath?: string) {
-  const { state, log } = ctx;
+  const { log } = ctx;
   let data: any;
   try { data = JSON.parse(text); } catch { throw new Error(t("proj.errBroken")); }
   if (data?.format !== "cnc-craft-project" || !Array.isArray(data.shapes)) throw new Error(t("proj.errInvalid"));
-  if (state.shapes.length && !window.confirm(t("proj.confirmReplace"))) return;
+  if (allShapes().length && !window.confirm(t("proj.confirmReplace"))) return;
   // Werkzeuge aus dem Projekt übernehmen, falls sie in dieser Bibliothek fehlen
   const addedTools = mergeProjectTools(data.tools, data.shapes);
   if (addedTools) log(t("tool.importedFromProject", { n: addedTools }));
@@ -258,8 +261,7 @@ function loadProjectText(text: string, name: string, fullPath?: string) {
   const addedCuts = mergeProjectCuts(data.plasmaCuts, data.shapes);
   if (addedCuts) log(t("plasma.importedFromProject", { n: addedCuts }));
   if (["mill", "laser", "plasma"].includes(data.machineMode)) setMachineMode(data.machineMode);
-  state.shapes = data.shapes;
-  state.selectedShapeIds = [];
+  loadBeds(data.shapes, data.beds, data.activeBed);
   if (data.bed) {
     const w = document.getElementById("bed-w") as HTMLInputElement | null;
     const h = document.getElementById("bed-h") as HTMLInputElement | null;

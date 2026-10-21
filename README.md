@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app (think LightBurn + Estlcam + OpenBuilds combined). Runs on macOS, Windows and Linux.
 
-**Status: 0.2.8 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.2.9 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 

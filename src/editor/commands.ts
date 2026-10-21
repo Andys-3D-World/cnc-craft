@@ -26,6 +26,7 @@ import {
 import { offsetPolygon } from "../polyOffset";
 import { openBoxDialog } from "./boxGen";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
+import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
@@ -222,7 +223,9 @@ function align(kind: "left" | "centerH" | "right" | "top" | "centerV" | "bottom"
 export function zoomFit() {
   const st = app();
   const bed = bedSizeMm();
-  let b: Bounds = { minX: 0, minY: 0, maxX: bed.w * MM_TO_PIXEL, maxY: bed.h * MM_TO_PIXEL };
+  // alle Betten zeigen (bei mehreren liegen sie nebeneinander), oben Platz für die Bett-Namen
+  let b: Bounds = allBedsBounds();
+  if (bedCount() > 1) b.maxY += 24 / Math.max(0.05, st.scale);
   const sb = groupBounds(st.shapes);
   if (sb) b = { minX: Math.min(b.minX, sb.minX), minY: Math.min(b.minY, sb.minY), maxX: Math.max(b.maxX, sb.maxX), maxY: Math.max(b.maxY, sb.maxY) };
   const W = canvasEl.width, H = canvasEl.height - 22;
@@ -338,6 +341,34 @@ function loadNestOptions(): NestOptions {
   } catch { return def; }
 }
 
+function overflowPref(): boolean {
+  try { return JSON.parse(localStorage.getItem(NEST_KEY) || "{}").overflow === true; } catch { return false; }
+}
+
+/**
+ * Was nicht aufs aktive Bett gepasst hat, kommt aufs nächste Bett (gibt es keins, wird eins angelegt) und wird
+ * dort verschachtelt – so lange, bis alles liegt. Passt ein Teil nicht mal auf ein leeres Bett, ist es zu groß.
+ */
+function spillToBeds(opts: NestOptions, failedIds: string[], placedHere: number) {
+  const start = activeBed();
+  const used = [`${bedName(start)} (${placedHere})`];
+  let left = failedIds;
+  for (let guard = 0; left.length && guard < 100; guard++) {
+    const target = activeBed() + 1 < bedCount() ? activeBed() + 1 : addBed();
+    const wasEmpty = bedShapes(target).length === 0;
+    const ids = new Set(left);
+    moveToBed(left, target);
+    switchBed(target);
+    const r = nestShapes(opts, app().shapes.filter((s: any) => ids.has(s.id)));
+    if (r.placed) used.push(`${bedName(target)} (${r.placed})`);
+    if (!r.placed && wasEmpty) { log(t("nest.tooBig", { n: r.failed, name: bedName() })); break; }
+    left = r.failedIds;
+  }
+  switchBed(start);
+  zoomFit();
+  log(t("nest.spread", { list: used.join(", ") }));
+}
+
 function openNestDialog() {
   const st = app();
   if (!st.shapes.length) { log(t("nest.empty")); return; }
@@ -365,6 +396,7 @@ function openNestDialog() {
           <option value="auto">${t("nest.rotAuto")}</option>
         </select></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="nest-holes" type="checkbox" ${o.holes ? "checked" : ""}> ${t("nest.holes")}</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;" title="${t("nest.overflowTip")}"><input id="nest-overflow" type="checkbox" ${overflowPref() ? "checked" : ""}> ${t("nest.overflow")}</label>
       <div style="display:flex;justify-content:space-between;gap:12px;font-size:0.85rem;">
         <div style="display:flex;flex-direction:column;gap:6px;">${t("nest.start")}
           <div style="display:grid;grid-template-columns:repeat(3,28px);gap:4px;padding:5px;border:1px dashed var(--border-color);border-radius:6px;width:max-content;">
@@ -416,10 +448,12 @@ function openNestDialog() {
       holes: (ov.querySelector("#nest-holes") as HTMLInputElement).checked,
       anchor, dir
     };
-    try { localStorage.setItem(NEST_KEY, JSON.stringify(opts)); } catch { /* egal */ }
+    const overflow = (ov.querySelector("#nest-overflow") as HTMLInputElement).checked;
+    try { localStorage.setItem(NEST_KEY, JSON.stringify({ ...opts, overflow })); } catch { /* egal */ }
     close();
     const r = nestShapes(opts);
     if (!r.total) log(t("nest.empty"));
+    else if (r.failed && overflow) { checkpoint(); spillToBeds(opts, r.failedIds, r.placed); }
     else if (r.failed) log(t("nest.partial", { n: r.placed, total: r.total, failed: r.failed }));
     else log(t("nest.done", { n: r.placed }));
     done();

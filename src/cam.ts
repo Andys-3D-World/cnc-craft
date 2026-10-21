@@ -435,7 +435,7 @@ export const handleGcodeGeneration = (shapes: any, appendToConsole: (t: string) 
 /**
  * G-Code erzeugen und per Speichern-Dialog als .gcode-Datei ablegen.
  */
-export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string) => void) {
+export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string) => void, fileName = "cnc-auftrag.gcode") {
   const gcode = generateGcode(shapes);
   if (!gcode) { appendToConsole(noGcodeMessage()); return; }
   showWarnings(appendToConsole);
@@ -443,7 +443,7 @@ export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string
   try {
     const filePath = await save({
       title: t("rp.saveGcode"),
-      defaultPath: "cnc-auftrag.gcode",
+      defaultPath: fileName,
       filters: [
         { name: t("stream.dlgFilter"), extensions: ["gcode", "nc", "tap"] }
       ]

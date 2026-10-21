@@ -137,26 +137,7 @@ export function drawEverything(
     ctx.strokeStyle = isSel ? "#34d17b" : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
     ctx.lineWidth = isSel ? 2.2 : 1.5;
     ctx.beginPath();
-
-    if (shape.type === "polyline" && shape.points?.length > 1) {
-      const pts = shape.points;
-      ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
-      if (shape.closed) ctx.closePath();
-    } else if (shape.type === "line") {
-      ctx.moveTo(sx(shape.x), sy(shape.y));
-      ctx.lineTo(sx(shape.x + shape.w), sy(shape.y + shape.h));
-    } else if (shape.type === "circle") {
-      ctx.arc(sx(shape.x), sy(shape.y), Math.abs(shape.w) * scale, 0, Math.PI * 2);
-    } else if (shape.type === "arc") {
-      const g = arcGeometry(shape);
-      if (g) {
-        // Bildschirm-Y ist gespiegelt -> Winkel umdrehen
-        ctx.arc(sx(g.cx), sy(g.cy), g.r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
-      }
-    } else if (shape.type === "rect") {
-      ctx.rect(sx(shape.x), sy(shape.y + shape.h), shape.w * scale, shape.h * scale);
-    }
+    tracePath(ctx, shape, sx, sy, scale);
     // liegt auf verbrauchter Fläche -> roter Schein unter der Linie
     if (checkUsed && shapeOnUsedArea(shape)) {
       const keep = { s: ctx.strokeStyle, w: ctx.lineWidth };
@@ -185,6 +166,30 @@ export function drawEverything(
   ctx.moveTo(mx - 12, my); ctx.lineTo(mx + 12, my);
   ctx.moveTo(mx, my - 12); ctx.lineTo(mx, my + 12);
   ctx.stroke();
+}
+
+/** Umriss einer Form als Pfad anlegen (ohne beginPath/stroke) */
+export function tracePath(ctx: CanvasRenderingContext2D, shape: any, sx: (x: number) => number, sy: (y: number) => number, scale: number) {
+  if (shape.type === "polyline" && shape.points?.length > 1) {
+    const pts = shape.points;
+    ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
+    if (shape.closed) ctx.closePath();
+  } else if (shape.type === "line") {
+    ctx.moveTo(sx(shape.x), sy(shape.y));
+    ctx.lineTo(sx(shape.x + shape.w), sy(shape.y + shape.h));
+  } else if (shape.type === "circle") {
+    ctx.moveTo(sx(shape.x) + Math.abs(shape.w) * scale, sy(shape.y));
+    ctx.arc(sx(shape.x), sy(shape.y), Math.abs(shape.w) * scale, 0, Math.PI * 2);
+  } else if (shape.type === "arc") {
+    const g = arcGeometry(shape);
+    if (g) {
+      // Bildschirm-Y ist gespiegelt -> Winkel umdrehen
+      ctx.arc(sx(g.cx), sy(g.cy), g.r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
+    }
+  } else if (shape.type === "rect") {
+    ctx.rect(sx(shape.x), sy(shape.y + shape.h), shape.w * scale, shape.h * scale);
+  }
 }
 
 /**

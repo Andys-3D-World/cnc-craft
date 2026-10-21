@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.2.9 Beta
 
 **New**
 - **Nesting (like “Nest” in LightBurn):** new icon on the left below “Measure” – packs the parts (selection, otherwise
@@ -46,7 +46,21 @@
   panels on the bed (selected, ready to nest). The joints are checked: the panels fill the box walls exactly – no
   overlaps, no gaps (corners belong to front/back). Box types: box with lid, open box, divider tray (dividers across/
   lengthwise with tabs in wall slots, half-lapped where they cross), carrying box (handle holes), drawer (larger front
-  plate with finger hole) and box with lift-off lid (two-layer lid). Slots and holes are grouped with their panel
+  plate with finger hole) and box with lift-off lid (two-layer lid). Slots and holes are grouped with their panel.
+  **Three more types:** *box with sliding lid* (lower front, liner strips inside carry the lid, retaining strips guide
+  it; finger grip in the lid – joints checked like the other boxes), *shelf* (open front, shelf boards with tabs in
+  slots of the side walls) and *round box* (corner radius adjustable; the wall is one strip with a living hinge in the
+  curves, laser only – the bottom has tabs on the straight sides that sit in notches of the strip; two-layer lid)
+- **Several beds in one project (like build plates in Bambu Studio / OrcaSlicer):** all beds lie on the canvas in a grid,
+  three per row (from bed 4 on a new row below), with name and part count above each; the active bed is shown normally, the others dimmed. Click an empty spot
+  of another bed to switch to it (the view stays put), drag parts onto another bed to move them there. Tab bar above
+  the canvas as well – one tab per bed, “＋” adds a bed, double-click the active tab to rename it. Drawing, nesting,
+  G-code, simulation and the job always use the active bed, so you work through the beds one by one.
+  “✓ Done” marks a finished bed, “Move selection …” puts selected parts (whole groups) on another or a new bed,
+  🗑 deletes a bed. Undo works per bed. Nesting has a new option “What doesn't fit → onto more beds”: parts that no
+  longer fit go to the next bed (created if needed) and are nested there, until everything is placed. The project file
+  (.cncc) keeps all beds in one file (older versions simply see all parts on one bed); the G-code file name contains
+  the bed name when there are several beds
 - **Wiring diagram for Ruida RDC6445G/S (CO2 laser controller):** board drawn after the Ruida manual (CN0 power,
   CN1 outputs, CN2 inputs, CN3/CN4 limits, AXIS_X…U, CN5/CN6 laser) with plans for power, external drivers (common
   anode), limit switches/NPN sensors, CO2 laser PSU + water flow switch, air relay, door and E-stop, plus a new
