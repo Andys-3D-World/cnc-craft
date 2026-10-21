@@ -12,6 +12,7 @@
  *  Messen (M)    ziehen -> Abstand und Winkel
  *  Stege setzen  Klick auf eine Kontur setzt einen Haltesteg, Klick auf einen Steg entfernt ihn
  *  Punkte (N)    Knoten und Tangenten bearbeiten, Kurve zeichnen (B) – siehe bezier.ts
+ *  Bemaßung (D)  Abstands- und Größenmaße, die beim Verschieben mitgehen – siehe dims.ts
  */
 import { app, options, ToolName, toWorld, screenDist, fmtMm } from "./editorState";
 import { snapPoint, snapAngle, SnapResult } from "./snap";
@@ -26,6 +27,7 @@ import {
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
 import { openEngraveDialog } from "../raster/engraveDialog";
+import { dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue } from "./dims";
 import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
 import { t } from "../i18n/i18n";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
@@ -115,6 +117,7 @@ export function cancelCurrent() {
   live.label = "";
   penCancel();
   nodeEdit.grab = null;
+  dimCancel();
 }
 
 function readModifiers(e: MouseEvent | KeyboardEvent) {
@@ -172,6 +175,13 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
   updateSnap();
   live.measure = tool === "measure" ? null : live.measure;
 
+  // Maßzahl angeklickt (Auswahl- oder Bemaßungs-Werkzeug): Maß auswählen (Entf löscht, Doppelklick ändert)
+  if (tool === "select" || tool === "dim") {
+    const d = dimAt(sx, sy);
+    dimSel.cur = d;
+    if (d) { redrawFn(); return; }
+  }
+
   switch (tool) {
     case "select": {
       const handle = selectedShapes().length ? handleAt(sx, sy) : null;
@@ -214,6 +224,9 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
       if (done) addShapes([done]);
       break;
     }
+    case "dim":
+      if (dimClick(live.raw, hitTest(live.raw.x, live.raw.y))) finishChange();
+      break;
     default:
       break;
   }
@@ -290,6 +303,7 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
   }
   if (tool === "node" && nodeEdit.grab) { nodeMove(live.raw, live.alt); redrawFn(); return; }
   if (tool === "pen") { updateSnap(); penMove(pen.dragging ? live.raw : live.world); redrawFn(); return; }
+  if (tool === "dim") { dimTool.mouse = { ...live.raw }; live.hover = hitTest(live.raw.x, live.raw.y); redrawFn(); return; }
 
   switch (live.mode) {
     case "pressSelect":
@@ -648,6 +662,9 @@ function finishDragDraw(tool: ToolName) {
 
 export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
   const tool = currentTool();
+  // Doppelklick auf eine Maßzahl: Wert eingeben
+  const d = dimAt(sx, sy);
+  if (d && canvasEl) { dimCancel(); editDimValue(d, canvasEl, () => { finishChange(); window.dispatchEvent(new Event("cnc-dims-changed")); }); return; }
   if (tool === "line") { finishLine(false); return; }
   if (tool === "node") { if (nodeDblClick(toWorld(sx, sy), sx, sy)) finishChange(); return; }
   if (tool === "pen") { const s = penFinish(false); if (s) addShapes([s]); return; }
@@ -664,7 +681,8 @@ export function onToolKey(e: KeyboardEvent): boolean {
   readModifiers(e);
   const tool = currentTool();
   if (e.key === "Escape") {
-    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure || pen.nodes.length > 0;
+    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure || pen.nodes.length > 0 || !!dimTool.a;
+    dimSel.cur = null;
     if (busy) cancelCurrent();
     else if (tool !== "select") setTool("select");
     else app().selectedShapeIds = [];
@@ -679,6 +697,13 @@ export function onToolKey(e: KeyboardEvent): boolean {
     const s = penFinish(false);
     if (s) addShapes([s]);
     redrawFn();
+    return true;
+  }
+  // gewähltes Maß löschen (nicht die Form)
+  if ((e.key === "Delete" || e.key === "Backspace") && dimSel.cur) {
+    deleteDim(dimSel.cur);
+    dimSel.cur = null;
+    finishChange();
     return true;
   }
   // Punkte bearbeiten: Entf löscht nur den gewählten Knoten, nicht die ganze Form

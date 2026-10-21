@@ -14,6 +14,8 @@ const P: Record<string, string> = {
   pen: `<path d="M4 20c3-1 4-4 5-7s3-6 7-7"/><path d="M14 4l6 6-3 1-4-4z"/><circle cx="4" cy="20" r="1.4"/>`,
   node: `<path d="M5 18C7 9 13 7 19 6"/><rect x="3" y="16" width="4" height="4"/><rect x="17" y="4" width="4" height="4"/><path d="M9 9.5l-3-3" opacity=".6"/><circle cx="5.5" cy="6" r="1.4"/>`,
   text: `<path d="M5 6V4.5h14V6M12 4.5V19.5M9 19.5h6"/>`,
+  dim: `<path d="M4 7v10M20 7v10"/><path d="M4 12h16"/><path d="M7 9.5L4 12l3 2.5M17 9.5l3 2.5-3 2.5"/><path d="M10 6h4" stroke-width="1.4"/>`,
+  centerFix: `<rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 6v2.5M12 15.5V18M6 12h2.5M15.5 12H18" stroke-dasharray="1.5 1.5"/>`,
   measure: `<path d="M3.5 15.5l12-12 5 5-12 12z"/><path d="M7 12l2 2M10 9l1.5 1.5M13 6l2 2"/>`,
   boxgen: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M7 9.2v1.6M9.5 10.6v1.6M16.5 10.6v1.6M14 12v1.6" stroke-width="1.6"/>`,
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,

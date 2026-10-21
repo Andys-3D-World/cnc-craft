@@ -19,6 +19,7 @@ import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { combine, splitByLines, roundCorners, patternFill, weldAndScore, BoolOp, OpResult, PatternOptions } from "./shapeOps";
 import { getLayers } from "../laserLayers";
+import { centerOn } from "./dims";
 import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor } from "./tools";
@@ -43,7 +44,7 @@ let pasteCount = 0;
 
 const TOOL_KEYS: Record<string, ToolName> = {
   v: "select", h: "pan", l: "line", r: "rect", e: "ellipse", p: "polygon", a: "arc", t: "text", m: "measure",
-  n: "node", b: "pen"
+  n: "node", b: "pen", d: "dim"
 };
 
 function done() {
@@ -142,6 +143,7 @@ export const commands: Record<string, () => void> = {
   imageSplit: () => { imageSplit(); },
   patternFill: () => openPatternDialog(),
   weldScore: () => weldScore(),
+  centerFix: () => centerFix(),
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   duplicateDialog: () => openDuplicateDialog(),
@@ -585,6 +587,22 @@ function weldScore() {
   if (r.error) { log(t(r.error)); return; }
   applyOp(r, "weld.done");
   log(t("weld.scores", { n: r.scores || 0 }));
+}
+
+/** Mittig fixieren: die größte ausgewählte geschlossene Form ist der Bezug, alle anderen bleiben darauf mittig */
+function centerFix() {
+  const sel = selectedShapes();
+  let ref: any = null, best = 0;
+  for (const s of sel) {
+    const p = shapeToPaths(s).find(q => q.closed && q.pts.length >= 3);
+    const a = p ? Math.abs(pathArea(p.pts)) : 0;
+    if (a > best) { best = a; ref = s; }
+  }
+  const n = ref ? centerOn(ref, sel) : 0;
+  if (!n) { log(t("dims.needTwo")); return; }
+  log(t("dims.centered", { n }));
+  done();
+  checkpoint();
 }
 
 const PATTERN_KEY = "cnc_craft_pattern";

@@ -10,6 +10,7 @@ import { selectionBounds, selectionHandles, HANDLE_SIZE, selectedShapes } from "
 import { Pt, shapeToPaths, makeEllipsePoints, makeRectPoints, arcGeometry, MM_TO_PIXEL } from "../shapeTransform";
 import { berechne3PunktBogen } from "../arcEngine";
 import { drawBezierOverlay } from "./bezier";
+import { drawDims, drawDimPreview } from "./dims";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -43,6 +44,9 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
 
   // ---- Zeichen-Vorschau ----
   drawToolPreview(ctx, tool);
+  // ---- Maße (immer sichtbar) + Vorschau beim Bemaßen ----
+  drawDims(ctx);
+  if (tool === "dim") drawDimPreview(ctx);
   // ---- Kurven: Knoten und Tangenten (Punkte bearbeiten, Kurve zeichnen) ----
   if (tool === "node" || tool === "pen") drawBezierOverlay(ctx, tool);
 

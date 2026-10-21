@@ -40,6 +40,7 @@ import { drawOverlay } from "./editor/overlay";
 import { initHistory } from "./editor/history";
 import { setEngraveLog } from "./raster/engraveDialog";
 import { initMaterialView } from "./materialView";
+import { solveConstraints } from "./editor/dims";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
@@ -118,6 +119,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     const paint = () => {
       if (dirty && ctx && canvas) {
         dirty = false;
+        solveConstraints(); // Maße: abhängige Formen folgen ihrer Bezugsform
         drawEverything(ctx, canvas, state.shapes, state.selectedShapeIds, state.offsetX, state.offsetY, state.scale);
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawOverlay(ctx, canvas);

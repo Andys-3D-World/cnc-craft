@@ -38,6 +38,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("node", "node", "tip.tool.node")}
     <div class="strip-sep"></div>
     ${tool("measure", "measure", "tip.tool.measure")}
+    ${tool("dim", "dim", "tip.tool.dim")}
     <button data-cmd="nest" class="btn-tool-icon" ${tip("tip.cmd.nest")}>${icon("nest", 20)}</button>
     <button data-cmd="boxgen" class="btn-tool-icon" ${tip("tip.cmd.boxgen")}>${icon("boxgen", 20)}</button>
     <div class="strip-sep strip-push"></div>
@@ -83,6 +84,7 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("fillet", "fillet", "tip.cmd.fillet")}
       ${cmd("patternFill", "patternFill", "tip.cmd.patternFill")}
       ${cmd("weldScore", "weldScore", "tip.cmd.weldScore")}
+      ${cmd("centerFix", "centerFix", "tip.cmd.centerFix")}
       ${cmd("imageMask", "imageMask", "tip.cmd.imageMask")}
       ${cmd("imageSplit", "imageSplit", "tip.cmd.imageSplit")}
     </div>

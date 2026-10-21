@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Dimensions and constraints:** new *Dimension* tool (D) – click shape A, then shape B (corner, edge middle or
+  centre snaps; clicking inside a hole picks the hole), then place the dimension line (mouse beside = vertical,
+  above/below = horizontal). The dimension stays on the canvas: when the reference shape is moved or resized, the
+  other shape (with its group) follows; moving the dependent shape itself just updates the value. Double-click the
+  number to type a new distance. Clicking the same shape twice gives a size dimension (width/height) – double-click
+  to set a new size. Click a number and press Del to remove it. New toolbar button *Fix centred*: the selected parts
+  always stay centred on the largest selected shape (e.g. a hole in a plate), shown with ⊕. Dimensions are saved
+  in the project and are part of undo
 - **Curves with points and handles (Bézier):** two new tools in the left toolbar. *Draw curve* (B): click = corner,
   click and drag = smooth point with handles, click the first point = close, double-click/Enter = finish open,
   Esc = cancel. *Edit points* (N): click any contour (lines, rectangles, circles and polylines are converted) –
