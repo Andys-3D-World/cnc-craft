@@ -42,6 +42,7 @@ const P: Record<string, string> = {
   boolSubtract: `<path d="M14.5 9.5A5.5 5.5 0 109.5 14.5 5.5 5.5 0 0114.5 9.5z" fill="currentColor" fill-opacity=".25"/><circle cx="15" cy="15" r="5.5" stroke-dasharray="2.5 2"/>`,
   boolIntersect: `<circle cx="9" cy="9" r="5.5" stroke-dasharray="2.5 2"/><circle cx="15" cy="15" r="5.5" stroke-dasharray="2.5 2"/><path d="M14.5 9.5A5.5 5.5 0 009.5 14.5 5.5 5.5 0 0014.5 9.5z" fill="currentColor" fill-opacity=".45"/>`,
   splitByLine: `<rect x="4" y="6" width="16" height="12" rx="1.5"/><path d="M15 3L9 21" stroke-dasharray="3 2"/><path d="M17.5 4.5l1.5-1.5M6.5 19.5L5 21"/>`,
+  imageMask: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="2.5 2" opacity=".55"/><path d="M12 7.5l1.6 3.2 3.5.5-2.5 2.5.6 3.5L12 15.6l-3.2 1.6.6-3.5-2.5-2.5 3.5-.5z"/>`,
   fillet: `<path d="M5 20V12a7 7 0 017-7h8"/><path d="M5 9V5h4" stroke-dasharray="2 2" opacity=".6"/>`,
   offset: `<rect x="8" y="8" width="8" height="8" rx="1"/><rect x="4" y="4" width="16" height="16" rx="4" stroke-dasharray="3 2"/>`,
   zoomFit: `<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/><rect x="8.5" y="8.5" width="7" height="7"/>`,

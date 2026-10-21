@@ -10,7 +10,7 @@
  * zwischengespeichert und neu gerechnet, wenn sich Größe oder Einstellungen ändern.
  */
 import { MM_TO_PIXEL, Pt, newId, updatePolylineBounds } from "../shapeTransform";
-import { Adjust, NO_ADJUST, RasterSettings, EngravePreset, presetSettings, toGray, resample, applyAdjust, rasterize, autoAdjust } from "./dither";
+import { Adjust, NO_ADJUST, RasterSettings, EngravePreset, presetSettings, toGray, resample, applyAdjust, rasterize, autoAdjust, removeBackground } from "./dither";
 
 export interface ImageSettings {
   src: string;          // Bild als Daten-URL (verkleinert)
@@ -21,6 +21,9 @@ export interface ImageSettings {
   interval: number;     // Linienabstand in mm (= Größe eines Bildpunkts)
   minPower: number;     // % – nur Graustufen: so viel Leistung für fast weiße Stellen
   overscan: number;     // mm – über den Rand hinaus fahren, damit die Kanten gleichmäßig werden
+  bg?: { on: boolean; tol: number };  // Hintergrund entfernen (Toleranz 0…100)
+  /** Bildmaske: nur innerhalb dieser Konturen gravieren (Gerade/Ungerade). Punkte in Bild-Anteilen: u nach rechts, v nach oben */
+  mask?: { u: number; v: number }[][];
 }
 
 /** höchstens so viele Raster-Punkte (sonst wird der Linienabstand für die Rechnung gröber) */
@@ -112,11 +115,45 @@ export function processed(s: any, img: ImageSettings = s.img, withCanvas = true)
   const key = JSON.stringify([rest, gw, gh, img.src.length, img.src.slice(-40)]);
   const hit = results.get(s.id);
   if (hit && hit.key === key && (hit.res.canvas || !withCanvas)) return hit.res;
-  const g = applyAdjust(resample(src.gray, src.w, src.h, gw, gh), gw, gh, img.adjust || NO_ADJUST);
+  const base = img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray;
+  const g = applyAdjust(resample(base, src.w, src.h, gw, gh), gw, gh, img.adjust || NO_ADJUST);
   const burn = rasterize(g, gw, gh, img.raster);
+  if (img.mask?.length) applyMask(burn, gw, gh, img.mask);
   const res: Processed = { burn, gw, gh, step, canvas: withCanvas ? burnCanvas(burn, gw, gh) : null };
   results.set(s.id, { key, res });
   return res;
+}
+
+/** Hintergrund entfernt – zuletzt benutztes Ergebnis je Bild merken (Regler ziehen rechnet sonst ständig neu) */
+const noBg = new Map<string, { tol: number; gray: Float32Array }>();
+function withoutBackground(key: string, src: { gray: Float32Array; w: number; h: number }, tol: number): Float32Array {
+  const hit = noBg.get(key);
+  if (hit && hit.tol === tol) return hit.gray;
+  const gray = removeBackground(src.gray, src.w, src.h, tol);
+  noBg.set(key, { tol, gray });
+  return gray;
+}
+
+/** Alles außerhalb der Maske löschen (Maske über eine Zeichenfläche füllen – schnell auch bei vielen Punkten) */
+function applyMask(burn: Float32Array, gw: number, gh: number, rings: { u: number; v: number }[][]) {
+  const c = document.createElement("canvas");
+  c.width = gw; c.height = gh;
+  const ctx = c.getContext("2d", { willReadFrequently: true })!;
+  ctx.beginPath();
+  for (const r of rings) r.forEach((q, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, q.u * gw, (1 - q.v) * gh));
+  ctx.fillStyle = "#000";
+  ctx.fill("evenodd");
+  const a = ctx.getImageData(0, 0, gw, gh).data;
+  for (let i = 0; i < burn.length; i++) if (a[i * 4 + 3] < 128) burn[i] = 0;
+}
+
+/** Welt-Punkt → Bild-Anteile (u, v) für eine Bild-Form */
+export function toImageUV(s: any, q: Pt): { u: number; v: number } {
+  const [p0, p1, , p3] = s.points as Pt[];
+  const ax = p1.x - p0.x, ay = p1.y - p0.y, bx = p3.x - p0.x, by = p3.y - p0.y;
+  const det = ax * by - ay * bx || 1e-12;
+  const dx = q.x - p0.x, dy = q.y - p0.y;
+  return { u: (dx * by - dy * bx) / det, v: (ax * dy - ay * dx) / det };
 }
 
 /** Ergebnis als Bild: gebrannt = dunkelbraun, frei = helles Holz */

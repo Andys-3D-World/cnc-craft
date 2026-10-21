@@ -61,6 +61,11 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
             <button type="button" id="eng-reset" class="btn-secondary" style="flex:1;">${t("eng.reset")}</button>
           </div>
           <div class="eng-rating" id="eng-rating"></div>
+          <div class="eng-sec">
+            <label class="eng-ck"><input id="eng-bg" type="checkbox"> ${t("eng.bg")}</label>
+            <div id="eng-bg-tol">${slider("eng-bgt", "eng.bgTol", 1, 100, 1)}</div>
+            <div class="eng-row" id="eng-mask-row"><span>✂️ ${t("eng.maskOn")}</span><button type="button" id="eng-mask-off" class="btn-secondary" style="margin-left:auto;">${t("eng.maskOff")}</button></div>
+          </div>
           <details class="eng-sec" open><summary>${t("eng.adjust")}</summary>
             ${slider("eng-br", "eng.brightness", -100, 100, 1)}
             ${slider("eng-ct", "eng.contrast", -100, 100, 1)}
@@ -113,6 +118,10 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     set("eng-cell", img.raster.cell, String(img.raster.cell));
     set("eng-ang", img.raster.angle, img.raster.angle + "°");
     set("eng-thr", Math.round(img.raster.threshold * 100), Math.round(img.raster.threshold * 100) + " %");
+    $("eng-bg").checked = !!img.bg?.on;
+    set("eng-bgt", img.bg?.tol ?? 20, String(img.bg?.tol ?? 20));
+    $<HTMLElement>("eng-bg-tol").style.display = img.bg?.on ? "" : "none";
+    $<HTMLElement>("eng-mask-row").style.display = img.mask?.length ? "" : "none";
     $("eng-int").value = String(img.interval);
     $("eng-min").value = String(img.minPower);
     $("eng-over").value = String(img.overscan);
@@ -129,6 +138,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     const m = $<HTMLSelectElement>("eng-m").value as RasterMethod;
     if (m !== img.raster.method) img.preset = "custom";
     img.raster = { method: m, cell: num("eng-cell", 6), angle: num("eng-ang", 0), threshold: num("eng-thr", 50) / 100 };
+    img.bg = { on: $("eng-bg").checked, tol: num("eng-bgt", 20) };
     img.interval = Math.min(1, Math.max(0.03, num("eng-int", 0.1)));
     img.minPower = Math.min(100, Math.max(0, num("eng-min", 0)));
     img.overscan = Math.min(20, Math.max(0, num("eng-over", 2)));
@@ -227,6 +237,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     fill(); update(true);
     log(t("eng.autoDone"));
   });
+  $("eng-mask-off").addEventListener("click", () => { delete img.mask; fill(); update(true); });
   $("eng-reset").addEventListener("click", () => { img.adjust = { ...NO_ADJUST, invert: A().invert }; fill(); update(true); });
   ov.querySelectorAll(".eng-right input, .eng-right select").forEach(el => el.addEventListener("input", () => { read(); fill(); update(); }));
   $("eng-zoom").addEventListener("input", draw);

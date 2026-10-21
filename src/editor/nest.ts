@@ -23,6 +23,7 @@ export interface NestOptions {
   holes: boolean;      // kleine Teile dürfen in Löcher großer Teile
   anchor: NestAnchor;  // wo das erste Teil hinkommt
   dir: NestDir;        // in welche Richtung es weitergeht
+  container?: any;     // geschlossene Form (z. B. Reststück): nur darin verschachteln, Rand = marginMm
 }
 
 /** t/m/b = oben/Mitte/unten, l/c/r = links/Mitte/rechts */
@@ -351,10 +352,10 @@ export function nestShapes(opts: NestOptions, only?: any[], sets?: any[][]): Nes
   const lo = Math.max(0, Math.ceil((Math.max(0, opts.marginMm) * MM_TO_PIXEL - half) / cell));
   const hiX = grid.cols - lo, hiY = grid.rows - lo;
 
-  // Formen, die liegen bleiben, sind Hindernisse
+  // Formen, die liegen bleiben, sind Hindernisse (die Umrandung selbst nicht – sie wird unten als „außen“ gesperrt)
   const moving = new Set(units.flatMap(u => u.members.map(s => s.id)));
   for (const s of st.shapes as any[]) {
-    if (moving.has(s.id)) continue;
+    if (moving.has(s.id) || s === opts.container) continue;
     const g = unitGeometry([s]);
     const m = rasterize(tPaths(g.paths), tBoxes(g.boxes), cell, half, opts.holes);
     if (!m) continue;
@@ -379,6 +380,21 @@ export function nestShapes(opts: NestOptions, only?: any[], sets?: any[][]): Nes
     const grow = Math.ceil((clear * MM_TO_PIXEL - half) / cell);
     if (grow > 0) used = dilate(used, grid.cols, grid.rows, grow);
     for (let i = 0; i < used.length; i++) if (used[i]) { grid.occ[i] = 1; obst.occ[i] = 1; }
+    grid.rebuildAll(); obst.rebuildAll();
+  }
+
+  // Eigene Kontur: alles außerhalb sperren, mit dem Rand-Abstand nach innen (Löcher darin sind normale Hindernisse)
+  const outline = opts.container ? shapeToPaths(opts.container).find(p => p.closed && p.pts.length >= 3)?.pts : null;
+  if (outline) {
+    let out: Uint8Array = new Uint8Array(grid.cols * grid.rows);
+    for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) {
+      const vx = (c + 0.5) * cell, vy = (r + 0.5) * cell;
+      const [px, py] = tr ? [vy, vx] : [vx, vy];
+      if (!pointInPath(mx ? BW - px : px, my ? BH - py : py, outline)) out[r * grid.cols + c] = 1;
+    }
+    const grow = Math.ceil((Math.max(0, opts.marginMm) * MM_TO_PIXEL - half) / cell);
+    if (grow > 0) out = dilate(out, grid.cols, grid.rows, grow);
+    for (let i = 0; i < out.length; i++) if (out[i]) { grid.occ[i] = 1; obst.occ[i] = 1; }
     grid.rebuildAll(); obst.rebuildAll();
   }
 

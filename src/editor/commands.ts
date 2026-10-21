@@ -18,6 +18,7 @@
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { combine, splitByLines, roundCorners, BoolOp, OpResult } from "./shapeOps";
+import { toImageUV } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor } from "./tools";
 import {
@@ -135,6 +136,7 @@ export const commands: Record<string, () => void> = {
   boolIntersect: () => runCombine("intersect"),
   splitByLine: () => applyOp(splitByLines(selectedShapes()), "ops.splitDone"),
   fillet: () => openFilletDialog(),
+  imageMask: () => imageMask(),
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   duplicateDialog: () => openDuplicateDialog(),
@@ -375,11 +377,30 @@ function spillToBeds(opts: NestOptions, failedIds: string[], placedHere: number)
   log(t("nest.spread", { list: used.join(", ") }));
 }
 
+/**
+ * Umrandung fürs Verschachteln in einer eigenen Kontur: die größte ausgewählte geschlossene Form –
+ * aber nur, wenn außer ihr (und ihrer Gruppe) noch etwas anderes ausgewählt ist
+ */
+function nestContainer(): any | null {
+  const sel = selectedShapes();
+  let best: any = null, bestA = 0;
+  for (const s of sel) {
+    const p = shapeToPaths(s).find(q => q.closed && q.pts.length >= 3);
+    if (!p) continue;
+    const a = Math.abs(pathArea(p.pts));
+    if (a > bestA) { bestA = a; best = s; }
+  }
+  if (!best) return null;
+  const others = sel.filter((s: any) => s !== best && !(best.groupId && s.groupId === best.groupId));
+  return others.length ? best : null;
+}
+
 function openNestDialog() {
   const st = app();
   if (!st.shapes.length) { log(t("nest.empty")); return; }
   const o = loadNestOptions();
   const n = st.selectedShapeIds.length;
+  const container = nestContainer();
 
   document.getElementById("nest-dialog-overlay")?.remove();
   const ov = document.createElement("div");
@@ -403,6 +424,7 @@ function openNestDialog() {
         </select></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="nest-holes" type="checkbox" ${o.holes ? "checked" : ""}> ${t("nest.holes")}</label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;" title="${t("nest.overflowTip")}"><input id="nest-overflow" type="checkbox" ${overflowPref() ? "checked" : ""}> ${t("nest.overflow")}</label>
+      ${container ? `<label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;" title="${t("nest.insideTip")}"><input id="nest-inside" type="checkbox" checked> ${t("nest.inside")}</label>` : ""}
       <div style="display:flex;justify-content:space-between;gap:12px;font-size:0.85rem;">
         <div style="display:flex;flex-direction:column;gap:6px;">${t("nest.start")}
           <div style="display:grid;grid-template-columns:repeat(3,28px);gap:4px;padding:5px;border:1px dashed var(--border-color);border-radius:6px;width:max-content;">
@@ -457,6 +479,19 @@ function openNestDialog() {
     const overflow = (ov.querySelector("#nest-overflow") as HTMLInputElement).checked;
     try { localStorage.setItem(NEST_KEY, JSON.stringify({ ...opts, overflow })); } catch { /* egal */ }
     close();
+    // In eigener Kontur: die größte ausgewählte geschlossene Form ist die Umrandung, der Rest wird hineingelegt
+    const inside = container && (ov.querySelector("#nest-inside") as HTMLInputElement | null)?.checked;
+    if (inside) {
+      const keep = new Set(st.shapes.filter((s: any) => s === container || (container.groupId && s.groupId === container.groupId)));
+      const parts = selectedShapes().filter((s: any) => !keep.has(s));
+      const r = nestShapes({ ...opts, container }, parts);
+      if (!r.total) log(t("nest.empty"));
+      else if (r.failed) log(t("nest.insidePartial", { n: r.placed, total: r.total, failed: r.failed }));
+      else log(t("nest.insideDone", { n: r.placed }));
+      done();
+      checkpoint();
+      return;
+    }
     const r = nestShapes(opts);
     if (!r.total) log(t("nest.empty"));
     else if (r.failed && overflow) { checkpoint(); spillToBeds(opts, r.failedIds, r.placed); }
@@ -486,6 +521,28 @@ function applyOp(r: OpResult, doneKey: string) {
   st.shapes = [...st.shapes.filter((s: any) => !gone.has(s)), ...r.add];
   st.selectedShapeIds = r.add.map((s: any) => s.id);
   log(t(doneKey, { n: r.remove.length, m: r.add.length }));
+  done();
+  checkpoint();
+}
+
+/**
+ * Bildmaske: ein Bild + geschlossene Kontur(en) auswählen → das Bild wird nur innerhalb graviert.
+ * Die Kontur bleibt stehen (zum Ausschneiden). Nur das Bild ausgewählt → Maske wieder weg.
+ */
+function imageMask() {
+  const sel = selectedShapes();
+  const imgs = sel.filter((s: any) => s.type === "image");
+  if (imgs.length !== 1) { log(t("mask.selectOne")); return; }
+  const im = imgs[0];
+  const rings = sel.filter((s: any) => s !== im).flatMap((s: any) => shapeToPaths(s).filter(p => p.closed && p.pts.length >= 3).map(p => p.pts));
+  if (!rings.length) {
+    if (im.img?.mask) { delete im.img.mask; log(t("mask.removed")); done(); checkpoint(); }
+    else log(t("mask.needContour"));
+    return;
+  }
+  im.img = { ...im.img, mask: rings.map(r => r.map(q => toImageUV(im, q))) };
+  app().selectedShapeIds = [im.id];
+  log(t("mask.done", { n: rings.length }));
   done();
   checkpoint();
 }

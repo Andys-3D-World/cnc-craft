@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Nest inside your own contour (offcut):** select a closed shape (e.g. an offcut or a round disc) together with the
+  parts and tick “Nest inside the largest selected contour” – the parts are placed only inside it, “margin” is the
+  distance to its edge, holes inside the contour are avoided
+- **Image: remove background** (engraving window): the colour of the image border counts as background; everything
+  connected to the border within the tolerance is not engraved – good for product photos and logos on a plain
+  background. Areas enclosed by the motif stay
+- **Image mask:** select an image and a closed contour, click the new mask button – the image is engraved only inside
+  the contour (moves, scales and rotates with the image). The contour stays so it can be cut out; select only the
+  image and click again (or “Remove mask” in the engraving window) to remove the mask
 - **Shape tools (new group in the toolbar):** *Union* merges the selected shapes into one area, *Subtract* removes
   all other selected shapes from the largest one (holes, cut-outs), *Intersect* keeps only the overlap. A group
   counts as one part, so holes of imported parts stay holes; the result gets outside/inside and keeps tool, laser

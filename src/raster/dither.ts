@@ -102,6 +102,36 @@ export function resample(src: Float32Array, sw: number, sh: number, gw: number, 
   return out;
 }
 
+/**
+ * Hintergrund entfernen: Farbe des Randes (Median aller Randpunkte) gilt als Hintergrund; von allen Rändern aus
+ * werden zusammenhängende Punkte, die höchstens „tol“ (0…100) davon abweichen, weiß (= kein Laser).
+ * Innen liegende Flächen in derselben Farbe bleiben erhalten, wenn das Motiv sie umschließt.
+ */
+export function removeBackground(g: Float32Array, w: number, h: number, tol: number): Float32Array {
+  const out = g.slice();
+  const border: number[] = [];
+  for (let x = 0; x < w; x++) border.push(g[x], g[(h - 1) * w + x]);
+  for (let y = 0; y < h; y++) border.push(g[y * w], g[y * w + w - 1]);
+  border.sort((a, b) => a - b);
+  const bg = border[border.length >> 1];
+  const lim = (Math.max(0, Math.min(100, tol)) / 100) * 0.5;
+  const seen = new Uint8Array(w * h);
+  const stack: number[] = [];
+  const push = (i: number) => { if (!seen[i] && Math.abs(g[i] - bg) <= lim) { seen[i] = 1; stack.push(i); } };
+  for (let x = 0; x < w; x++) { push(x); push((h - 1) * w + x); }
+  for (let y = 0; y < h; y++) { push(y * w); push(y * w + w - 1); }
+  while (stack.length) {
+    const i = stack.pop()!;
+    out[i] = 1;
+    const x = i % w, y = (i - x) / w;
+    if (x > 0) push(i - 1);
+    if (x < w - 1) push(i + 1);
+    if (y > 0) push(i - w);
+    if (y < h - 1) push(i + w);
+  }
+  return out;
+}
+
 // ---------------------------------------------------------------------
 // Verbessern
 // ---------------------------------------------------------------------
