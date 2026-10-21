@@ -11,6 +11,8 @@ const P: Record<string, string> = {
   ellipse: `<ellipse cx="12" cy="12" rx="8.5" ry="6.5"/>`,
   polygon: `<path d="M12 3.5l7.5 4.3v8.4L12 20.5l-7.5-4.3V7.8z"/>`,
   arc: `<path d="M4 18a8 8 0 0116 0"/><circle cx="4" cy="18" r="1.4"/><circle cx="20" cy="18" r="1.4"/>`,
+  pen: `<path d="M4 20c3-1 4-4 5-7s3-6 7-7"/><path d="M14 4l6 6-3 1-4-4z"/><circle cx="4" cy="20" r="1.4"/>`,
+  node: `<path d="M5 18C7 9 13 7 19 6"/><rect x="3" y="16" width="4" height="4"/><rect x="17" y="4" width="4" height="4"/><path d="M9 9.5l-3-3" opacity=".6"/><circle cx="5.5" cy="6" r="1.4"/>`,
   text: `<path d="M5 6V4.5h14V6M12 4.5V19.5M9 19.5h6"/>`,
   measure: `<path d="M3.5 15.5l12-12 5 5-12 12z"/><path d="M7 12l2 2M10 9l1.5 1.5M13 6l2 2"/>`,
   boxgen: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M7 9.2v1.6M9.5 10.6v1.6M16.5 10.6v1.6M14 12v1.6" stroke-width="1.6"/>`,

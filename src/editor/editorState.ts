@@ -7,7 +7,7 @@
  */
 import { MM_TO_PIXEL } from "../shapeTransform";
 
-export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab";
+export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen";
 
 export function app(): any {
   return (window as any).cncState;

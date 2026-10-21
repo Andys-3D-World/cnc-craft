@@ -34,6 +34,8 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("polygon", "polygon", "tip.tool.polygon")}
     ${tool("arc", "arc", "tip.tool.arc")}
     ${tool("text", "text", "tip.tool.text")}
+    ${tool("pen", "pen", "tip.tool.pen")}
+    ${tool("node", "node", "tip.tool.node")}
     <div class="strip-sep"></div>
     ${tool("measure", "measure", "tip.tool.measure")}
     <button data-cmd="nest" class="btn-tool-icon" ${tip("tip.cmd.nest")}>${icon("nest", 20)}</button>

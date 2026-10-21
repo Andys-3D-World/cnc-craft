@@ -232,8 +232,18 @@ export function groupBounds(shapes: any[]): Bounds | null {
 // VERÄNDERN: verschieben, skalieren, drehen, spiegeln
 // =====================================================================
 
+/** Bézier-Knoten (siehe editor/bezier.ts) samt Tangenten mitbewegen */
+function mapBezNodes(s: any, f: (p: Pt) => Pt) {
+  if (!s.bez) return;
+  s.bez = s.bez.map((n: any) => {
+    const p = f(n);
+    return { x: p.x, y: p.y, ...(n.hi ? { hi: f(n.hi) } : {}), ...(n.ho ? { ho: f(n.ho) } : {}), ...(n.smooth ? { smooth: true } : {}) };
+  });
+}
+
 export function translateShape(s: any, dx: number, dy: number) {
   if (s.type === "polyline" || s.type === "image") {
+    mapBezNodes(s, p => ({ x: p.x + dx, y: p.y + dy }));
     for (const p of s.points) { p.x += dx; p.y += dy; }
     updatePolylineBounds(s);
     return;
@@ -269,6 +279,7 @@ export function scaleShape(s: any, ox: number, oy: number, sx: number, sy: numbe
   if (s.type === "rect") convertToPolyline(s);
 
   if (s.type === "polyline" || s.type === "image") {
+    mapBezNodes(s, p => ({ x: fx(p.x), y: fy(p.y) }));
     for (const p of s.points) { p.x = fx(p.x); p.y = fy(p.y); }
     updatePolylineBounds(s);
   } else if (s.type === "circle") {
@@ -298,6 +309,7 @@ export function rotateShape(s: any, cx: number, cy: number, angle: number) {
   if (s.type === "rect") convertToPolyline(s);
 
   if (s.type === "polyline" || s.type === "image") {
+    mapBezNodes(s, p => rot(p.x, p.y));
     s.points = s.points.map((p: Pt) => rot(p.x, p.y));
     updatePolylineBounds(s);
   } else if (s.type === "circle") {

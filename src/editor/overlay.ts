@@ -9,6 +9,7 @@ import { t } from "../i18n/i18n";
 import { selectionBounds, selectionHandles, HANDLE_SIZE, selectedShapes } from "./selection";
 import { Pt, shapeToPaths, makeEllipsePoints, makeRectPoints, arcGeometry, MM_TO_PIXEL } from "../shapeTransform";
 import { berechne3PunktBogen } from "../arcEngine";
+import { drawBezierOverlay } from "./bezier";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -42,6 +43,8 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
 
   // ---- Zeichen-Vorschau ----
   drawToolPreview(ctx, tool);
+  // ---- Kurven: Knoten und Tangenten (Punkte bearbeiten, Kurve zeichnen) ----
+  if (tool === "node" || tool === "pen") drawBezierOverlay(ctx, tool);
 
   // ---- Messlinie (bleibt stehen, bis neu gemessen wird) ----
   if (live.measure) drawMeasure(ctx, live.measure.a, live.measure.b);

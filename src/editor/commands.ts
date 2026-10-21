@@ -42,7 +42,8 @@ let clipboard: any[] = [];
 let pasteCount = 0;
 
 const TOOL_KEYS: Record<string, ToolName> = {
-  v: "select", h: "pan", l: "line", r: "rect", e: "ellipse", p: "polygon", a: "arc", t: "text", m: "measure"
+  v: "select", h: "pan", l: "line", r: "rect", e: "ellipse", p: "polygon", a: "arc", t: "text", m: "measure",
+  n: "node", b: "pen"
 };
 
 function done() {

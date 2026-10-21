@@ -11,6 +11,7 @@
  *  Text (T)      klicken -> Text-Dialog
  *  Messen (M)    ziehen -> Abstand und Winkel
  *  Stege setzen  Klick auf eine Kontur setzt einen Haltesteg, Klick auf einen Steg entfernt ihn
+ *  Punkte (N)    Knoten und Tangenten bearbeiten, Kurve zeichnen (B) – siehe bezier.ts
  */
 import { app, options, ToolName, toWorld, screenDist, fmtMm } from "./editorState";
 import { snapPoint, snapAngle, SnapResult } from "./snap";
@@ -25,6 +26,7 @@ import {
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
 import { openEngraveDialog } from "../raster/engraveDialog";
+import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
 import { t } from "../i18n/i18n";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 
@@ -86,6 +88,12 @@ export function currentTool(): ToolName {
 export function setTool(name: ToolName) {
   cancelCurrent();
   app().currentTool = name;
+  // Punkte bearbeiten: eine einzeln ausgewählte Form gleich übernehmen
+  if (name === "node") {
+    const sel = selectedShapes();
+    nodeEdit.targetId = sel.length === 1 && ensureBez(sel[0]) ? sel[0].id : null;
+    nodeEdit.sel = -1;
+  }
   document.querySelectorAll(".btn-tool-icon[data-tool]").forEach(b =>
     b.classList.toggle("active", (b as HTMLElement).dataset.tool === name));
   window.dispatchEvent(new CustomEvent("cnc-tool-changed", { detail: name }));
@@ -105,6 +113,8 @@ export function cancelCurrent() {
   live.measure = null;
   live.originals.clear();
   live.label = "";
+  penCancel();
+  nodeEdit.grab = null;
 }
 
 function readModifiers(e: MouseEvent | KeyboardEvent) {
@@ -195,6 +205,15 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
     case "tab":
       placeTab();
       break;
+    case "node":
+      nodeDown(live.raw, sx, sy, hitTest(live.raw.x, live.raw.y));
+      updateDimensionInputs(null);
+      break;
+    case "pen": {
+      const done = penDown(live.world, sx, sy);
+      if (done) addShapes([done]);
+      break;
+    }
     default:
       break;
   }
@@ -269,6 +288,8 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
     redrawFn();
     return;
   }
+  if (tool === "node" && nodeEdit.grab) { nodeMove(live.raw, live.alt); redrawFn(); return; }
+  if (tool === "pen") { updateSnap(); penMove(pen.dragging ? live.raw : live.world); redrawFn(); return; }
 
   switch (live.mode) {
     case "pressSelect":
@@ -493,6 +514,8 @@ export function onMouseUp(e: MouseEvent, sx: number, sy: number) {
 
   if (live.mode === "panning") { live.mode = "idle"; updateCursor(); return; }
   if (e.button !== 0) return;
+  if (tool === "node") { nodeUp(); finishChange(); return; }
+  if (tool === "pen") { penUp(); redrawFn(); return; }
 
   switch (live.mode) {
     case "pressSelect": {
@@ -626,6 +649,8 @@ function finishDragDraw(tool: ToolName) {
 export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
   const tool = currentTool();
   if (tool === "line") { finishLine(false); return; }
+  if (tool === "node") { if (nodeDblClick(toWorld(sx, sy), sx, sy)) finishChange(); return; }
+  if (tool === "pen") { const s = penFinish(false); if (s) addShapes([s]); return; }
   if (tool === "select") {
     const w = toWorld(sx, sy);
     const hit = hitTest(w.x, w.y);
@@ -639,7 +664,7 @@ export function onToolKey(e: KeyboardEvent): boolean {
   readModifiers(e);
   const tool = currentTool();
   if (e.key === "Escape") {
-    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure;
+    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure || pen.nodes.length > 0;
     if (busy) cancelCurrent();
     else if (tool !== "select") setTool("select");
     else app().selectedShapeIds = [];
@@ -648,6 +673,18 @@ export function onToolKey(e: KeyboardEvent): boolean {
   }
   if (e.key === "Enter" && tool === "line" && live.points.length >= 2) {
     finishLine(false);
+    return true;
+  }
+  if (e.key === "Enter" && tool === "pen" && pen.nodes.length) {
+    const s = penFinish(false);
+    if (s) addShapes([s]);
+    redrawFn();
+    return true;
+  }
+  // Punkte bearbeiten: Entf löscht nur den gewählten Knoten, nicht die ganze Form
+  if ((e.key === "Delete" || e.key === "Backspace") && tool === "node" && nodeEdit.sel >= 0) {
+    nodeDelete();
+    finishChange();
     return true;
   }
   return false;

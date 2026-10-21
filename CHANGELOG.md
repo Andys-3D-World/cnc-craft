@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Curves with points and handles (Bézier):** two new tools in the left toolbar. *Draw curve* (B): click = corner,
+  click and drag = smooth point with handles, click the first point = close, double-click/Enter = finish open,
+  Esc = cancel. *Edit points* (N): click any contour (lines, rectangles, circles and polylines are converted) –
+  drag nodes, drag handles (smooth points keep both sides in line, Alt = only one side), drag a line between two
+  nodes to bend it, double-click a line to insert a node, double-click a node to switch corner ↔ smooth, Del deletes
+  the selected node. Curves stay editable after moving, scaling, rotating and mirroring and are saved in the project;
+  G-code, nesting and offsets use the smooth contour (max. 0.02 mm deviation)
 - **Material view:** new selector in the toolbar (🪵) – light wood (birch), dark wood (walnut), black and clear
   acrylic, leather, slate, cardboard, anodized aluminium. The bed shows the material surface at real scale,
   engravings appear in the burn colour of the material (dark on wood/leather, light on acrylic/slate/aluminium),

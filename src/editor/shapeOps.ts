@@ -165,6 +165,7 @@ export function roundCorners(s: any, r: number, chamfer: boolean): number {
   }
   if (!changed) return 0;
   s.points = out;
+  delete s.bez;    // Kurven-Knoten passen nicht mehr zu den neuen Punkten
   delete s.tabPts; // selbst gesetzte Stege hängen an der alten Kontur
   if (s.tabMode === "manual") s.tabMode = "auto";
   updatePolylineBounds(s);
