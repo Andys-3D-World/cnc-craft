@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Pattern fill:** select a closed area (e.g. a coaster) together with a motif – the area is filled with copies of
+  the motif in a grid (horizontal/vertical spacing, every 2nd row offset, centred). Only whole motifs, or clipped at
+  the edge for closed motifs. Each copy is its own group
+- **Weld and score:** overlapping parts (e.g. script lettering, overlapping shapes) become one cut contour; the
+  visible transitions – edges of an upper part that lie on a lower one – stay as score lines (laser: the weakest line
+  layer, mill: 0.3 mm deep). Drawing order decides what is on top
+- **Split image:** select an image and one or two straight lines – nearly vertical lines split left/right, nearly
+  horizontal ones top/bottom. Each piece becomes its own image with the same engraving settings (mask carried over);
+  the lines are removed
 - **Nest inside your own contour (offcut):** select a closed shape (e.g. an offcut or a round disc) together with the
   parts and tick “Nest inside the largest selected contour” – the parts are placed only inside it, “margin” is the
   distance to its edge, holes inside the contour are avoided

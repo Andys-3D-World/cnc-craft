@@ -78,7 +78,10 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("boolIntersect", "boolIntersect", "tip.cmd.boolIntersect")}
       ${cmd("splitByLine", "splitByLine", "tip.cmd.splitByLine")}
       ${cmd("fillet", "fillet", "tip.cmd.fillet")}
+      ${cmd("patternFill", "patternFill", "tip.cmd.patternFill")}
+      ${cmd("weldScore", "weldScore", "tip.cmd.weldScore")}
       ${cmd("imageMask", "imageMask", "tip.cmd.imageMask")}
+      ${cmd("imageSplit", "imageSplit", "tip.cmd.imageSplit")}
     </div>
     <div class="tb-group">
       ${cmd("rotateLeft", "rotateLeft", "tip.cmd.rotateLeft")}

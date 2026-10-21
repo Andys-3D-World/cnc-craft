@@ -11,9 +11,12 @@
  *   Schnittmenge nur was in allen Teilen liegt
  *   zerschneiden offene Linien/Bögen in der Auswahl schneiden die geschlossenen Formen (Spalt 0,01 mm),
  *                die Schneidlinien werden danach entfernt
+ *   Musterfüllung  die größte ausgewählte geschlossene Form wird mit Kopien der übrigen Auswahl (Motiv) gefüllt
+ *   verbinden + anritzen  überlappende Teile (z. B. Schreibschrift) werden zu einer Schnittkontur vereint;
+ *                sichtbare Übergänge (Kanten eines oberen Teils über einem unteren) bleiben als Ritzlinien
  */
 import polygonClipping, { MultiPolygon, Polygon, Ring } from "polygon-clipping";
-import { createPolyline, shapeToPaths, convertToPolyline, updatePolylineBounds, MM_TO_PIXEL, Pt } from "../shapeTransform";
+import { createPolyline, shapeToPaths, convertToPolyline, updatePolylineBounds, MM_TO_PIXEL, Pt, cloneShape, newId, translateShape, groupBounds } from "../shapeTransform";
 
 export type BoolOp = "union" | "subtract" | "intersect";
 
@@ -60,7 +63,7 @@ function toShapes(m: MultiPolygon, like: any): any[] {
   return out;
 }
 
-export interface OpResult { remove: any[]; add: any[]; error?: string }
+export interface OpResult { remove: any[]; add: any[]; error?: string; scores?: number }
 
 export function combine(op: BoolOp, sel: any[]): OpResult {
   const list = units(sel).map(u => ({ u, r: region(u) })).filter(x => x.r && x.r.length) as { u: any[]; r: MultiPolygon }[];
@@ -166,4 +169,137 @@ export function roundCorners(s: any, r: number, chamfer: boolean): number {
   if (s.tabMode === "manual") s.tabMode = "auto";
   updatePolylineBounds(s);
   return changed;
+}
+
+// ---------------------------------------------------------------------
+// Musterfüllung
+// ---------------------------------------------------------------------
+
+export interface PatternOptions { gapX: number; gapY: number; brick: boolean; clip: boolean } // Abstände in mm
+
+/** Liegt der Punkt in der Fläche (Gerade/Ungerade über alle Ringe)? */
+function inRegion(m: MultiPolygon, x: number, y: number): boolean {
+  let n = 0;
+  for (const poly of m) for (const r of poly) {
+    let inside = false;
+    for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+      const [xi, yi] = r[i], [xj, yj] = r[j];
+      if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    if (inside) n++;
+  }
+  return n % 2 === 1;
+}
+
+/**
+ * Die größte ausgewählte geschlossene Form (mit ihrer Gruppe) ist die Fläche, der Rest ist das Motiv.
+ * Kopien im Raster (Motiv-Größe + Abstand, auf Wunsch jede zweite Reihe um eine halbe Breite versetzt), mittig.
+ * clip = false: nur Kopien, die ganz drin liegen; clip = true: geschlossene Motiv-Teile am Rand abschneiden.
+ */
+export function patternFill(sel: any[], o: PatternOptions): OpResult {
+  const us = units(sel).map(u => ({ u, r: region(u) }));
+  const closed = us.filter(x => x.r && x.r.length) as { u: any[]; r: MultiPolygon }[];
+  if (us.length < 2 || !closed.length) return { remove: [], add: [], error: "pat.select" };
+  const area = closed.reduce((a, b) => (mpArea(b.r) > mpArea(a.r) ? b : a));
+  const motif = us.filter(x => x !== area).flatMap(x => x.u);
+  const mb = groupBounds(motif), ab = groupBounds(area.u);
+  if (!mb || !ab) return { remove: [], add: [], error: "pat.select" };
+  const mw = mb.maxX - mb.minX, mh = mb.maxY - mb.minY;
+  const sx = mw + Math.max(0, o.gapX) * MM_TO_PIXEL, sy = mh + Math.max(0, o.gapY) * MM_TO_PIXEL;
+  if (sx < 0.5 || sy < 0.5) return { remove: [], add: [], error: "pat.tooSmall" };
+  const aw = ab.maxX - ab.minX, ah = ab.maxY - ab.minY;
+  const cols = Math.ceil(aw / sx) + 2, rows = Math.ceil(ah / sy) + 2;
+  if (cols * rows > 5000) return { remove: [], add: [], error: "pat.tooMany" };
+  // Raster mittig über der Fläche
+  const x0 = (ab.minX + ab.maxX) / 2 - (cols * sx) / 2 + (sx - mw) / 2, y0 = (ab.minY + ab.maxY) / 2 - (rows * sy) / 2 + (sy - mh) / 2;
+  const motifRegion = region(motif);
+  const add: any[] = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const dx = x0 + c * sx + (o.brick && r % 2 ? sx / 2 : 0) - mb.minX, dy = y0 + r * sy - mb.minY;
+    const pts = motif.flatMap(m => shapeToPaths(m).flatMap(p => p.pts)).map(q => ({ x: q.x + dx, y: q.y + dy }));
+    const allIn = pts.every(q => inRegion(area.r, q.x, q.y));
+    const anyIn = allIn || pts.some(q => inRegion(area.r, q.x, q.y));
+    if (allIn) {
+      // ganze Kopie: neue IDs, alle Teile einer Kopie in eine Gruppe
+      const gid = "pat-" + newId();
+      for (const m of motif) { const k = cloneShape(m); k.id = newId(); k.groupId = gid; translateShape(k, dx, dy); add.push(k); }
+    } else if (o.clip && anyIn && motifRegion) {
+      // am Rand: geschlossene Teile mit der Fläche schneiden
+      const moved: MultiPolygon = motifRegion.map(poly => poly.map(rg => rg.map(([x, y]) => [x + dx, y + dy] as [number, number])));
+      const cut = polygonClipping.intersection(moved, area.r);
+      if (cut.length) add.push(...toShapes(cut, motif[0]));
+    }
+  }
+  if (!add.length) return { remove: [], add: [], error: "pat.none" };
+  return { remove: [], add };
+}
+
+// ---------------------------------------------------------------------
+// Verbinden und Anritzen
+// ---------------------------------------------------------------------
+
+/** Kontur in Stücke teilen (Schritt ≈ 0,1 mm) und nur die Stücke behalten, deren Mitte keep() erfüllt */
+function keepRuns(pts: Pt[], closed: boolean, keep: (x: number, y: number) => boolean): Pt[][] {
+  const step = 0.1 * MM_TO_PIXEL;
+  const seq = closed ? [...pts, pts[0]] : pts;
+  const runs: Pt[][] = [];
+  let cur: Pt[] | null = null;
+  for (let i = 1; i < seq.length; i++) {
+    const a = seq[i - 1], b = seq[i];
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / step));
+    for (let k = 0; k < n; k++) {
+      const p = { x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n };
+      const q = { x: a.x + ((b.x - a.x) * (k + 1)) / n, y: a.y + ((b.y - a.y) * (k + 1)) / n };
+      if (keep((p.x + q.x) / 2, (p.y + q.y) / 2)) {
+        if (!cur) { cur = [p]; runs.push(cur); }
+        cur.push(q);
+      } else cur = null;
+    }
+  }
+  // geschlossene Kontur: letztes und erstes Stück gehören zusammen
+  if (closed && runs.length > 1) {
+    const f = runs[0], l = runs[runs.length - 1];
+    if (Math.hypot(f[0].x - l[l.length - 1].x, f[0].y - l[l.length - 1].y) < 1e-6) { runs[0] = [...l, ...f.slice(1)]; runs.pop(); }
+  }
+  return runs.map(simplifyRun).filter(r => r.length >= 2);
+}
+
+/** Punkte auf einer Geraden zusammenfassen (die 0,1-mm-Schritte sollen nicht im G-Code landen) */
+function simplifyRun(r: Pt[]): Pt[] {
+  if (r.length < 3) return r;
+  const out = [r[0]];
+  for (let i = 1; i < r.length - 1; i++) {
+    const a = out[out.length - 1], b = r[i], c = r[i + 1];
+    const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    if (Math.abs(cross) / (Math.hypot(c.x - a.x, c.y - a.y) || 1) > 0.002 * MM_TO_PIXEL) out.push(b);
+  }
+  out.push(r[r.length - 1]);
+  return out;
+}
+
+/**
+ * Teile in Zeichen-Reihenfolge (später = oben). Ergebnis: vereinte Außenkontur (Schnitt) + Ritzlinien:
+ * die Kanten eines Teils, die über einem darunterliegenden Teil liegen und nicht von einem höheren verdeckt sind.
+ * scoreExtra: Eigenschaften der Ritzlinien (z. B. Laser-Ebene „Linien markieren“)
+ */
+export function weldAndScore(sel: any[], scoreExtra: Record<string, any>): OpResult {
+  const list = units(sel).map(u => ({ u, r: region(u) })).filter(x => x.r && x.r.length) as { u: any[]; r: MultiPolygon }[];
+  if (list.length < 2) return { remove: [], add: [], error: "ops.needTwo" };
+  const union = polygonClipping.union(list[0].r, ...list.slice(1).map(x => x.r));
+  const add = toShapes(union, list[0].u[0]);
+  let scores = 0;
+  list.forEach((x, i) => {
+    const below = list.slice(0, i).map(y => y.r), above = list.slice(i + 1).map(y => y.r);
+    if (!below.length) return;
+    const under = below.length === 1 ? below[0] : polygonClipping.union(below[0], ...below.slice(1));
+    const over = above.length ? (above.length === 1 ? above[0] : polygonClipping.union(above[0], ...above.slice(1))) : null;
+    for (const poly of x.r) for (const rg of poly) {
+      const pts = rg.map(([px, py]) => ({ x: px, y: py }));
+      for (const run of keepRuns(pts, true, (px, py) => inRegion(under, px, py) && !(over && inRegion(over, px, py)))) {
+        add.push(createPolyline(run, false, "on-line", { ...scoreExtra, isScore: true }));
+        scores++;
+      }
+    }
+  });
+  return { remove: list.flatMap(x => x.u), add, scores };
 }

@@ -17,8 +17,9 @@
  */
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
-import { combine, splitByLines, roundCorners, BoolOp, OpResult } from "./shapeOps";
-import { toImageUV } from "../raster/imageShape";
+import { combine, splitByLines, roundCorners, patternFill, weldAndScore, BoolOp, OpResult, PatternOptions } from "./shapeOps";
+import { getLayers } from "../laserLayers";
+import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor } from "./tools";
 import {
@@ -137,6 +138,9 @@ export const commands: Record<string, () => void> = {
   splitByLine: () => applyOp(splitByLines(selectedShapes()), "ops.splitDone"),
   fillet: () => openFilletDialog(),
   imageMask: () => imageMask(),
+  imageSplit: () => { imageSplit(); },
+  patternFill: () => openPatternDialog(),
+  weldScore: () => weldScore(),
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   duplicateDialog: () => openDuplicateDialog(),
@@ -547,6 +551,89 @@ function imageMask() {
   checkpoint();
 }
 
+/** Bild teilen: Bild + gerade Linien auswählen; fast senkrechte Linien teilen links/rechts, fast waagerechte oben/unten */
+async function imageSplit() {
+  const sel = selectedShapes();
+  const imgs = sel.filter((s: any) => s.type === "image");
+  if (imgs.length !== 1) { log(t("isplit.select")); return; }
+  const im = imgs[0];
+  const lines = sel.filter((s: any) => s !== im && shapeToPaths(s).some(p => !p.closed && p.pts.length >= 2));
+  if (!lines.length) { log(t("isplit.needLine")); return; }
+  const cu: number[] = [], cv: number[] = [];
+  for (const l of lines) {
+    const p = shapeToPaths(l).find(q => !q.closed)!.pts;
+    const a = toImageUV(im, p[0]), b = toImageUV(im, p[p.length - 1]);
+    if (Math.abs(b.u - a.u) < Math.abs(b.v - a.v)) cu.push((a.u + b.u) / 2); else cv.push((a.v + b.v) / 2);
+  }
+  const pieces = await splitImage(im, cu, cv);
+  if (pieces.length < 2) { log(t("isplit.outside")); return; }
+  const st = app();
+  const gone = new Set([im, ...lines]);
+  st.shapes = [...st.shapes.filter((s: any) => !gone.has(s)), ...pieces];
+  st.selectedShapeIds = pieces.map(p => p.id);
+  log(t("isplit.done", { n: pieces.length }));
+  done();
+  checkpoint();
+}
+
+/** Verbinden und Anritzen: Ritzlinien kommen in die schwächste Linien-Ebene (Laser) bzw. werden flach graviert (Fräse) */
+function weldScore() {
+  const sel = selectedShapes();
+  const mark = getLayers().filter(l => l.mode === "line").sort((a, b) => a.power - b.power)[0];
+  const r = weldAndScore(sel, { ...(mark ? { laserLayerId: mark.id } : {}), millingDepth: -0.3 });
+  if (r.error) { log(t(r.error)); return; }
+  applyOp(r, "weld.done");
+  log(t("weld.scores", { n: r.scores || 0 }));
+}
+
+const PATTERN_KEY = "cnc_craft_pattern";
+
+function openPatternDialog() {
+  const sel = selectedShapes();
+  if (sel.length < 2) { log(t("pat.select")); return; }
+  let o: PatternOptions = { gapX: 3, gapY: 3, brick: false, clip: false };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(PATTERN_KEY) || "{}") }; } catch { /* egal */ }
+  document.getElementById("pattern-dialog-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "pattern-dialog-overlay";
+  ov.className = "dlg-overlay";
+  ov.innerHTML = `
+    <div class="dlg-box" role="dialog" style="width:360px;">
+      <h3>▦ ${t("pat.title")}</h3>
+      <div class="dlg-hint">${t("pat.desc")}</div>
+      <label class="prop-row">${t("pat.gapX")}<input id="pat-gx" type="number" step="0.5" min="0" class="prop-input" style="width:90px;"></label>
+      <label class="prop-row">${t("pat.gapY")}<input id="pat-gy" type="number" step="0.5" min="0" class="prop-input" style="width:90px;"></label>
+      <label class="prop-row" style="cursor:pointer;"><span>${t("pat.brick")}</span><input id="pat-brick" type="checkbox" style="width:auto;"></label>
+      <label class="prop-row" style="cursor:pointer;"><span>${t("pat.clip")}</span><input id="pat-clip" type="checkbox" style="width:auto;"></label>
+      <div class="dlg-buttons">
+        <button id="pat-cancel" class="btn-secondary">${t("dlg.cancel")}</button>
+        <button id="pat-ok" class="btn-primary">✔ ${t("pat.run")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const $ = (id: string) => ov.querySelector("#" + id) as HTMLInputElement;
+  $("pat-gx").value = String(o.gapX); $("pat-gy").value = String(o.gapY); $("pat-brick").checked = o.brick; $("pat-clip").checked = o.clip;
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") $("pat-ok").click(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  $("pat-cancel").onclick = close;
+  $("pat-ok").onclick = () => {
+    const num = (id: string) => Math.max(0, parseFloat($(id).value) || 0);
+    const opts: PatternOptions = { gapX: num("pat-gx"), gapY: num("pat-gy"), brick: $("pat-brick").checked, clip: $("pat-clip").checked };
+    try { localStorage.setItem(PATTERN_KEY, JSON.stringify(opts)); } catch { /* egal */ }
+    close();
+    const r = patternFill(sel, opts);
+    if (r.error) { log(t(r.error)); return; }
+    const st = app();
+    st.shapes = [...st.shapes, ...r.add];
+    st.selectedShapeIds = r.add.map((s: any) => s.id);
+    log(t("pat.done", { n: new Set(r.add.map((s: any) => s.groupId || s.id)).size }));
+    done();
+    checkpoint();
+  };
+  setTimeout(() => $("pat-gx").select(), 0);
+}
+
 const FILLET_KEY = "cnc_craft_fillet";
 
 function openFilletDialog() {
@@ -738,7 +825,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
-    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #fillet-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
+    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #fillet-dialog-overlay, #pattern-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");
     if (camTab && !camTab.classList.contains("active")) return;
