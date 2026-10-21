@@ -24,6 +24,7 @@ import {
 } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
+import { openEngraveDialog } from "../raster/engraveDialog";
 import { t } from "../i18n/i18n";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 
@@ -629,6 +630,7 @@ export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
     const w = toWorld(sx, sy);
     const hit = hitTest(w.x, w.y);
     if (hit && hit.textData) editTextGroup(hit);
+    if (hit && hit.type === "image") openEngraveDialog(hit, undefined, () => finishChange());
   }
 }
 

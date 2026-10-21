@@ -448,6 +448,9 @@ function drawHookup(b: Board, hk: Hookup, box: Box): string {
       if (side === "left" || side === "right") {
         const towardsInside = (side === "left") !== outer;
         tx = towardsInside ? p.x - 8 : p.x + 8; ty = p.y + 3.5; anchor = towardsInside ? "end" : "start";
+      } else if (outerPins(pl.part).includes(nm)) {
+        // Außenklemmen (Netz, Röhre, Umrichter): Beschriftung außerhalb des Kastens, sonst liegt sie oben auf dem Namen
+        ty = side === "top" ? p.y - 7 : p.y + 14;
       } else {
         const below = (side === "top") !== outer;
         ty = below ? p.y - 7 : p.y + 14;

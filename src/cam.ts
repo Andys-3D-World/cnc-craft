@@ -70,7 +70,7 @@ export const generateGcode = (shapes: any): string | null => {
 let allSkipped = false;
 
 /** Meldung, wenn generateGcode() nichts geliefert hat */
-export const noGcodeMessage = () => t(allSkipped ? "stock.allSkipped" : "gcw.noObjects");
+export const noGcodeMessage = () => allSkipped ? t("stock.allSkipped") : (lastGcodeWarnings[0] || t("gcw.noObjects"));
 
 /** Formen, die wegen verbrauchter Fläche nicht geschnitten werden (ganze Gruppe, wenn ein Teil davon betroffen ist) */
 function usedAreaShapes(shapes: any[]): Set<any> {
@@ -92,10 +92,19 @@ const generateGcodeInner = (shapes: any): string | null => {
     lastGcodeWarnings = res.warnings;
     return res.gcode;
   }
+  // Bilder (Bildgravur) gibt es nur beim Laser
+  const images = shapes.filter((s: any) => s.type === "image").length;
+  if (images) {
+    shapes = shapes.filter((s: any) => s.type !== "image");
+    if (!shapes.length) { lastGcodeWarnings = [t("img.onlyLaser", { n: images })]; return null; }
+  }
+  const imageNote = () => { if (images) lastGcodeWarnings.unshift(t("img.onlyLaser", { n: images })); };
+
   // PLASMA: Schnittspalt, Anfahrbahn, Einstechen – siehe plasmaCam.ts
   if (isPlasma()) {
     const res = generatePlasmaGcode(shapes);
     lastGcodeWarnings = res.warnings;
+    imageNote();
     return res.gcode;
   }
 
@@ -415,6 +424,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   // ---- 7. FOOTER ----
   gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
 
+  imageNote();
   return gcode;
 };
 

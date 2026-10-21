@@ -7,6 +7,8 @@
  *   gefüllt (gerade/ungerade-Regel) -> Löcher in Buchstaben bleiben frei.
  * - "Linie": jede Kontur wird abgefahren, kleine/innere Konturen zuerst (Teile fallen
  *   sonst heraus, bevor ihre Löcher geschnitten sind).
+ * - Bilder (Bildgravur): Zeile für Zeile, abwechselnd hin und zurück, vor allen Konturen der Ebene
+ *   (siehe raster/imageShape.ts). Gerastert = Laser an/aus, Graustufen = Leistung folgt der Helligkeit.
  * - Leistung: S = Leistung% × S-Max ($30). M4 = dynamische Leistung (empfohlen),
  *   M3 = konstante Leistung. Bei jeder Leerfahrt steht zusätzlich S0 (Sicherheit).
  */
@@ -18,6 +20,7 @@ import {
   getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine
 } from "./laserLayers";
 import { t, ascii } from "./i18n/i18n";
+import { imageGcode } from "./raster/imageShape";
 
 const MAX_SCANLINES = 40000; // Schutz vor riesigen Dateien
 
@@ -55,6 +58,20 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     g += `\n${c("lgc.layer", { i: li + 1, name: layer.name, mode: t("laser.mode." + layer.mode), p: layer.power, f: layer.speed, x: layer.passes })}\n`;
     if (layer.air) g += `M8 ${c("lgc.airOn")}\n`;
     g += `F${n(layer.speed)}\n`;
+
+    // ---- BILDER (zuerst gravieren, dann schneiden) ----
+    for (const s of list) {
+      if (s.type !== "image") continue;
+      const r = imageGcode(s, S, n);
+      if (!r) { warnings.push(t("lgw.imageLoading", { name: ascii(s.source || "") })); continue; }
+      if (!r.rows) continue;
+      for (let pass = 0; pass < layer.passes; pass++) {
+        g += `${c("lgc.image", { name: s.source || "", rows: r.rows })}\n`;
+        if (both) g += `F${n(fillF)}\n`;
+        g += r.g;
+      }
+      if (both) g += `F${n(layer.speed)}\n`;
+    }
 
     // Pfade in mm
     const closed: Pt[][] = [];

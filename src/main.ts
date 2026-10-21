@@ -38,6 +38,7 @@ import { bindOffsetModes } from "./offsetModes";
 import { loadGcodeFromFile, startStreaming, pauseStreaming, stopStreaming } from "./machineStream";
 import { drawOverlay } from "./editor/overlay";
 import { initHistory } from "./editor/history";
+import { setEngraveLog } from "./raster/engraveDialog";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
@@ -141,7 +142,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       initCommands(canvas, redraw, appendToConsole);
     }
     initHistory();
-    initBeds(redraw, appendToConsole, () => zoomFit()); // mehrere Betten: Reiter über der Zeichenfläche
+    initBeds(redraw, appendToConsole, () => zoomFit());
+    setEngraveLog(appendToConsole);   // Bildgravur: Meldungen aus dem Gravur-Fenster // mehrere Betten: Reiter über der Zeichenfläche
 
     if (clearBtn) clearBtn.addEventListener("click", () => {
       if (!state.shapes.length) return;

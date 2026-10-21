@@ -118,9 +118,9 @@ async function loadImage(name: string, bytes: Uint8Array): Promise<CanvasImageSo
   const blob = new Blob([bytes as BlobPart], { type: mime });
   const url = URL.createObjectURL(blob);
   try {
+    // onload statt decode(): decode() bleibt in manchen WebViews hängen, wenn das Bild nicht im Dokument ist
     const img = new Image();
-    img.src = url;
-    await img.decode();
+    await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(new Error(t("imp.error"))); img.src = url; });
     return img;
   } finally {
     setTimeout(() => URL.revokeObjectURL(url), 1000);

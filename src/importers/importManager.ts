@@ -21,6 +21,9 @@ import { parseDxf } from "./dxfImport";
 import { parseHpgl, parseGcode } from "./plotImport";
 import { parsePdf } from "./pdfImport";
 import { openImageTraceDialog } from "./imageTrace";
+import { createImageShape } from "../raster/imageShape";
+import { openEngraveDialog } from "../raster/engraveDialog";
+import { isLaser } from "../machineMode";
 import { openStlFromBytes } from "../stlInteraction";
 import { traceText } from "../editor/textTool";
 import { createPolyline, createCircle, newId, MM_TO_PIXEL, pathArea, pointInPath } from "../shapeTransform";
@@ -30,7 +33,7 @@ import { assignPartGroups } from "../editor/parts";
 import { t } from "../i18n/i18n";
 import { toolsUsedBy, mergeProjectTools } from "../toolLibrary";
 import { getMachineMode, setMachineMode } from "../machineMode";
-import { layersUsedBy, mergeProjectLayers } from "../laserLayers";
+import { getLayers, layersUsedBy, mergeProjectLayers } from "../laserLayers";
 import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
 
@@ -98,7 +101,13 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     else if (ext === "pdf" || ext === "ai") res = await parsePdf(bytes);
     else if (["plt", "hpgl", "hpg"].includes(ext)) res = parseHpgl(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.gcode.includes(ext)) res = parseGcode(decodeText(bytes));
-    else if (IMPORT_EXTENSIONS.image.includes(ext)) res = await openImageTraceDialog(name, bytes);
+    else if (IMPORT_EXTENSIONS.image.includes(ext)) {
+      // Bild: gravieren (Bild-Form) oder nachzeichnen (Konturen)
+      const how = await chooseImageUse(name);
+      if (!how) return;
+      if (how === "engrave") { await insertEngraveImage(name, bytes); return; }
+      res = await openImageTraceDialog(name, bytes);
+    }
     else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
     else if (ext === "cncc") { loadProjectText(decodeText(bytes), name, fullPath); return; }
     else if (ext === "dwg") throw new Error(t("imp.errDwg"));
@@ -110,6 +119,49 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
   } catch (err) {
     log(`${t("imp.error")} ${name}: ${err instanceof Error ? err.message : String(err)}`);
   }
+}
+
+/** Kleines Fenster: Bild gravieren oder nachzeichnen? */
+function chooseImageUse(name: string): Promise<"engrave" | "trace" | null> {
+  return new Promise(resolve => {
+    document.getElementById("imguse-overlay")?.remove();
+    const ov = document.createElement("div");
+    ov.id = "imguse-overlay";
+    ov.className = "dlg-overlay";
+    ov.innerHTML = `
+      <div class="dlg-box" role="dialog" style="width:420px;">
+        <h3>🖼️ ${t("img.choose")}</h3>
+        <div class="dlg-hint imguse-file"></div>
+        <button type="button" class="imguse-btn" data-how="engrave"><b>${t("img.engrave")}</b><span>${t("img.engraveD")}</span></button>
+        <button type="button" class="imguse-btn" data-how="trace"><b>${t("img.trace")}</b><span>${t("img.traceD")}</span></button>
+        <div class="dlg-buttons"><button type="button" class="btn-secondary" data-how="">${t("dlg.cancel")}</button></div>
+      </div>`;
+    (ov.querySelector(".imguse-file") as HTMLElement).textContent = name;
+    document.body.appendChild(ov);
+    const done = (v: "engrave" | "trace" | null) => { ov.remove(); resolve(v); };
+    ov.querySelectorAll<HTMLElement>("[data-how]").forEach(b => b.addEventListener("click", () => done((b.dataset.how || null) as any)));
+    ov.addEventListener("mousedown", e => { if (e.target === ov) done(null); });
+    ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") done(null); });
+    (ov.querySelector(".imguse-btn") as HTMLElement).focus();
+  });
+}
+
+/** Bild als Gravur-Form einfügen (unten links mit 10 mm Rand, höchstens halb so breit wie das Bett) und Einstellungen öffnen */
+async function insertEngraveImage(name: string, bytes: Uint8Array) {
+  const { state, log } = ctx;
+  const bed = bedSizeMm();
+  const shape = await createImageShape(name, bytes, Math.min(100, Math.max(20, bed.w / 2 - 10)), 10, 10);
+  // Bilder in die Gravier-Ebene (Füllen) – nicht in die Schneid-Ebene mit voller Leistung
+  const engraveLayer = getLayers().find(l => l.mode === "fill");
+  if (engraveLayer) shape.laserLayerId = engraveLayer.id;
+  state.shapes = [...state.shapes, shape];
+  state.selectedShapeIds = [shape.id];
+  updateDimensionInputs(null);
+  ctx.redraw();
+  const w = (shape.w / MM_TO_PIXEL).toFixed(1), h = (shape.h / MM_TO_PIXEL).toFixed(1);
+  log(t("img.inserted", { name, w, h }));
+  if (!isLaser()) log(t("img.notLaser"));
+  openEngraveDialog(shape, log, () => { updateDimensionInputs(null); ctx.redraw(); });
 }
 
 // =====================================================================

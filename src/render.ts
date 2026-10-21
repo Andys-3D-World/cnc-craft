@@ -17,6 +17,7 @@ import { drawPlasmaLeads } from "./plasmaCam";
 import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
 import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
 import { drawCameraUnderlay } from "./camera/cameraOverlay";
+import { drawImageShape } from "./raster/imageShape";
 
 export const liveMachinePos = { x: 0, y: 0, z: 0 };
 
@@ -118,6 +119,9 @@ export function drawEverything(
   drawStock(ctx, sx, sy, scale);
   const checkUsed = hasUsedArea();
 
+  // 5c. Bilder (Bildgravur) unter allen Konturen
+  for (const s of shapes) if (s.type === "image") drawImageShape(ctx, s, sx, sy);
+
   // 6a. Fräserbreite unter den Formen (Werkzeug-Ansicht) bzw. Laser-Füllflächen bzw. Plasma-Schnittspalt
   if (laser) drawLaserFills(ctx, shapes, sx, sy, scale);
   else if (plasma) {
@@ -170,11 +174,11 @@ export function drawEverything(
 
 /** Umriss einer Form als Pfad anlegen (ohne beginPath/stroke) */
 export function tracePath(ctx: CanvasRenderingContext2D, shape: any, sx: (x: number) => number, sy: (y: number) => number, scale: number) {
-  if (shape.type === "polyline" && shape.points?.length > 1) {
+  if ((shape.type === "polyline" || shape.type === "image") && shape.points?.length > 1) {
     const pts = shape.points;
     ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
     for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
-    if (shape.closed) ctx.closePath();
+    if (shape.closed || shape.type === "image") ctx.closePath();
   } else if (shape.type === "line") {
     ctx.moveTo(sx(shape.x), sy(shape.y));
     ctx.lineTo(sx(shape.x + shape.w), sy(shape.y + shape.h));

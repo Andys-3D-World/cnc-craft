@@ -1,5 +1,31 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Image engraving (laser):** when you import a photo or picture (PNG, JPG, BMP, GIF, WEBP) you now choose
+  “Engrave” or “Trace” (as before). Engrave inserts the picture as an image on the canvas – move, scale, rotate and
+  mirror it like any other shape; it shows exactly what will be burned. The engraving window (double-click the image)
+  has a before/after preview with a draggable divider (whole image or 100/200/400 %), six **engraving types** –
+  photo (Jarvis), graphic (Atkinson), black & white, line engraving, dot screen and newspaper (45° halftone) –
+  **auto enhance** (stretches the tones, balances the midtones, sharpens a little) with a **rating** before → after
+  (contrast, detail, brightness, pure black/white), sliders for brightness, contrast, gamma, sharpness, denoise,
+  black/white point and invert (acrylic, slate), and an expert section with all **dithering methods**
+  (Jarvis, Floyd-Steinberg, Stucki, Atkinson, Sierra, Bayer, halftone, line screen, threshold, grayscale with power
+  modulation). Line interval (with DPI), minimum power for grayscale and overscan are adjustable; estimated time
+  shown. G-code: line by line, alternating direction, empty margins skipped, laser on only where it burns, works for
+  rotated images too. New images go to the engraving layer (power/speed from the layer). In mill and plasma mode
+  images are skipped with a note
+
+**Fixed**
+- **Trace image did not open in some web views:** the picture is now loaded with `onload` instead of `decode()`,
+  which could hang when the image was not part of the page
+- **Message when no G-code was made:** shows the actual reason (e.g. “images are only engraved with the laser”)
+  instead of “no objects”
+- **Wiring diagram – terminal labels on top of the part name:** the outer terminals of the CO2 laser power supply
+  (AC L, AC N, Anode, Cathode) were labelled inside the box, right over its name. Outer terminals are now labelled
+  outside the box
+
 ## 0.2.9 Beta
 
 **New**

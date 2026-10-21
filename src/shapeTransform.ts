@@ -182,6 +182,7 @@ export function updatePolylineBounds(shape: any) {
 export function shapeBounds(s: any): Bounds | null {
   switch (s.type) {
     case "polyline":
+    case "image":
       return { minX: s.x, minY: s.y, maxX: s.x + s.w, maxY: s.y + s.h };
     case "circle": {
       const r = Math.abs(s.w);
@@ -232,7 +233,7 @@ export function groupBounds(shapes: any[]): Bounds | null {
 // =====================================================================
 
 export function translateShape(s: any, dx: number, dy: number) {
-  if (s.type === "polyline") {
+  if (s.type === "polyline" || s.type === "image") {
     for (const p of s.points) { p.x += dx; p.y += dy; }
     updatePolylineBounds(s);
     return;
@@ -267,7 +268,7 @@ export function scaleShape(s: any, ox: number, oy: number, sx: number, sy: numbe
   }
   if (s.type === "rect") convertToPolyline(s);
 
-  if (s.type === "polyline") {
+  if (s.type === "polyline" || s.type === "image") {
     for (const p of s.points) { p.x = fx(p.x); p.y = fy(p.y); }
     updatePolylineBounds(s);
   } else if (s.type === "circle") {
@@ -296,7 +297,7 @@ export function rotateShape(s: any, cx: number, cy: number, angle: number) {
 
   if (s.type === "rect") convertToPolyline(s);
 
-  if (s.type === "polyline") {
+  if (s.type === "polyline" || s.type === "image") {
     s.points = s.points.map((p: Pt) => rot(p.x, p.y));
     updatePolylineBounds(s);
   } else if (s.type === "circle") {
@@ -329,6 +330,13 @@ export function segDist(px: number, py: number, a: Pt, b: Pt): number {
 
 export function distanceToShape(px: number, py: number, s: any): number {
   if (s.type === "circle") return Math.abs(Math.hypot(px - s.x, py - s.y) - Math.abs(s.w));
+  // Bild: irgendwo draufklicken genügt
+  if (s.type === "image") {
+    if (pointInPath(px, py, s.points)) return 0;
+    let d = Infinity;
+    for (let i = 0; i < 4; i++) d = Math.min(d, segDist(px, py, s.points[i], s.points[(i + 1) % 4]));
+    return d;
+  }
   let best = Infinity;
   for (const path of shapeToPaths(s)) {
     const pts = path.pts, n = pts.length;
