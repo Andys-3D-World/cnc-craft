@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Shape tools (new group in the toolbar):** *Union* merges the selected shapes into one area, *Subtract* removes
+  all other selected shapes from the largest one (holes, cut-outs), *Intersect* keeps only the overlap. A group
+  counts as one part, so holes of imported parts stay holes; the result gets outside/inside and keeps tool, laser
+  layer, plasma cut and depth. *Split* cuts closed shapes with an open line, polyline or arc (selected together; the
+  cutting line is removed). *Round corners* gives every real corner of rectangles and closed polylines an arc or a
+  chamfer with the chosen radius (smaller on short edges, curves stay as they are). Uses the library
+  polygon-clipping (MIT)
 - **Image engraving (laser):** when you import a photo or picture (PNG, JPG, BMP, GIF, WEBP) you now choose
   “Engrave” or “Trace” (as before). Engrave inserts the picture as an image on the canvas – move, scale, rotate and
   mirror it like any other shape; it shows exactly what will be burned. The engraving window (double-click the image)

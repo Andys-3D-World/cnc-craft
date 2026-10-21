@@ -73,6 +73,13 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("offset", "offset", "tip.cmd.offset")}
     </div>
     <div class="tb-group">
+      ${cmd("boolUnion", "boolUnion", "tip.cmd.boolUnion")}
+      ${cmd("boolSubtract", "boolSubtract", "tip.cmd.boolSubtract")}
+      ${cmd("boolIntersect", "boolIntersect", "tip.cmd.boolIntersect")}
+      ${cmd("splitByLine", "splitByLine", "tip.cmd.splitByLine")}
+      ${cmd("fillet", "fillet", "tip.cmd.fillet")}
+    </div>
+    <div class="tb-group">
       ${cmd("rotateLeft", "rotateLeft", "tip.cmd.rotateLeft")}
       ${cmd("rotateRight", "rotateRight", "tip.cmd.rotateRight")}
       ${cmd("mirrorH", "mirrorH", "tip.cmd.mirrorH")}

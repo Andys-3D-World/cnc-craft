@@ -17,6 +17,7 @@
  */
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
+import { combine, splitByLines, roundCorners, BoolOp, OpResult } from "./shapeOps";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor } from "./tools";
 import {
@@ -129,6 +130,11 @@ export const commands: Record<string, () => void> = {
   alignBottom: () => align("bottom"),
 
   offset: () => openOffsetDialog(),
+  boolUnion: () => runCombine("union"),
+  boolSubtract: () => runCombine("subtract"),
+  boolIntersect: () => runCombine("intersect"),
+  splitByLine: () => applyOp(splitByLines(selectedShapes()), "ops.splitDone"),
+  fillet: () => openFilletDialog(),
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   duplicateDialog: () => openDuplicateDialog(),
@@ -463,6 +469,75 @@ function openNestDialog() {
 }
 
 // =====================================================================
+// FORMEN KOMBINIEREN / ZERSCHNEIDEN / ECKEN ABRUNDEN (Rechnung in shapeOps.ts)
+// =====================================================================
+
+function runCombine(op: BoolOp) {
+  const sel = selectedShapes();
+  if (sel.length < 2) { log(t("ops.needTwo")); return; }
+  applyOp(combine(op, sel), "ops." + op + "Done");
+}
+
+/** Ergebnis übernehmen: alte Formen raus, neue rein und auswählen */
+function applyOp(r: OpResult, doneKey: string) {
+  if (r.error) { log(t(r.error)); return; }
+  const st = app();
+  const gone = new Set(r.remove);
+  st.shapes = [...st.shapes.filter((s: any) => !gone.has(s)), ...r.add];
+  st.selectedShapeIds = r.add.map((s: any) => s.id);
+  log(t(doneKey, { n: r.remove.length, m: r.add.length }));
+  done();
+  checkpoint();
+}
+
+const FILLET_KEY = "cnc_craft_fillet";
+
+function openFilletDialog() {
+  const sel = selectedShapes().filter((s: any) => s.type === "rect" || (s.type === "polyline" && s.closed));
+  if (!sel.length) { log(t("ops.filletSelect")); return; }
+  let o = { r: 3, chamfer: false };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(FILLET_KEY) || "{}") }; } catch { /* egal */ }
+  document.getElementById("fillet-dialog-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "fillet-dialog-overlay";
+  ov.className = "dlg-overlay";
+  ov.innerHTML = `
+    <div class="dlg-box" role="dialog" style="width:340px;">
+      <h3>◜ ${t("ops.filletTitle")}</h3>
+      <div class="dlg-hint">${t("ops.filletDesc", { n: sel.length })}</div>
+      <label class="prop-row">${t("ops.filletKind")}
+        <select id="fil-kind" class="prop-input" style="width:auto;">
+          <option value="round">${t("ops.filletRound")}</option><option value="chamfer">${t("ops.filletChamfer")}</option>
+        </select></label>
+      <label class="prop-row">${t("ops.filletRadius")}
+        <input id="fil-r" type="number" min="0.1" step="0.5" class="prop-input" style="width:90px;"></label>
+      <div class="dlg-buttons">
+        <button id="fil-cancel" class="btn-secondary">${t("dlg.cancel")}</button>
+        <button id="fil-ok" class="btn-primary">✔ ${t("ops.filletApply")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const rIn = ov.querySelector("#fil-r") as HTMLInputElement, kind = ov.querySelector("#fil-kind") as HTMLSelectElement;
+  rIn.value = String(o.r); kind.value = o.chamfer ? "chamfer" : "round";
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") (ov.querySelector("#fil-ok") as HTMLElement).click(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  (ov.querySelector("#fil-cancel") as HTMLElement).onclick = close;
+  (ov.querySelector("#fil-ok") as HTMLElement).onclick = () => {
+    const r = parseFloat(rIn.value), chamfer = kind.value === "chamfer";
+    close();
+    if (!(r > 0)) return;
+    try { localStorage.setItem(FILLET_KEY, JSON.stringify({ r, chamfer })); } catch { /* egal */ }
+    let corners = 0;
+    for (const s of sel) corners += roundCorners(s, r * MM_TO_PIXEL, chamfer);
+    log(corners ? t("ops.filletDone", { n: corners, r }) : t("ops.filletNone"));
+    done();
+    checkpoint();
+  };
+  setTimeout(() => rIn.select(), 0);
+}
+
+// =====================================================================
 // DUPLIZIEREN-DIALOG: Anzahl Kopien oder Bett voll, auf Wunsch gleich verschachtelt
 // =====================================================================
 
@@ -606,7 +681,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
-    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
+    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #fillet-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");
     if (camTab && !camTab.classList.contains("active")) return;

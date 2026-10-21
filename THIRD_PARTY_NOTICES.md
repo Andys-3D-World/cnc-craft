@@ -27,6 +27,7 @@ Quellcode der mitgelieferten Teile (unverändert übernommen):
 | serialport | MPL-2.0 |
 | rusb | MIT |
 | libusb (über rusb „vendored“ mitgebaut) | LGPL-2.1 |
+| polygon-clipping 0.15.7 (Formen kombinieren / zerschneiden), mit splaytree und robust-predicates | MIT / MIT / Unlicense |
 | Vite, TypeScript (nur zum Bauen) | MIT / Apache-2.0 |
 
 Alle weiteren, indirekt verwendeten Rust- und npm-Pakete stehen unter freien Lizenzen (überwiegend MIT/Apache-2.0)
