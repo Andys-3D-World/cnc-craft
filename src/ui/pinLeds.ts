@@ -15,9 +15,16 @@
  * Marlin meldet Endschalter nur auf Anfrage: Knopf "M119", die Antwortzeilen
  * ("x_min: TRIGGERED", "z_probe: open" …) werden ausgewertet.
  * Wechsel (frei ↔ ausgelöst) wird in der Konsole gemeldet – praktisch zum Testen der Schalter.
+ *
+ * Endschalter testen (GRBL): Mit harten Endschaltern ($21=1) löst JEDER Druck auf einen Endschalter sofort
+ * Alarm 1 aus – auch im Stillstand (Schutzfunktion von GRBL). Der Testmodus schaltet $21 kurz aus, die
+ * Lämpchen zeigen jeden Schalter, „Test beenden“ schaltet $21 wieder ein. Bricht die Verbindung im Test ab,
+ * wird $21=1 beim nächsten Verbinden mit demselben Anschluss automatisch zurückgesetzt (KEY_TEST).
  */
 import { t, T, tip } from "../i18n/i18n";
-import { machine, MACHINE_EVENT, send } from "../machine";
+import { machine, MACHINE_EVENT, send, sendAndWait, errorText } from "../machine";
+
+const KEY_TEST = "cnc_craft_limit_test"; // Anschluss, an dem $21 für den Test ausgeschaltet ist
 
 const AXES = ["X", "Y", "Z", "A", "B", "C", "U", "V", "W"];
 const CTRL = ["D", "H", "S", "R", "E"];
@@ -30,6 +37,8 @@ export function pinLedsHtml(): string {
       <div class="pin-row pin-row-ctrl" id="pin-row-ctrl"></div>
       <div class="pin-warn" id="pin-warn" style="display:none;"></div>
       <button id="pin-m119" class="btn-secondary btn-compact only-marlin" ${tip("pin.m119Tip")}>🔍 ${T("pin.m119")}</button>
+      <div class="pin-test-warn" id="pin-test-warn" style="display:none;"></div>
+      <button id="pin-test" class="btn-secondary btn-compact not-marlin" ${tip("pin.testTip")}>🧪 ${T("pin.test")}</button>
     </div>`;
 }
 
@@ -100,6 +109,58 @@ export function initPinLeds(log: (s: string) => void) {
     last = st ? new Set(st) : null;
   };
 
+  // ---------------- Endschalter testen (GRBL, $21 kurz aus) ----------------
+  let testing = false;
+  const testUi = () => {
+    const b = $("pin-test"), w = $("pin-test-warn");
+    if (b) b.textContent = testing ? `✔ ${t("pin.testEnd")}` : `🧪 ${t("pin.test")}`;
+    if (b) b.classList.toggle("pin-test-on", testing);
+    if (w) { w.style.display = testing ? "" : "none"; w.textContent = testing ? t("pin.testActive") : ""; }
+  };
+  const setHard = async (on: boolean): Promise<boolean> => {
+    const a = await sendAndWait(`$21=${on ? 1 : 0}`, 5000);
+    if (!a.ok) { log(t("pin.testFail", { e: a.code && a.code > 0 ? errorText(a.code) : String(a.code ?? "") })); return false; }
+    return true;
+  };
+  const endTest = async () => {
+    if (!machine.connected) return;
+    if (await setHard(true)) {
+      testing = false;
+      try { localStorage.removeItem(KEY_TEST); } catch { /* egal */ }
+      log(t("pin.testOff"));
+      testUi();
+    }
+  };
+  $("pin-test")?.addEventListener("click", async () => {
+    if (!machine.connected) { log(t("conn.connectFirst")); return; }
+    if (!isGrbl()) return;
+    if (testing) { await endTest(); return; }
+    if (machine.job.active) { log(t("sp.jobRunning")); return; }
+    if (!machine.settings.has("$21")) await sendAndWait("$$", 5000, true);
+    const v = machine.settings.get("$21");
+    if (v === undefined) { log(t("pin.testNoSetting")); return; }
+    if (Number(v) === 0) { log(t("pin.testAlreadyOff")); return; }
+    if (!window.confirm(t("pin.testConfirm"))) return;
+    if (!await setHard(false)) return;
+    testing = true;
+    try { localStorage.setItem(KEY_TEST, machine.port || "?"); } catch { /* egal */ }
+    // Alarm 1 vom letzten Druck noch aktiv? Jetzt (ohne harte Endschalter) entsperren
+    if (machine.status.state === "Alarm") await sendAndWait("$X", 5000);
+    log(t("pin.testOn"));
+    testUi();
+  });
+  /** Nach einem Abbruch im Test: $21 beim nächsten Verbinden wieder einschalten */
+  const restoreAfterReconnect = async () => {
+    let port: string | null = null;
+    try { port = localStorage.getItem(KEY_TEST); } catch { /* egal */ }
+    if (!port || !machine.connected || !isGrbl() || testing) return;
+    if (port !== "?" && machine.port && port !== machine.port) return;
+    if (await setHard(true)) {
+      try { localStorage.removeItem(KEY_TEST); } catch { /* egal */ }
+      log(t("pin.testRestored"));
+    }
+  };
+
   // ---------------- Marlin: M119 ----------------
   $("pin-m119")?.addEventListener("click", async () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
@@ -134,6 +195,9 @@ export function initPinLeds(log: (s: string) => void) {
     else if (type === "text" && machine.protocol === "marlin") onMarlinLine(String(data?.text || ""));
     else if (type === "connected" || type === "disconnected" || type === "welcome") {
       if (type !== "welcome") { seen.clear(); marlinPins = null; last = null; }
+      // Verbindung weg im Test: $21 bleibt am Board aus → beim nächsten Verbinden zurücksetzen
+      if (type === "disconnected" && testing) { testing = false; testUi(); }
+      if (type === "welcome") setTimeout(() => { restoreAfterReconnect().catch(() => {}); }, 1500);
       render();
     }
   });

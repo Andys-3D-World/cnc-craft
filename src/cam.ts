@@ -6,6 +6,7 @@ import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
 import { pocketPaths, PocketStrategy } from "./pocket";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
 import { makeEllipsePoints } from "./shapeTransform";
+import { spindleCode } from "./spindleDir";
 import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
@@ -285,7 +286,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     gcode += `M0 ${c("gc.toolChange", { i: gi + 1, name: toolName, d: toolDiameter.toFixed(1) })}\n`;
   }
   gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
-  gcode += `M3 S${rpm} ${c("gc.spindleOn", { rpm })}\n`;
+  // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
+  gcode += `${spindleCode("M3")} S${rpm} ${c("gc.spindleOn", { rpm })}\n`;
   if (gi > 0) gcode += `G4 P2 ${c("gc.spinUp")}\n`;
   gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
 

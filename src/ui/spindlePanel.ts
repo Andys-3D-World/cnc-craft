@@ -19,6 +19,7 @@ import { t, T, tip } from "../i18n/i18n";
 import { machine, MACHINE_EVENT, RT, OV_MIN, OV_MAX, send, realtime, setOverride, canCommand } from "../machine";
 import { currentMachine } from "./machineWizard";
 import { plasmaSettings } from "../plasmaCuts";
+import { spindleCode, spindleInverted, setSpindleInverted } from "../spindleDir";
 
 const KEY_RPM = "cnc_craft_spindle_rpm";
 const KEY_DIR = "cnc_craft_spindle_dir";
@@ -44,6 +45,7 @@ export function spindlePanelHtml(): string {
             <label ${tip("sp.cwTip")}><input type="radio" name="sp-dir" value="M3" checked> ↻ ${T("sp.cw")}</label>
             <label ${tip("sp.ccwTip")}><input type="radio" name="sp-dir" value="M4"> ↺ ${T("sp.ccw")}</label>
           </div>
+          <label class="prop-row sp-invert" style="cursor:pointer;" ${tip("sp.invertTip")}><span>${T("sp.invert")}</span><input type="checkbox" id="sp-invert" style="width:auto;"></label>
           <div class="sp-btns">
             <button id="sp-on" class="btn-primary" ${tip("sp.onTip")}>▶ ${T("sp.on")}</button>
             <button id="sp-off" class="btn-secondary sp-stop" ${tip("sp.offTip")}>■ ${T("sp.offBtn")}</button>
@@ -143,6 +145,15 @@ export function initSpindlePanel(log: (s: string) => void) {
     r.addEventListener("change", () => { if (r.checked) put(KEY_DIR, r.value); });
   });
   const dir = () => document.querySelector<HTMLInputElement>("input[name=sp-dir]:checked")?.value === "M4" ? "M4" : "M3";
+  const inv = $<HTMLInputElement>("sp-invert");
+  if (inv) {
+    inv.checked = spindleInverted();
+    inv.addEventListener("change", () => {
+      setSpindleInverted(inv.checked);
+      log(t(inv.checked ? "sp.invertOn" : "sp.invertOff"));
+      updateState();
+    });
+  }
   if (lfPower) {
     lfPower.value = get(KEY_LF_POWER) || "1";
     lfPower.addEventListener("change", () => {
@@ -189,7 +200,8 @@ export function initSpindlePanel(log: (s: string) => void) {
     if (rpm <= 0) { log(t("sp.noRpm")); rpmIn?.focus(); return; }
     if (rpm > max) { log(t("sp.clamped", { rpm, max })); rpm = max; if (rpmIn) rpmIn.value = String(max); }
     spOn = dir();
-    await queue([`${spOn} S${rpm}`]);
+    // Spindel falsch herum verkabelt? Dann M3/M4 vertauscht schicken (Einstellung „Drehrichtung umkehren“)
+    await queue([`${spindleCode(spOn)} S${rpm}`]);
     updateState();
   });
   $("sp-off")?.addEventListener("click", async () => {
@@ -351,7 +363,8 @@ export function initSpindlePanel(log: (s: string) => void) {
     if (rpmIn) rpmIn.max = String(max);
     const run = conn && spindleRunning();
     const a = machine.status.acc || "";
-    const ccw = machine.protocol === "grbl" && machine.status.acc !== null ? a.includes("C") : spOn === "M4";
+    // Board meldet den Ausgang (C = M4) – bei umgekehrter Drehrichtung ist das der Rechtslauf
+    const ccw = machine.protocol === "grbl" && machine.status.acc !== null ? a.includes("C") !== spindleInverted() : spOn === "M4";
     const sNow = Math.round(machine.status.spindle || 0);
     setChip($("sp-state"),
       !conn ? t("sp.off") : run ? t(ccw ? "sp.runCcw" : "sp.runCw", { s: sNow || (rpmIn?.value ?? "") }) : t("sp.off"), run);

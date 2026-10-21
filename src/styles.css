@@ -707,6 +707,13 @@ input:not([type]) {
 .dlg-num em { font-style: normal; font-size: 0.72rem; color: var(--text-muted); width: 46px; }
 .dlg-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
 /* Material erkennen (Beta) – camera/materialDialog.ts */
+.box-grid { display: grid; grid-template-columns: 210px 1fr; gap: 12px; align-items: start; }
+.box-fields { display: flex; flex-direction: column; gap: 4px; }
+.box-prev { background: #0d0d12; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-height: 220px; display: flex; flex-direction: column; gap: 6px; }
+.box-prev svg { width: 100%; height: 230px; }
+.box-panel { fill: rgba(240, 140, 0, 0.12); stroke: #f08c00; stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+.box-lbl { fill: #c9ced6; text-anchor: middle; dominant-baseline: middle; font-family: var(--font-ui); }
+@media (max-width: 620px) { .box-grid { grid-template-columns: 1fr; } }
 .mat-beta { font-size: 0.78rem; line-height: 1.4; padding: 8px 10px; border-radius: 8px; background: rgba(255, 176, 32, 0.12); border: 1px solid rgba(255, 176, 32, 0.55); color: #ffcf70; }
 .mat-steps { margin: 0; padding-left: 20px; font-size: 0.8rem; line-height: 1.5; display: flex; flex-direction: column; gap: 4px; }
 .mat-steps .btn-compact { margin-left: 4px; }
@@ -1036,6 +1043,11 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
 .pin-led.pin-warnstate i { background: #ffb020; }
 .pin-row-ctrl .pin-led { font-family: var(--font-ui); font-weight: 600; font-size: 0.68rem; }
 .pin-warn { font-size: 0.7rem; color: #ffb020; line-height: 1.35; }
+.pin-test-warn { font-size: 0.72rem; line-height: 1.35; padding: 6px 8px; border-radius: 6px; color: #ffcf70; background: rgba(255, 176, 32, 0.12); border: 1px solid rgba(255, 176, 32, 0.55); }
+#pin-test.pin-test-on { border-color: #ffb020; color: #ffcf70; }
+.pr-sub { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+.pr-more { font-size: 0.78rem; }
+.pr-more summary { cursor: pointer; color: var(--text-muted); margin: 2px 0 4px; }
 
 /* =====================================================================
    ANSCHLUSSPLAN
@@ -1112,6 +1124,8 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
 .wr-metal-t { fill: #3d4248; font-size: 10px; font-weight: 700; }
 .wr-pin-screw { fill: #b9bec5; stroke: #555; }
 .wr-connlbl-rot { font-size: 9.5px; letter-spacing: 0.02em; }
+/* helles Gehäuse (Ruida): dunkle Beschriftung auf der Platine */
+.wr-svg.wr-light .wr-pinlbl, .wr-svg.wr-light .wr-connlbl, .wr-svg.wr-light .wr-silk { fill: #1d2228; }
 .wr-jumper { fill: #1f5fd6; stroke: #fff; stroke-width: 1.4; filter: drop-shadow(0 0 3px rgba(80, 160, 255, 0.9)); }
 .wr-dip { fill: #f4f4f4; }
 .wr-dip.on { filter: drop-shadow(0 0 3px rgba(80, 160, 255, 0.95)); }

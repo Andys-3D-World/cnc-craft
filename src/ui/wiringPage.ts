@@ -28,10 +28,10 @@ const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
   psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1",
-  spindle: "#9b5de5", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3"
+  spindle: "#9b5de5", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", io: "#2dd4bf"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", io: "🔘"
 };
 
 function esc(s: string): string {
@@ -87,6 +87,10 @@ interface Box { x0: number; y0: number; x1: number; y1: number }
 function outerPins(p: Part): string[] {
   if (p.kind === "relay") return ["COM", "NO"];
   if (p.kind === "extdrv") return ["A+", "A−", "B+", "B−", "VCC", "GND"];
+  // 0–10-V-Wandler: eigene Versorgung 12–24 V, Ausgang an den Analog-Eingang des Umrichters (AVI/ACM)
+  if (p.kind === "vfd") return ["+24V", "0V", "AVI", "ACM"];
+  // CO2-Laser-Netzteil: Netz (230 V) und Hochspannung zur Röhre (Anode +, Kathode −)
+  if (p.kind === "lpsu") return ["AC L", "AC N", "Anode", "Kathode"];
   return [];
 }
 
@@ -172,7 +176,7 @@ function partGlyph(pl: Placed): string {
     case "estop": return `<circle cx="${n(cx)}" cy="${n(cy)}" r="14" fill="#f5c518"/><circle cx="${n(cx)}" cy="${n(cy)}" r="10" fill="#e5484d" stroke="#8b1d20"/>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
-      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤"
+      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡"
     }[p.kind as string] || "■"}</text>`;
   }
 }
@@ -331,7 +335,13 @@ function boardSvg(b: Board, active: Set<string>, connComp: Map<string, CompId> |
       if (screw) s += `<line x1="${pp.x - 3.5}" y1="${pp.y}" x2="${pp.x + 3.5}" y2="${pp.y}" stroke="#555" stroke-width="1.4" pointer-events="none"/>`;
       if (c.pinLbl === false) return;
       // Pin-Beschriftung
-      if (c.dir === "h") s += `<text x="${pp.x}" y="${c.labelPos === "above" ? pp.y + 18 + pad.py : pp.y - 10 - pad.py}" text-anchor="middle" class="wr-pinlbl">${esc(p.label)}</text>`;
+      if (c.dir === "h" && c.pinRot) {
+        // senkrecht, vom Stecker weg in die Platine hinein (Name steht dann außen)
+        const below = c.labelPos === "above";
+        const ty = below ? pp.y + 10 + pad.py : pp.y - 10 - pad.py;
+        s += `<text x="${pp.x + 3}" y="${n(ty)}" text-anchor="${below ? "end" : "start"}" transform="rotate(-90 ${pp.x + 3} ${n(ty)})" class="wr-pinlbl">${esc(p.label)}</text>`;
+      }
+      else if (c.dir === "h") s += `<text x="${pp.x}" y="${c.labelPos === "above" ? pp.y + 18 + pad.py : pp.y - 10 - pad.py}" text-anchor="middle" class="wr-pinlbl">${esc(p.label)}</text>`;
       else {
         const right = c.pinSide ? c.pinSide === "right" : c.labelPos !== "left" && c.x < b.w / 2;
         const off = 11 + pad.px;
@@ -349,7 +359,7 @@ function boardSvg(b: Board, active: Set<string>, connComp: Map<string, CompId> |
     } else if (c.dir === "h" && (lp === "left" || lp === "right")) {
       s += `<text x="${n(lp === "left" ? x0 - 6 : x0 + w + 6)}" y="${n(y0 + h / 2 + 4)}" text-anchor="${lp === "left" ? "end" : "start"}" class="wr-connlbl">${esc(c.label)}</text>`;
     } else if (c.dir === "h") {
-      const ty = lp === "below" ? y0 + h + (c.pinLbl === false ? 14 : 22) : y0 - 6;
+      const ty = lp === "below" ? y0 + h + (c.pinLbl === false || c.pinRot ? 14 : 22) : y0 - 6;
       s += `<text x="${x0 + w / 2}" y="${ty}" text-anchor="middle" class="wr-connlbl">${esc(c.label)}</text>`;
     } else {
       const right = c.x < b.w / 2;
@@ -516,7 +526,7 @@ export function initWiringPage() {
         <em>${esc(b.mcu)} · ${esc(b.volt)} · ${esc(t(b.fw))}</em>
       </label>`;
     const chips = [`<button class="wr-chip${comp === "overview" ? " active" : ""}" data-comp="overview">🗺️ ${esc(t("wr.overview"))}</button>`]
-      .concat(COMPS.map(c => {
+      .concat(COMPS.filter(c => c !== "io" || b.hookups[c]).map(c => {
         const h = b.hookups[c];
         const na = !h || !!h.unavailable;
         return `<button class="wr-chip${comp === c ? " active" : ""}${na ? " na" : ""}" data-comp="${c}" style="--cc:${COMP_COLOR[c]}">${COMP_ICON[c]} ${esc(t("wr.comp." + c))}</button>`;
@@ -527,7 +537,7 @@ export function initWiringPage() {
     let svgInner = boardSvg(b, active, connComp);
     if (hk && !hk.unavailable) svgInner += drawHookup(b, hk, box);
     const vb = `${n(box.x0)} ${n(box.y0)} ${n(box.x1 - box.x0)} ${n(box.y1 - box.y0)}`;
-    const svg = `<svg class="wr-svg" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${svgInner}</svg>`;
+    const svg = `<svg class="wr-svg${b.pcb?.light ? " wr-light" : ""}" viewBox="${vb}" xmlns="http://www.w3.org/2000/svg">${svgInner}</svg>`;
 
     // rechte Spalte
     const tx = (s: { k: string; p?: Record<string, string> }) => esc(t(s.k, s.p));
@@ -559,7 +569,7 @@ export function initWiringPage() {
         side += `<details class="wr-details"><summary>${esc(t("wr.steps"))}</summary><ol class="wr-steps">${hk.steps.map(s => `<li>${tx(s)}</li>`).join("")}</ol></details>`;
       }
       if (hk.settings.length) side += `<h4>${esc(t("wr.settings"))}</h4><div class="wr-settings">${hk.settings.map(s => `<code>${esc(s)}</code>`).join("")}</div>`;
-      side += `<div class="wr-test">✅ ${esc(t("wr.test"))}</div>`;
+      side += `<div class="wr-test">✅ ${esc(t(b.maker === "Ruida" ? "wr.test.ruida" : "wr.test"))}</div>`;
     }
 
     root.innerHTML = `

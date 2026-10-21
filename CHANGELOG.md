@@ -41,6 +41,30 @@
   material lies, not which material – that stays the user’s choice (safety, e.g. PVC). Tested with synthetic camera
   images, not yet with a real camera
 
+- **Box generator (like boxes.py):** new box icon in the left toolbar. Width, depth, height (outside or inside),
+  material thickness, finger width, with/without lid and kerf; live preview of the panels. Creates 5 or 6 finger-jointed
+  panels on the bed (selected, ready to nest). The joints are checked: the panels fill the box walls exactly – no
+  overlaps, no gaps (corners belong to front/back). Box types: box with lid, open box, divider tray (dividers across/
+  lengthwise with tabs in wall slots, half-lapped where they cross), carrying box (handle holes), drawer (larger front
+  plate with finger hole) and box with lift-off lid (two-layer lid). Slots and holes are grouped with their panel
+- **Wiring diagram for Ruida RDC6445G/S (CO2 laser controller):** board drawn after the Ruida manual (CN0 power,
+  CN1 outputs, CN2 inputs, CN3/CN4 limits, AXIS_X…U, CN5/CN6 laser) with plans for power, external drivers (common
+  anode), limit switches/NPN sensors, CO2 laser PSU + water flow switch, air relay, door and E-stop, plus a new
+  “Inputs/outputs” plan (foot switch, manual laser button, status lamp) as in the manual’s overall wiring diagram;
+  the laser PSU shows its mains (AC L/N) and tube (anode/cathode) terminals. Pin names are
+  printed vertically like on the board; light housings get dark labels
+- **Probing / tool length (mill, GRBL/grblHAL):** new section in the “Machine” tab. *Touch plate*: enter the plate
+  thickness, Z probes down until contact and sets Z = plate thickness. *Tool length sensor*: sensor position (machine
+  coordinates, “use current position”), height of the trigger point above the bed and material thickness – the tool is
+  measured at the sensor and Z is set so that Z = 0 is on the workpiece top (Z at trigger = trigger height − material
+  thickness). Two-step probing (fast search, back off 2 mm, slow measure), adjustable search travel, feeds and lift;
+  aborts if the probe is already triggered or no contact is made
+- **Test limit switches (GRBL):** with hard limits ($21=1) every press of a limit switch causes alarm 1 – even when
+  standing still. “🧪 Test limit switches” at the input lights switches $21 off for the test and back on afterwards; if
+  the connection drops during the test, $21=1 is restored on the next connect. The alarm 1 message now points to it
+- **Reverse spindle direction:** if the spindle turns the wrong way (wiring), a tick in the spindle control swaps
+  M3/M4 for the manual control and the generated mill G-code; the status shows the real direction
+
 **Improved**
 - **Nesting uses only free material:** used area of the material sheet (from jobs or the camera) and everything
   outside the sheet is avoided, with the same clearance as “lies on used area” (tool width + safety distance)
@@ -56,6 +80,9 @@
   The site is generated with `tools/website/build.py`
 
 **Fixed**
+- **Wiring diagram CNC Shield V3 – spindle:** the 0–10 V converter and the relay were both drawn on the same pin
+  (Z−). The converter is now on Z+ (also D11 on the shield), shows its own supply (+24V/0V) and its output to the
+  VFD (AVI/ACM); the note says that usually only one of the two is needed (router via relay OR VFD via converter)
 - **Inside offset failed on curved shapes:** for shapes made of many short segments (arcs, circles from polylines)
   the inside offset sometimes returned nothing at certain tool radii (e.g. exactly 1.5 mm = 3 mm bit), so “Inside”
   or a pocket was skipped with “tool does not fit”. Also removed occasional duplicate contours

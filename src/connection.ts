@@ -439,7 +439,9 @@ export function initConnection(appendToConsole: (text: string) => void) {
       if (al) {
         const show = s.state === "Alarm";
         al.style.display = show ? "" : "none";
-        if (show) al.innerHTML = `⚠ ${machine.lastAlarm ? alarmText(machine.lastAlarm) : t("m.alarmGeneric")}<br><b>${t("m.alarmHelp")}</b>`;
+        // Alarm 1 kommt bei harten Endschaltern auch, wenn man im Stillstand einen Schalter drückt → Hinweis auf den Test
+        if (show) al.innerHTML = `⚠ ${machine.lastAlarm ? alarmText(machine.lastAlarm) : t("m.alarmGeneric")}<br><b>${t("m.alarmHelp")}</b>`
+          + (machine.lastAlarm === 1 ? `<br>${t("pin.alarm1Hint")}` : "");
       }
       updateButtons();
       redraw();

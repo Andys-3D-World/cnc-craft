@@ -14,6 +14,7 @@ import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
 import { stockSectionHtml } from "./stockPanel";
 import { machineLineHtml } from "./machineWizard";
 import { spindlePanelHtml } from "./spindlePanel";
+import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
 
 export function renderRightPanel(container: HTMLElement) {
@@ -204,6 +205,8 @@ export function renderRightPanel(container: HTMLElement) {
         </div>
 
         ${spindlePanelHtml()}
+
+        ${probePanelHtml()}
 
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.jog")}</h3>

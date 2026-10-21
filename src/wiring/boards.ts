@@ -10,6 +10,8 @@
  *     (i2s_out_xyz_mks_dlc32.h): Endschalter X=IO36, Y=IO35, Z=IO34, Taster=IO22,
  *     Laser/Spindel=IO32, Kühlung=IO4 (I2C-SCL).
  *   - MKS DLC32 MAX V1.0: Makerbase-Pinplan „MKS DLC32 MAX V1.0_002 PIN“.
+ *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
+ *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
  * Koordinaten: Board-Fläche w × h je Board (Zeichnung in ui/wiringPage.ts).
  *
@@ -29,8 +31,9 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "plasma" | "air" | "estop" | "door";
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "plasma", "air", "estop", "door"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "plasma" | "air" | "estop" | "door" | "io";
+/** "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "plasma", "air", "estop", "door", "io"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
 /**
@@ -44,10 +47,11 @@ export interface BConn {
   body?: string; style?: "screw" | "barrel" | "xt" | "pads" | "header"; pinLbl?: boolean; rot?: boolean;
   pitch?: number;              // Pin-Abstand (Standard 13); echte 2,54-mm-Leisten auf dem Shield sind breiter
   pinSide?: "left" | "right";  // senkrechte Stecker: Seite der Pin-Beschriftung (sonst nach labelPos)
+  pinRot?: boolean;            // waagerechte Stecker: Pin-Namen senkrecht (lange Namen, wie auf Ruida-Platinen)
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part { id: string; kind: PartKind; name: string; side: "left" | "right" | "top" | "bottom"; pins: string[]; wires: Wire[]; outer?: boolean }
@@ -91,7 +95,7 @@ export interface Board {
   conns: BConn[];
   deco: Deco[];
   /** Aussehen wie das echte Board: Platinenfarbe, Befestigungslöcher */
-  pcb?: { fill: string; edge: string };
+  pcb?: { fill: string; edge: string; light?: boolean };   // light: helles Gehäuse → dunkle Schrift
   outline?: [number, number][];   // Umriss der Platine (sonst Rechteck), z. B. Arduino-Form
   holes?: { x: number; y: number; r: number }[];
   hookups: Partial<Record<CompId, Hookup>>;
@@ -150,6 +154,8 @@ const shield: Board = {
     { id: "pwr", label: "12-36V", x: 30, y: 373, dir: "h", labelPos: "below", pitch: 48, style: "screw", body: "#2f7fd6",
       pins: [{ k: "-", label: "−" }, { k: "+", label: "+" }] },
     shMot("mx", "X", 308, 102), shMot("my", "Y", 502, 102), shMot("mz", "Z", 308, 329), shMot("ma", "A", 502, 329),
+    // Z+ und Z− sind auf dem Shield beide D11 (GRBL 1.1: Spindel-/Laser-PWM)
+    sgRow("lzp", "Z+", 155, "D11", "Spindel/Laser PWM (GRBL 1.1)"),
     sgRow("lz", "Z−", 179, "D11", "Spindel/Laser PWM (GRBL 1.1)"),
     sgRow("ly", "Y−", 226, "D10", "Y-Limit"),
     sgRow("lx", "X−", 274, "D9", "X-Limit"),
@@ -193,10 +199,8 @@ const shield: Board = {
     { x: 500, y: 78, w: 46, h: 12, label: "TX", kind: "text", size: 9, align: "end" },
     { x: 500, y: 101, w: 46, h: 12, label: "5V", kind: "text", size: 9, align: "end" },
     { x: 500, y: 125, w: 46, h: 12, label: "3V3", kind: "text", size: 9, align: "end" },
-    { x: 592, y: 155, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
     { x: 592, y: 203, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
     { x: 592, y: 250, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 1, gap: SP },
-    { x: 550, y: 149, w: 30, h: 12, label: "Z+", kind: "text", size: 10, align: "end" },
     { x: 550, y: 197, w: 30, h: 12, label: "Y+", kind: "text", size: 10, align: "end" },
     { x: 550, y: 244, w: 30, h: 12, label: "X+", kind: "text", size: 10, align: "end" },
     { x: 548, y: 160, w: 0, h: 100, label: "END STOPS", kind: "text", size: 9, rot: true },
@@ -322,10 +326,161 @@ const dlcMax: Board = {
 };
 
 // =====================================================================
+// Ruida RDC6445G / RDC6445S (CO2-Laser-Steuerung, eigene Firmware)
+// Lage wie auf dem Bild der Hauptplatine im Ruida-Handbuch: oben CN6/CN5 (Laser 2/1) und AXIS_U…X,
+// links CN0 (24 V), unten CN1 (Ausgänge), CN2 (Eingänge), CN3/CN4 (Endschalter), rechts Ethernet/USB.
+// Pin 1 liegt oben rechts bzw. unten links (wie aufgedruckt).
+// =====================================================================
+const RD_GREEN = "#2f7d3c";
+const rdTop = (id: string, label: string, x: number, pins: BPin[]): BConn => ({
+  id, label, x, y: 24, dir: "h", labelPos: "above", pitch: 18, style: "screw", body: RD_GREEN, pinRot: true, pins
+});
+const rdBottom = (id: string, label: string, x: number, pins: BPin[]): BConn => ({
+  id, label, x, y: 366, dir: "h", labelPos: "below", pitch: 18.5, style: "screw", body: RD_GREEN, pinRot: true, pins
+});
+const rdAxis = (id: string, label: string, x: number): BConn => rdTop(id, label, x, [
+  { k: "5V", label: "+5V" }, { k: "PUL", label: "PUL−", fn: "Puls (OC)" }, { k: "DIR", label: "DIR−", fn: "Richtung (OC)" }
+]);
+const rdLaser = (id: string, label: string, x: number, i: number): BConn => rdTop(id, label, x, [
+  { k: "AN", label: "L-AN" + i, fn: "Laserleistung analog" }, { k: "WP", label: "WP" + i, fn: "Wasserschutz (24 V)" },
+  { k: "PWM", label: "LPWM" + i, fn: "Laserleistung PWM" }, { k: "ON", label: "L-ON" + i, fn: "Laser ein (aktiv low)" }, { k: "G", label: "GND" }
+]);
+const ruida6445: Board = {
+  id: "ruida-rdc6445g",
+  maker: "Ruida",
+  name: "Ruida RDC6445G / RDC6445S",
+  mcu: "Ruida RDC644XG",
+  fw: "wr.fw.ruida",
+  source: "wr.src.ruida",
+  volt: "24 V",
+  w: 640, h: 392,
+  pcb: { fill: "#c9ced6", edge: "#7d848e", light: true },
+  holes: [{ x: 14, y: 14, r: 6 }, { x: 626, y: 14, r: 6 }, { x: 14, y: 378, r: 6 }, { x: 626, y: 378, r: 6 }],
+  conns: [
+    rdLaser("cn6", "CN6", 98, 2), rdLaser("cn5", "CN5", 205, 1),
+    rdAxis("axu", "AXIS_U", 315), rdAxis("axz", "AXIS_Z", 384), rdAxis("axy", "AXIS_Y", 453), rdAxis("axx", "AXIS_X", 522),
+    { id: "cn0", label: "CN0", x: 32, y: 172, dir: "v", labelPos: "below", pitch: 18, style: "screw", body: RD_GREEN, pinSide: "right",
+      pins: [{ k: "G", label: "GND" }, { k: "24", label: "+24V" }] },
+    rdBottom("cn1", "CN1", 91, [{ k: "G", label: "GND" }, { k: "O2", label: "Out2" }, { k: "O1", label: "Out1" },
+      { k: "ST", label: "Status", fn: "Läuft (OC)" }, { k: "W", label: "Wind", fn: "Luft/Gebläse (OC)" }, { k: "24", label: "+24V" }]),
+    rdBottom("cn2", "CN2", 212, [{ k: "G", label: "GND" }, { k: "FS", label: "FootSW", fn: "Fußschalter Start/Pause" },
+      { k: "DR", label: "DrProt", fn: "Tür-Schutz" }, { k: "SH", label: "Shot", fn: "Laser von Hand" }, { k: "I1", label: "IN1" }, { k: "24", label: "+24V" }]),
+    rdBottom("cn3", "CN3", 338, [{ k: "G", label: "GND" }, { k: "U-", label: "LmtU−" }, { k: "U+", label: "LmtU+" },
+      { k: "Z-", label: "LmtZ−" }, { k: "Z+", label: "LmtZ+" }, { k: "5V", label: "Puzu" }]),
+    rdBottom("cn4", "CN4", 459, [{ k: "G", label: "GND" }, { k: "Y-", label: "LmtY−" }, { k: "Y+", label: "LmtY+" },
+      { k: "X-", label: "LmtX−" }, { k: "X+", label: "LmtX+" }, { k: "5V", label: "Puxy" }])
+  ],
+  deco: [
+    { x: 290, y: 100, w: 0, h: 0, label: "", kind: "pins", cols: 15, rows: 1, gap: 19.6, oval: true },
+    { x: 268, y: 168, w: 170, h: 52, label: "RDC644XG", kind: "chip" },
+    { x: 34, y: 236, w: 60, h: 14, label: "HMI", kind: "text", size: 11 },
+    { x: 590, y: 140, w: 44, h: 34, label: "", kind: "rj" }, { x: 548, y: 178, w: 86, h: 12, label: "Ethernet", kind: "text", size: 10 },
+    { x: 596, y: 196, w: 38, h: 22, label: "", kind: "usb" }, { x: 548, y: 222, w: 86, h: 12, label: "Udisk", kind: "text", size: 10 },
+    { x: 596, y: 240, w: 38, h: 22, label: "", kind: "usb" }, { x: 548, y: 266, w: 86, h: 12, label: "PC-USB", kind: "text", size: 10 }
+  ],
+  hookups: {}
+};
+
+/** Verdrahtung Ruida: externe Treiber (gemeinsame Anode), Endschalter an GND, CO2-Laser-Netzteil an CN5 */
+function ruidaHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  const drv = (axis: string, conn: string): Part => ({
+    id: "drv" + axis, kind: "extdrv", name: axis, side: "top", pins: ["PUL+", "PUL−", "DIR+", "DIR−"],
+    wires: [{ from: "PUL+", to: conn + ".5V", color: RED }, { from: "PUL−", to: conn + ".PUL", color: YEL },
+      { from: "DIR+", to: conn + ".5V", color: RED }, { from: "DIR−", to: conn + ".DIR", color: GRN }]
+  });
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "", side: "left", pins: ["+", "-"],
+      wires: [{ from: "+", to: "cn0.24", color: RED }, { from: "-", to: "cn0.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.rd.psu.1" }, { k: "wr.s.rd.psu.2" }],
+    notes: [{ k: "wr.n.rd.psu" }], pro: [{ k: "wr.p.rd.psu" }], settings: []
+  };
+  h.motors = {
+    comp: "motors",
+    parts: [drv("X", "axx"), drv("Y", "axy")],
+    steps: [1, 2, 3, 4].map(i => ({ k: "wr.s.rd.mot." + i })),
+    notes: [{ k: "wr.n.rd.mot" }], pro: [{ k: "wr.p.rd.mot" }], settings: []
+  };
+  h.extdrv = {
+    comp: "extdrv",
+    parts: [
+      { ...drv("X", "axx"), side: "top" },
+      { id: "mX", kind: "motor", name: "X", side: "top", outer: true, pins: ["1A", "1B", "2A", "2B"],
+        wires: [{ from: "1A", to: "@drvX.A+", color: BLACK }, { from: "1B", to: "@drvX.A−", color: GRN }, { from: "2A", to: "@drvX.B+", color: RED }, { from: "2B", to: "@drvX.B−", color: BLU }] },
+      { id: "psuD", kind: "psu", name: "", side: "top", outer: true, pins: ["+", "-"],
+        wires: [{ from: "+", to: "@drvX.VCC", color: RED }, { from: "-", to: "@drvX.GND", color: BLACK }] }
+    ],
+    steps: [1, 2, 3, 4].map(i => ({ k: "wr.s.rd.mot." + i })),
+    notes: [{ k: "wr.n.rd.mot" }], pro: [{ k: "wr.p.rd.mot" }], settings: []
+  };
+  h.limits = {
+    comp: "limits",
+    parts: [switchPart("X", "cn4", "X-", "G", "bottom"), switchPart("Y", "cn4", "Y-", "G", "bottom"), switchPart("Z", "cn3", "Z-", "G", "bottom")],
+    steps: [1, 2, 3].map(i => ({ k: "wr.s.rd.lim." + i })),
+    notes: [{ k: "wr.n.rd.lim" }], pro: [{ k: "wr.p.rd.lim" }], settings: []
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "lpsu", kind: "lpsu", name: "", side: "top", pins: ["L", "IN", "G"],
+        wires: [{ from: "L", to: "cn5.ON", color: GRN }, { from: "IN", to: "cn5.PWM", color: YEL }, { from: "G", to: "cn5.G", color: BLACK }] },
+      { id: "flow", kind: "flow", name: "", side: "top", pins: ["NO", "C"],
+        wires: [{ from: "NO", to: "cn5.WP", color: BLU }, { from: "C", to: "cn5.G", color: BLACK }] }
+    ],
+    steps: [1, 2, 3, 4, 5].map(i => ({ k: "wr.s.rd.las." + i })),
+    notes: [{ k: "wr.n.rd.laser" }], pro: [{ k: "wr.p.rd.laser" }], settings: []
+  };
+  // ---- weitere Ein-/Ausgänge (wie im Gesamt-Schaltplan des Handbuchs, Bild 3.3-1) ----
+  h.io = {
+    comp: "io",
+    parts: [
+      { id: "foot", kind: "foot", name: "", side: "bottom", pins: ["NO", "C"],
+        wires: [{ from: "NO", to: "cn2.FS", color: YEL }, { from: "C", to: "cn2.G", color: BLACK }] },
+      { id: "shot", kind: "button", name: "", side: "bottom", pins: ["NO", "C"],
+        wires: [{ from: "NO", to: "cn2.SH", color: VIO }, { from: "C", to: "cn2.G", color: BLACK }] },
+      { id: "lamp", kind: "lamp", name: "", side: "bottom", pins: ["+", "-"],
+        wires: [{ from: "+", to: "cn1.24", color: RED }, { from: "-", to: "cn1.ST", color: ORG }] }
+    ],
+    steps: [1, 2, 3].map(i => ({ k: "wr.s.rd.io." + i })),
+    notes: [{ k: "wr.n.rd.io" }], pro: [], settings: []
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "relay", kind: "relay", name: "", side: "bottom", pins: ["+", "-"],
+      wires: [{ from: "+", to: "cn1.24", color: RED }, { from: "-", to: "cn1.W", color: ORG }] },
+      { id: "pump", kind: "pump", name: "", side: "bottom", outer: true, pins: ["+", "-"], wires: [{ from: "+", to: "@relay.NO", color: RED }] }],
+    steps: [{ k: "wr.s.rd.air.1" }, { k: "wr.s.rd.air.2" }],
+    notes: [{ k: "wr.n.rd.air" }], pro: [], settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "bottom", pins: ["NO", "C"],
+      wires: [{ from: "NO", to: "cn2.DR", color: YEL }, { from: "C", to: "cn2.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.rd.door.1" }, { k: "wr.s.rd.door.2" }],
+    notes: [], pro: [], settings: []
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "left", pins: ["+", "-"], wires: [{ from: "-", to: "cn0.G", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "left", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "cn0.24", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.rd.estop.2" }],
+    notes: [{ k: "wr.n.rd.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
+  };
+  const none = (comp: CompId): Hookup => ({ comp, parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.rd" });
+  h.probe = none("probe"); h.spindle = none("spindle"); h.plasma = none("plasma");
+  return h;
+}
+
+// =====================================================================
 // Verdrahtung je Board
 // =====================================================================
 
 function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
+  if (b.maker === "Ruida") return ruidaHookups();
   const isShield = b.id === "cnc-shield-v3";
   const isMax = b.id === "mks-dlc32-max";
   const h: Partial<Record<CompId, Hookup>> = {};
@@ -438,15 +593,16 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   const spParts: Part[] = isShield
     ? [{ id: "relay", kind: "relay", name: "", side: "right", pins: ["IN", "GND", "VCC"],
         wires: [{ from: "IN", to: "lz.S", color: YEL }, { from: "GND", to: "lz.G", color: BLACK }, { from: "VCC", to: "v5.5V", color: RED }] },
+       // Wandler an Z+ (auch D11) – so liegt er nicht auf demselben Stift wie das Relais
        { id: "vfd", kind: "vfd", name: "", side: "right", pins: ["PWM", "GND"],
-        wires: [{ from: "PWM", to: "lz.S", color: VIO }, { from: "GND", to: "lz.G", color: BLACK }] }]
+        wires: [{ from: "PWM", to: "lzp.S", color: VIO }, { from: "GND", to: "lzp.G", color: BLACK }] }]
     : [{ id: "relay", kind: "relay", name: "", side: "left", pins: ["+", "-"],
         wires: [{ from: "+", to: "spin.+", color: RED }, { from: "-", to: "spin.-", color: BLACK }] }];
   h.spindle = {
     comp: "spindle",
     parts: spParts,
     steps: isShield
-      ? [{ k: "wr.s.sp.1", p: { sig: P("lz", "S (D11)"), gnd: "GND", vcc: "5V" } }, { k: "wr.s.sp.2" }, { k: "wr.s.sp.3", p: { sig: P("lz", "S (D11)"), gnd: "GND" } }, { k: "wr.s.sp.4" }]
+      ? [{ k: "wr.s.sp.1", p: { sig: P("lz", "S (D11)"), gnd: "GND", vcc: "5V" } }, { k: "wr.s.sp.2" }, { k: "wr.s.sp.3", p: { sig: P("lzp", "S (D11)"), gnd: "GND" } }, { k: "wr.s.sp.4" }]
       : [{ k: "wr.s.sp.dlc", p: { conn: P("spin", "") } }, { k: "wr.s.sp.2" }, { k: "wr.s.sp.4" }],
     notes: isShield ? [{ k: "wr.n.shield.spindle" }] : [{ k: "wr.n.dlc.spindle" }],
     pro: [{ k: "wr.p.vfd" }],
@@ -522,7 +678,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, ruida6445];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {

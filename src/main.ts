@@ -23,6 +23,7 @@ import { initStockPanel } from "./ui/stockPanel";
 import { applySavedMachine, initMachineWizard } from "./ui/machineWizard";
 import { initJobTools } from "./ui/jobTools";
 import { initSpindlePanel } from "./ui/spindlePanel";
+import { initProbePanel } from "./ui/probePanel";
 import { initPinLeds } from "./ui/pinLeds";
 import { initWiringPage } from "./ui/wiringPage";
 import { initAboutDialog } from "./ui/aboutDialog";
@@ -165,6 +166,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initStreamEvents(appendToConsole);
     initConnection(appendToConsole);
     initSpindlePanel(appendToConsole); // Spindel an/aus, Laser-Testschuss, THC, Override-Regler
+    initProbePanel(appendToConsole);   // Antasten: Tasterplatte, Werkzeuglängensensor
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates
