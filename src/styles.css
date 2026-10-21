@@ -1466,3 +1466,4 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .imguse-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: transparent; color: var(--text-main); cursor: pointer; font-size: 0.85rem; }
 .imguse-btn span { font-size: 0.76rem; color: var(--text-muted); }
 .imguse-btn:hover, .imguse-btn:focus-visible { border-color: var(--accent-color); outline: none; box-shadow: 0 0 0 1px var(--accent-color) inset; }
+.tb-sel { font-size: 0.74rem; padding: 2px 4px; max-width: 140px; }

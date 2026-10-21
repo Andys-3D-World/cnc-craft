@@ -18,6 +18,7 @@ import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
 import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
 import { drawCameraUnderlay } from "./camera/cameraOverlay";
 import { drawImageShape } from "./raster/imageShape";
+import { materialView, drawMaterialBed, drawMaterialShapes } from "./materialView";
 
 export const liveMachinePos = { x: 0, y: 0, z: 0 };
 
@@ -57,6 +58,14 @@ export function drawEverything(
   const bx0 = sx(0), by0 = sy(bedHPx), bx1 = sx(bedW * MM_TO_PIXEL), by1 = sy(0);
   ctx.fillStyle = "#16161c";
   ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+  // Materialansicht: Oberfläche + Brandfarben statt Raster und Bahn-Farben
+  const mat = materialView();
+  if (mat) {
+    drawMaterialBed(ctx, bx0, by0, bx1 - bx0, by1 - by0, scale, mat);
+    drawMaterialShapes(ctx, shapes, new Set(selectedShapeIds), sx, sy, scale, mat);
+    drawCrosshair(ctx, sx, sy);
+    return;
+  }
   // 2b. Kamerabild (falls eingeschaltet) – liegt unter Raster und Zeichnung
   drawCameraUnderlay(ctx, bx0, by0, bx1 - bx0, by1 - by0);
 
@@ -161,6 +170,10 @@ export function drawEverything(
   if (laser) drawLaserTabs(ctx, shapes, sx, sy);
 
   // 7. Maschinen-Fadenkreuz
+  drawCrosshair(ctx, sx, sy);
+}
+
+function drawCrosshair(ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number) {
   const mx = sx(liveMachinePos.x * MM_TO_PIXEL);
   const my = sy(liveMachinePos.y * MM_TO_PIXEL);
   ctx.strokeStyle = "#ff4d4d";

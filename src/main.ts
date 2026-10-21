@@ -39,6 +39,7 @@ import { loadGcodeFromFile, startStreaming, pauseStreaming, stopStreaming } from
 import { drawOverlay } from "./editor/overlay";
 import { initHistory } from "./editor/history";
 import { setEngraveLog } from "./raster/engraveDialog";
+import { initMaterialView } from "./materialView";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
@@ -143,7 +144,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     }
     initHistory();
     initBeds(redraw, appendToConsole, () => zoomFit());
-    setEngraveLog(appendToConsole);   // Bildgravur: Meldungen aus dem Gravur-Fenster // mehrere Betten: Reiter über der Zeichenfläche
+    setEngraveLog(appendToConsole);
+    initMaterialView(redraw);         // Materialansicht (Holz, Acryl, Leder …) – Auswahl in der Werkzeugleiste   // Bildgravur: Meldungen aus dem Gravur-Fenster // mehrere Betten: Reiter über der Zeichenfläche
 
     if (clearBtn) clearBtn.addEventListener("click", () => {
       if (!state.shapes.length) return;

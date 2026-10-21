@@ -12,10 +12,19 @@
  *   halftone   Punktraster (runde Punkte in Zellen, Größe = Helligkeit, Winkel einstellbar)
  *   lines      Linienraster (Linien, Dicke = Helligkeit, Winkel einstellbar)
  *   gray       Graustufen: keine Punkte, die Leistung folgt der Helligkeit
+ * Bildeffekte (Zellgröße/Winkel einstellbar):
+ *   stipple    Punkte in einem leicht verwackelten Raster – wirkt wie von Hand getupft
+ *   spiral     eine einzige Spirale von der Mitte aus, dicker wo es dunkel ist
+ *   waves      Wellenlinien, dicker wo es dunkel ist
+ *   crosshatch Kreuzschraffur wie mit dem Stift: je dunkler, desto mehr Lagen (schräg, gegenschräg, waagerecht)
  */
 
-export type RasterMethod = "threshold" | "floyd" | "jarvis" | "stucki" | "atkinson" | "sierra" | "bayer" | "halftone" | "lines" | "gray";
-export const RASTER_METHODS: RasterMethod[] = ["jarvis", "floyd", "stucki", "atkinson", "sierra", "bayer", "halftone", "lines", "threshold", "gray"];
+export type RasterMethod = "threshold" | "floyd" | "jarvis" | "stucki" | "atkinson" | "sierra" | "bayer" | "halftone" | "lines" | "gray"
+  | "stipple" | "spiral" | "waves" | "crosshatch";
+export const RASTER_METHODS: RasterMethod[] = ["jarvis", "floyd", "stucki", "atkinson", "sierra", "bayer", "halftone", "lines", "threshold", "gray",
+  "stipple", "spiral", "waves", "crosshatch"];
+/** Verfahren mit Zellgröße + Winkel */
+export const CELL_METHODS: RasterMethod[] = ["halftone", "lines", "stipple", "spiral", "waves", "crosshatch"];
 
 /** Gravurtypen (wie Voreinstellungen): Verfahren + passende Werte */
 export type EngravePreset = "photo" | "graphic" | "bw" | "lines" | "dots" | "newspaper";
@@ -267,6 +276,7 @@ export function rasterize(g: Float32Array, w: number, h: number, s: RasterSettin
     }
     return out;
   }
+  if (s.method === "stipple" || s.method === "spiral" || s.method === "waves" || s.method === "crosshatch") return effect(g, w, h, s, out);
   // Fehlerverteilung, Zeilen abwechselnd von links und von rechts
   const k = KERNELS[s.method] || KERNELS.floyd;
   const e = new Float32Array(g.length);
@@ -285,6 +295,79 @@ export function rasterize(g: Float32Array, w: number, h: number, s: RasterSettin
         e[yy * w + xx] += (err * wt) / k.d;
       }
     }
+  }
+  return out;
+}
+
+/** Pseudo-Zufall 0…1 je Zelle (immer gleich → Vorschau und G-Code stimmen überein) */
+function hash(a: number, b: number): number {
+  let x = (a * 374761393 + b * 668265263) | 0;
+  x = Math.imul(x ^ (x >>> 13), 1274126177);
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Bildeffekte (siehe oben) */
+function effect(g: Float32Array, w: number, h: number, s: RasterSettings, out: Float32Array): Float32Array {
+  const cell = Math.max(2, s.cell);
+  const soft = blur(g, w, h, Math.max(1, Math.round(cell / 3)));
+  const a = (s.angle * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+  // Kante einer Linie: Abstand dist von der Mitte, halbe Breite half – der angeschnittene Bildpunkt wird
+  // nach Bayer-Raster an/aus gesetzt, sonst springt die Breite in ganzen Punkten (Streifen, wo die Linie
+  // genau senkrecht oder waagerecht läuft)
+  const edge = (dist: number, half: number, x: number, y: number) => {
+    const cov = Math.min(1, Math.max(0, half - dist + 0.5));
+    return cov > BAYER8[y & 7][x & 7] ? 1 : 0;
+  };
+  const dark = (x: number, y: number) => 1 - soft[Math.min(h - 1, Math.max(0, Math.round(y))) * w + Math.min(w - 1, Math.max(0, Math.round(x)))];
+  if (s.method === "stipple") {
+    // jede Zelle: ein Punkt an verwackelter Stelle, Fläche = Dunkelheit (Nachbarzellen mitprüfen, Punkte ragen hinüber)
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const cx0 = Math.floor(x / cell), cy0 = Math.floor(y / cell);
+      let on = 0;
+      for (let j = -1; j <= 1 && !on; j++) for (let i = -1; i <= 1 && !on; i++) {
+        const cx = cx0 + i, cy = cy0 + j;
+        const px = (cx + 0.2 + 0.6 * hash(cx, cy)) * cell, py = (cy + 0.2 + 0.6 * hash(cy + 7919, cx)) * cell;
+        const d = dark(px, py);
+        if (d < 0.02) continue;
+        const r = Math.sqrt(d / Math.PI) * cell * 1.05;
+        if (Math.hypot(x + 0.5 - px, y + 0.5 - py) < r) on = 1;
+      }
+      out[y * w + x] = on;
+    }
+    return out;
+  }
+  if (s.method === "spiral") {
+    // archimedische Spirale ab der Bildmitte, Windungsabstand = cell, Linie so dick wie die Dunkelheit
+    const mx = w / 2, my = h / 2;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const dx = x + 0.5 - mx, dy = y + 0.5 - my;
+      const r = Math.hypot(dx, dy), th = Math.atan2(dy, dx) + a;
+      const f = ((r - (th / (2 * Math.PI)) * cell) % cell + cell) % cell; // 0…cell: Lage zwischen zwei Windungen
+      out[y * w + x] = edge(Math.abs(f - cell / 2), (dark(x, y) * cell) / 2, x, y);
+    }
+    return out;
+  }
+  if (s.method === "waves") {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const u = (x + 0.5) * ca + (y + 0.5) * sa, v = -(x + 0.5) * sa + (y + 0.5) * ca;
+      const vv = v + Math.sin((u / (cell * 3)) * 2 * Math.PI) * cell * 0.6;
+      const f = ((vv % cell) + cell) % cell;
+      out[y * w + x] = edge(Math.abs(f - cell / 2), (dark(x, y) * cell) / 2, x, y);
+    }
+    return out;
+  }
+  // Kreuzschraffur: Lagen ab 15 %, 40 %, 65 %, 85 % Dunkelheit
+  const layers = [a + Math.PI / 4, a - Math.PI / 4, a, a + Math.PI / 2];
+  const from = [0.15, 0.4, 0.65, 0.85];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const d = dark(x, y);
+    let on = 0;
+    for (let k = 0; k < 4 && !on; k++) {
+      if (d < from[k]) break;
+      const v = -(x + 0.5) * Math.sin(layers[k]) + (y + 0.5) * Math.cos(layers[k]);
+      if (((v % cell) + cell) % cell < 1) on = 1;
+    }
+    out[y * w + x] = on;
   }
   return out;
 }

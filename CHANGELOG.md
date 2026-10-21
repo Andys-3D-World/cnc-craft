@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Material view:** new selector in the toolbar (🪵) – light wood (birch), dark wood (walnut), black and clear
+  acrylic, leather, slate, cardboard, anodized aluminium. The bed shows the material surface at real scale,
+  engravings appear in the burn colour of the material (dark on wood/leather, light on acrylic/slate/aluminium),
+  cuts as a gap; images too. Laser: fill layers = engraved area, line layers = engraved line, strong line layers
+  (from 70 %) = cut; mill: pockets recessed, other paths as gaps. Display only – the G-code does not change
+- **Image effects** (engraving window, new row of buttons): stippled dots (jittered), spiral (one continuous spiral
+  from the centre, thicker where dark), wavy lines and crosshatch (more layers the darker it is). Screen size and
+  angle adjustable; also in the expert method list
 - **Pattern fill:** select a closed area (e.g. a coaster) together with a motif – the area is filled with copies of
   the motif in a grid (horizontal/vertical spacing, every 2nd row offset, centred). Only whole motifs, or clipped at
   the edge for closed motifs. Each copy is its own group

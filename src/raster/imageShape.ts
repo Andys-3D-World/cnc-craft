@@ -103,7 +103,7 @@ export function gridSize(s: any, img: ImageSettings = s.img): { gw: number; gh: 
   return { gw: Math.max(1, Math.round(w / step)), gh: Math.max(1, Math.round(h / step)), step };
 }
 
-export interface Processed { burn: Float32Array; gw: number; gh: number; step: number; canvas: HTMLCanvasElement | null }
+export interface Processed { burn: Float32Array; gw: number; gh: number; step: number; canvas: HTMLCanvasElement | null; tinted?: Map<string, HTMLCanvasElement> }
 const results = new Map<string, { key: string; res: Processed }>();
 
 /** Gerastertes Bild (burn 0…1 je Punkt, Zeile 0 = oben) – null, solange das Quellbild noch lädt */
@@ -178,8 +178,27 @@ export function burnCanvas(burn: Float32Array, gw: number, gh: number): HTMLCanv
 // Zeichnen, Anklicken
 // ---------------------------------------------------------------------
 
-/** Bild auf der Zeichenfläche (unter den Konturen) */
-export function drawImageShape(ctx: CanvasRenderingContext2D, s: any, sx: (x: number) => number, sy: (y: number) => number) {
+/** Gebrannte Punkte in einer Farbe, sonst durchsichtig (Materialansicht: die Oberfläche scheint durch) */
+function tintCanvas(r: Processed, c: [number, number, number]): HTMLCanvasElement {
+  const key = c.join(",");
+  r.tinted ??= new Map();
+  const hit = r.tinted.get(key);
+  if (hit) return hit;
+  const cv = document.createElement("canvas");
+  cv.width = r.gw; cv.height = r.gh;
+  const ctx = cv.getContext("2d")!;
+  const id = ctx.createImageData(r.gw, r.gh);
+  for (let i = 0; i < r.burn.length; i++) {
+    id.data[i * 4] = c[0]; id.data[i * 4 + 1] = c[1]; id.data[i * 4 + 2] = c[2];
+    id.data[i * 4 + 3] = Math.round(r.burn[i] * 240);
+  }
+  ctx.putImageData(id, 0, 0);
+  r.tinted.set(key, cv);
+  return cv;
+}
+
+/** Bild auf der Zeichenfläche (unter den Konturen); tint = Brandfarbe für die Materialansicht */
+export function drawImageShape(ctx: CanvasRenderingContext2D, s: any, sx: (x: number) => number, sy: (y: number) => number, tint?: [number, number, number]) {
   const [p0, p1, , p3] = s.points as Pt[];
   const r = processed(s);
   const tl = { x: sx(p3.x), y: sy(p3.y) };
@@ -196,7 +215,7 @@ export function drawImageShape(ctx: CanvasRenderingContext2D, s: any, sx: (x: nu
   ctx.transform((tr.x - tl.x) / r.gw, (tr.y - tl.y) / r.gw, (bl.x - tl.x) / r.gh, (bl.y - tl.y) / r.gh, tl.x, tl.y);
   // stark vergrößert: Punkte scharf zeigen
   ctx.imageSmoothingEnabled = Math.hypot(tr.x - tl.x, tr.y - tl.y) / r.gw < 2;
-  ctx.drawImage(r.canvas, 0, 0);
+  ctx.drawImage(tint ? tintCanvas(r, tint) : r.canvas, 0, 0);
   ctx.restore();
 }
 

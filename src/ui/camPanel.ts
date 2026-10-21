@@ -8,8 +8,9 @@
  * Knöpfe mit data-cmd="..." führen einen Befehl aus (siehe editor/commands.ts).
  */
 import { icon } from "./icons";
-import { tip } from "../i18n/i18n";
+import { tip, T } from "../i18n/i18n";
 import { placeButtonHtml } from "./stockPanel";
+import { MATERIALS } from "../materialView";
 
 const tool = (id: string, ico: string, tipKey: string, active = false) =>
   `<button id="tool-${id}" data-tool="${id}" class="btn-tool-icon${active ? " active" : ""}" ${tip(tipKey)}>${icon(ico, 20)}</button>`;
@@ -103,6 +104,11 @@ export function renderEditorToolbar(container: HTMLElement) {
       <button id="btn-clear-canvas" class="btn-cmd btn-cmd-danger" ${tip("tip.clearAll")}>${icon("clear")}</button>
     </div>
     <div class="tb-group tb-options">
+      <label class="tb-opt" ${tip("tip.material")}>🪵
+        <select id="opt-material" class="tb-sel">
+          <option value="off">${T("mat3d.off")}</option>
+          ${MATERIALS.map(m => `<option value="${m.id}">${T("mat3d." + m.id)}</option>`).join("")}
+        </select></label>
       <label class="tb-opt" ${tip("tip.showTools")}>
         <input type="checkbox" id="opt-show-tools">${icon("endmill", 16)}</label>
       <label class="tb-opt" ${tip("tip.snapObjects")}>

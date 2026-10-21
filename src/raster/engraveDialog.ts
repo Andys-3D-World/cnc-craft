@@ -7,10 +7,12 @@
  */
 import { t } from "../i18n/i18n";
 import { layerForShape } from "../laserLayers";
-import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, RasterMethod, presetSettings, autoAdjust, applyAdjust, resample, stats } from "./dither";
+import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, applyAdjust, resample, stats } from "./dither";
 import { ImageSettings, imageSizeMm, gridSize, processed, sourceGray } from "./imageShape";
 
 const ICON: Record<EngravePreset, string> = { photo: "📷", graphic: "🎨", bw: "◐", lines: "〰️", dots: "⠿", newspaper: "📰" };
+/** Bildeffekte als eigene Knöpfe (Verfahren + Zellgröße) */
+const FX: [RasterMethod, string, number][] = [["stipple", "∴", 5], ["spiral", "🌀", 5], ["waves", "≈", 6], ["crosshatch", "▦", 6]];
 
 /** Meldungen in die Konsole (wird beim Start gesetzt, main.ts) */
 let defaultLog: (s: string) => void = () => {};
@@ -56,6 +58,8 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
           <div class="eng-h">${t("eng.type")}</div>
           <div class="eng-presets">${ENGRAVE_PRESETS.map(p => `<button type="button" class="eng-pre" data-p="${p}"><span>${ICON[p]}</span>${t("eng.p." + p)}</button>`).join("")}</div>
           <div class="dlg-hint" id="eng-pdesc"></div>
+          <div class="eng-h">${t("eng.effects")}</div>
+          <div class="eng-presets eng-fx">${FX.map(([m, ic]) => `<button type="button" class="eng-pre" data-m="${m}"><span>${ic}</span>${t("eng.m." + m)}</button>`).join("")}</div>
           <div class="eng-row">
             <button type="button" id="eng-auto" class="btn-primary" style="flex:2;">${t("eng.auto")}</button>
             <button type="button" id="eng-reset" class="btn-secondary" style="flex:1;">${t("eng.reset")}</button>
@@ -79,7 +83,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
           <details class="eng-sec"><summary>${t("eng.expert")}</summary>
             <label class="prop-row">${t("eng.method")}
               <select id="eng-m" class="prop-input" style="width:auto;">${RASTER_METHODS.map(m => `<option value="${m}">${t("eng.m." + m)}</option>`).join("")}</select></label>
-            <div data-for="halftone lines">${slider("eng-cell", "eng.cell", 2, 20, 1)}${slider("eng-ang", "eng.angle", 0, 90, 1)}</div>
+            <div data-for="${CELL_METHODS.join(" ")}">${slider("eng-cell", "eng.cell", 2, 20, 1)}${slider("eng-ang", "eng.angle", 0, 90, 1)}</div>
             <div data-for="threshold">${slider("eng-thr", "eng.threshold", 1, 99, 1)}</div>
           </details>
           <details class="eng-sec" open><summary>${t("eng.output")}</summary>
@@ -125,7 +129,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     $("eng-int").value = String(img.interval);
     $("eng-min").value = String(img.minPower);
     $("eng-over").value = String(img.overscan);
-    ov.querySelectorAll<HTMLElement>(".eng-pre").forEach(b => b.classList.toggle("active", b.dataset.p === img.preset));
+    ov.querySelectorAll<HTMLElement>(".eng-pre").forEach(b => b.classList.toggle("active", b.dataset.p ? b.dataset.p === img.preset : img.preset === "custom" && b.dataset.m === img.raster.method));
     $<HTMLElement>("eng-pdesc").textContent = img.preset === "custom" ? t("eng.p.custom") : t("eng.pd." + img.preset);
     ov.querySelectorAll<HTMLElement>("[data-for]").forEach(el => { el.style.display = el.dataset.for!.split(" ").includes(img.raster.method) ? "" : "none"; });
   };
@@ -224,7 +228,13 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   };
 
   // ---- Bedienung ----
-  ov.querySelectorAll<HTMLElement>(".eng-pre").forEach(b => b.addEventListener("click", () => {
+  ov.querySelectorAll<HTMLElement>(".eng-fx .eng-pre").forEach(b => b.addEventListener("click", () => {
+    const fx = FX.find(f => f[0] === b.dataset.m)!;
+    img.preset = "custom";
+    img.raster = { ...img.raster, method: fx[0], cell: fx[2], angle: fx[0] === "crosshatch" ? 0 : img.raster.angle };
+    fill(); update(true);
+  }));
+  ov.querySelectorAll<HTMLElement>(".eng-pre[data-p]").forEach(b => b.addEventListener("click", () => {
     const p = b.dataset.p as EngravePreset, ps = presetSettings(p);
     img.preset = p;
     img.raster = { ...ps.raster };
