@@ -3,6 +3,7 @@
  *   - renderCamPanel():      schmale Leiste links mit den Zeichenwerkzeugen
  *   - renderEditorToolbar(): Werkzeugleiste über der Zeichenfläche
  *                            (Datei, Bearbeiten, Drehen/Spiegeln, Ausrichten, Fang-Optionen)
+ * Seltener gebrauchte, zusammengehörige Knöpfe stecken in aufklappenden Gruppen (ui/flyout.ts).
  *
  * Knöpfe mit data-tool="..." wählen ein Werkzeug (siehe toolsHandler.ts),
  * Knöpfe mit data-cmd="..." führen einen Befehl aus (siehe editor/commands.ts).
@@ -11,6 +12,7 @@ import { icon } from "./icons";
 import { tip, T } from "../i18n/i18n";
 import { placeButtonHtml } from "./stockPanel";
 import { MATERIALS } from "../materialView";
+import { flyTools, flyCmds } from "./flyout";
 
 const tool = (id: string, ico: string, tipKey: string, active = false) =>
   `<button id="tool-${id}" data-tool="${id}" class="btn-tool-icon${active ? " active" : ""}" ${tip(tipKey)}>${icon(ico, 20)}</button>`;
@@ -28,22 +30,14 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("select", "select", "tip.tool.select", true)}
     ${tool("pan", "pan", "tip.tool.pan")}
     <div class="strip-sep"></div>
-    ${tool("line", "line", "tip.tool.line")}
-    ${tool("rect", "rect", "tip.tool.rect")}
-    ${tool("ellipse", "ellipse", "tip.tool.ellipse")}
-    ${tool("polygon", "polygon", "tip.tool.polygon")}
-    ${tool("arc", "arc", "tip.tool.arc")}
+    ${flyTools("shapes", [["line", "line", "tip.tool.line"], ["rect", "rect", "tip.tool.rect"], ["ellipse", "ellipse", "tip.tool.ellipse"],
+      ["polygon", "polygon", "tip.tool.polygon"], ["arc", "arc", "tip.tool.arc"]])}
     ${tool("text", "text", "tip.tool.text")}
-    ${tool("pen", "pen", "tip.tool.pen")}
-    ${tool("node", "node", "tip.tool.node")}
+    ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"]])}
+    ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
-    ${tool("measure", "measure", "tip.tool.measure")}
-    ${tool("dim", "dim", "tip.tool.dim")}
-    <button data-cmd="nest" class="btn-tool-icon" ${tip("tip.cmd.nest")}>${icon("nest", 20)}</button>
-    <button data-cmd="boxgen" class="btn-tool-icon" ${tip("tip.cmd.boxgen")}>${icon("boxgen", 20)}</button>
-    <button data-cmd="shapeLib" class="btn-tool-icon" ${tip("tip.cmd.shapeLib")}>${icon("shapeLib", 20)}</button>
-    <button data-cmd="view3d" class="btn-tool-icon" ${tip("tip.cmd.view3d")}>${icon("view3d", 20)}</button>
-    <button data-cmd="nodeGraph" class="btn-tool-icon" ${tip("tip.cmd.nodeGraph")}>${icon("nodeGraph", 20)}</button>
+    ${flyCmds("extras", "boxgen", [["nest", "nest", "tip.cmd.nest"], ["boxgen", "boxgen", "tip.cmd.boxgen"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
+      ["view3d", "view3d", "tip.cmd.view3d"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
@@ -76,35 +70,18 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${cmd("group", "group", "tip.cmd.group")}
       ${cmd("ungroup", "ungroup", "tip.cmd.ungroup")}
-      ${cmd("splitParts", "splitParts", "tip.cmd.splitParts")}
-      ${cmd("offset", "offset", "tip.cmd.offset")}
     </div>
     <div class="tb-group">
-      ${cmd("boolUnion", "boolUnion", "tip.cmd.boolUnion")}
-      ${cmd("boolSubtract", "boolSubtract", "tip.cmd.boolSubtract")}
-      ${cmd("boolIntersect", "boolIntersect", "tip.cmd.boolIntersect")}
-      ${cmd("splitByLine", "splitByLine", "tip.cmd.splitByLine")}
-      ${cmd("fillet", "fillet", "tip.cmd.fillet")}
-      ${cmd("patternFill", "patternFill", "tip.cmd.patternFill")}
-      ${cmd("weldScore", "weldScore", "tip.cmd.weldScore")}
-      ${cmd("centerFix", "centerFix", "tip.cmd.centerFix")}
-      ${cmd("imageMask", "imageMask", "tip.cmd.imageMask")}
-      ${cmd("imageSplit", "imageSplit", "tip.cmd.imageSplit")}
-      ${cmd("tiles", "tiles", "tip.cmd.tiles")}
-    </div>
-    <div class="tb-group">
-      ${cmd("rotateLeft", "rotateLeft", "tip.cmd.rotateLeft")}
-      ${cmd("rotateRight", "rotateRight", "tip.cmd.rotateRight")}
-      ${cmd("mirrorH", "mirrorH", "tip.cmd.mirrorH")}
-      ${cmd("mirrorV", "mirrorV", "tip.cmd.mirrorV")}
-    </div>
-    <div class="tb-group">
-      ${cmd("alignLeft", "alignLeft", "tip.cmd.alignLeft")}
-      ${cmd("alignCenterH", "alignCenterH", "tip.cmd.alignCenterH")}
-      ${cmd("alignRight", "alignRight", "tip.cmd.alignRight")}
-      ${cmd("alignTop", "alignTop", "tip.cmd.alignTop")}
-      ${cmd("alignCenterV", "alignCenterV", "tip.cmd.alignCenterV")}
-      ${cmd("alignBottom", "alignBottom", "tip.cmd.alignBottom")}
+      ${flyCmds("combine", "boolUnion", [["boolUnion", "boolUnion", "tip.cmd.boolUnion"], ["boolSubtract", "boolSubtract", "tip.cmd.boolSubtract"],
+        ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
+      ${flyCmds("edit", "offset", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["patternFill", "patternFill", "tip.cmd.patternFill"],
+        ["centerFix", "centerFix", "tip.cmd.centerFix"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"]])}
+      ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"]])}
+      ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],
+        ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"]])}
+      ${flyCmds("align", "alignCenterH", [["alignLeft", "alignLeft", "tip.cmd.alignLeft"], ["alignCenterH", "alignCenterH", "tip.cmd.alignCenterH"],
+        ["alignRight", "alignRight", "tip.cmd.alignRight"], ["alignTop", "alignTop", "tip.cmd.alignTop"], ["alignCenterV", "alignCenterV", "tip.cmd.alignCenterV"],
+        ["alignBottom", "alignBottom", "tip.cmd.alignBottom"]])}
     </div>
     <div class="tb-group">
       ${cmd("zoomFit", "zoomFit", "tip.cmd.zoomFit")}
@@ -124,10 +101,16 @@ export function renderEditorToolbar(container: HTMLElement) {
       <label class="tb-opt" ${tip("tip.snapGrid")}>
         <input type="checkbox" id="opt-snap-grid">${icon("grid", 16)}
         <input type="number" id="opt-grid-step" min="0.1" step="0.5" class="tb-num"></label>
-      <label class="tb-opt" ${tip("tip.rectRadius")}>
+      <label class="tb-opt tb-opt-tool" data-for="rect" ${tip("tip.rectRadius")}>
         ${icon("rect", 16)}<span class="tb-lbl">R</span><input type="number" id="opt-rect-radius" min="0" step="0.5" class="tb-num"></label>
-      <label class="tb-opt" ${tip("tip.polySides")}>
+      <label class="tb-opt tb-opt-tool" data-for="polygon" ${tip("tip.polySides")}>
         ${icon("polygon", 16)}<input type="number" id="opt-poly-sides" min="3" max="100" step="1" class="tb-num"></label>
     </div>
   `;
+  // Eckenradius / Anzahl Ecken nur zeigen, solange Rechteck bzw. Vieleck gewählt ist (spart Platz in der Leiste)
+  const showToolOpts = (name: string) => container.querySelectorAll<HTMLElement>(".tb-opt-tool").forEach(el => {
+    el.style.display = el.dataset.for === name ? "" : "none";
+  });
+  window.addEventListener("cnc-tool-changed", e => showToolOpts(String((e as CustomEvent).detail)));
+  showToolOpts("select");
 }

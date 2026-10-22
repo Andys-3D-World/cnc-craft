@@ -551,16 +551,16 @@ body.drop-active .canvas-holder { outline: 2px dashed var(--accent-color); outli
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 10px;
+  gap: 4px 7px;
   padding: 5px 8px;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
 .tb-group { display: flex; align-items: center; gap: 2px; }
-.tb-group + .tb-group { padding-left: 10px; border-left: 1px solid var(--border-color); }
+.tb-group + .tb-group { padding-left: 7px; border-left: 1px solid var(--border-color); }
 .editor-toolbar .btn-cmd {
-  width: 30px;
+  width: 28px;
   height: 30px;
   background: transparent;
   border: 1px solid transparent;
@@ -568,7 +568,7 @@ body.drop-active .canvas-holder { outline: 2px dashed var(--accent-color); outli
 }
 .editor-toolbar .btn-cmd:hover { background: var(--bg-panel-2); border-color: var(--border-color); }
 .btn-cmd-danger { color: var(--color-danger) !important; }
-.tb-options { gap: 8px; }
+.tb-options { gap: 6px; }
 .tb-opt { display: flex; align-items: center; gap: 3px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer; }
 .tb-opt input[type="checkbox"] { margin: 0; }
 .tb-lbl { font-size: 0.7rem; }
@@ -1544,3 +1544,27 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .rot-check { font-size: 0.76rem; line-height: 1.35; padding: 6px 8px; border-radius: 6px; background: rgba(128,128,128,0.1); color: var(--text-muted); }
 .rot-check.warn { background: rgba(245,159,0,0.12); color: var(--color-warning); }
 .rot-check.block { background: rgba(255,107,107,0.12); color: var(--color-danger); }
+/* Aufklappende Gruppen in den Werkzeugleisten (ui/flyout.ts) */
+.fly { position: relative; display: flex; }
+.fly-btn { position: relative; }
+.fly-tri { position: absolute; right: 2px; bottom: 2px; width: 0; height: 0; border-left: 4px solid transparent; border-bottom: 4px solid var(--text-muted); pointer-events: none; }
+.fly.open > .fly-btn { border-color: var(--accent-color); background: var(--bg-panel-2); }
+.fly-menu { display: none; position: fixed; z-index: 4000; flex-direction: column; gap: 2px; min-width: 190px; padding: 5px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 9px; box-shadow: 0 10px 28px rgba(0,0,0,0.4); }
+.fly.open > .fly-menu { display: flex; }
+.fly-menu .fly-item { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; height: 32px; aspect-ratio: auto;
+  padding: 0 9px; background: transparent; border: 1px solid transparent; border-radius: 6px; color: var(--text-main); font-size: 0.8rem; text-align: left; transform: none; box-shadow: none; }
+.fly-menu .fly-item:hover { background: var(--accent-glow); border-color: var(--accent-color); transform: none; }
+.fly-menu .fly-item.active { background: var(--accent-glow); border-color: var(--accent-color); box-shadow: none; }
+.fly-lbl { flex: 1; white-space: nowrap; }
+.fly-kbd { margin-left: 10px; padding: 0 5px; border-radius: 4px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-muted); font: 600 0.68rem/16px var(--font-mono, monospace); }
+.editor-toolbar .fly-btn { width: 28px; }
+#opt-material { max-width: 118px; }
+/* Rechte Seite: Objekt ohne Auswahl, feste Maschinen-Leiste, Konsole */
+#rp-object.no-sel .needs-sel { display: none; }
+.rp-nosel { display: none; font-size: 0.78rem; color: var(--text-muted); padding: 10px 12px; border: 1px dashed var(--border-color); border-radius: var(--radius-md); line-height: 1.4; }
+#rp-object.no-sel .rp-nosel { display: block; }
+.m-dock { position: sticky; top: -8px; z-index: 5; display: flex; flex-direction: column; gap: 6px; padding: 8px; margin: -8px -8px 4px; background: var(--bg-panel); border-bottom: 1px solid var(--border-color); box-shadow: 0 6px 10px -8px rgba(0,0,0,0.5); }
+.m-dock .dro { padding-bottom: 4px; }
+.rp-console-new { margin-left: 8px; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--accent-color); color: #fff; font-size: 0.65rem; line-height: 16px; text-align: center; }
+.rp-console-new:empty { display: none; }

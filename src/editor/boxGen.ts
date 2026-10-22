@@ -42,13 +42,22 @@ export interface BoxOptions {
  *   lidbox  Kiste mit Stülpdeckel (offen + Deckel aus zwei Platten: außen + innen als Führung)
  *   slide   Kiste mit Schiebedeckel (vorne niedriger; Leisten innen bilden die Führung für den Deckel)
  *   shelf   Regal (vorne offen, Regalbretter mit Zapfen in Schlitzen der Seitenwände)
- *   flex    Runde Kiste: Wand aus einem Streifen mit Biegescharnier (nur Laser), Boden mit Zapfen
+ *   traylid Sortierkasten mit Stülpdeckel (Trennwände um eine Materialstärke niedriger)
+ *   flex    Runde Kiste: Wand aus einem Streifen mit Biegescharnier (nur Laser), Boden und Ring oben mit Zapfen,
+ *           Stoß hinten mit Puzzle-Verschluss, Stülpdeckel
+ *   flexcup Runder Becher: wie flex, ohne Deckel (Stifte, Pinsel …)
+ *   lantern Laterne / Teelichthaus: geschlossen, Fenster in allen vier Wänden, Abzugsloch im Deckel
+ *   coin    Spardose: geschlossen, Münzschlitz im Deckel, rundes Loch im Boden mit Stopfen (zwei Scheiben)
  */
-export type BoxType = "closed" | "open" | "tray" | "handle" | "drawer" | "lidbox" | "slide" | "shelf" | "flex";
-export const BOX_TYPES: BoxType[] = ["closed", "open", "tray", "handle", "drawer", "lidbox", "slide", "shelf", "flex"];
+export type BoxType = "closed" | "open" | "tray" | "traylid" | "handle" | "drawer" | "lidbox" | "slide" | "shelf" | "flex" | "flexcup" | "lantern" | "coin";
+export const BOX_TYPES: BoxType[] = ["closed", "open", "lidbox", "slide", "tray", "traylid", "handle", "drawer", "shelf", "flex", "flexcup", "lantern", "coin"];
+/** Arten mit Deckel aus Fingerzinken (sechs Platten) */
+const LIDDED: BoxType[] = ["closed", "lantern", "coin"];
+const isFlex = (ty?: BoxType) => ty === "flex" || ty === "flexcup";
 
 export type PanelName = "bottom" | "top" | "front" | "back" | "left" | "right" | "divX" | "divY" | "blende" | "lidOuter" | "lidInner"
-  | "slideLid" | "linerSide" | "linerBack" | "railSide" | "railBack" | "shelfBack" | "shelfEnd" | "shelf" | "flexWall";
+  | "slideLid" | "linerSide" | "linerBack" | "railSide" | "railBack" | "shelfBack" | "shelfEnd" | "shelf" | "flexWall" | "flexRing"
+  | "plugOuter" | "plugInner";
 /** holes: Ausschnitte in der Platte (Schlitze, Grifflöcher); lines: offene Schnitte (Biegescharnier) */
 export interface Panel { name: PanelName; w: number; h: number; pts: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; lines?: { x: number; y: number }[][] }
 
@@ -57,11 +66,20 @@ export function outerSize(o: BoxOptions): { W: number; D: number; H: number } {
   const t = Math.max(0.1, o.t), type = o.type || (o.lid ? "closed" : "open");
   if (!o.inner) return { W: o.w, D: o.d, H: o.h };
   if (type === "shelf") return { W: o.w + 2 * t, D: o.d + t, H: o.h + 2 * t }; // vorne offen, Rückwand hinten
-  return { W: o.w + 2 * t, D: o.d + 2 * t, H: o.h + (type === "closed" ? 2 : 1) * t };
+  return { W: o.w + 2 * t, D: o.d + 2 * t, H: o.h + (LIDDED.includes(type) ? 2 : 1) * t };
 }
 
 type Pt2 = { x: number; y: number };
 const rect = (x0: number, y0: number, x1: number, y1: number): Pt2[] => [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
+/** Kreis als Vieleck (Mitte cx, cy) */
+const circle = (cx: number, cy: number, r: number, n = 64): Pt2[] =>
+  Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / n), y: cy + r * Math.sin((2 * Math.PI * i) / n) }));
+/** Fenster mit Rundbogen oben (unten links x0,y0, Breite w, Höhe h) */
+function archWindow(x0: number, y0: number, w: number, h: number): Pt2[] {
+  const r = Math.min(w / 2, h / 2), pts: Pt2[] = [{ x: x0, y: y0 }, { x: x0 + w, y: y0 }];
+  for (let i = 0; i <= 16; i++) { const a = (Math.PI * i) / 16; pts.push({ x: x0 + w / 2 + (w / 2) * Math.cos(a), y: y0 + h - r + r * Math.sin(a) }); }
+  return pts;
+}
 /** Langloch (Griff) mit runden Enden, Mitte (cx, cy) */
 function slot(cx: number, cy: number, len: number, hgt: number): Pt2[] {
   const r = hgt / 2, a = len / 2 - r, pts: Pt2[] = [];
@@ -147,7 +165,7 @@ function merge(segs: Seg[]): Seg[] {
 
 function rawPanels(o: BoxOptions): Panel[] {
   const type: BoxType = o.type && BOX_TYPES.includes(o.type) ? o.type : (o.lid ? "closed" : "open");
-  if (type === "flex") return flexPanels(o);
+  if (isFlex(type)) return flexPanels({ ...o, type });
   if (type === "shelf") {
     // Regal = Sortierkasten auf den Rücken gelegt: Boden → Rückwand, vorne/hinten → Boden/Oberseite,
     // Quer-Trennwände → Regalbretter (die offene Seite zeigt nach vorne)
@@ -156,7 +174,7 @@ function rawPanels(o: BoxOptions): Panel[] {
     return rawPanels({ ...o, inner: false, w: W, d: H, h: D, type: "tray", nx: o.shelves ?? 2, ny: 0 })
       .map(p => ({ ...p, name: rename[p.name] || p.name }));
   }
-  const lid = type === "closed";
+  const lid = LIDDED.includes(type);
   const t = Math.max(0.1, o.t);
   const { W, D, H } = outerSize({ ...o, type });
   const f = Math.max(t, o.finger);
@@ -182,12 +200,14 @@ function rawPanels(o: BoxOptions): Panel[] {
   lr("left"); lr("right");
 
   const Wi = W - 2 * t, Di = D - 2 * t, Hi = H - t; // Innenmaße (offene Box)
-  if (type === "tray") {
+  if (type === "tray" || type === "traylid") {
     // Trennwände stehen auf dem Boden (Höhe = Innenhöhe); Zapfen (t lang) stecken in Schlitzen der Außenwände.
     // Quer-Wände (divX, parallel zur Front) von oben, Längs-Wände (divY) von unten halb eingeschnitten → stecken ineinander
     const nx = Math.max(0, Math.min(20, Math.round(o.nx ?? 1))), ny = Math.max(0, Math.min(20, Math.round(o.ny ?? 1)));
-    const tabH = Math.max(t, Hi / 3);
-    const tb = (Hi - tabH) / 2, te = tb + tabH;   // Zapfen relativ zur Unterkante der Trennwand
+    // mit Stülpdeckel: Trennwände eine Materialstärke niedriger, sonst stößt der Deckel innen an
+    const Hd = type === "traylid" ? Hi - t : Hi;
+    const tabH = Math.max(t, Hd / 3);
+    const tb = (Hd - tabH) / 2, te = tb + tabH;   // Zapfen relativ zur Unterkante der Trennwand
     const xs = Array.from({ length: ny }, (_, i) => (Wi * (i + 1)) / (ny + 1)); // Längs-Wände: Abstand von der linken Innenseite
     const ys = Array.from({ length: nx }, (_, i) => (Di * (i + 1)) / (nx + 1)); // Quer-Wände: Abstand von der vorderen Innenseite
     // Schlitze in den Außenwänden (Wand-Koordinaten: + t Wanddicke; die Trennwand steht auf dem Boden bei t)
@@ -196,11 +216,11 @@ function rawPanels(o: BoxOptions): Panel[] {
     /** Trennwand: Innenlänge L, Zapfen links/rechts; Einschnitte (Breite t, halbe Höhe) an den Stellen cuts */
     const divider = (L: number, cuts: number[], fromTop: boolean, name: "divX" | "divY"): Panel => {
       const pts: Pt2[] = [{ x: t, y: 0 }];
-      if (!fromTop) for (const c of cuts) pts.push({ x: t + c - t / 2, y: 0 }, { x: t + c - t / 2, y: Hi / 2 }, { x: t + c + t / 2, y: Hi / 2 }, { x: t + c + t / 2, y: 0 });
-      pts.push({ x: L + t, y: 0 }, { x: L + t, y: tb }, { x: L + 2 * t, y: tb }, { x: L + 2 * t, y: te }, { x: L + t, y: te }, { x: L + t, y: Hi });
-      if (fromTop) for (const c of [...cuts].reverse()) pts.push({ x: t + c + t / 2, y: Hi }, { x: t + c + t / 2, y: Hi / 2 }, { x: t + c - t / 2, y: Hi / 2 }, { x: t + c - t / 2, y: Hi });
-      pts.push({ x: t, y: Hi }, { x: t, y: te }, { x: 0, y: te }, { x: 0, y: tb }, { x: t, y: tb });
-      return { name, w: L + 2 * t, h: Hi, pts };
+      if (!fromTop) for (const c of cuts) pts.push({ x: t + c - t / 2, y: 0 }, { x: t + c - t / 2, y: Hd / 2 }, { x: t + c + t / 2, y: Hd / 2 }, { x: t + c + t / 2, y: 0 });
+      pts.push({ x: L + t, y: 0 }, { x: L + t, y: tb }, { x: L + 2 * t, y: tb }, { x: L + 2 * t, y: te }, { x: L + t, y: te }, { x: L + t, y: Hd });
+      if (fromTop) for (const c of [...cuts].reverse()) pts.push({ x: t + c + t / 2, y: Hd }, { x: t + c + t / 2, y: Hd / 2 }, { x: t + c - t / 2, y: Hd / 2 }, { x: t + c - t / 2, y: Hd });
+      pts.push({ x: t, y: Hd }, { x: t, y: te }, { x: 0, y: te }, { x: 0, y: tb }, { x: t, y: tb });
+      return { name, w: L + 2 * t, h: Hd, pts };
     };
     for (let i = 0; i < nx; i++) panels.push(divider(Wi, xs, true, "divX"));
     for (let i = 0; i < ny; i++) panels.push(divider(Di, ys, false, "divY"));
@@ -230,7 +250,29 @@ function rawPanels(o: BoxOptions): Panel[] {
     const gl = Math.min(lw * 0.4, 50), gh = Math.min(10, ld * 0.15);
     panels.push({ name: "slideLid", w: lw, h: ld, pts: rect(0, 0, lw, ld), holes: gl > gh * 1.5 ? [slot(lw / 2, 6 + gh / 2, gl, gh)] : [] });
   }
-  if (type === "lidbox") {
+  if (type === "lantern") {
+    // Fenster mit Rundbogen in allen vier Wänden (Rand frei für die Zinken), Abzugsloch im Deckel
+    const m = Math.max(8, 3 * t + 4);
+    for (const n of ["front", "back", "left", "right"] as const) {
+      const p = get(n), ww = p.w - 2 * m, wh = p.h - 2 * m;
+      if (ww > 8 && wh > 8) p.holes = [archWindow(m, m, ww, wh)];
+    }
+    const top = get("top"), vr = Math.min(top.w, top.h) * 0.15;
+    if (vr > 4) top.holes = [circle(top.w / 2, top.h / 2, vr)];
+  }
+  if (type === "coin") {
+    // Münzschlitz im Deckel (passt bis 2-€-Münze), Loch im Boden mit Stopfen aus zwei Scheiben (innen 0,2 mm kleiner)
+    const top = get("top"), bot = get("bottom");
+    const sl = Math.min(32, top.w - 4 * t), sh = 4;
+    if (sl > 2 * sh) top.holes = [slot(top.w / 2, top.h / 2, sl, sh)];
+    const hr = Math.min(25, (Math.min(bot.w, bot.h) - 4 * t) / 2 - 2);
+    if (hr > 6) {
+      bot.holes = [circle(bot.w / 2, bot.h / 2, hr)];
+      panels.push({ name: "plugOuter", w: 2 * hr + 10, h: 2 * hr + 10, pts: circle(hr + 5, hr + 5, hr + 5) });
+      panels.push({ name: "plugInner", w: 2 * hr, h: 2 * hr, pts: circle(hr, hr, hr - 0.2) });
+    }
+  }
+  if (type === "lidbox" || type === "traylid") {
     // Stülpdeckel: außen W × D, innen passend in die Öffnung (0,2 mm Luft je Seite) – beide aufeinander kleben
     const c = 0.2;
     panels.push({ name: "lidOuter", w: W, h: D, pts: rect(0, 0, W, D) });
@@ -277,9 +319,12 @@ function roundRect(x0: number, y0: number, x1: number, y1: number, rad: number, 
 }
 
 /**
- * Runde Kiste: Boden mit Zapfen auf den geraden Seiten, die Wand ist EIN Streifen um den Boden herum.
- * In den Rundungen hat der Streifen ein Biegescharnier (viele versetzte Schnitte) – nur mit dem Laser sinnvoll.
- * Der Stoß ist vorne links (Anfang der Front) und wird geklebt. Deckel wie beim Stülpdeckel aus zwei Platten.
+ * Runde Kiste / runder Becher: Boden und Ring oben mit Zapfen auf den geraden Seiten, die Wand ist EIN Streifen
+ * drumherum. In den Rundungen hat der Streifen ein Biegescharnier (viele versetzte Schnitte) – nur mit dem Laser.
+ * Zusammenbau: Streifen um den Boden legen (Zapfen in die Aussparungen unten), Ring oben aufstecken – dann hält
+ * die Form von selbst. Der Stoß liegt mitten auf der längeren geraden Seite hinten und hat einen Puzzle-Verschluss
+ * (Schwalbenschwanz-Nasen greifen in passende Aussparungen); ein Tropfen Leim genügt.
+ * Kiste (flex): Stülpdeckel aus zwei Platten, die kleine passt in die Öffnung des Rings.
  */
 function flexPanels(o: BoxOptions): Panel[] {
   const t = Math.max(0.1, o.t), f = Math.max(t, o.finger), c = 0.2;
@@ -287,24 +332,51 @@ function flexPanels(o: BoxOptions): Panel[] {
   const r = Math.max(t + 1, Math.min(o.radius ?? 15, W / 2, D / 2));
   const Lw = W - 2 * r, Ld = D - 2 * r;
   const arc = (Math.PI / 2) * (r - t / 2);              // Länge der Rundung in der Wandmitte
+  const rw = Math.max(6, 2 * t + 2);                     // Breite des Rings oben
   const panels: Panel[] = [];
-  // Boden: liegt innerhalb der Wand, Zapfen gehen durch die Wand bis außen
-  panels.push({ name: "bottom", w: W, h: D, pts: roundRect(t, t, W - t, D - t, r - t, { t, finger: f, d: t }) });
-  // Wand: Abschnitte vorne, Rundung, rechts, Rundung, hinten, Rundung, links, Rundung
-  const secs: { L: number; bend: boolean }[] = [];
-  for (const L of [Lw, Ld, Lw, Ld]) secs.push({ L, bend: false }, { L: arc, bend: true });
+  // Boden + Ring: liegen innerhalb der Wand, Zapfen gehen durch die Wand bis außen
+  const plate = () => roundRect(t, t, W - t, D - t, r - t, { t, finger: f, d: t });
+  panels.push({ name: "bottom", w: W, h: D, pts: plate() });
+  const hole = roundRect(t + rw, t + rw, W - t - rw, D - t - rw, Math.max(0.5, r - t - rw));
+  panels.push({ name: "flexRing", w: W, h: D, pts: plate(), holes: [hole] });
+
+  // Stoß mitten auf der längeren geraden Seite (hinten bzw. links); Reihenfolge wie roundRect: vorne, rechts, hinten, links
+  const straight = [Lw, Ld, Lw, Ld];
+  const seamSide = Lw >= Ld ? 2 : 3;
+  const order = [seamSide, (seamSide + 1) % 4, (seamSide + 2) % 4, (seamSide + 3) % 4, seamSide];
+  type Sec = { L: number; bend: boolean; tabs: [number, number][] };
+  const secs: Sec[] = [];
+  // Stoß in die Mitte einer Lücke zwischen zwei Zapfen, die der Seitenmitte am nächsten ist (nie durch eine Aussparung)
+  const Ls = straight[seamSide], tabsS = tabsOn(Ls, t, f);
+  let sp = Ls / 2;
+  if (tabsS.length) {
+    const gaps: number[] = [tabsS[0][0] / 2];
+    for (let i = 0; i < tabsS.length; i++) gaps.push(((tabsS[i][1]) + (i + 1 < tabsS.length ? tabsS[i + 1][0] : Ls)) / 2);
+    sp = gaps.reduce((best, x) => (Math.abs(x - Ls / 2) < Math.abs(best - Ls / 2) ? x : best));
+  }
+  order.forEach((side, i) => {
+    const L = straight[side];
+    const all = tabsOn(L, t, f);
+    // Stoß-Seite: erst das Stück ab dem Stoß, am Ende das Stück bis zum Stoß
+    if (i === 0) secs.push({ L: L - sp, bend: false, tabs: all.filter(([a2]) => a2 > sp).map(([a2, b2]) => [a2 - sp, b2 - sp]) });
+    else if (i === 4) secs.push({ L: sp, bend: false, tabs: all.filter(([, b2]) => b2 < sp) });
+    else secs.push({ L, bend: false, tabs: all });
+    if (i < 4) secs.push({ L: arc, bend: true, tabs: [] });
+  });
   const len = secs.reduce((n, q) => n + q.L, 0);
-  const pts: Pt2[] = [{ x: 0, y: 0 }];
+
   const lines: Pt2[][] = [];
   const g = Math.max(2, t);                               // Stege zwischen den Schnitten
   const step = Math.min(2.5, Math.max(1, t * 0.5));       // Abstand der Schnitt-Reihen
   const cut = (x: number, y0: number, y1: number) => { if (y1 - y0 > 1) lines.push([{ x, y: y0 }, { x, y: y1 }]); };
+  const notches: [number, number][] = [];                 // Aussparungen unten und oben (für die Zapfen)
   let s0 = 0;
   for (const sec of secs) {
-    if (!sec.bend) for (const [a, b] of tabsOn(sec.L, t, f)) pts.push({ x: s0 + a, y: 0 }, { x: s0 + a, y: t }, { x: s0 + b, y: t }, { x: s0 + b, y: 0 });
+    if (!sec.bend) for (const [a2, b2] of sec.tabs) notches.push([s0 + a2, s0 + b2]);
     else {
-      // Biegescharnier etwas breiter als die Rundung; abwechselnd Reihe A (2 Schnitte) und B (3 Schnitte, versetzt)
-      const m = Math.min(1, s0), from = s0 - m, span = sec.L + 2 * m;
+      // Biegescharnier etwas breiter als die Rundung (t je Seite, nicht über die Nachbar-Abschnitte hinaus);
+      // abwechselnd Reihe A (2 Schnitte) und B (3 Schnitte, versetzt, bis an die Kanten)
+      const m = Math.min(t, s0, len - s0 - sec.L), from = s0 - m, span = sec.L + 2 * m;
       const n = Math.max(2, Math.round(span / step));
       for (let j = 0; j < n; j++) {
         const x = from + ((j + 0.5) * span) / n;
@@ -314,12 +386,30 @@ function flexPanels(o: BoxOptions): Panel[] {
     }
     s0 += sec.L;
   }
-  pts.push({ x: len, y: 0 }, { x: len, y: H }, { x: 0, y: H });
-  panels.push({ name: "flexWall", w: len, h: H, pts, lines });
-  // Deckel: außen wie die Kiste, innen passend in die Öffnung
-  panels.push({ name: "lidOuter", w: W, h: D, pts: roundRect(0, 0, W, D, r) });
-  const iw = W - 2 * t - 2 * c, id = D - 2 * t - 2 * c;
-  panels.push({ name: "lidInner", w: iw, h: id, pts: roundRect(0, 0, iw, id, Math.max(0.5, r - t - c)) });
+
+  // Puzzle-Verschluss: Nasen am Ende (x = len) greifen in Aussparungen am Anfang (x = 0)
+  const kd = Math.max(4, 2 * t), hw = kd * 1.3, nw = kd * 0.75;
+  const free = H - 2 * t - 4;
+  const nK = Math.max(1, Math.min(4, Math.floor(free / (2.6 * hw))));
+  const knobs = Array.from({ length: nK }, (_, i) => t + 2 + (free * (i + 0.5)) / nK);
+
+  const pts: Pt2[] = [{ x: 0, y: 0 }];
+  for (const [a2, b2] of notches) pts.push({ x: a2, y: 0 }, { x: a2, y: t }, { x: b2, y: t }, { x: b2, y: 0 });
+  pts.push({ x: len, y: 0 });
+  for (const yc of knobs) pts.push({ x: len, y: yc - nw / 2 }, { x: len + kd, y: yc - hw / 2 }, { x: len + kd, y: yc + hw / 2 }, { x: len, y: yc + nw / 2 });
+  pts.push({ x: len, y: H });
+  for (const [a2, b2] of [...notches].reverse()) pts.push({ x: b2, y: H }, { x: b2, y: H - t }, { x: a2, y: H - t }, { x: a2, y: H });
+  pts.push({ x: 0, y: H });
+  for (const yc of [...knobs].reverse()) pts.push({ x: 0, y: yc + nw / 2 }, { x: kd, y: yc + hw / 2 }, { x: kd, y: yc - hw / 2 }, { x: 0, y: yc - nw / 2 });
+  const clean = pts.filter((q, i) => { const nq = pts[(i + 1) % pts.length]; return Math.hypot(q.x - nq.x, q.y - nq.y) > 1e-6; });
+  panels.push({ name: "flexWall", w: len + kd, h: H, pts: clean, lines });
+
+  if (o.type !== "flexcup") {
+    // Stülpdeckel: außen wie die Kiste, innen passend in die Öffnung des Rings
+    panels.push({ name: "lidOuter", w: W, h: D, pts: roundRect(0, 0, W, D, r) });
+    const iw = W - 2 * (t + rw) - 2 * c, id = D - 2 * (t + rw) - 2 * c;
+    panels.push({ name: "lidInner", w: iw, h: id, pts: roundRect(0, 0, iw, id, Math.max(0.5, r - t - rw - c)) });
+  }
   return panels;
 }
 
@@ -376,10 +466,10 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
           <label class="prop-row" style="cursor:pointer;"><span>${t("box.inner")}</span><input id="box-inner" type="checkbox" ${o.inner ? "checked" : ""} style="width:auto;"></label>
           ${num("box-t", "box.t", o.t, "0.1", "0.5")}
           ${num("box-f", "box.finger", o.finger, "0.5", "1")}
-          <div class="box-x" data-for="tray">${num("box-nx", "box.nx", o.nx ?? 1, "1", "0")}${num("box-ny", "box.ny", o.ny ?? 2, "1", "0")}</div>
+          <div class="box-x" data-for="tray traylid">${num("box-nx", "box.nx", o.nx ?? 1, "1", "0")}${num("box-ny", "box.ny", o.ny ?? 2, "1", "0")}</div>
           <div class="box-x" data-for="drawer">${num("box-ov", "box.overhang", o.overhang ?? 5, "1", "0")}</div>
           <div class="box-x" data-for="shelf">${num("box-sh", "box.shelves", o.shelves ?? 2, "1", "0")}</div>
-          <div class="box-x" data-for="flex">${num("box-rad", "box.radius", o.radius ?? 15, "1", "2")}</div>
+          <div class="box-x" data-for="flex flexcup">${num("box-rad", "box.radius", o.radius ?? 15, "1", "2")}</div>
           ${num("box-kerf", "box.kerf", o.kerf, "0.01", "0")}
         </div>
         <div class="box-prev"><svg id="box-svg" viewBox="0 0 100 100"></svg><div id="box-info" class="dlg-hint"></div></div>
@@ -396,7 +486,7 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     const n = (id: string, d: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? v : d; };
     const type = $<HTMLSelectElement>("box-type").value as BoxType;
     return { w: n("box-w", o.w), d: n("box-d", o.d), h: n("box-h", o.h), inner: $("box-inner").checked, t: n("box-t", o.t),
-      finger: n("box-f", o.finger), lid: type === "closed", kerf: n("box-kerf", o.kerf), type,
+      finger: n("box-f", o.finger), lid: LIDDED.includes(type), kerf: n("box-kerf", o.kerf), type,
       nx: Math.round(n("box-nx", o.nx ?? 1)), ny: Math.round(n("box-ny", o.ny ?? 2)), overhang: n("box-ov", o.overhang ?? 5),
       shelves: Math.min(20, Math.round(n("box-sh", o.shelves ?? 2))), radius: n("box-rad", o.radius ?? 15) };
   };
@@ -404,13 +494,13 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     if (!(b.t > 0) || Math.min(b.w, b.d, b.h) <= (b.inner ? 0 : 3 * b.t)) return false;
     const { H } = outerSize(b);
     if (b.type === "slide" && H < 6 * b.t + 2) return false;         // Platz für Futter + Deckel + Leiste
-    if (b.type === "flex" && H < 4 * Math.max(2, b.t) + 4) return false; // sonst passt kein Biegescharnier
+    if (isFlex(b.type) && H < 6 * Math.max(2, b.t) + 8) return false;   // Aussparungen oben/unten + Biegescharnier + Verschluss
     return true;
   };
   const preview = () => {
     const b = read();
     // Zusatzfelder nur bei der passenden Art
-    ov.querySelectorAll<HTMLElement>(".box-x").forEach(el => { el.style.display = el.dataset.for === b.type ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>(".box-x").forEach(el => { el.style.display = (el.dataset.for || "").split(" ").includes(b.type!) ? "" : "none"; });
     $<HTMLElement>("box-tdesc").textContent = t("box.tdesc." + b.type);
     const svg = $<HTMLElement>("box-svg") as unknown as SVGSVGElement;
     const info = $<HTMLElement>("box-info");

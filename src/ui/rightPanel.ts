@@ -1,10 +1,12 @@
 /**
- * RECHTE SEITE: drei Reiter + Konsole (immer sichtbar unten)
+ * RECHTE SEITE: drei Reiter + Konsole (unten, einklappbar)
  *
  *   Objekt   – Position/Größe/Drehung der Auswahl, Werkzeug, Bahn-Korrektur, Frästiefe
  *   Fräsen   – G-Code erzeugen/speichern, Werkzeuge im Auftrag, Nullpunkt, Arbeitsraum
- *   Maschine – Verbindung, Position, Job starten/pausieren/stoppen,
- *              Spindel/Laser/Brenner mit Overrides (spindlePanel.ts), manuelle Fahrt
+ *   Maschine – feste Leiste oben (Zustand, Position, Fortschritt, Start/Pause/Stopp), darunter Verbindung
+ *              (klappt nach dem Verbinden zu), manuelle Fahrt, Maschine (Entsperren, Referenzfahrt …), Auftrag,
+ *              Spindel/Laser/Brenner mit Overrides (spindlePanel.ts), Antasten
+ *   Objekt ohne Auswahl: nur Ebenen + Hinweis (Abschnitte .needs-sel sind dann versteckt)
  */
 import { icon } from "./icons";
 import { t, T, tip, ph } from "../i18n/i18n";
@@ -17,6 +19,12 @@ import { machineLineHtml } from "./machineWizard";
 import { spindlePanelHtml } from "./spindlePanel";
 import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
+import { setSectionOpen } from "../ui";
+import { MACHINE_EVENT } from "../machine";
+
+const CONSOLE_KEY = "cnc_craft_console_collapsed";
+/** Meldungen, bei denen die zugeklappte Konsole von selbst aufgeht (alle Sprachen) */
+const ERROR_RE = /error|fehler|erreur|errore|fout|błąd|alarm|⚠|❌|⛔/i;
 
 export function renderRightPanel(container: HTMLElement) {
   container.innerHTML = `
@@ -33,7 +41,8 @@ export function renderRightPanel(container: HTMLElement) {
       <div id="rp-object" class="rp-page active">
         ${laserLayersHtml()}
         ${plasmaCutsHtml()}
-        <div class="menu-section-unified">
+        <div class="rp-nosel">${T("rp.noSel")}</div>
+        <div class="menu-section-unified needs-sel">
           <h3 class="menu-trigger">${T("rp.properties")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row">${T("rp.centerX")}<input type="number" id="dim-x" class="prop-input"></div>
@@ -47,7 +56,7 @@ export function renderRightPanel(container: HTMLElement) {
 
         ${toolPickerHtml()}
 
-        <div class="menu-section-unified mill-plasma">
+        <div class="menu-section-unified mill-plasma needs-sel">
           <h3 class="menu-trigger">${T("rp.pathMode")}</h3>
           <div class="menu-body rp-grid2">
             <button id="cam-mode-part" class="btn-secondary" ${tip("rp.modeOutsideTip")}>🔷 ${T("rp.modeOutside")}</button>
@@ -71,7 +80,7 @@ export function renderRightPanel(container: HTMLElement) {
         </div>
 
         <!-- Haltestege: Fräse (mit Höhe), Laser und Plasma (Werkzeug über dem Steg aus) -->
-        <div class="menu-section-unified">
+        <div class="menu-section-unified needs-sel">
           <h3 class="menu-trigger">${T("rp.tabsTitle")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row" ${tip("rp.tabsModeTip")}>${T("rp.tabsMode")}
@@ -131,6 +140,28 @@ export function renderRightPanel(container: HTMLElement) {
 
       <!-- ================= REITER: MASCHINE ================= -->
       <div id="rp-machine" class="rp-page">
+        <div class="m-dock">
+            <div class="m-state-row">
+              <span id="machine-state" class="m-state m-state-off">${T("m.state.Offline")}</span>
+              <span id="machine-fs" class="m-fs"></span>
+            </div>
+            <div id="machine-alarm" class="m-alarm" style="display:none;"></div>
+            <div class="dro">
+              <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
+              <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
+              <div style="color: #ffc043;">Z <span id="pos-z">0.00</span></div>
+            </div>
+            <div id="job-progress-track" style="height: 8px; border-radius: 4px; overflow: hidden;">
+              <div id="job-progress-bar" style="height: 100%; width: 0%; transition: width 0.2s;"></div>
+            </div>
+            <div id="job-progress-label" style="font-size: 0.7rem; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">${T("rp.noJob")}</div>
+            <div style="display: flex; gap: 5px;">
+              <button id="btn-job-start" class="btn-primary" style="flex: 1; padding: 6px;">▶ ${T("rp.start")}</button>
+              <button id="btn-job-pause" class="btn-secondary" style="flex: 1; padding: 6px;" ${tip("m.pauseTip")}>⏸ ${T("rp.pause")}</button>
+              <button id="btn-job-stop" class="btn-secondary" style="flex: 1; padding: 6px; color: var(--color-danger); border-color: var(--color-danger);" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
+            </div>
+        </div>
+
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.connection")}</h3>
           <div class="menu-body rp-box">
@@ -159,56 +190,6 @@ export function renderRightPanel(container: HTMLElement) {
             ${machineLineHtml()}
           </div>
         </div>
-
-        <div class="menu-section-unified">
-          <h3 class="menu-trigger">${T("m.statusSection")}</h3>
-          <div class="menu-body rp-box">
-            <div class="m-state-row">
-              <span id="machine-state" class="m-state m-state-off">${T("m.state.Offline")}</span>
-              <span id="machine-fs" class="m-fs"></span>
-            </div>
-            <div id="machine-alarm" class="m-alarm" style="display:none;"></div>
-            <div class="dro">
-              <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
-              <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
-              <div style="color: #ffc043;">Z <span id="pos-z">0.00</span></div>
-            </div>
-            <div id="machine-mpos" class="tool-scope m-mpos"></div>
-            ${pinLedsHtml()}
-            <div class="m-btn-grid">
-              <button id="m-unlock" class="btn-secondary not-ruida" ${tip("m.unlockTip")}>🔓 ${T("m.unlock")}</button>
-              <button id="m-home" class="btn-secondary" ${tip("m.homeTip")}>⌂ ${T("m.home")}</button>
-              <button id="m-reset" class="btn-secondary" ${tip("m.resetTip")}>⟲ ${T("m.reset")}</button>
-              <button id="m-zero-xy" class="btn-secondary not-ruida not-k40" ${tip("m.zeroXYTip")}>◎ XY=0</button>
-              <button id="m-zero-z" class="btn-secondary not-ruida not-k40" ${tip("m.zeroZTip")}>⊥ Z=0</button>
-              <button id="m-goto-zero" class="btn-secondary" ${tip("m.gotoZeroTip")}>➜ 0,0</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="menu-section-unified">
-          <h3 class="menu-trigger">${T("rp.positionJob")}</h3>
-          <div class="menu-body rp-box">
-            <div style="display: flex; gap: 5px;">
-              <button id="btn-load-gcode" class="btn-secondary" style="flex: 1;" ${tip("rp.loadGcodeTip")}>📂 ${T("rp.loadGcode")}</button>
-              <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
-            </div>
-            <div id="job-progress-track" style="height: 8px; border-radius: 4px; overflow: hidden;">
-              <div id="job-progress-bar" style="height: 100%; width: 0%; transition: width 0.2s;"></div>
-            </div>
-            <div id="job-progress-label" style="font-size: 0.7rem; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">${T("rp.noJob")}</div>
-            <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
-            <div style="display: flex; gap: 5px;">
-              <button id="btn-job-start" class="btn-primary" style="flex: 1; padding: 6px;">▶ ${T("rp.start")}</button>
-              <button id="btn-job-pause" class="btn-secondary" style="flex: 1; padding: 6px;" ${tip("m.pauseTip")}>⏸ ${T("rp.pause")}</button>
-              <button id="btn-job-stop" class="btn-secondary" style="flex: 1; padding: 6px; color: var(--color-danger); border-color: var(--color-danger);" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
-            </div>
-          </div>
-        </div>
-
-        ${spindlePanelHtml()}
-
-        ${probePanelHtml()}
 
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.jog")}</h3>
@@ -244,13 +225,45 @@ export function renderRightPanel(container: HTMLElement) {
             </div>
           </div>
         </div>
+
+        <div class="menu-section-unified">
+          <h3 class="menu-trigger">${T("m.statusSection")}</h3>
+          <div class="menu-body rp-box">
+            <div id="machine-mpos" class="tool-scope m-mpos"></div>
+            ${pinLedsHtml()}
+            <div class="m-btn-grid">
+              <button id="m-unlock" class="btn-secondary not-ruida" ${tip("m.unlockTip")}>🔓 ${T("m.unlock")}</button>
+              <button id="m-home" class="btn-secondary" ${tip("m.homeTip")}>⌂ ${T("m.home")}</button>
+              <button id="m-reset" class="btn-secondary" ${tip("m.resetTip")}>⟲ ${T("m.reset")}</button>
+              <button id="m-zero-xy" class="btn-secondary not-ruida not-k40" ${tip("m.zeroXYTip")}>◎ XY=0</button>
+              <button id="m-zero-z" class="btn-secondary not-ruida not-k40" ${tip("m.zeroZTip")}>⊥ Z=0</button>
+              <button id="m-goto-zero" class="btn-secondary" ${tip("m.gotoZeroTip")}>➜ 0,0</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="menu-section-unified">
+          <h3 class="menu-trigger">${T("rp.positionJob")}</h3>
+          <div class="menu-body rp-box">
+            <div style="display: flex; gap: 5px;">
+              <button id="btn-load-gcode" class="btn-secondary" style="flex: 1;" ${tip("rp.loadGcodeTip")}>📂 ${T("rp.loadGcode")}</button>
+              <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
+            </div>
+            <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
+          </div>
+        </div>
+
+        ${spindlePanelHtml()}
+
+        ${probePanelHtml()}
+
       </div>
     </div>
 
     <!-- ================= KONSOLE (immer sichtbar) ================= -->
     <div class="rp-console" id="rp-console">
       <div class="rp-console-head" id="rp-console-toggle" ${tip("rp.consoleTip")}>
-        ${icon("console", 15)} ${T("rp.console")}<span class="rp-console-arrow">▾</span>
+        ${icon("console", 15)} ${T("rp.console")}<span class="rp-console-new" id="rp-console-new"></span><span class="rp-console-arrow">▾</span>
       </div>
       <div class="rp-console-body">
         <div id="console-log">
@@ -271,9 +284,33 @@ export function renderRightPanel(container: HTMLElement) {
     container.querySelectorAll(".rp-page").forEach(p => p.classList.toggle("active", p.id === t.dataset.rp));
   }));
 
-  // Konsole ein-/ausklappen
-  const con = container.querySelector("#rp-console")!;
-  container.querySelector("#rp-console-toggle")!.addEventListener("click", () => con.classList.toggle("collapsed"));
+  // Konsole ein-/ausklappen (gemerkt). Zugeklappt: Zähler für neue Meldungen, bei Fehlern/Alarm geht sie von selbst auf
+  const con = container.querySelector<HTMLElement>("#rp-console")!;
+  const badge = container.querySelector<HTMLElement>("#rp-console-new")!;
+  let unseen = 0;
+  const setCollapsed = (c: boolean) => {
+    con.classList.toggle("collapsed", c);
+    if (!c) { unseen = 0; badge.textContent = ""; }
+    try { localStorage.setItem(CONSOLE_KEY, c ? "1" : "0"); } catch { /* egal */ }
+  };
+  try { if (localStorage.getItem(CONSOLE_KEY) === "1") con.classList.add("collapsed"); } catch { /* egal */ }
+  container.querySelector("#rp-console-toggle")!.addEventListener("click", () => setCollapsed(!con.classList.contains("collapsed")));
+  const log = container.querySelector("#console-log");
+  if (log) new MutationObserver(recs => {
+    if (!con.classList.contains("collapsed")) return;
+    const added = recs.flatMap(r => [...r.addedNodes]).map(n => n.textContent || "");
+    if (!added.length) return;
+    if (added.some(x => ERROR_RE.test(x))) { setCollapsed(false); log.scrollTop = log.scrollHeight; return; }
+    unseen += added.length;
+    badge.textContent = String(Math.min(unseen, 99)) + (unseen > 99 ? "+" : "");
+  }).observe(log, { childList: true });
+
+  // Verbindung: nach dem Verbinden zuklappen, nach dem Trennen wieder aufklappen (nicht gemerkt)
+  window.addEventListener(MACHINE_EVENT, e => {
+    const ty = (e as CustomEvent).detail?.type;
+    if (ty === "connected") setSectionOpen("rp.connection", false);
+    else if (ty === "disconnected") setSectionOpen("rp.connection", true);
+  });
 
   // Aktiv-Markierung für die Bahn-Korrektur-Knöpfe
   ["part", "hole", "engrave", "pocket"].forEach(mode => {

@@ -10,6 +10,7 @@ import { drawEverything } from "./render";
 import { initCollapsibleMenus } from "./ui";
 import { initLightBurnTooltips } from "./tooltips";
 import { renderCamPanel, renderEditorToolbar } from "./ui/camPanel";
+import { initFlyouts } from "./ui/flyout";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
@@ -97,6 +98,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const toolbarContainer = document.getElementById("editor-toolbar");
   if (camContainer) renderCamPanel(camContainer);
   if (toolbarContainer) renderEditorToolbar(toolbarContainer);
+  initFlyouts();
   if (rightContainer) renderRightPanel(rightContainer);
   applySavedMachine(); // gewählte Maschine: Bettgröße, Baudrate, Nullpunkt
   applyTranslations(document); // feste Texte aus index.html übersetzen
@@ -129,6 +131,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         refreshLaserPanel(); // Laser-Ebenen ebenso
         refreshPlasmaPanel(); // und Plasma-Schnitte
         refreshBeds();        // Reiter der Betten (Anzahl Teile)
+        // Reiter „Objekt“: ohne Auswahl nur Ebenen + Hinweis
+        document.getElementById("rp-object")?.classList.toggle("no-sel", !state.selectedShapeIds.length);
       }
       requestAnimationFrame(paint);
     };

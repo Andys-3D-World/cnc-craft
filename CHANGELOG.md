@@ -50,6 +50,32 @@
   is started; the panel explains that the A axis needs grblHAL, FluidNC or Grbl_ESP32 with a 4th axis. Warning when
   a GRBL board reports no 4th-axis settings ($103 missing, plain GRBL would stop with error 20), and on Ruida a
   reminder to switch the controller's own rotary function off so Y is not converted twice
+- **Tidier toolbars:** related buttons now sit in groups that open when you move the mouse over them (or click),
+  with icon, name and shortcut. Top bar in one row: *Combine* (union, subtract, intersect, split, weld & score),
+  *Edit* (offset, round corners, pattern fill, fix centred, tiles, split into parts), *Image* (mask, split),
+  *Rotate/mirror* and *Align*; file, undo, copy/paste/duplicate/delete, group and view stay single buttons. Left bar
+  from 20 to 10 buttons: *Shapes* (line, rectangle, ellipse, polygon, arc), *Curves* (draw curve, edit points),
+  *Measure* (measure, dimension) and *Extras* (nesting, box generator, shape library, 3D view, node graph). A tool
+  group shows the last used tool and selects it with one click; keyboard shortcuts work as before and switch the
+  group icon too. Corner radius and number of corners in the top bar only appear while that tool is active
+- **Tidier right side:** sections remember whether they are open or closed; rarely used ones (origin, work area,
+  rotary, material plate, probing) start closed. *Object* tab without a selection shows only the layers and a short
+  hint instead of empty fields. *Machine* tab: a fixed bar at the top always shows state, position, job progress and
+  Start/Pause/Stop while you scroll; *Connection* closes by itself once connected (opens again after disconnecting)
+  and manual jogging moved up. The console remembers when it is folded, counts new messages in its header and opens
+  by itself on errors or alarms
+- **Round box is much easier to assemble:** a ring with tabs now sits on top (like the bottom), so the bent wall
+  holds its shape by itself – no more holding the curve while the glue dries. The seam moved from the front corner
+  to the middle of the longer straight side and locks like a puzzle (dovetail knobs into matching sockets, placed
+  between two tabs); the living hinge reaches a little into the straight parts so the curves bend evenly. The lid's
+  inner plate fits into the ring
+- **Four new box types:** *sorting box with lid* (dividers one material thickness lower so the two-part lid fits),
+  *round cup* (round box without lid – pens, brushes), *lantern / tea-light house* (arched windows in all four
+  walls, vent hole in the lid) and *money box* (coin slot up to a 2-euro coin, round hole in the bottom with a
+  two-disc plug)
+
+**Fixed**
+- Open sections in the right panel were cut off at 500 px – long sections now show completely
 
 ## 0.3.0 Beta
 

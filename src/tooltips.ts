@@ -53,7 +53,7 @@ export function initLightBurnTooltips() {
     const vw = window.innerWidth, vh = window.innerHeight;
     let x: number, y: number;
 
-    if (el.closest(".tool-strip")) {
+    if (el.closest(".tool-strip") || el.closest(".fly-menu")) {
       // rechts neben dem Knopf
       x = r.right + gap;
       y = r.top + r.height / 2 - t.height / 2;
@@ -72,6 +72,8 @@ export function initLightBurnTooltips() {
   const show = (el: HTMLElement) => {
     const text = el.getAttribute("data-tip");
     if (!text) return;
+    // Gruppen-Knopf mit aufgeklappter Liste: kein Hinweis (er würde über der Liste liegen, die Namen stehen ja schon da)
+    if (el.hasAttribute("data-fly-btn") && el.closest(".fly.open")) return;
     tip.innerHTML = format(text);
     tip.style.left = "-9999px";
     tip.style.top = "0px";
