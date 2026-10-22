@@ -15,6 +15,7 @@ import { readTextFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop } from "./machine";
 import { getMachineMode, MachineMode } from "./machineMode";
+import { stockBed } from "./stock";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -25,6 +26,7 @@ export const streamState = {
   totalLines: 0,
   loadedLines: [] as string[],
   label: "",                // Name des Jobs (Dateiname oder "aktuelle Zeichnung")
+  bed: 0,                   // Bett, dessen Material-Platte der Job verbraucht
   onMachine: false          // läuft gerade an der echten Maschine?
 };
 
@@ -65,6 +67,7 @@ export function loadGcodeFromText(content: string, label: string, appendToConsol
   streamState.totalLines = streamState.loadedLines.length;
   streamState.currentLine = 0;
   streamState.label = label;
+  streamState.bed = stockBed();
   appendToConsole(t("stream.loaded", { n: streamState.totalLines }));
   updateJobDisplay();
   window.dispatchEvent(new CustomEvent("cnc-job-loaded", { detail: { lines: streamState.loadedLines, label } }));
@@ -82,7 +85,7 @@ function emitDone(aborted: boolean, simulated: boolean, s: typeof streamState = 
   window.dispatchEvent(new CustomEvent("cnc-job-done", {
     detail: {
       aborted, line: s.currentLine, lines: s.loadedLines,
-      label: s.label, simulated, mode
+      label: s.label, simulated, mode, bed: s.bed
     }
   }));
 }

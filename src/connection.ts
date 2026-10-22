@@ -24,6 +24,7 @@ import {
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
 import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
 import { analyze, isDefaultHost } from "./wifiCodec";
+import { releaseMachine } from "./ui/pinLeds";
 
 /** Text sicher in HTML einsetzen (Gerätenamen, Antworten des Boards …) */
 function escHtml(s: string): string {
@@ -513,7 +514,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
     if (!machine.connected) { appendToConsole(t("conn.connectFirst")); return; }
     try { await fn(); } catch (e) { appendToConsole(`${t("log.error")} ${t("m.why." + String(e)) !== "m.why." + String(e) ? t("m.why." + String(e)) : String(e)}`); }
   };
-  $("m-unlock")?.addEventListener("click", guard(async () => { await send("$X"); machine.lastAlarm = 0; }));
+  $("m-unlock")?.addEventListener("click", guard(() => releaseMachine()));
   $("m-home")?.addEventListener("click", guard(() => send("$H")));
   $("m-reset")?.addEventListener("click", guard(async () => { appendToConsole("> Ctrl-X (Reset)"); await realtime(RT.reset); }));
   $("m-zero-xy")?.addEventListener("click", guard(() => send("G10 L20 P1 X0 Y0")));

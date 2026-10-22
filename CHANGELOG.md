@@ -3,6 +3,11 @@
 ## Next version (unreleased)
 
 **New**
+- **Release the machine with one key (F11, like Estlcam):** the 🔓 button now does a reset first and then clears the
+  alarm ($X). After a limit switch alarm GRBL only accepts $X after a reset, so “Unlock” alone often did not work and
+  the board had to be restarted. If a limit switch is still pressed, hard limits ($21) are switched off briefly so
+  you can jog away; they turn back on by themselves as soon as all switches are free (also restored on the next
+  connect if the connection drops)
 - **Dimensions and constraints:** new *Dimension* tool (D) – click shape A, then shape B (corner, edge middle or
   centre snaps; clicking inside a hole picks the hole), then place the dimension line (mouse beside = vertical,
   above/below = horizontal). The dimension stays on the canvas: when the reference shape is moved or resized, the
@@ -66,6 +71,12 @@
   images are skipped with a note
 
 **Fixed**
+- **Used material area was shared by all beds:** every bed now has its own material plate. A job marks the used
+  area only on the bed it was started from, and bed 2, 3 … no longer show the hatching of bed 1. New *Clear plate*
+  button (🧱) in the bed bar frees the used area of the active bed without restarting the app
+- **Job aborted with an unclear reason:** when the board restarts by itself in the middle of a job, the console now
+  says so (“the board restarted by itself – usually interference from the spindle or a weak power supply”)
+  instead of just “reset”
 - **Trace image did not open in some web views:** the picture is now loaded with `onload` instead of `decode()`,
   which could hang when the image was not part of the page
 - **Message when no G-code was made:** shows the actual reason (e.g. “images are only engraved with the laser”)

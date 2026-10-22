@@ -20,9 +20,14 @@
  * Alarm 1 aus – auch im Stillstand (Schutzfunktion von GRBL). Der Testmodus schaltet $21 kurz aus, die
  * Lämpchen zeigen jeden Schalter, „Test beenden“ schaltet $21 wieder ein. Bricht die Verbindung im Test ab,
  * wird $21=1 beim nächsten Verbinden mit demselben Anschluss automatisch zurückgesetzt (KEY_TEST).
+ *
+ * Freigeben (🔓 / F11, wie in Estlcam): Reset (Strg-X), dann $X. Nach einem Endschalter-Alarm nimmt GRBL $X erst
+ * nach einem Reset an – deshalb ging „Entsperren“ allein oft nicht. Ist danach noch ein Endschalter gedrückt,
+ * werden die harten Endschalter ($21) kurz ausgeschaltet, damit man vom Schalter wegfahren kann. Sobald alle
+ * Endschalter frei sind und die Maschine steht, schaltet $21 von selbst wieder ein (bei Verbindungsabbruch über KEY_TEST).
  */
 import { t, T, tip } from "../i18n/i18n";
-import { machine, MACHINE_EVENT, send, sendAndWait, errorText } from "../machine";
+import { machine, MACHINE_EVENT, send, sendAndWait, errorText, realtime, RT } from "../machine";
 
 const KEY_TEST = "cnc_craft_limit_test"; // Anschluss, an dem $21 für den Test ausgeschaltet ist
 
@@ -52,6 +57,10 @@ function longName(p: string): string {
   if (AXES.includes(p)) return t("pin.axisName", { a: p });
   return t("pin.long." + p);
 }
+
+let releaseFn: () => Promise<void> = async () => { /* noch nicht bereit */ };
+/** Maschine freigeben (Knopf 🔓 und Taste F11) */
+export function releaseMachine(): Promise<void> { return releaseFn(); }
 
 export function initPinLeds(log: (s: string) => void) {
   const $ = (id: string) => document.getElementById(id);
@@ -107,6 +116,7 @@ export function initPinLeds(log: (s: string) => void) {
       for (const p of last) if (!st.has(p)) log(t("pin.logFree", { name: nm(p) }));
     }
     last = st ? new Set(st) : null;
+    checkBypassEnd(st);
   };
 
   // ---------------- Endschalter testen (GRBL, $21 kurz aus) ----------------
@@ -161,6 +171,74 @@ export function initPinLeds(log: (s: string) => void) {
     }
   };
 
+  // ---------------- Freigeben (wie F11 in Estlcam) ----------------
+  let releasing = false;
+  let bypass = false;   // $21 ist aus, bis alle Endschalter frei sind
+  let restoring = false;
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+  const waitFor = (type: string, ms: number) => new Promise<boolean>(res => {
+    const h = (e: Event) => { if ((e as CustomEvent).detail?.type === type) { done(true); } };
+    const timer = window.setTimeout(() => done(false), ms);
+    const done = (v: boolean) => { clearTimeout(timer); window.removeEventListener(MACHINE_EVENT, h); res(v); };
+    window.addEventListener(MACHINE_EVENT, h);
+  });
+  const axesHit = (st: Set<string> | null) => st ? AXES.filter(a => st.has(a)) : [];
+  function checkBypassEnd(st: Set<string> | null) {
+    if (!bypass || restoring || !st || !machine.connected) return;
+    if (axesHit(st).length || machine.status.state !== "Idle") return;
+    restoring = true;
+    setHard(true).then(ok => {
+      if (ok) {
+        bypass = false;
+        try { localStorage.removeItem(KEY_TEST); } catch { /* egal */ }
+        log(t("rel.restored"));
+      }
+    }).finally(() => { restoring = false; });
+  }
+  releaseFn = async () => {
+    if (!machine.connected) { log(t("conn.connectFirst")); return; }
+    if (!isGrbl()) { await send("$X"); machine.lastAlarm = 0; return; }
+    if (machine.job.active) { log(t("sp.jobRunning")); return; }
+    if (releasing) return;
+    releasing = true;
+    try {
+      log(t("rel.start"));
+      const welcome = waitFor("welcome", 3000);
+      await realtime(RT.reset);
+      await welcome;
+      await sleep(700); // Board-Infos und frischer Status nach dem Reset
+      let ack = await sendAndWait("$X", 5000);
+      await sleep(400);
+      const hit = axesHit(current());
+      if (hit.length && !testing && !bypass) {
+        if (!machine.settings.has("$21")) await sendAndWait("$$", 5000, true);
+        if (Number(machine.settings.get("$21") ?? 0) !== 0) {
+          if (!await setHard(false)) return;
+          bypass = true;
+          try { localStorage.setItem(KEY_TEST, machine.port || "?"); } catch { /* egal */ }
+          ack = await sendAndWait("$X", 5000);
+          log(t("rel.bypass", { axes: hit.join(", ") }));
+          machine.lastAlarm = 0;
+          return;
+        }
+      }
+      await sleep(200);
+      if (machine.status.state === "Alarm" || !ack.ok) log(t("rel.still"));
+      else { machine.lastAlarm = 0; log(t("rel.ok")); }
+    } catch (e) {
+      log(`${t("log.error")} ${e}`);
+    } finally {
+      releasing = false;
+    }
+  };
+  window.addEventListener("keydown", (e) => {
+    if (e.key !== "F11" || e.repeat) return;
+    const el = e.target as HTMLElement | null;
+    if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+    e.preventDefault();
+    releaseFn().catch(() => {});
+  });
+
   // ---------------- Marlin: M119 ----------------
   $("pin-m119")?.addEventListener("click", async () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
@@ -197,6 +275,7 @@ export function initPinLeds(log: (s: string) => void) {
       if (type !== "welcome") { seen.clear(); marlinPins = null; last = null; }
       // Verbindung weg im Test: $21 bleibt am Board aus → beim nächsten Verbinden zurücksetzen
       if (type === "disconnected" && testing) { testing = false; testUi(); }
+      if (type === "disconnected") bypass = false; // KEY_TEST bleibt → $21 beim nächsten Verbinden zurück
       if (type === "welcome") setTimeout(() => { restoreAfterReconnect().catch(() => {}); }, 1500);
       render();
     }

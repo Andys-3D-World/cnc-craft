@@ -211,7 +211,7 @@ impl Machine {
                     inner.counter.rx_size = 128;
                     inner.poll = w.firmware != "Marlin";
                 }
-                self.abort_job_internal("reset");
+                self.abort_job_internal("reboot");
                 self.emit("machine-welcome", format!("{{\"firmware\":{},\"version\":{},\"raw\":{}}}",
                     jstr(&w.firmware), jstr(&w.version), jstr(&w.raw)));
             }

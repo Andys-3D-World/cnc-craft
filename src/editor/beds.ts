@@ -21,6 +21,7 @@ import { t } from "../i18n/i18n";
 import { MM_TO_PIXEL, groupBounds, shapeBounds, translateShape, type Bounds } from "../shapeTransform";
 import { tracePath } from "../render";
 import { updateDimensionInputs } from "../uiInputs";
+import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
 
 interface Sheet { name: string; done: boolean; shapes: any[]; hist?: HistoryState | null }
 
@@ -94,6 +95,7 @@ export function switchBed(i: number) {
   st.offsetX += o.x * st.scale;
   st.offsetY -= o.y * st.scale;
   active = i;
+  setStockBed(i);
   st.shapes = beds[i].shapes;
   st.selectedShapeIds = [];
   putHistory(beds[i].hist);
@@ -113,6 +115,7 @@ export function removeBed(i: number) {
   stash();
   const n = parts(beds[i].shapes);
   if (n && !window.confirm(t("bed.confirmDelete", { name: bedName(i), n }))) return;
+  removeStockBed(i, beds.length);
   beds.splice(i, 1);
   if (i === active) {
     active = Math.min(i, beds.length - 1);
@@ -121,6 +124,7 @@ export function removeBed(i: number) {
     st.selectedShapeIds = [];
     putHistory(beds[active].hist);
   } else if (i < active) active--;
+  setStockBed(active);
   changed();
   fitAll(); // die Betten rücken im Raster nach
 }
@@ -171,6 +175,7 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
     });
   } else beds = [{ name: "", done: false, shapes }];
   active = Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < beds.length ? activeIdx : 0;
+  setStockBed(active);
   const st = app();
   st.shapes = beds[active].shapes;
   st.selectedShapeIds = [];
@@ -209,6 +214,11 @@ export function initBeds(onRedraw: () => void, onLog: (s: string) => void, onFit
     if (act === "add") { switchBed(addBed()); fitAll(); log(t("bed.added", { name: bedName() })); }
     if (act === "done") { beds[active].done = !beds[active].done; changed(); }
     if (act === "del") removeBed(active);
+    if (act === "plate") {
+      if (!window.confirm(t("bed.plateConfirm", { name: bedName() }))) return;
+      newPlate();
+      log(t("bed.plateDone", { name: bedName() }));
+    }
   });
   bar.addEventListener("dblclick", e => {
     const el = (e.target as HTMLElement).closest<HTMLElement>("[data-bed]");
@@ -257,7 +267,8 @@ function rename(tab: HTMLElement) {
 export function refreshBeds() {
   if (!bar || bar.querySelector(".bed-rename")) return;
   const counts = beds.map((_, i) => parts(bedShapes(i)));
-  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done])]);
+  const used = hasUsedArea();
+  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done]), used]);
   if (sig === shown) return;
   shown = sig;
   const tabs = beds.map((b, i) =>
@@ -268,6 +279,7 @@ export function refreshBeds() {
   bar.innerHTML = `${tabs}
     <button type="button" class="bed-btn" data-act="add" title="${esc(t("bed.addTip"))}">＋</button>
     <span class="bed-space"></span>
+    ${used ? `<button type="button" class="bed-btn" data-act="plate" title="${esc(t("bed.plateTip"))}">🧱 ${esc(t("bed.plate"))}</button>` : ""}
     <button type="button" class="bed-btn${beds[active].done ? " on" : ""}" data-act="done" title="${esc(t("bed.doneTip"))}">✓ ${esc(t("bed.done"))}</button>
     <select id="bed-move" class="bed-move" title="${esc(t("bed.moveTip"))}">
       <option value="">${esc(t("bed.move"))}</option>${others}<option value="new">→ ${esc(t("bed.moveNew"))}</option>

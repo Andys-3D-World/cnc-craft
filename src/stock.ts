@@ -7,7 +7,8 @@
  *   - die von Schnitten ganz umschlossen sind (das Teil ist ja herausgefallen).
  * Das funktioniert für jeden G-Code – egal ob aus der Zeichnung oder aus einer Datei.
  *
- * Für jede Maschinenart (Fräse / Laser / Plasma) gibt es eine eigene Platte.
+ * Für jede Maschinenart (Fräse / Laser / Plasma) und jedes Bett gibt es eine eigene Platte
+ * (Bett 1 unter dem alten Schlüssel, Bett 2, 3 … unter "…_bed1", "…_bed2").
  * Koordinaten: wie im G-Code (mm, Nullpunkt links unten) – der Werkstück-Nullpunkt muss
  * also beim nächsten Mal wieder an derselben Stelle liegen.
  *
@@ -38,8 +39,33 @@ export interface Stock {
 /** skipUsed: Formen auf verbrauchter Fläche nicht in den G-Code übernehmen */
 export const stockOptions = { margin: 2, show: true, skipUsed: true };
 const KEY_OPTIONS = "cnc_craft_stock_options";
-const keyFor = (m: MachineMode) => "cnc_craft_stock_" + m;
-const stocks = new Map<MachineMode, Stock>();
+const keyFor = (m: MachineMode, bed: number) => "cnc_craft_stock_" + m + (bed ? "_bed" + bed : "");
+const MODES: MachineMode[] = ["mill", "laser", "plasma"];
+const stocks = new Map<string, Stock>();   // "mode:bed"
+let bedIdx = 0;                            // aktives Bett (setzt beds.ts)
+
+/** Aktives Bett wechseln → ab jetzt gilt dessen Platte */
+export function setStockBed(i: number) {
+  if (i === bedIdx) return;
+  bedIdx = Math.max(0, i | 0);
+  window.dispatchEvent(new CustomEvent(STOCK_CHANGED));
+  window.dispatchEvent(new Event("cnc-redraw"));
+}
+export function stockBed(): number { return bedIdx; }
+
+/** Bett i wurde gelöscht: die Platten der Betten dahinter rücken eine Stelle nach vorn */
+export function removeStockBed(i: number, countBefore: number) {
+  try {
+    for (const m of MODES) {
+      for (let b = i; b < countBefore - 1; b++) {
+        const next = localStorage.getItem(keyFor(m, b + 1));
+        if (next === null) localStorage.removeItem(keyFor(m, b)); else localStorage.setItem(keyFor(m, b), next);
+      }
+      localStorage.removeItem(keyFor(m, countBefore - 1));
+    }
+  } catch { /* egal */ }
+  stocks.clear();
+}
 let versionCounter = 1;
 
 // ---------------------------------------------------------------------
@@ -103,11 +129,11 @@ function bedMm(): { w: number; h: number } {
 }
 
 /** Platte der aktuellen Maschinenart */
-export function getStock(mode: MachineMode = getMachineMode()): Stock {
-  let s = stocks.get(mode);
+export function getStock(mode: MachineMode = getMachineMode(), bed = bedIdx): Stock {
+  let s = stocks.get(mode + ":" + bed);
   if (s) return s;
   try {
-    const raw = localStorage.getItem(keyFor(mode));
+    const raw = localStorage.getItem(keyFor(mode, bed));
     if (raw) {
       const d = JSON.parse(raw);
       const b = blank(+d.w, +d.h);
@@ -120,15 +146,15 @@ export function getStock(mode: MachineMode = getMachineMode()): Stock {
     }
   } catch { /* defekt -> neue Platte */ }
   if (!s) { const bed = bedMm(); s = blank(bed.w, bed.h); }
-  stocks.set(mode, s);
+  stocks.set(mode + ":" + bed, s);
   return s;
 }
 
-function save(mode: MachineMode = getMachineMode()) {
-  const s = getStock(mode);
+function save(mode: MachineMode = getMachineMode(), bed = bedIdx) {
+  const s = getStock(mode, bed);
   s.version = versionCounter++;
   try {
-    localStorage.setItem(keyFor(mode), JSON.stringify({
+    localStorage.setItem(keyFor(mode, bed), JSON.stringify({
       w: s.w, h: s.h, cell: s.cell, used: encode(s.used), jobs: s.jobs, undo: s.undo
     }));
   } catch { /* zu groß / gesperrt – gilt trotzdem bis zum Neustart */ }
@@ -142,8 +168,8 @@ export function usedPercent(s: Stock = getStock()): number {
   return s.used.length ? (n / s.used.length) * 100 : 0;
 }
 
-export function hasUsedArea(mode: MachineMode = getMachineMode()): boolean {
-  const s = getStock(mode);
+export function hasUsedArea(mode: MachineMode = getMachineMode(), bed = bedIdx): boolean {
+  const s = getStock(mode, bed);
   for (let i = 0; i < s.used.length; i++) if (s.used[i]) return true;
   return false;
 }
@@ -154,7 +180,7 @@ export function newPlate(w?: number, h?: number) {
   const old = getStock(mode);
   const size = w && h ? { w, h } : { w: old.w, h: old.h };
   const s = blank(size.w, size.h);
-  stocks.set(mode, s);
+  stocks.set(mode + ":" + bedIdx, s);
   save(mode);
 }
 
@@ -174,7 +200,7 @@ export function applyPlateFromCamera(w: number, h: number, isUsed: (x: number, y
   const percent = usedPercent(s);
   s.jobs.push({ date: new Date().toISOString(), label, percent });
   s.jobs = s.jobs.slice(-50);
-  stocks.set(mode, s);
+  stocks.set(mode + ":" + bedIdx, s);
   save(mode);
   return percent;
 }
@@ -221,8 +247,9 @@ export function cutWidthFor(shapes: any[], mode: MachineMode = getMachineMode())
  * upToLine: nur bis zu dieser Zeile (bei abgebrochenem Job); width: Schnittbreite in mm.
  * Rückgabe: neu verbrauchte Fläche in Prozent der Platte.
  */
-export function markFromGcode(lines: string[], label: string, width: number, upToLine = Infinity, mode: MachineMode = getMachineMode()): number {
-  const s = getStock(mode);
+export function markFromGcode(lines: string[], label: string, width: number, upToLine = Infinity,
+  mode: MachineMode = getMachineMode(), bed = bedIdx): number {
+  const s = getStock(mode, bed);
   const before = usedPercent(s);
   const prog = parseGcodeProgram(lines);
   const cut = new Uint8Array(s.cols * s.rows);
@@ -247,7 +274,7 @@ export function markFromGcode(lines: string[], label: string, width: number, upT
   const after = usedPercent(s);
   s.jobs.push({ date: new Date().toISOString(), label, percent: Math.round(after * 10) / 10 });
   if (s.jobs.length > 50) s.jobs.shift();
-  save(mode);
+  save(mode, bed);
   return after - before;
 }
 
