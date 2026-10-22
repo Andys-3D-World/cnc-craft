@@ -2522,5 +2522,9 @@
   "ng.tpl.nest": "Imbriquer les pièces",
   "ng.tpl.nest.d": "Place les pièces prises serrées sur le plateau et remplace les originaux.",
   "ng.tpl.tiles": "Grand motif en tuiles",
-  "ng.tpl.tiles.d": "Découpe le motif pris en tuiles de 300 × 300 mm, chacune sur son plateau."
+  "ng.tpl.tiles.d": "Découpe le motif pris en tuiles de 300 × 300 mm, chacune sur son plateau.",
+  "rot.aBlocked": "Axe rotatif : le contrôleur {fw} n’a pas d’axe A – les valeurs A seraient ignorées et tout serait gravé sur une ligne. Choisissez « Connecteur Y » et branchez le rotatif sur le port Y.",
+  "rot.aNoAxis": "Axe rotatif : la carte n’indique aucun réglage de 4e axe ($103 absent). GRBL standard s’arrête alors avec l’erreur 20 – il faut grblHAL, FluidNC ou Grbl_ESP32 avec axe A, ou le connecteur Y.",
+  "rot.ruidaOwn": "Axe rotatif sur Ruida : CNC Craft convertit déjà Y. Désactivez la fonction rotatif du contrôleur (panneau ou réglage « Rotary » de RDWorks), sinon la conversion est faite deux fois et le motif est déformé.",
+  "rot.aNote": "L’axe A ne fonctionne qu’avec des cartes grblHAL, FluidNC ou Grbl_ESP32 à 4e axe – pas avec Ruida, K40 ou Marlin. Pour ceux-ci, utilisez le connecteur Y."
 }

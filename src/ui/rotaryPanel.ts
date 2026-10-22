@@ -7,7 +7,8 @@
  * Zylinder mit dem eingestellten Durchmesser – frei drehbar mit der Maus.
  */
 import { t, T, tip } from "../i18n/i18n";
-import { rotary, setRotary, circumference, ROTARY_CHANGED } from "../rotary";
+import { rotary, setRotary, circumference, rotaryCheck, ROTARY_CHANGED } from "../rotary";
+import { MACHINE_EVENT } from "../machine";
 import { openView3D } from "./view3dDialog";
 
 export function rotarySectionHtml(): string {
@@ -25,6 +26,7 @@ export function rotarySectionHtml(): string {
           <div class="prop-row" id="rot-roller-row" ${tip("rot.rollerTip")}>${T("rot.roller")}<input type="number" id="rot-roller" min="1" step="0.1" class="prop-input"></div>
           <div class="prop-row" id="rot-mpr-row" ${tip("rot.mprTip")}>${T("rot.mpr")}<input type="number" id="rot-mpr" min="0.1" step="0.1" class="prop-input"></div>
           <div class="tool-info" id="rot-info"></div>
+          <div class="rot-check" id="rot-check"></div>
           <button id="rot-preview" class="btn-secondary btn-compact">🧊 ${T("rot.preview")}</button>
           <div class="tool-scope">${T("rot.hint")}</div>
         </div>
@@ -47,6 +49,15 @@ export function initRotaryPanel(redraw: () => void) {
     if (mr) mr.style.display = rotary.axis === "y" ? "" : "none";
     const info = $("rot-info");
     if (info) info.textContent = t("rot.info", { c: circumference().toFixed(1), d: rotary.diameter });
+    // passt das zur verbundenen Steuerung? (ohne Verbindung: Hinweis, wofür die A-Achse geht)
+    const ck = $("rot-check");
+    if (ck) {
+      const c = rotaryCheck();
+      const text = c.block || c.warn || (rotary.axis === "a" ? t("rot.aNote") : "");
+      ck.textContent = text ? (c.block ? "⛔ " : "⚠ ") + text : "";
+      ck.className = "rot-check" + (c.block ? " block" : c.warn ? " warn" : "");
+      ck.style.display = text ? "" : "none";
+    }
   };
   $("rot-on")?.addEventListener("change", e => setRotary({ on: (e.target as HTMLInputElement).checked }));
   $("rot-axis")?.addEventListener("change", e => setRotary({ axis: (e.target as HTMLSelectElement).value === "a" ? "a" : "y" }));
@@ -57,6 +68,8 @@ export function initRotaryPanel(redraw: () => void) {
   $("rot-preview")?.addEventListener("click", () => openRotaryPreview());
   window.addEventListener(ROTARY_CHANGED, () => { sync(); redraw(); });
   window.addEventListener("cnc-language-changed", sync);
+  // Verbinden / Trennen / Einstellungen gelesen: Hinweis neu prüfen
+  window.addEventListener(MACHINE_EVENT, e => { if (["connected", "disconnected", "welcome", "setting", "switched"].includes((e as CustomEvent).detail?.type)) sync(); });
   sync();
 }
 

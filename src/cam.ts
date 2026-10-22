@@ -11,7 +11,7 @@ import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
-import { rotary, applyRotary, outsideBand, circumference } from "./rotary";
+import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./rotary";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 
 const MM_TO_PIXEL = 2;
@@ -96,6 +96,9 @@ const generateGcodeInner = (shapes: any): string | null => {
     lastGcodeWarnings = res.warnings;
     // Drehachse: Y auf den Umfang umrechnen (Y-Anschluss) oder in eine A-Achse (Grad)
     if (rotary.on && res.gcode && !flatOnly) {
+      const chk = rotaryCheck();
+      if (chk.block) { lastGcodeWarnings.unshift(chk.block); return null; }
+      if (chk.warn) lastGcodeWarnings.push(chk.warn);
       const out = outsideBand(shapes, shapeBounds);
       if (out) lastGcodeWarnings.push(t("rot.outside", { n: out, c: circumference().toFixed(1) }));
       const g = applyRotary(res.gcode);

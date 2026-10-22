@@ -1541,3 +1541,6 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .ng-tpl-save .prop-input { flex: 1; min-width: 0; }
 .ng-tpl-save .btn-secondary { flex: 1; }
 .ng-tpl-save input + .btn-secondary { flex: none; }
+.rot-check { font-size: 0.76rem; line-height: 1.35; padding: 6px 8px; border-radius: 6px; background: rgba(128,128,128,0.1); color: var(--text-muted); }
+.rot-check.warn { background: rgba(245,159,0,0.12); color: var(--color-warning); }
+.rot-check.block { background: rgba(255,107,107,0.12); color: var(--color-danger); }

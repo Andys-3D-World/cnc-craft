@@ -2522,5 +2522,9 @@
   "ng.tpl.nest": "Rozmieść części",
   "ng.tpl.nest.d": "Układa pobrane części ciasno na stole i zastępuje oryginały.",
   "ng.tpl.tiles": "Duży projekt w kafelkach",
-  "ng.tpl.tiles.d": "Dzieli pobrany projekt na kafelki 300 × 300 mm, każdy na osobnym stole."
+  "ng.tpl.tiles.d": "Dzieli pobrany projekt na kafelki 300 × 300 mm, każdy na osobnym stole.",
+  "rot.aBlocked": "Oś obrotowa: sterownik {fw} nie ma osi A – wartości A zostałyby pominięte i wszystko wygrawerowane w jednej linii. Wybierz „Złącze Y” i podłącz oś do portu Y.",
+  "rot.aNoAxis": "Oś obrotowa: płyta nie zgłasza ustawień 4. osi (brak $103). Zwykły GRBL zatrzyma się z błędem 20 – potrzebny grblHAL, FluidNC lub Grbl_ESP32 z osią A albo złącze Y.",
+  "rot.ruidaOwn": "Oś obrotowa na Ruida: CNC Craft już przelicza Y. Wyłącz funkcję osi obrotowej w sterowniku (panel lub ustawienie „Rotary” w RDWorks), inaczej przeliczenie nastąpi dwa razy i projekt będzie zniekształcony.",
+  "rot.aNote": "Oś A działa tylko z płytami grblHAL, FluidNC lub Grbl_ESP32 z 4. osią – nie z Ruida, K40 ani Marlin. Tam użyj złącza Y."
 }

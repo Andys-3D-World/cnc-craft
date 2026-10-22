@@ -2522,5 +2522,9 @@
   "ng.tpl.nest": "Nesting delle parti",
   "ng.tpl.nest.d": "Dispone le parti prese strette sul piano e sostituisce gli originali.",
   "ng.tpl.tiles": "Disegno grande in tasselli",
-  "ng.tpl.tiles.d": "Divide il disegno preso in tasselli 300 × 300 mm, ognuno sul proprio piano."
+  "ng.tpl.tiles.d": "Divide il disegno preso in tasselli 300 × 300 mm, ognuno sul proprio piano.",
+  "rot.aBlocked": "Asse rotante: il controller {fw} non ha l’asse A – i valori A verrebbero ignorati e tutto sarebbe inciso su una riga. Scegli «Connettore Y» e collega il rotante alla porta Y.",
+  "rot.aNoAxis": "Asse rotante: la scheda non riporta impostazioni per un 4° asse (manca $103). GRBL normale si ferma con errore 20 – serve grblHAL, FluidNC o Grbl_ESP32 con asse A, oppure il connettore Y.",
+  "rot.ruidaOwn": "Asse rotante su Ruida: CNC Craft converte già Y. Disattiva la funzione rotante del controller (pannello o impostazione «Rotary» di RDWorks), altrimenti la conversione avviene due volte e il disegno risulta deformato.",
+  "rot.aNote": "L’asse A funziona solo con schede grblHAL, FluidNC o Grbl_ESP32 con 4° asse – non con Ruida, K40 o Marlin. Per quelli usa il connettore Y."
 }

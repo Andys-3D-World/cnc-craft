@@ -2697,5 +2697,9 @@
   "ng.tpl.nest": "Nest parts",
   "ng.tpl.nest.d": "Packs the taken parts tightly onto the bed and replaces the originals.",
   "ng.tpl.tiles": "Large design in tiles",
-  "ng.tpl.tiles.d": "Splits the taken design into 300 × 300 mm tiles, each on its own bed."
+  "ng.tpl.tiles.d": "Splits the taken design into 300 × 300 mm tiles, each on its own bed.",
+  "rot.aBlocked": "Rotary: the {fw} controller has no A axis – the A values would be ignored and everything would be engraved on one line. Choose “Y connector” and plug the rotary into the Y port.",
+  "rot.aNoAxis": "Rotary: the board reports no settings for a 4th axis ($103 is missing). Plain GRBL then stops with error 20 – you need grblHAL, FluidNC or Grbl_ESP32 with an A axis, or the Y connector.",
+  "rot.ruidaOwn": "Rotary on Ruida: CNC Craft already converts Y. Switch the rotary function in the controller off (panel or RDWorks “Rotary” setting), otherwise it is converted twice and the design comes out stretched.",
+  "rot.aNote": "A axis only works with grblHAL, FluidNC or Grbl_ESP32 boards that have a 4th axis – not with Ruida, K40 or Marlin. Those use the Y connector."
 }

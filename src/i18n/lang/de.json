@@ -2697,5 +2697,9 @@
   "ng.tpl.nest": "Teile verschachteln",
   "ng.tpl.nest.d": "Legt die übernommenen Teile eng aufs Bett und ersetzt die Originale.",
   "ng.tpl.tiles": "Großes Motiv in Kacheln",
-  "ng.tpl.tiles.d": "Teilt das übernommene Motiv in Kacheln 300 × 300 mm, jede auf ihr eigenes Bett."
+  "ng.tpl.tiles.d": "Teilt das übernommene Motiv in Kacheln 300 × 300 mm, jede auf ihr eigenes Bett.",
+  "rot.aBlocked": "Drehachse: Die Steuerung {fw} kennt keine A-Achse – die A-Werte würden verworfen und alles auf einer Linie graviert. „Y-Anschluss“ wählen und die Drehachse an den Y-Anschluss stecken.",
+  "rot.aNoAxis": "Drehachse: Das Board meldet keine Einstellungen für eine 4. Achse ($103 fehlt). Normales GRBL bricht dann mit Fehler 20 ab – nötig ist grblHAL, FluidNC oder Grbl_ESP32 mit A-Achse, oder der Y-Anschluss.",
+  "rot.ruidaOwn": "Drehachse an Ruida: CNC Craft rechnet Y schon um. Die Drehachsen-Funktion in der Steuerung ausschalten (Bedienfeld oder RDWorks-Einstellung „Rotary“), sonst wird doppelt umgerechnet und das Motiv wird verzerrt.",
+  "rot.aNote": "A-Achse geht nur mit grblHAL-, FluidNC- oder Grbl_ESP32-Boards mit 4. Achse – nicht mit Ruida, K40 oder Marlin. Dort den Y-Anschluss nehmen."
 }

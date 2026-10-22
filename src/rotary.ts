@@ -12,6 +12,7 @@
  */
 import { MM_TO_PIXEL } from "./shapeTransform";
 import { t, ascii } from "./i18n/i18n";
+import { machine } from "./machine";
 
 export interface RotarySettings {
   on: boolean;
@@ -49,6 +50,35 @@ export function circumference(s: RotarySettings = rotary): number { return Math.
 
 /** Durchmesser, der die Drehung bestimmt (Rolle oder Teil) */
 function driveDia(s: RotarySettings): number { return s.kind === "roller" ? s.rollerDia : s.diameter; }
+
+/** Name der Steuerung, die keine A-Achse kennt (null = kann eine haben) */
+function noAxisController(): string | null {
+  if (!machine.connected) return null;
+  return machine.protocol === "ruida" ? "Ruida" : machine.protocol === "k40" ? "K40" : machine.protocol === "marlin" ? "Marlin" : null;
+}
+
+/**
+ * Passt die Drehachse zur verbundenen Steuerung?
+ *  - block: A-Achse an Ruida/K40/Marlin – deren Übersetzer verwerfen A, alles würde auf einer Linie graviert
+ *  - warn:  GRBL ohne Einstellungen für eine 4. Achse ($103 fehlt) → vermutlich Fehler 20;
+ *           Ruida: deren eigene Drehachsen-Funktion muss aus sein, sonst wird doppelt umgerechnet
+ */
+export function rotaryCheck(s: RotarySettings = rotary): { block: string | null; warn: string | null } {
+  if (!s.on) return { block: null, warn: null };
+  const fw = noAxisController();
+  if (s.axis === "a" && fw) return { block: t("rot.aBlocked", { fw }), warn: null };
+  let warn: string | null = null;
+  if (s.axis === "a" && machine.connected && machine.protocol === "grbl" && machine.settings.size > 0 && !machine.settings.has("$103")) warn = t("rot.aNoAxis");
+  if (machine.connected && machine.protocol === "ruida") warn = t("rot.ruidaOwn");
+  return { block: null, warn };
+}
+
+/** G-Code mit A-Achse an eine Steuerung, die sie nicht kennt? (Auftrag starten) */
+export function aAxisRefused(lines: string[]): string | null {
+  const fw = noAxisController();
+  if (!fw) return null;
+  return lines.some(l => /\bA-?[\d.]/i.test(l.replace(/\([^)]*\)/g, "").replace(/;.*$/, ""))) ? t("rot.aBlocked", { fw }) : null;
+}
 
 /** Y (mm auf der Oberfläche) → Wert für die Maschine */
 export function mapY(y: number, s: RotarySettings = rotary): number {

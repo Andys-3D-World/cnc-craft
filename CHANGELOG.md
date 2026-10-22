@@ -44,6 +44,13 @@
   files to share. Templates keep only the workflow, not the taken shapes – loading one keeps the shapes already
   taken, so the same motif can be tried with different workflows
 
+**Improved**
+- **Rotary checks the connected controller:** the A-axis mode is refused for Ruida, K40 and Marlin (their
+  translators drop A values, everything would be engraved on one line) – both when the G-code is made and when a job
+  is started; the panel explains that the A axis needs grblHAL, FluidNC or Grbl_ESP32 with a 4th axis. Warning when
+  a GRBL board reports no 4th-axis settings ($103 missing, plain GRBL would stop with error 20), and on Ruida a
+  reminder to switch the controller's own rotary function off so Y is not converted twice
+
 ## 0.3.0 Beta
 
 **New**

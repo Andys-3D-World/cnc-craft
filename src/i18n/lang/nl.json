@@ -2522,5 +2522,9 @@
   "ng.tpl.nest": "Onderdelen nesten",
   "ng.tpl.nest.d": "Legt de overgenomen onderdelen dicht op het bed en vervangt de originelen.",
   "ng.tpl.tiles": "Groot ontwerp in tegels",
-  "ng.tpl.tiles.d": "Verdeelt het overgenomen ontwerp in tegels van 300 × 300 mm, elk op een eigen bed."
+  "ng.tpl.tiles.d": "Verdeelt het overgenomen ontwerp in tegels van 300 × 300 mm, elk op een eigen bed.",
+  "rot.aBlocked": "Draaias: de besturing {fw} kent geen A-as – de A-waarden worden genegeerd en alles komt op één lijn. Kies „Y-aansluiting” en steek de draaias in de Y-poort.",
+  "rot.aNoAxis": "Draaias: het board meldt geen instellingen voor een 4e as ($103 ontbreekt). Gewone GRBL stopt dan met fout 20 – nodig is grblHAL, FluidNC of Grbl_ESP32 met A-as, of de Y-aansluiting.",
+  "rot.ruidaOwn": "Draaias op Ruida: CNC Craft rekent Y al om. Zet de draaiasfunctie in de besturing uit (paneel of RDWorks-instelling „Rotary”), anders wordt dubbel omgerekend en raakt het ontwerp vervormd.",
+  "rot.aNote": "De A-as werkt alleen met grblHAL-, FluidNC- of Grbl_ESP32-boards met een 4e as – niet met Ruida, K40 of Marlin. Gebruik daar de Y-aansluiting."
 }

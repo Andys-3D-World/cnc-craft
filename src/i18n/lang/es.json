@@ -2522,5 +2522,9 @@
   "ng.tpl.nest": "Anidar piezas",
   "ng.tpl.nest.d": "Coloca las piezas tomadas juntas en la cama y sustituye los originales.",
   "ng.tpl.tiles": "Diseño grande en mosaicos",
-  "ng.tpl.tiles.d": "Divide el diseño tomado en mosaicos de 300 × 300 mm, cada uno en su cama."
+  "ng.tpl.tiles.d": "Divide el diseño tomado en mosaicos de 300 × 300 mm, cada uno en su cama.",
+  "rot.aBlocked": "Eje rotativo: el controlador {fw} no tiene eje A; los valores A se ignorarían y todo se grabaría en una línea. Elige «Conector Y» y conecta el rotativo al puerto Y.",
+  "rot.aNoAxis": "Eje rotativo: la placa no informa ajustes de un 4.º eje (falta $103). GRBL normal se detiene con el error 20; necesitas grblHAL, FluidNC o Grbl_ESP32 con eje A, o el conector Y.",
+  "rot.ruidaOwn": "Eje rotativo en Ruida: CNC Craft ya convierte Y. Desactiva la función rotativa del controlador (panel o ajuste «Rotary» de RDWorks); si no, se convierte dos veces y el diseño sale deformado.",
+  "rot.aNote": "El eje A solo funciona con placas grblHAL, FluidNC o Grbl_ESP32 con 4.º eje, no con Ruida, K40 ni Marlin. Con esos usa el conector Y."
 }
