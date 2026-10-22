@@ -1,22 +1,33 @@
 WEBVTT
 
-00:00:00.000 --> 00:00:02.400
-Neu in CNC Craft 0.2.8
-Anschlussplan · grblHAL · Board flashen
+00:00:00.000 --> 00:00:02.600
+Neu in CNC Craft 0.3.0
+Bildgravur · Form-Werkzeuge · mehrere Betten
 
-00:00:02.400 --> 00:00:06.600
-Jumper im Bild
-Mikroschritte und Motor A als Y2 – genau da, wo sie hingehören
+00:00:02.600 --> 00:00:06.800
+Bildgravur
+Fotos für den Laser – „Automatisch verbessern“ mit einem Klick
 
-00:00:06.600 --> 00:00:10.600
-Wie das echte Board
-MKS DLC32 / MAX und CNC Shield in Original-Farben
+00:00:06.800 --> 00:00:10.600
+14 Gravurtypen
+Linien, Punktraster, Zeitung, Spirale, Wellen …
 
-00:00:10.600 --> 00:00:14.600
-Externe Treiber
-TB6600 / DM542 – Maus aufs Kabel, es leuchtet auf
+00:00:10.600 --> 00:00:14.400
+Materialansicht
+So sieht es auf Holz, Schiefer oder Acryl aus
 
-00:00:14.600 --> 00:00:17.800
+00:00:14.400 --> 00:00:18.200
+Form-Werkzeuge & Bézier-Kurven
+Verbinden, Zerschneiden, Ecken abrunden · Maße, die mitwandern
+
+00:00:18.200 --> 00:00:21.600
+Mehrere Betten in einem Projekt
+Teile wie im Slicer verteilen – fertige Betten abhaken
+
+00:00:21.600 --> 00:00:24.600
+Kisten-Generator
+Schiebedeckel, Fächer und Kisten mit Biegescharnier
+
+00:00:24.600 --> 00:00:27.600
 Kostenlos & Open Source
 andys-3d-world.github.io/cnc-craft
-

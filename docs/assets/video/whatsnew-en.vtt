@@ -1,22 +1,33 @@
 WEBVTT
 
-00:00:00.000 --> 00:00:02.400
-New in CNC Craft 0.2.8
-Wiring diagram · grblHAL · board flashing
+00:00:00.000 --> 00:00:02.600
+New in CNC Craft 0.3.0
+Image engraving · shape tools · several beds
 
-00:00:02.400 --> 00:00:06.600
-Jumpers in the picture
-Microsteps and motor A as Y2 – exactly where they go
+00:00:02.600 --> 00:00:06.800
+Image engraving
+Photos for the laser – “Auto enhance” in one click
 
-00:00:06.600 --> 00:00:10.600
-Looks like the real board
-MKS DLC32 / MAX and CNC Shield in original colors
+00:00:06.800 --> 00:00:10.600
+14 engraving styles
+Lines, dot screen, newspaper, spiral, waves …
 
-00:00:10.600 --> 00:00:14.600
-External drivers
-TB6600 / DM542 – hover a wire and it lights up
+00:00:10.600 --> 00:00:14.400
+Material preview
+See it on wood, slate or acrylic before you start
 
-00:00:14.600 --> 00:00:17.800
+00:00:14.400 --> 00:00:18.200
+Shape tools & Bézier curves
+Combine, split, round corners · dimensions that stay attached
+
+00:00:18.200 --> 00:00:21.600
+Several beds in one project
+Spread parts like in a slicer – tick off finished beds
+
+00:00:21.600 --> 00:00:24.600
+Box generator
+Sliding lid, shelves and living hinge boxes
+
+00:00:24.600 --> 00:00:27.600
 Free & open source
 andys-3d-world.github.io/cnc-craft
-

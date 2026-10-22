@@ -24,7 +24,10 @@ T = {
   heroalt="CNC Craft with a drawing and router toolpaths",
   fh="Everything from drawing to the finished part", fl="Draw or import, create toolpaths, check the simulation and send the job – without switching between programs.",
   feats=[
-   ("✏️", "Design &amp; import", "Draw shapes and text or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP)."),
+   ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP)."),
+   ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
+   ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill and dimensions that stay attached."),
+   ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
    ("🛠️", "CAM for CNC routers", "Outside, inside, pocket and engrave with a tool library – as simple as in Estlcam."),
    ("🔦", "Laser layers", "Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn."),
    ("🔥", "Plasma cutting", "Kerf compensation, lead-ins, pierce points, sheet height probing and torch height control (THC)."),
@@ -36,8 +39,8 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.2.8", nl="Wiring diagrams that look like your real board, jumpers and DIP switches for microsteps, external drivers (TB6600), grblHAL flasher and more.",
-  nlink="All changes", vid="whatsnew-en.mp4", vpost="en/05-wiring",
+  nh="New in 0.3.0", nl="Image engraving with 14 styles and auto enhance, material preview, shape tools, Bézier curves, dimensions, several beds per project and new box types.",
+  nlink="All changes", vid="whatsnew-en.mp4", vpost="en/08-image-engraving",
   ch="Built for makers", cl="CNC Craft combines what usually needs three programs:",
   cmp=["LightBurn", "Estlcam", "OpenBuilds", "CNC Craft"],
   sh="Screenshots", sl="Click a picture to enlarge it.",
@@ -45,7 +48,11 @@ T = {
             ("03-laser", "Laser", "layers for engraving and cutting"), ("04-plasma", "Plasma", "cuts, pierce points and lead-ins"),
             ("05-wiring", "Wiring diagram", "jumpers for microsteps and a second Y motor"),
             ("06-mks-max", "MKS DLC32 MAX", "drawn like the real board, original connector colors"),
-            ("07-external-drivers", "External drivers", "TB6600 / DM542 wiring – hover a wire to highlight it")],
+            ("07-external-drivers", "External drivers", "TB6600 / DM542 wiring – hover a wire to highlight it"),
+            ("08-image-engraving", "Image engraving", "original and engraving side by side, auto enhance"),
+            ("09-material-view", "Material preview", "how the job will look on birch plywood"),
+            ("10-shape-tools", "Shape tools", "combined shape, Bézier curve and dimensions"),
+            ("11-beds", "Several beds", "parts spread over three beds in one project")],
   dh="Download", dlead='Free for everyone. Latest version: <b data-version>see GitHub</b>. All files and older versions are on <a href="' + GH + '/releases">GitHub Releases</a>.',
   dcards=[("🍎 macOS", [("mac-arm", "Apple chip (M1–M4) · .dmg"), ("mac-intel", "Intel · .dmg")], "Not signed by Apple yet: on first start right-click the app → “Open”, or System Settings → Privacy &amp; Security → “Open Anyway”."),
           ("🪟 Windows", [("win", "Installer · .exe"), ("win-msi", "Installer · .msi")], "If Windows SmartScreen warns: “More info” → “Run anyway”."),
@@ -80,7 +87,10 @@ T = {
   heroalt="CNC Craft mit Zeichnung und Fräsbahnen",
   fh="Alles von der Zeichnung bis zum fertigen Teil", fl="Zeichnen oder importieren, Bahnen erzeugen, Simulation prüfen und den Job senden – ohne zwischen Programmen zu wechseln.",
   feats=[
-   ("✏️", "Zeichnen &amp; Importieren", "Formen und Text zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, STEP) laden."),
+   ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, STEP) laden."),
+   ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
+   ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung und Maße, die mitwandern."),
+   ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
    ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche und Gravur mit Werkzeug-Bibliothek – so einfach wie in Estlcam."),
    ("🔦", "Laser-Ebenen", "Füllen, Linie und Schneiden mit eigener Leistung und Geschwindigkeit, Freischnitt – wie Ebenen in LightBurn."),
    ("🔥", "Plasmaschneiden", "Schnittspalt, Anfahrbahnen, Einstichpunkte, Blechhöhe abtasten und Höhenregelung (THC)."),
@@ -92,8 +102,8 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.2.8", nl="Anschlusspläne, die wie dein echtes Board aussehen, Jumper und DIP-Schalter für Mikroschritte, externe Treiber (TB6600), grblHAL-Flasher und mehr.",
-  nlink="Alle Änderungen", vid="whatsnew-de.mp4", vpost="de/05-anschluesse",
+  nh="Neu in 0.3.0", nl="Bildgravur mit 14 Gravurtypen und „Automatisch verbessern“, Materialansicht, Form-Werkzeuge, Bézier-Kurven, Bemaßung, mehrere Betten pro Projekt und neue Kisten-Arten.",
+  nlink="Alle Änderungen", vid="whatsnew-de.mp4", vpost="de/08-bildgravur",
   ch="Für Maker gebaut", cl="CNC Craft vereint, wofür man sonst drei Programme braucht:",
   cmp=["LightBurn", "Estlcam", "OpenBuilds", "CNC Craft"],
   sh="Bilder", sl="Bild anklicken zum Vergrößern.",
@@ -101,7 +111,11 @@ T = {
             ("03-laser", "Laser", "Ebenen zum Gravieren und Schneiden"), ("04-plasma", "Plasma", "Schnitte, Einstichpunkte und Anfahrbahnen"),
             ("05-anschluesse", "Anschlussplan", "Jumper für Mikroschritte und zweiten Y-Motor"),
             ("06-mks-max", "MKS DLC32 MAX", "wie das echte Board, Stecker in Original-Farben"),
-            ("07-extern", "Externe Treiber", "TB6600 / DM542 anschließen – Maus aufs Kabel hebt es hervor")],
+            ("07-extern", "Externe Treiber", "TB6600 / DM542 anschließen – Maus aufs Kabel hebt es hervor"),
+            ("08-bildgravur", "Bildgravur", "Original und Gravur nebeneinander, automatisch verbessern"),
+            ("09-materialansicht", "Materialansicht", "so sieht der Job auf Birke-Sperrholz aus"),
+            ("10-formen", "Form-Werkzeuge", "verbundene Form, Bézier-Kurve und Maße"),
+            ("11-betten", "Mehrere Betten", "Teile auf drei Betten in einem Projekt verteilt")],
   dh="Download", dlead='Kostenlos für alle. Neueste Version: <b data-version>siehe GitHub</b>. Alle Dateien und ältere Versionen gibt es unter <a href="' + GH + '/releases">GitHub Releases</a>.',
   dcards=[("🍎 macOS", [("mac-arm", "Apple-Chip (M1–M4) · .dmg"), ("mac-intel", "Intel · .dmg")], "Noch nicht von Apple signiert: beim ersten Start Rechtsklick auf das Programm → „Öffnen“, oder Systemeinstellungen → Datenschutz &amp; Sicherheit → „Dennoch öffnen“."),
           ("🪟 Windows", [("win", "Installation · .exe"), ("win-msi", "Installation · .msi")], "Wenn Windows SmartScreen warnt: „Weitere Informationen“ → „Trotzdem ausführen“."),
@@ -301,10 +315,12 @@ import os
 os.makedirs(OUT + "/de", exist_ok=True)
 open(OUT + "/index.html", "w").write(page("en"))
 open(OUT + "/de/index.html", "w").write(page("de"))
+import datetime
+TODAY = datetime.date.today().isoformat()
 open(OUT + "/sitemap.xml", "w").write(f'''<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-  <url><loc>{SITE}</loc><xhtml:link rel="alternate" hreflang="de" href="{SITE}de/"/><xhtml:link rel="alternate" hreflang="en" href="{SITE}"/></url>
-  <url><loc>{SITE}de/</loc><xhtml:link rel="alternate" hreflang="de" href="{SITE}de/"/><xhtml:link rel="alternate" hreflang="en" href="{SITE}"/></url>
+  <url><loc>{SITE}</loc><lastmod>{TODAY}</lastmod><xhtml:link rel="alternate" hreflang="de" href="{SITE}de/"/><xhtml:link rel="alternate" hreflang="en" href="{SITE}"/></url>
+  <url><loc>{SITE}de/</loc><lastmod>{TODAY}</lastmod><xhtml:link rel="alternate" hreflang="de" href="{SITE}de/"/><xhtml:link rel="alternate" hreflang="en" href="{SITE}"/></url>
 </urlset>
 ''')
 print("ok")
