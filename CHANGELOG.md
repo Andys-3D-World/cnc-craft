@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.0 Beta
 
 **New**
 - **Release the machine with one key (F11, like Estlcam):** the 🔓 button now does a reset first and then clears the
