@@ -39,6 +39,7 @@ export interface Adjust {
   sharpen: number;    // 0…100
   denoise: number;    // 0…3 (Weichzeichnen vor dem Schärfen)
   invert: boolean;    // für Acryl / dunkles Material
+  curve?: number[][]; // Bildkurve: Punkte [ein, aus] 0…1, sortiert, mit Anfang (x = 0) und Ende (x = 1)
 }
 export const NO_ADJUST: Adjust = { black: 0, white: 1, gamma: 1, brightness: 0, contrast: 0, sharpen: 0, denoise: 0, invert: false };
 
@@ -172,6 +173,45 @@ function blur(g: Float32Array, w: number, h: number, r: number): Float32Array {
   return a;
 }
 
+/** Ist die Kurve nur die Diagonale (ändert nichts)? */
+export function curveIsIdentity(c?: number[][]): boolean {
+  return !c || c.length < 2 || c.every(p => Math.abs(p[0] - p[1]) < 1e-4);
+}
+
+/**
+ * Bildkurve als Tabelle mit 256 Werten: weiche Kurve durch die Punkte, die nie „überschwingt“
+ * (monotone kubische Interpolation nach Fritsch–Carlson) – wie die Gradationskurve in Bildprogrammen.
+ */
+export function curveLut(pts: number[][]): Float32Array {
+  const p = pts.map(q => [Math.min(1, Math.max(0, q[0])), Math.min(1, Math.max(0, q[1]))]).sort((a, b) => a[0] - b[0]);
+  const lut = new Float32Array(256);
+  const n = p.length;
+  if (n < 2) { for (let i = 0; i < 256; i++) lut[i] = i / 255; return lut; }
+  const d: number[] = [], m: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n - 1; i++) d.push((p[i + 1][1] - p[i][1]) / Math.max(1e-6, p[i + 1][0] - p[i][0]));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for (let i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(d[i]) < 1e-9) { m[i] = 0; m[i + 1] = 0; continue; }
+    const a = m[i] / d[i], b = m[i + 1] / d[i], r = a * a + b * b;
+    if (r > 9) { const k = 3 / Math.sqrt(r); m[i] = k * a * d[i]; m[i + 1] = k * b * d[i]; }
+  }
+  for (let k = 0; k < 256; k++) {
+    const x = k / 255;
+    let i = 0;
+    while (i < n - 2 && x > p[i + 1][0]) i++;
+    let y: number;
+    if (x <= p[0][0]) y = p[0][1];
+    else if (x >= p[n - 1][0]) y = p[n - 1][1];
+    else {
+      const h = p[i + 1][0] - p[i][0], t = (x - p[i][0]) / h, t2 = t * t, t3 = t2 * t;
+      y = (2 * t3 - 3 * t2 + 1) * p[i][1] + (t3 - 2 * t2 + t) * h * m[i] + (-2 * t3 + 3 * t2) * p[i + 1][1] + (t3 - t2) * h * m[i + 1];
+    }
+    lut[k] = Math.min(1, Math.max(0, y));
+  }
+  return lut;
+}
+
 export function applyAdjust(src: Float32Array, w: number, h: number, a: Adjust): Float32Array {
   let g: Float32Array = new Float32Array(src.length);
   const span = Math.max(0.02, a.white - a.black);
@@ -183,6 +223,13 @@ export function applyAdjust(src: Float32Array, w: number, h: number, a: Adjust):
     v = Math.pow(v, inv);
     v = (v - 0.5) * c + 0.5 + b;
     g[i] = Math.min(1, Math.max(0, v));
+  }
+  if (!curveIsIdentity(a.curve)) {
+    const lut = curveLut(a.curve!);
+    for (let i = 0; i < g.length; i++) {
+      const f = g[i] * 255, k = Math.min(254, Math.floor(f));
+      g[i] = lut[k] + (lut[k + 1] - lut[k]) * (f - k);
+    }
   }
   if (a.denoise > 0) g = blur(g, w, h, Math.round(a.denoise));
   if (a.sharpen > 0) {

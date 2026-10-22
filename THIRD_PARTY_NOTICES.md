@@ -28,6 +28,7 @@ Quellcode der mitgelieferten Teile (unverändert übernommen):
 | rusb | MIT |
 | libusb (über rusb „vendored“ mitgebaut) | LGPL-2.1 |
 | polygon-clipping 0.15.7 (Formen kombinieren / zerschneiden), mit splaytree und robust-predicates | MIT / MIT / Unlicense |
+| earcut 3.0.2 (Flächen in Dreiecke zerlegen für die 3D-Ansicht) | ISC |
 | Vite, TypeScript (nur zum Bauen) | MIT / Apache-2.0 |
 
 Alle weiteren, indirekt verwendeten Rust- und npm-Pakete stehen unter freien Lizenzen (überwiegend MIT/Apache-2.0)

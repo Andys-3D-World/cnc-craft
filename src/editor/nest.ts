@@ -24,6 +24,7 @@ export interface NestOptions {
   anchor: NestAnchor;  // wo das erste Teil hinkommt
   dir: NestDir;        // in welche Richtung es weitergeht
   container?: any;     // geschlossene Form (z. B. Reststück): nur darin verschachteln, Rand = marginMm
+  ignoreBed?: boolean; // andere Formen auf dem Bett nicht als Hindernis sehen (Knotengraph: freie Kopien)
 }
 
 /** t/m/b = oben/Mitte/unten, l/c/r = links/Mitte/rechts */
@@ -354,7 +355,7 @@ export function nestShapes(opts: NestOptions, only?: any[], sets?: any[][]): Nes
 
   // Formen, die liegen bleiben, sind Hindernisse (die Umrandung selbst nicht – sie wird unten als „außen“ gesperrt)
   const moving = new Set(units.flatMap(u => u.members.map(s => s.id)));
-  for (const s of st.shapes as any[]) {
+  for (const s of (opts.ignoreBed ? [] : st.shapes) as any[]) {
     if (moving.has(s.id) || s === opts.container) continue;
     const g = unitGeometry([s]);
     const m = rasterize(tPaths(g.paths), tBoxes(g.boxes), cell, half, opts.holes);

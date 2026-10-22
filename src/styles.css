@@ -1468,3 +1468,76 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .imguse-btn:hover, .imguse-btn:focus-visible { border-color: var(--accent-color); outline: none; box-shadow: 0 0 0 1px var(--accent-color) inset; }
 .tb-sel { font-size: 0.74rem; padding: 2px 4px; max-width: 140px; }
 .dim-edit { position: fixed; z-index: 6000; width: 90px; padding: 2px 6px; font-size: 0.8rem; border: 1px solid #34d17b; border-radius: 4px; background: var(--bg-panel); color: var(--text-main); }
+
+/* Formen-Bibliothek */
+.sl-cats { display: flex; gap: 6px; flex-wrap: wrap; }
+.sl-cat { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.82rem; }
+.sl-cat.active { background: var(--accent-color); border-color: transparent; color: #fff; }
+.sl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; max-height: 340px; overflow: auto; padding: 2px; }
+.sl-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; color: #b9a8ff; cursor: pointer; }
+.sl-item:hover { border-color: var(--accent-color); background: var(--accent-glow); }
+.sl-item span { font-size: 0.72rem; color: var(--text-main); text-align: center; line-height: 1.2; }
+.eng-curve { width: 100%; height: auto; aspect-ratio: 300 / 220; border-radius: 6px; border: 1px solid var(--border-color); cursor: crosshair; display: block; }
+.v3d-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.82rem; }
+.v3d-bar label { display: flex; align-items: center; gap: 6px; }
+/* Knoten-Editor */
+.ng-box { width: calc(100vw - 32px); max-width: 1500px; height: calc(100vh - 32px); padding: 12px; gap: 8px; overflow: hidden; }
+.ng-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ng-top h3 { margin: 0 8px 0 0; }
+.ng-top .ng-help { flex: 1; min-width: 180px; }
+.ng-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 170px 1fr 260px; gap: 8px; }
+.ng-pal { overflow: auto; display: flex; flex-direction: column; gap: 3px; padding-right: 2px; }
+.ng-cat { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 8px 0 2px; }
+.ng-cat:first-child { margin-top: 0; }
+.ng-add { display: flex; align-items: center; gap: 7px; text-align: left; font-size: 0.8rem; padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-input); color: var(--text-main); cursor: grab; }
+.ng-add span { width: 18px; text-align: center; }
+.ng-add:hover { border-color: var(--accent-color); background: var(--accent-glow); }
+.ng-view { position: relative; overflow: hidden; border-radius: 10px; border: 1px solid var(--border-color); outline: none; cursor: default;
+  background-color: var(--bg-canvas); background-image: radial-gradient(circle, rgba(128,128,128,0.25) 1px, transparent 1px); background-size: 22px 22px; }
+.ng-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.ng-wires { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+.ng-wire { fill: none; stroke-width: 2.4; pointer-events: none; }
+.ng-wire.temp { stroke-dasharray: 6 4; }
+.ng-wire-hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer; }
+.ng-wire-hit:hover + .ng-wire { stroke: var(--color-danger) !important; }
+.ng-node { position: absolute; width: 200px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 9px; box-shadow: 0 4px 14px rgba(0,0,0,0.25); font-size: 0.76rem; user-select: none; }
+.ng-node.sel { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--accent-glow), 0 4px 14px rgba(0,0,0,0.25); }
+.ng-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 8px; font-weight: 600; border-radius: 9px 9px 0 0; cursor: move; border-bottom: 1px solid var(--border-subtle); }
+.ng-c-source .ng-head { background: rgba(77,171,247,0.14); }
+.ng-c-shape .ng-head { background: rgba(132,94,247,0.14); }
+.ng-c-image .ng-head { background: rgba(245,159,0,0.15); }
+.ng-c-number .ng-head { background: rgba(105,219,124,0.14); }
+.ng-c-output .ng-head { background: rgba(255,107,107,0.15); }
+.ng-del { border: none; background: none; color: var(--text-muted); cursor: pointer; padding: 0 2px; font-size: 0.8rem; }
+.ng-del:hover { color: var(--color-danger); }
+.ng-ports { display: flex; justify-content: space-between; gap: 6px; padding: 5px 0; }
+.ng-pin { display: flex; align-items: center; gap: 5px; padding: 2px 0; cursor: crosshair; color: var(--text-muted); }
+.ng-pin i { width: 10px; height: 10px; border-radius: 50%; background: var(--pc); border: 2px solid var(--bg-panel); box-shadow: 0 0 0 1px var(--pc); flex: none; }
+.ng-pin.in i { margin-left: -6px; }
+.ng-pin.out i { margin-right: -6px; }
+.ng-pin:hover { color: var(--text-main); }
+.ng-outs { display: flex; flex-direction: column; align-items: flex-end; }
+.ng-thumb { display: block; width: 180px; height: 96px; margin: 0 10px; border-radius: 6px; background: rgba(128,128,128,0.08); }
+.ng-stat { padding: 4px 8px 6px; color: var(--text-muted); font-size: 0.7rem; min-height: 1em; overflow-wrap: anywhere; }
+.ng-stat.warn { color: var(--color-warning); }
+.ng-stat.err { color: var(--color-danger); }
+.ng-side { overflow: auto; display: flex; flex-direction: column; gap: 8px; font-size: 0.82rem; }
+.ng-side-title { font-weight: 600; font-size: 0.92rem; }
+.ng-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ng-row .prop-input { width: 120px; }
+.ng-big { width: 100%; aspect-ratio: 4 / 3; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-canvas); display: block; }
+@media (max-width: 900px) { .ng-main { grid-template-columns: 130px 1fr; } .ng-side { display: none; } }
+.ng-box { position: relative; }
+.ng-tpl { position: absolute; top: 54px; right: 12px; z-index: 10; width: 330px; max-height: calc(100% - 70px); overflow: auto; display: flex; flex-direction: column; gap: 5px;
+  background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); font-size: 0.8rem; }
+.ng-tpl-h { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-top: 6px; }
+.ng-tpl-h:first-child { margin-top: 0; }
+.ng-tpl-item { display: flex; gap: 9px; align-items: flex-start; text-align: left; width: 100%; padding: 6px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background: var(--bg-input); color: var(--text-main); cursor: pointer; }
+.ng-tpl-item:hover { border-color: var(--accent-color); background: var(--accent-glow); }
+.ng-tpl-item > span { width: 18px; text-align: center; flex: none; }
+.ng-tpl-item small { display: block; color: var(--text-muted); font-size: 0.72rem; margin-top: 2px; }
+.ng-tpl-own { display: flex; gap: 4px; align-items: center; }
+.ng-tpl-save { display: flex; gap: 6px; margin-top: 4px; }
+.ng-tpl-save .prop-input { flex: 1; min-width: 0; }
+.ng-tpl-save .btn-secondary { flex: 1; }
+.ng-tpl-save input + .btn-secondary { flex: none; }

@@ -7,7 +7,7 @@
  */
 import { t } from "../i18n/i18n";
 import { layerForShape } from "../laserLayers";
-import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, applyAdjust, resample, stats } from "./dither";
+import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, applyAdjust, resample, stats, curveLut, curveIsIdentity } from "./dither";
 import { ImageSettings, imageSizeMm, gridSize, processed, sourceGray } from "./imageShape";
 
 const ICON: Record<EngravePreset, string> = { photo: "📷", graphic: "🎨", bw: "◐", lines: "〰️", dots: "⠿", newspaper: "📰" };
@@ -80,6 +80,15 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
             ${slider("eng-wh", "eng.white", 0, 100, 1)}
             <label class="eng-ck"><input id="eng-inv" type="checkbox"> ${t("eng.invert")}</label>
           </details>
+          <details class="eng-sec" id="eng-curve-sec"><summary>${t("eng.curve")}</summary>
+            <canvas id="eng-curve" class="eng-curve" width="300" height="220"></canvas>
+            <div class="eng-row">
+              <button type="button" class="btn-secondary btn-compact" data-curve="s">${t("eng.curveS")}</button>
+              <button type="button" class="btn-secondary btn-compact" data-curve="light">${t("eng.curveLight")}</button>
+              <button type="button" class="btn-secondary btn-compact" data-curve="reset">${t("eng.curveReset")}</button>
+            </div>
+            <div class="dlg-hint">${t("eng.curveHint")}</div>
+          </details>
           <details class="eng-sec"><summary>${t("eng.expert")}</summary>
             <label class="prop-row">${t("eng.method")}
               <select id="eng-m" class="prop-input" style="width:auto;">${RASTER_METHODS.map(m => `<option value="${m}">${t("eng.m." + m)}</option>`).join("")}</select></label>
@@ -135,10 +144,12 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   };
   const num = (id: string, d: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : d; };
   const read = () => {
+    const curve = img.adjust?.curve;
     img.adjust = {
       brightness: num("eng-br", 0), contrast: num("eng-ct", 0), gamma: num("eng-ga", 1), sharpen: num("eng-sh", 0), denoise: num("eng-dn", 0),
       black: num("eng-bk", 0) / 100, white: Math.max(num("eng-bk", 0) + 2, num("eng-wh", 100)) / 100, invert: $("eng-inv").checked
     };
+    if (curve) img.adjust.curve = curve;
     const m = $<HTMLSelectElement>("eng-m").value as RasterMethod;
     if (m !== img.raster.method) img.preset = "custom";
     img.raster = { method: m, cell: num("eng-cell", 6), angle: num("eng-ang", 0), threshold: num("eng-thr", 50) / 100 };
@@ -268,7 +279,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   });
   window.addEventListener("mouseup", () => { drag = null; });
 
-  const close = () => ov.remove();
+  const close = () => { ov.dispatchEvent(new Event("remove-listeners")); ov.remove(); };
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   $("eng-cancel").addEventListener("click", close);
@@ -279,8 +290,86 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     log(t("eng.applied", { type: img.preset === "custom" ? t("eng.m." + img.raster.method) : t("eng.p." + img.preset) }));
     onDone();
   });
+  // ---- Bildkurve: Punkte ziehen, Klick = neuer Punkt, Doppelklick = Punkt weg ----
+  const ccv = $<HTMLCanvasElement>("eng-curve");
+  const pts = (): number[][] => (img.adjust.curve && img.adjust.curve.length >= 2 ? img.adjust.curve : [[0, 0], [1, 1]]).map(p => [...p]);
+  let hist: Float32Array | null = null;
+  const histogram = () => {
+    const g = applyAdjust(small, sw, sh, { ...A(), curve: undefined });
+    const h = new Float32Array(64);
+    for (let i = 0; i < g.length; i++) h[Math.min(63, Math.floor(g[i] * 64))]++;
+    const mx = Math.max(1, ...h);
+    hist = h.map(v => v / mx);
+  };
+  const PAD = 10;
+  const toC = (x: number, y: number) => ({ x: PAD + x * (ccv.width - 2 * PAD), y: ccv.height - PAD - y * (ccv.height - 2 * PAD) });
+  const fromC = (cx: number, cy: number) => ({
+    x: Math.min(1, Math.max(0, (cx - PAD) / (ccv.width - 2 * PAD))),
+    y: Math.min(1, Math.max(0, (ccv.height - PAD - cy) / (ccv.height - 2 * PAD)))
+  });
+  const drawCurve = () => {
+    const g = ccv.getContext("2d")!, W = ccv.width, H = ccv.height;
+    g.clearRect(0, 0, W, H);
+    g.fillStyle = "#0d0d12"; g.fillRect(0, 0, W, H);
+    if (!hist) histogram();
+    g.fillStyle = "rgba(160,150,200,0.22)";
+    hist!.forEach((v, i) => { const a = toC(i / 64, 0), b = toC((i + 1) / 64, v * 0.9); g.fillRect(a.x, b.y, b.x - a.x, a.y - b.y); });
+    g.strokeStyle = "rgba(255,255,255,0.08)"; g.lineWidth = 1;
+    for (let k = 1; k < 4; k++) { const a = toC(k / 4, 0), b = toC(k / 4, 1), c = toC(0, k / 4), d = toC(1, k / 4); g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.moveTo(c.x, c.y); g.lineTo(d.x, d.y); g.stroke(); }
+    g.strokeStyle = "rgba(255,255,255,0.18)"; g.setLineDash([4, 4]);
+    const o = toC(0, 0), e = toC(1, 1); g.beginPath(); g.moveTo(o.x, o.y); g.lineTo(e.x, e.y); g.stroke(); g.setLineDash([]);
+    const lut = curveLut(pts());
+    g.strokeStyle = "#a78bff"; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i < 256; i++) { const q = toC(i / 255, lut[i]); if (i) g.lineTo(q.x, q.y); else g.moveTo(q.x, q.y); }
+    g.stroke();
+    pts().forEach((p, i) => { const q = toC(p[0], p[1]); g.fillStyle = i === cdrag ? "#fff" : "#6d4aff"; g.strokeStyle = "#fff"; g.lineWidth = 1.5; g.beginPath(); g.arc(q.x, q.y, 5, 0, Math.PI * 2); g.fill(); g.stroke(); });
+  };
+  const setCurve = (c: number[][] | undefined) => {
+    if (!c || curveIsIdentity(c)) delete img.adjust.curve; else img.adjust.curve = c.map(p => [+p[0].toFixed(3), +p[1].toFixed(3)]);
+    drawCurve(); update();
+  };
+  let cdrag = -1;
+  const pos = (e: MouseEvent) => { const r = ccv.getBoundingClientRect(); return { cx: (e.clientX - r.left) * ccv.width / r.width, cy: (e.clientY - r.top) * ccv.height / r.height }; };
+  const near = (cx: number, cy: number) => pts().findIndex(p => { const q = toC(p[0], p[1]); return Math.hypot(q.x - cx, q.y - cy) < 9; });
+  ccv.addEventListener("mousedown", e => {
+    const { cx, cy } = pos(e);
+    let i = near(cx, cy);
+    if (i < 0) {
+      const p = fromC(cx, cy), list = pts();
+      list.push([p.x, p.y]); list.sort((a, b) => a[0] - b[0]);
+      i = list.findIndex(q => q[0] === p.x && q[1] === p.y);
+      setCurve(list);
+    }
+    cdrag = i; drawCurve();
+  });
+  const onCurveMove = (e: MouseEvent) => {
+    if (cdrag < 0 || !document.body.contains(ccv)) return;
+    const { cx, cy } = pos(e), p = fromC(cx, cy), list = pts();
+    const last = list.length - 1;
+    // Anfang und Ende bleiben am Rand (x = 0 / 1), sonst zwischen den Nachbarn
+    const x = cdrag === 0 ? 0 : cdrag === last ? 1 : Math.min(list[cdrag + 1][0] - 0.01, Math.max(list[cdrag - 1][0] + 0.01, p.x));
+    list[cdrag] = [x, p.y];
+    setCurve(list);
+  };
+  const onCurveUp = () => { if (cdrag >= 0) { cdrag = -1; drawCurve(); } };
+  window.addEventListener("mousemove", onCurveMove);
+  window.addEventListener("mouseup", onCurveUp);
+  ccv.addEventListener("dblclick", e => {
+    const { cx, cy } = pos(e), i = near(cx, cy), list = pts();
+    if (i > 0 && i < list.length - 1) { list.splice(i, 1); setCurve(list); }
+  });
+  ov.querySelectorAll<HTMLElement>("[data-curve]").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.curve;
+    setCurve(k === "s" ? [[0, 0], [0.25, 0.18], [0.75, 0.84], [1, 1]] : k === "light" ? [[0, 0], [0.3, 0.42], [1, 1]] : undefined);
+  }));
+  // Schieber geändert → Verteilung neu zeichnen
+  ov.querySelectorAll(".eng-right input, .eng-right select, .eng-pre, #eng-auto, #eng-reset").forEach(el =>
+    el.addEventListener(el.tagName === "BUTTON" ? "click" : "input", () => { hist = null; drawCurve(); }));
+  ov.addEventListener("remove-listeners", () => { window.removeEventListener("mousemove", onCurveMove); window.removeEventListener("mouseup", onCurveUp); });
+
   fill();
   update(true);
+  drawCurve();
 }
 
 /** Zeilen mit mindestens einem gebrannten Punkt (für die Zeit-Schätzung) */

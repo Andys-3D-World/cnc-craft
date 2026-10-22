@@ -5,12 +5,13 @@ import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
 import { pocketPaths, PocketStrategy } from "./pocket";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
-import { makeEllipsePoints } from "./shapeTransform";
+import { makeEllipsePoints, shapeBounds } from "./shapeTransform";
 import { spindleCode } from "./spindleDir";
 import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
+import { rotary, applyRotary, outsideBand, circumference } from "./rotary";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 
 const MM_TO_PIXEL = 2;
@@ -56,7 +57,10 @@ export function orderToolGroups(shapes: any[]): ToolGroup[] {
  * G-Code erzeugen (Fräse / Laser / Plasma je nach Maschinenart).
  * Zusätzlich: Warnung, wenn Formen auf bereits verbrauchter Fläche der Platte liegen.
  */
-export const generateGcode = (shapes: any): string | null => {
+/** flat: Drehachse nicht umrechnen (Simulation zeigt die abgewickelte Fläche) */
+let flatOnly = false;
+export const generateGcode = (shapes: any, opts: { flat?: boolean } = {}): string | null => {
+  flatOnly = !!opts.flat;
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
   const skipped = usedAreaShapes(shapes);
   allSkipped = skipped.size > 0 && skipped.size === shapes.length;
@@ -90,6 +94,14 @@ const generateGcodeInner = (shapes: any): string | null => {
   if (isLaser()) {
     const res = generateLaserGcode(shapes);
     lastGcodeWarnings = res.warnings;
+    // Drehachse: Y auf den Umfang umrechnen (Y-Anschluss) oder in eine A-Achse (Grad)
+    if (rotary.on && res.gcode && !flatOnly) {
+      const out = outsideBand(shapes, shapeBounds);
+      if (out) lastGcodeWarnings.push(t("rot.outside", { n: out, c: circumference().toFixed(1) }));
+      const g = applyRotary(res.gcode);
+      if (!g) { lastGcodeWarnings.unshift(t("rot.arcs")); return null; }
+      return g;
+    }
     return res.gcode;
   }
   // Bilder (Bildgravur) gibt es nur beim Laser

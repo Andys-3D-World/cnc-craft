@@ -3,7 +3,7 @@
  * Werkstück gehört: Auswahlrahmen mit Griffen, Vorschau beim Zeichnen,
  * Fangpunkt-Markierung, Messlinie, Info-Text an der Maus, Statuszeile.
  */
-import { app, toScreen, toWorld, fmtMm, options } from "./editorState";
+import { app, toScreen, toWorld, fmtMm, options, bedSizeMm } from "./editorState";
 import { live, currentTool, toolHint, dragRect, dragPolygonPoints, measureText } from "./tools";
 import { t } from "../i18n/i18n";
 import { selectionBounds, selectionHandles, HANDLE_SIZE, selectedShapes } from "./selection";
@@ -11,6 +11,8 @@ import { Pt, shapeToPaths, makeEllipsePoints, makeRectPoints, arcGeometry, MM_TO
 import { berechne3PunktBogen } from "../arcEngine";
 import { drawBezierOverlay } from "./bezier";
 import { drawDims, drawDimPreview } from "./dims";
+import { drawRotaryBand } from "../rotary";
+import { isLaser } from "../machineMode";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -18,6 +20,8 @@ const SELECT = "#34d17b";
 export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
   ctx.save();
   const tool = currentTool();
+  // ---- Drehachse: Band für den abgewickelten Umfang ----
+  if (isLaser()) drawRotaryBand(ctx, toScreen, bedSizeMm().w);
 
   // ---- Hover: Form unter der Maus leicht hervorheben ----
   if (tool === "select" && live.mode === "idle" && live.hover && !app().selectedShapeIds.includes(live.hover.id)) {

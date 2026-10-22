@@ -10,6 +10,7 @@ import { icon } from "./icons";
 import { t, T, tip, ph } from "../i18n/i18n";
 import { toolPickerHtml, toolSummaryHtml } from "./toolPicker";
 import { modeSwitchHtml, laserLayersHtml, laserSettingsHtml } from "./laserPanel";
+import { rotarySectionHtml } from "./rotaryPanel";
 import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
 import { stockSectionHtml } from "./stockPanel";
 import { machineLineHtml } from "./machineWizard";
@@ -102,6 +103,7 @@ export function renderRightPanel(container: HTMLElement) {
         ${toolSummaryHtml()}
         ${stockSectionHtml()}
         ${laserSettingsHtml()}
+        ${rotarySectionHtml()}
         ${plasmaSettingsHtml()}
 
         <div class="menu-section-unified">

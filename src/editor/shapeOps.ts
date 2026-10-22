@@ -28,7 +28,7 @@ const ringArea = (r: Ring) => { let a = 0; for (let i = 0, j = r.length - 1; i <
 const mpArea = (m: MultiPolygon) => m.reduce((s, poly) => s + poly.reduce((t, r, i) => t + (i ? -1 : 1) * Math.abs(ringArea(r)), 0), 0);
 
 /** Auswahl in Teile aufteilen (Gruppe = ein Teil) */
-function units(shapes: any[]): any[][] {
+export function units(shapes: any[]): any[][] {
   const map = new Map<string, any[]>();
   for (const s of shapes) {
     const k = s.groupId || s.id;
@@ -39,7 +39,7 @@ function units(shapes: any[]): any[][] {
 }
 
 /** Fläche eines Teils: alle geschlossenen Konturen nach Gerade/Ungerade (xor) */
-function region(members: any[]): MultiPolygon | null {
+export function region(members: any[]): MultiPolygon | null {
   const rings: Polygon[] = [];
   for (const s of members) for (const p of shapeToPaths(s)) if (p.closed && p.pts.length >= 3) rings.push([ring(p.pts)]);
   if (!rings.length) return null;
@@ -47,7 +47,7 @@ function region(members: any[]): MultiPolygon | null {
 }
 
 /** Ergebnis-Flächen → neue Polylinien (je Fläche eine Gruppe, wenn sie Löcher hat) */
-function toShapes(m: MultiPolygon, like: any): any[] {
+export function toShapes(m: MultiPolygon, like: any): any[] {
   const extra: Record<string, any> = {};
   for (const k of KEEP) if (like?.[k] !== undefined) extra[k] = like[k];
   const out: any[] = [];
@@ -303,4 +303,76 @@ export function weldAndScore(sel: any[], scoreExtra: Record<string, any>): OpRes
     }
   });
   return { remove: list.flatMap(x => x.u), add, scores };
+}
+
+// ---------------------------------------------------------------------
+// Kacheln: großes Motiv in Stücke teilen, die aufs Bett passen
+// ---------------------------------------------------------------------
+
+export interface Tile { col: number; row: number; x0: number; y0: number; x1: number; y1: number; shapes: any[] }
+
+/** offene Linie auf ein Rechteck zuschneiden (Liang–Barsky je Abschnitt) → Stücke */
+function clipOpen(pts: Pt[], x0: number, y0: number, x1: number, y1: number): Pt[][] {
+  const out: Pt[][] = [];
+  let cur: Pt[] = [];
+  const close = () => { if (cur.length >= 2) out.push(cur); cur = []; };
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    let t0 = 0, t1 = 1, ok = true;
+    for (const [p, q] of [[-dx, a.x - x0], [dx, x1 - a.x], [-dy, a.y - y0], [dy, y1 - a.y]]) {
+      if (Math.abs(p) < 1e-12) { if (q < 0) { ok = false; break; } continue; }
+      const r = q / p;
+      if (p < 0) { if (r > t1) { ok = false; break; } if (r > t0) t0 = r; }
+      else { if (r < t0) { ok = false; break; } if (r < t1) t1 = r; }
+    }
+    if (!ok) { close(); continue; }
+    const pa = { x: a.x + t0 * dx, y: a.y + t0 * dy }, pb = { x: a.x + t1 * dx, y: a.y + t1 * dy };
+    const last = cur[cur.length - 1];
+    if (!last || t0 > 1e-9 || Math.hypot(last.x - pa.x, last.y - pa.y) > 1e-6) { close(); cur.push(pa); }
+    cur.push(pb);
+    if (t1 < 1 - 1e-9) close();
+  }
+  close();
+  return out;
+}
+
+/**
+ * Vektor-Formen in Kacheln w × h (Welt-Pixel) teilen. Teile, die ganz in einer Kachel liegen, bleiben unverändert
+ * (Kreise, Kurven, Text behalten ihre Art); andere werden an den Kachelgrenzen geschnitten – Flächen als Flächen,
+ * offene Linien als Linienstücke. Bilder werden hier übergangen (siehe splitImage).
+ */
+export function tileShapes(sel: any[], w: number, h: number): { tiles: Tile[]; error?: string } {
+  const vec = sel.filter(s => s.type !== "image");
+  const b = groupBounds(sel);
+  if (!b || !(w > 0) || !(h > 0)) return { tiles: [], error: "tile.select" };
+  const cols = Math.max(1, Math.ceil((b.maxX - b.minX) / w - 1e-6)), rows = Math.max(1, Math.ceil((b.maxY - b.minY) / h - 1e-6));
+  if (cols * rows > 400) return { tiles: [], error: "tile.tooMany" };
+  const tiles: Tile[] = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    tiles.push({ col: c, row: r, x0: b.minX + c * w, y0: b.minY + r * h, x1: b.minX + (c + 1) * w, y1: b.minY + (r + 1) * h, shapes: [] });
+  }
+  for (const u of units(vec)) {
+    const ub = groupBounds(u);
+    if (!ub) continue;
+    const whole = tiles.find(tl => ub.minX >= tl.x0 - 1e-6 && ub.maxX <= tl.x1 + 1e-6 && ub.minY >= tl.y0 - 1e-6 && ub.maxY <= tl.y1 + 1e-6);
+    if (whole) { const gid = u.length > 1 ? newId() : undefined; whole.shapes.push(...u.map(s => ({ ...cloneShape(s), ...(gid ? { groupId: gid } : {}) }))); continue; }
+    const reg = region(u);
+    const like = u[0];
+    const extra: Record<string, any> = {};
+    for (const k of KEEP) if (like?.[k] !== undefined) extra[k] = like[k];
+    for (const tl of tiles) {
+      if (ub.maxX < tl.x0 || ub.minX > tl.x1 || ub.maxY < tl.y0 || ub.minY > tl.y1) continue;
+      if (reg && reg.length) {
+        const box: Polygon = [[[tl.x0, tl.y0], [tl.x1, tl.y0], [tl.x1, tl.y1], [tl.x0, tl.y1]]];
+        const part = polygonClipping.intersection(reg, box);
+        if (part.length) tl.shapes.push(...toShapes(part, like));
+      }
+      for (const s of u) for (const p of shapeToPaths(s)) {
+        if (p.closed || p.pts.length < 2) continue;
+        for (const seg of clipOpen(p.pts, tl.x0, tl.y0, tl.x1, tl.y1)) tl.shapes.push(createPolyline(seg, false, s.millingMode || "on-line", { ...extra }));
+      }
+    }
+  }
+  return { tiles };
 }

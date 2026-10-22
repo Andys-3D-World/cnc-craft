@@ -1,5 +1,49 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Rotary (laser engraving on round items):** new section *Rotary* in the Laser tab – connection (rotary on the Y
+  connector, like xTool RA2 / Creality / LaserPecker roller rotaries, or its own A axis on grblHAL/FluidNC), type
+  (roller or chuck), item diameter, roller diameter and Y travel per rotation. You draw on the unrolled surface:
+  X = along the item, Y = around it; a blue band on the bed shows the circumference. When the G-code is made, Y is
+  converted (roller: by the roller diameter, chuck: by the item diameter; A axis: in degrees). Warning when parts lie
+  outside the circumference. The simulation shows the unrolled surface; framing moves only along X on an A axis
+- **3D view (new button in the left toolbar):** see the result from all sides – drag to turn freely in every
+  direction (also upside down), right-drag/Shift to move, wheel to zoom, double-click to reset. *Cut-out parts:*
+  everything that is cut through (laser: line layers from 70 % power, router: outside/inside, plasma: all closed
+  shapes) becomes a solid part with the chosen thickness, the top shows the material with the engraving (like the
+  material view), laser-cut edges on wood/leather/cardboard are charred dark; optionally the remaining sheet with
+  its holes and the parts lifted out of it. *Round item:* with the rotary switched on, the design is wrapped around
+  a cylinder with the set diameter. Small WebGL viewer, polygons are triangulated with earcut (ISC)
+- **Shape library:** new button in the left toolbar – 42 ready-made shapes in four groups (basic shapes, stars &
+  badges, symbols, maker parts such as tag, keychain, coaster, puzzle piece, plate and bracket with holes). Click a
+  shape to place it in the centre of the bed at the chosen width; holes are recognised as inside contours
+- **Tone curve for image engraving:** new section *Tone curve* in the engraving window – click to add a point, drag
+  to bend the brightness, double-click to remove a point; the brightness distribution of the picture is shown behind
+  the curve. Quick buttons: S-curve (more contrast), lighter midtones, straight. Smooth curve without overshoot
+  (monotone cubic); saved with the image
+- **Split into tiles:** new button in the shape tools – a design larger than the machine is cut into tiles of a chosen
+  size (or the bed size). Areas are cut at the tile borders and stay areas, lines become line pieces, parts that fit
+  completely into one tile stay unchanged, images are split (not rotated ones). Each tile can go onto its own bed at
+  the origin, with small registration marks in the corners (weakest line layer / 0.3 mm deep) for lining the pieces
+  up
+- **Node graph (first version, new button in the left toolbar):** build a workflow from blocks instead of clicking
+  step by step – drag an output onto an input, every node shows a small live preview and its result, settings of the
+  selected node on the right. 24 nodes in five groups: *sources* (shapes/image taken from the bed as a copy,
+  rectangle, circle, polygon), *shapes* (move/rotate/scale/mirror, position, offset, union/subtract/intersect/exclude,
+  round corners, grid copies, pattern fill, nesting, tiles, laser layer/cut side/depth, merge), *image* (remove
+  background, tone curve, brightness/contrast/gamma/sharpen/invert, engraving method and line interval, size and
+  position, mask with closed shapes), *numbers* (number, calculate – green inputs let one number drive several
+  settings) and *output*. "Place on bed" puts the result on the bed and replaces the previous result of the same
+  output; tiles can go onto their own beds. Only changed nodes are recalculated; connections that would form a loop
+  are refused. The graph is saved in the project file (`nodeGraph`, including the shapes taken from the bed) and
+  remembered between sessions. *Live* option on the source node: follows changes of those shapes on the bed and
+  recalculates at once. *Templates:* six included workflows (coaster set, sign with two holes, photo on slate, round
+  photo with cut-out, nest parts, large design in tiles), own templates saved by name, and templates as `.cncgraph`
+  files to share. Templates keep only the workflow, not the taken shapes – loading one keeps the shapes already
+  taken, so the same motif can be tried with different workflows
+
 ## 0.3.0 Beta
 
 **New**

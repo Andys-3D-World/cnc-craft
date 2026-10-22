@@ -13,7 +13,9 @@ import { renderCamPanel, renderEditorToolbar } from "./ui/camPanel";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
-import { initMachineMode } from "./machineMode";
+import { initMachineMode, isLaser } from "./machineMode";
+import { rotary } from "./rotary";
+import { initRotaryPanel } from "./ui/rotaryPanel";
 import { initLaserLayers } from "./laserLayers";
 import { initLaserPanel, refreshLaserPanel } from "./ui/laserPanel";
 import { initPlasmaCuts } from "./plasmaCuts";
@@ -196,9 +198,10 @@ window.addEventListener("DOMContentLoaded", async () => {
     attachPanelResizer(document.querySelector<HTMLElement>("#tab-sim .sim-layout"), document.querySelector<HTMLElement>("#tab-sim .sim-side"), "sim");
     const openSimTab = () => (document.querySelector('.tab-navigation [data-tab="tab-sim"]') as HTMLElement | null)?.click();
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
-      const gcode = generateGcode(state.shapes);
+      const gcode = generateGcode(state.shapes, { flat: true });
       if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
+      if (rotary.on && isLaser()) appendToConsole(t("rot.simFlat"));
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();
     });
@@ -215,6 +218,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLibraryTab(appendToConsole);   // im selben Reiter: Laser-/Plasma-Bibliothek + Export/Import/Sicherung
     initToolPicker(redraw);
     initLaserPanel(redraw);
+    initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
     initPlasmaPanel(redraw);
     initStockPanel(redraw, appendToConsole);
     initMachineWizard(redraw, appendToConsole);

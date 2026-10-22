@@ -17,6 +17,9 @@ const P: Record<string, string> = {
   dim: `<path d="M4 7v10M20 7v10"/><path d="M4 12h16"/><path d="M7 9.5L4 12l3 2.5M17 9.5l3 2.5-3 2.5"/><path d="M10 6h4" stroke-width="1.4"/>`,
   centerFix: `<rect x="3.5" y="3.5" width="17" height="17" rx="1.5"/><circle cx="12" cy="12" r="3.5"/><path d="M12 6v2.5M12 15.5V18M6 12h2.5M15.5 12H18" stroke-dasharray="1.5 1.5"/>`,
   measure: `<path d="M3.5 15.5l12-12 5 5-12 12z"/><path d="M7 12l2 2M10 9l1.5 1.5M13 6l2 2"/>`,
+  nodeGraph: `<rect x="2.5" y="4" width="7" height="5" rx="1.2"/><rect x="14.5" y="3" width="7" height="5" rx="1.2"/><rect x="14.5" y="15" width="7" height="5" rx="1.2"/><path d="M9.5 6.5c3 0 2-1 5-1M9.5 6.5c3 0 2 11 5 11"/>`,
+  view3d: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M18.5 3.5a3 3 0 012 2.5" stroke-width="1.4"/><path d="M20.5 6l.4-1.6-1.6.3" stroke-width="1.4"/>`,
+  shapeLib: `<path d="M12 3.5l2.3 4.7 5.2.7-3.8 3.6.9 5.1L12 15.2l-4.6 2.4.9-5.1-3.8-3.6 5.2-.7z" stroke-width="1.6"/><circle cx="6" cy="19" r="2.2"/><rect x="15.5" y="16.8" width="4.4" height="4.4" rx="0.8"/>`,
   boxgen: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M7 9.2v1.6M9.5 10.6v1.6M16.5 10.6v1.6M14 12v1.6" stroke-width="1.6"/>`,
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,
 
@@ -49,6 +52,7 @@ const P: Record<string, string> = {
   patternFill: `<circle cx="12" cy="12" r="9"/><path d="M8 7.5l1 1.8 2-.1-1.2 1.6.8 1.9-2-.6-1.5 1.3.1-2L5.5 10.3l2-.6zM15.5 12l.8 1.4 1.6-.1-1 1.3.6 1.5-1.6-.5-1.2 1 .1-1.6-1.3-.9 1.6-.5z"/>`,
   weldScore: `<path d="M4 17c1.5-5 3-9 5.5-9S12 12 14 12s3-4 6-4"/><path d="M9.5 8c-1 3-1.5 6-1 9" stroke-dasharray="1.6 1.6" opacity=".7"/><path d="M14 12c1 2 2.5 4 4.5 4"/>`,
   imageSplit: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M12 3v18M2 12h20" stroke-dasharray="2.5 2"/><circle cx="8" cy="8.5" r="1.4"/><path d="M14 18l2.5-3 2 2.5"/>`,
+  tiles: `<rect x="3" y="4" width="8" height="7" rx="1"/><rect x="13" y="4" width="8" height="7" rx="1"/><rect x="3" y="13" width="8" height="7" rx="1"/><rect x="13" y="13" width="8" height="7" rx="1" stroke-dasharray="2 1.6"/>`,
   imageMask: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="2.5 2" opacity=".55"/><path d="M12 7.5l1.6 3.2 3.5.5-2.5 2.5.6 3.5L12 15.6l-3.2 1.6.6-3.5-2.5-2.5 3.5-.5z"/>`,
   fillet: `<path d="M5 20V12a7 7 0 017-7h8"/><path d="M5 9V5h4" stroke-dasharray="2 2" opacity=".6"/>`,
   offset: `<rect x="8" y="8" width="8" height="8" rx="1"/><rect x="4" y="4" width="16" height="16" rx="4" stroke-dasharray="3 2"/>`,

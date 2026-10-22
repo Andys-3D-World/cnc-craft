@@ -15,9 +15,12 @@
  *  F                    Alles zeigen (Zoom auf Bett)
  *  Leertaste halten     Ansicht verschieben
  */
+import { openShapeLibrary } from "./shapeLibrary";
+import { openView3D } from "../ui/view3dDialog";
+import { openNodeEditor } from "../nodes/nodeEditor";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
-import { combine, splitByLines, roundCorners, patternFill, weldAndScore, BoolOp, OpResult, PatternOptions } from "./shapeOps";
+import { combine, splitByLines, roundCorners, patternFill, weldAndScore, tileShapes, BoolOp, OpResult, PatternOptions, Tile } from "./shapeOps";
 import { getLayers } from "../laserLayers";
 import { centerOn } from "./dims";
 import { toImageUV, splitImage } from "../raster/imageShape";
@@ -146,6 +149,10 @@ export const commands: Record<string, () => void> = {
   centerFix: () => centerFix(),
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
+  shapeLib: () => openShapeLibrary(log),
+  view3d: () => openView3D(),
+  nodeGraph: () => openNodeEditor(log),
+  tiles: () => openTileDialog(),
   duplicateDialog: () => openDuplicateDialog(),
   importFile: () => { importWithDialog(); },
   openProject: () => { openProjectWithDialog(); },
@@ -170,6 +177,7 @@ function makeCopies(source: any[], offsetPx: number): any[] {
   return source.map(s => {
     const c = cloneShape(s);
     c.id = newId();
+    delete c.ngOut; // Kopie gehört nicht mehr zum Ergebnis des Knotengraphen
     if (c.groupId) {
       if (!groupMap.has(c.groupId)) groupMap.set(c.groupId, "grp-" + newId());
       c.groupId = groupMap.get(c.groupId);
@@ -601,6 +609,122 @@ function centerFix() {
   const n = ref ? centerOn(ref, sel) : 0;
   if (!n) { log(t("dims.needTwo")); return; }
   log(t("dims.centered", { n }));
+  done();
+  checkpoint();
+}
+
+// =====================================================================
+// KACHELN: großes Motiv in bettgroße Stücke teilen (jede Kachel auf ein eigenes Bett)
+// =====================================================================
+
+const TILE_KEY = "cnc_craft_tiles";
+interface TileOptions { w: number; h: number; beds: boolean; marks: boolean }
+
+function openTileDialog() {
+  const sel = selectedShapes();
+  if (!sel.length) { log(t("tile.select")); return; }
+  const bed = bedSizeMm();
+  let o: TileOptions = { w: bed.w, h: bed.h, beds: true, marks: true };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(TILE_KEY) || "{}") }; } catch { /* egal */ }
+  const sb = groupBounds(sel)!;
+  const sw = (sb.maxX - sb.minX) / MM_TO_PIXEL, sh = (sb.maxY - sb.minY) / MM_TO_PIXEL;
+  document.getElementById("tile-dialog-overlay")?.remove();
+  const ov = document.createElement("div");
+  ov.id = "tile-dialog-overlay";
+  ov.className = "dlg-overlay";
+  ov.innerHTML = `
+    <div class="dlg-box" role="dialog" style="width:380px;">
+      <h3>🧩 ${t("tile.title")}</h3>
+      <div class="dlg-hint">${t("tile.desc", { w: sw.toFixed(1), h: sh.toFixed(1) })}</div>
+      <label class="prop-row">${t("tile.w")}<input id="tile-w" type="number" step="1" min="5" class="prop-input" style="width:90px;"></label>
+      <label class="prop-row">${t("tile.h")}<input id="tile-h" type="number" step="1" min="5" class="prop-input" style="width:90px;"></label>
+      <button type="button" id="tile-bed" class="btn-secondary btn-compact">${t("tile.useBed", { w: bed.w, h: bed.h })}</button>
+      <label class="prop-row" style="cursor:pointer;"><span>${t("tile.beds")}</span><input id="tile-beds" type="checkbox" style="width:auto;"></label>
+      <label class="prop-row" style="cursor:pointer;"><span>${t("tile.marks")}</span><input id="tile-marks" type="checkbox" style="width:auto;"></label>
+      <div class="tool-info" id="tile-info"></div>
+      <div class="dlg-buttons">
+        <button id="tile-cancel" class="btn-secondary">${t("dlg.cancel")}</button>
+        <button id="tile-ok" class="btn-primary">✔ ${t("tile.run")}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  const $ = (id: string) => ov.querySelector("#" + id) as HTMLInputElement;
+  $("tile-w").value = String(o.w); $("tile-h").value = String(o.h); $("tile-beds").checked = o.beds; $("tile-marks").checked = o.marks;
+  const read = (): TileOptions => ({ w: Math.max(5, parseFloat($("tile-w").value) || bed.w), h: Math.max(5, parseFloat($("tile-h").value) || bed.h), beds: $("tile-beds").checked, marks: $("tile-marks").checked });
+  const info = () => { const r = read(); const c = Math.max(1, Math.ceil(sw / r.w - 1e-6)), n = Math.max(1, Math.ceil(sh / r.h - 1e-6)); $("tile-info").textContent = t("tile.info", { c, r: n, n: c * n }); };
+  ov.querySelectorAll("input").forEach(i => i.addEventListener("input", info));
+  $("tile-bed").onclick = () => { $("tile-w").value = String(bed.w); $("tile-h").value = String(bed.h); info(); };
+  info();
+  const close = () => ov.remove();
+  ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") $("tile-ok").click(); });
+  ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
+  $("tile-cancel").onclick = close;
+  $("tile-ok").onclick = () => {
+    const opts = read();
+    try { localStorage.setItem(TILE_KEY, JSON.stringify(opts)); } catch { /* egal */ }
+    close();
+    runTiles(sel, opts);
+  };
+}
+
+async function runTiles(sel: any[], o: TileOptions) {
+  const W = o.w * MM_TO_PIXEL, H = o.h * MM_TO_PIXEL;
+  const r = tileShapes(sel, W, H);
+  if (r.error) { log(t(r.error)); return; }
+  const tiles = r.tiles;
+  const tileAt = (x: number, y: number): Tile | undefined =>
+    tiles.find(tl => x >= tl.x0 - 1e-6 && x <= tl.x1 + 1e-6 && y >= tl.y0 - 1e-6 && y <= tl.y1 + 1e-6);
+  // Bilder an den Kachelgrenzen teilen (nur nicht gedrehte; gedrehte bleiben ganz in der Kachel ihrer Mitte)
+  for (const im of sel.filter((s: any) => s.type === "image")) {
+    const [p0, p1, , p3] = im.points;
+    const straight = Math.abs(p1.y - p0.y) < 1e-6 && Math.abs(p3.x - p0.x) < 1e-6;
+    let pieces: any[] = [cloneShape(im)];
+    if (straight) {
+      const xs = [...new Set(tiles.map(tl => tl.x0))], ys = [...new Set(tiles.map(tl => tl.y0))];
+      const cu = xs.map(x => toImageUV(im, { x, y: p0.y }).u), cv = ys.map(y => toImageUV(im, { x: p0.x, y }).v);
+      pieces = await splitImage(im, cu, cv);
+    } else log(t("tile.imageRotated"));
+    for (const pc of pieces) {
+      const cx = pc.points.reduce((a: number, q: any) => a + q.x, 0) / 4, cy = pc.points.reduce((a: number, q: any) => a + q.y, 0) / 4;
+      (tileAt(cx, cy) || tiles[0]).shapes.push(pc);
+    }
+  }
+  const used = tiles.filter(tl => tl.shapes.length);
+  if (!used.length) { log(t("tile.select")); return; }
+  // Passermarken: kleine Winkel in den Kachel-Ecken (schwächste Linien-Ebene bzw. flach graviert)
+  if (o.marks && tiles.length > 1) {
+    const mark = getLayers().filter(l => l.mode === "line").sort((a, b) => a.power - b.power)[0];
+    const extra = { ...(mark ? { laserLayerId: mark.id } : {}), millingDepth: -0.3 };
+    const L = 4 * MM_TO_PIXEL;
+    for (const tl of used) {
+      for (const [x, y, sx, sy] of [[tl.x0, tl.y0, 1, 1], [tl.x1, tl.y0, -1, 1], [tl.x1, tl.y1, -1, -1], [tl.x0, tl.y1, 1, -1]]) {
+        tl.shapes.push(createPolyline([{ x: x + sx * L, y }, { x, y }, { x, y: y + sy * L }], false, "on-line", { ...extra }));
+      }
+    }
+  }
+  const st = app();
+  const gone = new Set(sel.flatMap((s: any) => s.groupId ? st.shapes.filter((q: any) => q.groupId === s.groupId) : [s]));
+  st.shapes = st.shapes.filter((s: any) => !gone.has(s));
+  st.selectedShapeIds = [];
+  if (o.beds && used.length > 1) {
+    // jede Kachel an den Nullpunkt, Kachel 1 bleibt auf diesem Bett, die anderen bekommen je ein neues Bett
+    used.forEach((tl, i) => {
+      tl.shapes.forEach(s => translateShape(s, -tl.x0, -tl.y0));
+      st.shapes = [...st.shapes, ...tl.shapes];
+      if (i > 0) moveToBed(tl.shapes.map(s => s.id), addBed());
+    });
+    log(t("tile.doneBeds", { n: used.length }));
+    zoomFit();
+  } else {
+    // auf demselben Bett etwas auseinanderziehen, damit man die Kacheln sieht
+    const gap = 8 * MM_TO_PIXEL;
+    for (const tl of used) {
+      tl.shapes.forEach(s => translateShape(s, tl.col * gap, tl.row * gap));
+      st.shapes = [...st.shapes, ...tl.shapes];
+    }
+    st.selectedShapeIds = used.flatMap(tl => tl.shapes.map(s => s.id));
+    log(t("tile.done", { n: used.length }));
+  }
   done();
   checkpoint();
 }

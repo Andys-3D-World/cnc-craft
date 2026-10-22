@@ -41,6 +41,9 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("dim", "dim", "tip.tool.dim")}
     <button data-cmd="nest" class="btn-tool-icon" ${tip("tip.cmd.nest")}>${icon("nest", 20)}</button>
     <button data-cmd="boxgen" class="btn-tool-icon" ${tip("tip.cmd.boxgen")}>${icon("boxgen", 20)}</button>
+    <button data-cmd="shapeLib" class="btn-tool-icon" ${tip("tip.cmd.shapeLib")}>${icon("shapeLib", 20)}</button>
+    <button data-cmd="view3d" class="btn-tool-icon" ${tip("tip.cmd.view3d")}>${icon("view3d", 20)}</button>
+    <button data-cmd="nodeGraph" class="btn-tool-icon" ${tip("tip.cmd.nodeGraph")}>${icon("nodeGraph", 20)}</button>
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
@@ -87,6 +90,7 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("centerFix", "centerFix", "tip.cmd.centerFix")}
       ${cmd("imageMask", "imageMask", "tip.cmd.imageMask")}
       ${cmd("imageSplit", "imageSplit", "tip.cmd.imageSplit")}
+      ${cmd("tiles", "tiles", "tip.cmd.tiles")}
     </div>
     <div class="tb-group">
       ${cmd("rotateLeft", "rotateLeft", "tip.cmd.rotateLeft")}

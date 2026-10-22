@@ -36,6 +36,7 @@ import { getMachineMode, setMachineMode } from "../machineMode";
 import { getLayers, layersUsedBy, mergeProjectLayers } from "../laserLayers";
 import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
+import { graphForProject, loadProjectGraph } from "../nodes/graphStore";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
@@ -277,7 +278,8 @@ export async function saveProject(saveAs: boolean) {
   // Alle Betten: Formen hintereinander, `beds` sagt, wie viele zu welchem Bett gehören
   const beds = bedsForSave(), all = allShapes();
   const data = { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: all, tools: toolsUsedBy(all),
-    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed() };
+    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed(),
+    nodeGraph: graphForProject() };
   try {
     await writeFile(p, new TextEncoder().encode(JSON.stringify(data)));
     lastProjectPath = p;
@@ -314,6 +316,7 @@ function loadProjectText(text: string, name: string, fullPath?: string) {
   if (addedCuts) log(t("plasma.importedFromProject", { n: addedCuts }));
   if (["mill", "laser", "plasma"].includes(data.machineMode)) setMachineMode(data.machineMode);
   loadBeds(data.shapes, data.beds, data.activeBed);
+  loadProjectGraph(data.nodeGraph);
   if (data.bed) {
     const w = document.getElementById("bed-w") as HTMLInputElement | null;
     const h = document.getElementById("bed-h") as HTMLInputElement | null;

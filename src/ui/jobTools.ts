@@ -13,6 +13,8 @@ import { machine, canCommand, sendAndWait, exportRd } from "../machine";
 import { streamState } from "../machineStream";
 import { generateGcode, lastGcodeWarnings, noGcodeMessage } from "../cam";
 import { state } from "../main";
+import { rotary } from "../rotary";
+import { isLaser } from "../machineMode";
 
 export interface Bounds { x0: number; y0: number; x1: number; y1: number }
 
@@ -81,8 +83,10 @@ export async function runFrame(log: (s: string) => void) {
   log(t("frame.start", { w: r2(b.x1 - b.x0), h: r2(b.y1 - b.y0), label: job.label }));
   const corners = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1], [b.x0, b.y0]];
   if (machine.protocol === "grbl") await sendAndWait("M5", 4000, true);
-  for (const [px, py] of corners) {
-    const a = await sendAndWait(`G90 G0 X${r2(px)} Y${r2(py)}`, machine.protocol === "ruida" || machine.protocol === "k40" ? 40000 : 8000, true);
+  // Drehachse an eigener A-Achse: Y gehört nicht zum Teil → nur entlang X fahren
+  const aAxis = rotary.on && rotary.axis === "a" && isLaser();
+  for (const [px, py] of aAxis ? [[b.x0, 0], [b.x1, 0], [b.x0, 0]] : corners) {
+    const a = await sendAndWait(aAxis ? `G90 G0 X${r2(px)}` : `G90 G0 X${r2(px)} Y${r2(py)}`, machine.protocol === "ruida" || machine.protocol === "k40" ? 40000 : 8000, true);
     if (!a.ok) { log(t("frame.failed")); return; }
   }
   log(t("frame.done"));
