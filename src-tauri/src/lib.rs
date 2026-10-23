@@ -10,6 +10,7 @@
 //!   serial.rs  – Ports auflisten (mit Chip-Erkennung) und öffnen
 //!   elfimg.rs  – .elf-Programme in flashbare ESP-Abbilder umwandeln (wie esptool elf2image)
 //!   flash.rs   – Firmware flashen: ESP32/ESP32-S3 (MKS DLC32 …) und Arduino (GRBL) – ohne Zusatzprogramm
+//!   fonts.rs   – Systemschriften für das Text-Werkzeug auflisten und laden
 //!
 //! Die Oberfläche ruft die Befehle unten per invoke(...) auf und bekommt Ereignisse:
 //!   machine-welcome, machine-status, machine-line, machine-alarm, machine-disconnected,
@@ -19,6 +20,7 @@
 
 mod elfimg;
 mod flash;
+mod fonts;
 mod fwzip;
 mod grbl;
 mod k40;
@@ -477,6 +479,21 @@ async fn camera_snapshot(url: String) -> Result<tauri::ipc::Response, String> {
     Ok(tauri::ipc::Response::new(bytes))
 }
 
+/// Alle installierten Schriften auflisten (fonts.rs) – für die Schriftauswahl im Text-Werkzeug
+#[tauri::command]
+async fn system_fonts() -> Result<Vec<fonts::SysFont>, String> {
+    tauri::async_runtime::spawn_blocking(fonts::list).await.map_err(|e| e.to_string())
+}
+
+/// Eine Systemschrift als Datei holen (nur Schriften aus der Liste oben) – Bytes direkt als ArrayBuffer
+#[tauri::command]
+async fn system_font_data(path: String, index: u32) -> Result<tauri::ipc::Response, String> {
+    let bytes = tauri::async_runtime::spawn_blocking(move || fonts::data(&path, index))
+        .await
+        .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 /// Befehl über die Weboberfläche eines ESP32-Boards schicken (für WLAN-Passwörter mit ! ? ~ oder Umlauten)
 #[tauri::command]
 async fn esp_web_command(host: String, command: String) -> Result<String, String> {
@@ -693,6 +710,8 @@ pub fn run() {
             settings_store_write,
             net_scan,
             camera_snapshot,
+            system_fonts,
+            system_font_data,
             esp_web_command,
             update::update_install,
             update::update_restart

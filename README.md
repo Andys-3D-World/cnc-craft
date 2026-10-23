@@ -108,7 +108,8 @@ Copyright © 2026 Andys 3D World.
 Bundled parts of other projects (all open source) are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md):
 the GRBL firmware (`src-tauri/firmware/`, GPLv3) and the STEP import with
 [occt-import-js](https://github.com/kovacsv/occt-import-js) and [Open CASCADE Technology](https://www.opencascade.com)
-(`public/occt/`, LGPL 2.1).
+(`public/occt/`, LGPL 2.1), plus 26 free fonts for the text tool (`public/fonts/`, SIL Open Font License 1.1 or
+Apache 2.0, licence texts next to the files). The text tool can also use every font installed on your computer.
 
 Product and company names mentioned (e.g. LightBurn, Estlcam, OpenBuilds, MKS, xTool, Ruida) belong to their
 respective owners and are only used to describe which programs and machines CNC Craft is comparable or compatible

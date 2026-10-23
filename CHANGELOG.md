@@ -1,5 +1,26 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **More fonts in the text tool:** 26 free fonts are now included (SIL Open Font License / Apache 2.0, licence texts
+  in `public/fonts/`): sans serif (Open Sans, Oswald, Josefin Sans, Nunito), serif (Lora, Libre Baskerville,
+  Roboto Slab, Cinzel), script (Dancing Script, Great Vibes, Pacifico, Lobster, Caveat, Permanent Marker),
+  stencil (Allerta Stencil, Stardos Stencil, Saira Stencil One), display (Bebas Neue, Anton, Bungee, Black Ops One,
+  Righteous, Abril Fatface) and monospace (Roboto Mono, Special Elite). They work the same on every computer
+- **Single-line font for engraving:** *Relief SingleLine* draws letters from simple open lines – the laser or
+  engraver runs every stroke only once instead of going around the outline
+- **System fonts:** every font installed on the computer (macOS, Windows, Linux) can be chosen in the text tool.
+  Need another font? Install it in the system and reload the list with ↻. A .ttf/.otf file can also be loaded
+  directly (valid until the app is restarted)
+- **New font picker:** search field, every font name shown in its own font, groups *Included*, *Own files* and
+  *System*, style tags (serif, script, stencil …)
+
+**Improved**
+- Projects remember the font of each text. If it is missing on another computer, the text tool shows a clear
+  hint and uses Open Sans instead; the existing shapes in the project stay unchanged
+- Bold/italic of system fonts use the real bold/italic files when the font has them
+
 ## 0.3.1 Beta
 
 **New**
