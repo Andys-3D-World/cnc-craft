@@ -2564,5 +2564,13 @@
   "pr.phaseNoLift": "[Tasten] Z staat al boven – rechtstreeks naar de sensor.",
   "pr.unstable": "[Tasten] De twee metingen komen niet overeen ({a} / {b} mm, machine-Z) – het tastersignaal is onbetrouwbaar (storing?). Z is NIET gezet.",
   "pr.glitch": "[Tasten] Stoorpuls bij Z {z} mm genegeerd (taster weer open) – zoek verder …",
-  "pr.tooManyGlitches": "[Tasten] Meer dan 25 stoorpulsen – gestopt, Z is NIET gezet. De tasteringang vangt veel storing op (kabel naast de motorkabels?)."
+  "pr.tooManyGlitches": "[Tasten] Meer dan 25 stoorpulsen – gestopt, Z is NIET gezet. De tasteringang vangt veel storing op (kabel naast de motorkabels?).",
+  "box.type.tissue": "Tissuedoos",
+  "box.type.bird": "Vogelhuisje / nestkast",
+  "box.type.planter": "Plantenbak",
+  "box.type.scoop": "Kaartenbak / bakje met greep",
+  "box.tdesc.tissue": "Gesloten doos met een lange opening met ronde uiteinden in het deksel – kies de maten passend bij het pak tissues (liefst binnenmaten).",
+  "box.tdesc.bird": "Gesloten doos met invlieggat (tot 32 mm, voor mezen) bovenin de voorkant, kleine ventilatiegaatjes in de zijkanten en afvoergaatjes in de bodem. Gebruik onbehandeld hout; lijm het deksel alleen achter vast of gebruik een scharnier, zodat je hem kunt schoonmaken.",
+  "box.tdesc.planter": "Open doos met afvoergaatjes (6 mm) in de bodem. Bij hout: binnenkant met folie bekleden of afdichten, dan gaat hij veel langer mee.",
+  "box.tdesc.scoop": "Open doos met een halfronde greep bovenin de voorkant – voor systeemkaarten, briefjes, gereedschap of als bureaubakje."
 }

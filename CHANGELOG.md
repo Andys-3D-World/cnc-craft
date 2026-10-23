@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.1 Beta
 
 **New**
 - **Rotary (laser engraving on round items):** new section *Rotary* in the Laser tab – connection (rotary on the Y
@@ -73,6 +73,9 @@
   *round cup* (round box without lid – pens, brushes), *lantern / tea-light house* (arched windows in all four
   walls, vent hole in the lid) and *money box* (coin slot up to a 2-euro coin, round hole in the bottom with a
   two-disc plug)
+- **Four more box types:** *tissue box* (long opening with round ends in the lid), *birdhouse / nest box*
+  (entrance hole up to 32 mm high in the front, vent holes in the sides, drain holes in the bottom), *planter*
+  (6 mm drain holes in the bottom) and *index box / tray* (half-round finger notch at the top of the front)
 
 **Fixed**
 - Open sections in the right panel were cut off at 500 px – long sections now show completely

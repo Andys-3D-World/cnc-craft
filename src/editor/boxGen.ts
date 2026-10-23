@@ -48,11 +48,17 @@ export interface BoxOptions {
  *   flexcup Runder Becher: wie flex, ohne Deckel (Stifte, Pinsel …)
  *   lantern Laterne / Teelichthaus: geschlossen, Fenster in allen vier Wänden, Abzugsloch im Deckel
  *   coin    Spardose: geschlossen, Münzschlitz im Deckel, rundes Loch im Boden mit Stopfen (zwei Scheiben)
+ *   tissue  Taschentuchbox: geschlossen, langes Loch mit runden Enden im Deckel
+ *   bird    Vogelhaus / Nistkasten: geschlossen, Einflugloch vorne oben, Lüftungs- und Abflusslöcher
+ *   planter Pflanzkasten: offen, Abflusslöcher im Boden
+ *   scoop   Karteikasten / Ablage: offen, halbrunde Griffmulde oben in der Front
  */
-export type BoxType = "closed" | "open" | "tray" | "traylid" | "handle" | "drawer" | "lidbox" | "slide" | "shelf" | "flex" | "flexcup" | "lantern" | "coin";
-export const BOX_TYPES: BoxType[] = ["closed", "open", "lidbox", "slide", "tray", "traylid", "handle", "drawer", "shelf", "flex", "flexcup", "lantern", "coin"];
+export type BoxType = "closed" | "open" | "tray" | "traylid" | "handle" | "drawer" | "lidbox" | "slide" | "shelf" | "flex" | "flexcup" | "lantern" | "coin"
+  | "tissue" | "bird" | "planter" | "scoop";
+export const BOX_TYPES: BoxType[] = ["closed", "open", "lidbox", "slide", "tray", "traylid", "handle", "drawer", "shelf", "flex", "flexcup",
+  "lantern", "coin", "tissue", "bird", "planter", "scoop"];
 /** Arten mit Deckel aus Fingerzinken (sechs Platten) */
-const LIDDED: BoxType[] = ["closed", "lantern", "coin"];
+const LIDDED: BoxType[] = ["closed", "lantern", "coin", "tissue", "bird"];
 const isFlex = (ty?: BoxType) => ty === "flex" || ty === "flexcup";
 
 export type PanelName = "bottom" | "top" | "front" | "back" | "left" | "right" | "divX" | "divY" | "blende" | "lidOuter" | "lidInner"
@@ -270,6 +276,39 @@ function rawPanels(o: BoxOptions): Panel[] {
       bot.holes = [circle(bot.w / 2, bot.h / 2, hr)];
       panels.push({ name: "plugOuter", w: 2 * hr + 10, h: 2 * hr + 10, pts: circle(hr + 5, hr + 5, hr + 5) });
       panels.push({ name: "plugInner", w: 2 * hr, h: 2 * hr, pts: circle(hr, hr, hr - 0.2) });
+    }
+  }
+  if (type === "tissue") {
+    // Entnahme-Loch im Deckel: Langloch mit runden Enden (Standard-Box ca. 120 × 25 mm)
+    const top = get("top"), sl = Math.min(140, top.w * 0.6), sh = Math.min(30, top.h * 0.3);
+    if (sl > sh * 1.5 && sh > 5) top.holes = [slot(top.w / 2, top.h / 2, sl, sh)];
+  }
+  if (type === "bird") {
+    // Einflugloch (Meise: 32 mm) vorne im oberen Drittel, kleine Lüftungslöcher oben in den Seiten, Abfluss im Boden
+    const fr = get("front"), r = Math.min(16, (fr.w - 6 * t) / 2 - 2, (fr.h - 6 * t) / 4);
+    if (r > 5) fr.holes = [circle(fr.w / 2, Math.min(fr.h * 0.65, fr.h - 3 * t - r - 4), r)];
+    for (const n of ["left", "right"] as const) { const p = get(n); if (p.h > 8 * t + 20) p.holes = [circle(p.w / 2, p.h - 3 * t - 6, 3, 24)]; }
+    const bot = get("bottom"), m = 3 * t + 6;
+    if (bot.w > 2 * m + 10 && bot.h > 2 * m + 10) bot.holes = [[m, m], [bot.w - m, m], [bot.w - m, bot.h - m], [m, bot.h - m]].map(([x, y]) => circle(x, y, 2.5, 24));
+  }
+  if (type === "planter") {
+    // Abflusslöcher (Ø 6 mm) im Raster von etwa 30 mm, mit Abstand zu den Zinken
+    const bot = get("bottom"), m = 3 * t + 6, aw = bot.w - 2 * m, ah = bot.h - 2 * m;
+    if (aw > 0 && ah > 0) {
+      const nx = Math.max(1, Math.round(aw / 30) + 1), ny = Math.max(1, Math.round(ah / 30) + 1), holes: Pt2[][] = [];
+      for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++)
+        holes.push(circle(nx > 1 ? m + (aw * i) / (nx - 1) : bot.w / 2, ny > 1 ? m + (ah * j) / (ny - 1) : bot.h / 2, 3, 24));
+      bot.holes = holes;
+    }
+  }
+  if (type === "scoop") {
+    // Griffmulde: Halbkreis oben in der Front (die Oberkante läuft von rechts nach links)
+    const fr = get("front"), r = Math.min(25, fr.w * 0.2, (fr.h - 2 * t) * 0.5);
+    const i = fr.pts.findIndex((q, k) => Math.abs(q.y - fr.h) < 1e-9 && Math.abs(fr.pts[(k + 1) % fr.pts.length].y - fr.h) < 1e-9);
+    if (r > 4 && i >= 0) {
+      const notch: Pt2[] = [];
+      for (let k = 0; k <= 24; k++) { const a = (Math.PI * k) / 24; notch.push({ x: fr.w / 2 + r * Math.cos(a), y: fr.h - r * Math.sin(a) }); }
+      fr.pts.splice(i + 1, 0, ...notch);
     }
   }
   if (type === "lidbox" || type === "traylid") {

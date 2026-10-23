@@ -2564,5 +2564,13 @@
   "pr.phaseNoLift": "[Palpage] Z est déjà en haut – trajet direct vers le capteur.",
   "pr.unstable": "[Palpage] Les deux mesures ne concordent pas ({a} / {b} mm, Z machine) – le signal du palpeur n’est pas fiable (parasites ?). Z n’a PAS été réglé.",
   "pr.glitch": "[Palpage] Parasite à Z {z} mm ignoré (palpeur de nouveau ouvert) – la recherche continue …",
-  "pr.tooManyGlitches": "[Palpage] Plus de 25 parasites – arrêt, Z n’a PAS été réglé. L’entrée palpeur capte beaucoup de parasites (câble le long des câbles moteur ?)."
+  "pr.tooManyGlitches": "[Palpage] Plus de 25 parasites – arrêt, Z n’a PAS été réglé. L’entrée palpeur capte beaucoup de parasites (câble le long des câbles moteur ?).",
+  "box.type.tissue": "Boîte à mouchoirs",
+  "box.type.bird": "Nichoir",
+  "box.type.planter": "Jardinière",
+  "box.type.scoop": "Boîte à fiches / bac avec encoche",
+  "box.tdesc.tissue": "Boîte fermée avec une longue ouverture aux bouts arrondis dans le couvercle – choisissez les cotes selon le paquet de mouchoirs (cotes intérieures).",
+  "box.tdesc.bird": "Boîte fermée avec trou d’entrée (jusqu’à 32 mm, pour mésanges) en haut de la façade, petits trous d’aération sur les côtés et trous d’écoulement dans le fond. Utilisez du bois non traité ; ne collez le couvercle qu’à l’arrière ou mettez une charnière pour pouvoir nettoyer.",
+  "box.tdesc.planter": "Boîte ouverte avec trous d’écoulement (6 mm) dans le fond. En bois : tapissez l’intérieur de film ou vernissez-le, elle durera bien plus longtemps.",
+  "box.tdesc.scoop": "Boîte ouverte avec une encoche demi-ronde en haut de la façade – pour fiches, notes, outils ou comme bac de bureau."
 }

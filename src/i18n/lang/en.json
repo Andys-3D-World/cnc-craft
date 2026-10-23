@@ -2739,5 +2739,13 @@
   "pr.phaseNoLift": "[Probing] Z is already at the top – going straight to the sensor.",
   "pr.unstable": "[Probing] The two measurements do not match ({a} / {b} mm, machine Z) – the probe signal is unreliable (interference?). Z was NOT set.",
   "pr.glitch": "[Probing] Interference pulse at Z {z} mm ignored (probe open again) – searching on …",
-  "pr.tooManyGlitches": "[Probing] More than 25 interference pulses – stopped, Z was NOT set. The probe input picks up a lot of interference (cable along the motor cables?)."
+  "pr.tooManyGlitches": "[Probing] More than 25 interference pulses – stopped, Z was NOT set. The probe input picks up a lot of interference (cable along the motor cables?).",
+  "box.type.tissue": "Tissue box",
+  "box.type.bird": "Birdhouse / nest box",
+  "box.type.planter": "Planter",
+  "box.type.scoop": "Index box / tray with finger notch",
+  "box.tdesc.tissue": "Closed box with a long opening with round ends in the lid – size it to fit your tissue pack (inner dimensions help).",
+  "box.tdesc.bird": "Closed box with an entrance hole (up to 32 mm, for tits) high in the front, small vent holes in the sides and drain holes in the bottom. Use untreated wood; glue the lid on only at the back or hinge it so you can clean it.",
+  "box.tdesc.planter": "Open box with drain holes (6 mm) in the bottom. For wood: line the inside with foil or seal it, then it lasts much longer.",
+  "box.tdesc.scoop": "Open box with a half-round finger notch at the top of the front – for index cards, notes, tools or as a desk tray."
 }

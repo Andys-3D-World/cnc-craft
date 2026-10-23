@@ -2564,5 +2564,13 @@
   "pr.phaseNoLift": "[Pomiar] Z jest już na górze – jadę prosto do czujnika.",
   "pr.unstable": "[Pomiar] Dwa pomiary się nie zgadzają ({a} / {b} mm, Z maszyny) – sygnał sondy jest niepewny (zakłócenia?). Z NIE zostało ustawione.",
   "pr.glitch": "[Pomiar] Zakłócenie przy Z {z} mm zignorowane (sonda znów otwarta) – szukam dalej …",
-  "pr.tooManyGlitches": "[Pomiar] Ponad 25 zakłóceń – zatrzymano, Z NIE zostało ustawione. Wejście sondy łapie dużo zakłóceń (kabel obok kabli silników?)."
+  "pr.tooManyGlitches": "[Pomiar] Ponad 25 zakłóceń – zatrzymano, Z NIE zostało ustawione. Wejście sondy łapie dużo zakłóceń (kabel obok kabli silników?).",
+  "box.type.tissue": "Pudełko na chusteczki",
+  "box.type.bird": "Budka lęgowa",
+  "box.type.planter": "Skrzynka na rośliny",
+  "box.type.scoop": "Kartoteka / pojemnik z wycięciem",
+  "box.tdesc.tissue": "Zamknięte pudełko z długim otworem o zaokrąglonych końcach w pokrywie – dobierz wymiary do opakowania chusteczek (najlepiej wewnętrzne).",
+  "box.tdesc.bird": "Zamknięte pudełko z otworem wlotowym (do 32 mm, dla sikor) u góry z przodu, małymi otworami wentylacyjnymi w bokach i odpływowymi w dnie. Użyj nieimpregnowanego drewna; pokrywę przyklej tylko z tyłu lub zamocuj na zawiasie, aby dało się ją czyścić.",
+  "box.tdesc.planter": "Otwarte pudełko z otworami odpływowymi (6 mm) w dnie. Przy drewnie: wyłóż wnętrze folią lub zabezpiecz je, wtedy posłuży dużo dłużej.",
+  "box.tdesc.scoop": "Otwarte pudełko z półokrągłym wycięciem u góry z przodu – na fiszki, karteczki, narzędzia lub jako pojemnik na biurko."
 }

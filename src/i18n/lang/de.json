@@ -2739,5 +2739,13 @@
   "pr.phaseNoLift": "[Antasten] Z steht schon oben – fahre direkt zum Sensor.",
   "pr.unstable": "[Antasten] Die zwei Messungen passen nicht zusammen ({a} / {b} mm, Maschinen-Z) – das Taster-Signal ist unzuverlässig (Störung?). Z wurde NICHT gesetzt.",
   "pr.glitch": "[Antasten] Störimpuls bei Z {z} mm ignoriert (Taster wieder offen) – suche weiter …",
-  "pr.tooManyGlitches": "[Antasten] Mehr als 25 Störimpulse – abgebrochen, Z wurde NICHT gesetzt. Der Taster-Eingang fängt sehr viele Störungen ein (Kabel neben den Motorkabeln?)."
+  "pr.tooManyGlitches": "[Antasten] Mehr als 25 Störimpulse – abgebrochen, Z wurde NICHT gesetzt. Der Taster-Eingang fängt sehr viele Störungen ein (Kabel neben den Motorkabeln?).",
+  "box.type.tissue": "Taschentuchbox",
+  "box.type.bird": "Vogelhaus / Nistkasten",
+  "box.type.planter": "Pflanzkasten",
+  "box.type.scoop": "Karteikasten / Ablage mit Griffmulde",
+  "box.tdesc.tissue": "Geschlossene Kiste mit langem Entnahme-Loch (runde Enden) im Deckel – Maße passend zur Taschentuch-Packung wählen (am besten Innenmaße).",
+  "box.tdesc.bird": "Geschlossene Kiste mit Einflugloch (bis 32 mm, für Meisen) oben in der Front, kleinen Lüftungslöchern in den Seiten und Abflusslöchern im Boden. Unbehandeltes Holz nehmen; den Deckel nur hinten ankleben oder mit Scharnier, damit man ihn reinigen kann.",
+  "box.tdesc.planter": "Offene Kiste mit Abflusslöchern (6 mm) im Boden. Bei Holz: innen mit Folie auslegen oder versiegeln, dann hält er viel länger.",
+  "box.tdesc.scoop": "Offene Kiste mit halbrunder Griffmulde oben in der Front – für Karteikarten, Zettel, Werkzeug oder als Ablage auf dem Schreibtisch."
 }

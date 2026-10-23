@@ -2564,5 +2564,13 @@
   "pr.phaseNoLift": "[Tastatura] Z è già in alto – vado direttamente al sensore.",
   "pr.unstable": "[Tastatura] Le due misure non coincidono ({a} / {b} mm, Z macchina) – il segnale della sonda non è affidabile (disturbi?). Z NON impostato.",
   "pr.glitch": "[Tastatura] Disturbo a Z {z} mm ignorato (sonda di nuovo aperta) – continuo a cercare …",
-  "pr.tooManyGlitches": "[Tastatura] Oltre 25 disturbi – fermato, Z NON impostato. L’ingresso sonda capta molti disturbi (cavo vicino ai cavi motore?)."
+  "pr.tooManyGlitches": "[Tastatura] Oltre 25 disturbi – fermato, Z NON impostato. L’ingresso sonda capta molti disturbi (cavo vicino ai cavi motore?).",
+  "box.type.tissue": "Scatola porta fazzoletti",
+  "box.type.bird": "Casetta per uccelli / nido",
+  "box.type.planter": "Fioriera",
+  "box.type.scoop": "Schedario / vaschetta con incavo",
+  "box.tdesc.tissue": "Scatola chiusa con una lunga apertura dalle estremità arrotondate nel coperchio – scegli le misure in base alla confezione (meglio misure interne).",
+  "box.tdesc.bird": "Scatola chiusa con foro d’ingresso (fino a 32 mm, per cince) in alto sul fronte, piccoli fori di aerazione sui lati e fori di scolo nel fondo. Usa legno non trattato; incolla il coperchio solo dietro o con una cerniera per poterlo pulire.",
+  "box.tdesc.planter": "Scatola aperta con fori di scolo (6 mm) nel fondo. Se in legno: rivesti l’interno con pellicola o sigillalo, così dura molto di più.",
+  "box.tdesc.scoop": "Scatola aperta con un incavo semicircolare in alto sul fronte – per schede, foglietti, attrezzi o come vaschetta da scrivania."
 }

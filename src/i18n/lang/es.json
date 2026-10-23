@@ -2564,5 +2564,13 @@
   "pr.phaseNoLift": "[Palpado] Z ya está arriba: voy directo al sensor.",
   "pr.unstable": "[Palpado] Las dos mediciones no coinciden ({a} / {b} mm, Z de máquina): la señal de la sonda no es fiable (¿interferencias?). Z NO se ha fijado.",
   "pr.glitch": "[Palpado] Interferencia en Z {z} mm ignorada (sonda abierta de nuevo): sigo buscando …",
-  "pr.tooManyGlitches": "[Palpado] Más de 25 interferencias: parado, Z NO se ha fijado. La entrada de sonda capta muchas interferencias (¿cable junto a los de los motores?)."
+  "pr.tooManyGlitches": "[Palpado] Más de 25 interferencias: parado, Z NO se ha fijado. La entrada de sonda capta muchas interferencias (¿cable junto a los de los motores?).",
+  "box.type.tissue": "Caja de pañuelos",
+  "box.type.bird": "Casita para pájaros / nido",
+  "box.type.planter": "Jardinera",
+  "box.type.scoop": "Fichero / bandeja con hueco para dedos",
+  "box.tdesc.tissue": "Caja cerrada con una abertura alargada de extremos redondos en la tapa: elige las medidas según el paquete de pañuelos (mejor medidas interiores).",
+  "box.tdesc.bird": "Caja cerrada con agujero de entrada (hasta 32 mm, para carboneros) arriba en el frente, pequeños agujeros de ventilación en los lados y de drenaje en la base. Usa madera sin tratar; pega la tapa solo por detrás o con bisagra para poder limpiarla.",
+  "box.tdesc.planter": "Caja abierta con agujeros de drenaje (6 mm) en la base. Si es de madera: forra el interior con plástico o séllalo, así dura mucho más.",
+  "box.tdesc.scoop": "Caja abierta con un hueco semicircular arriba en el frente: para fichas, notas, herramientas o como bandeja de escritorio."
 }
