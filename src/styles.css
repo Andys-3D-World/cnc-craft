@@ -1568,3 +1568,6 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .m-dock .dro { padding-bottom: 4px; }
 .rp-console-new { margin-left: 8px; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--accent-color); color: #fff; font-size: 0.65rem; line-height: 16px; text-align: center; }
 .rp-console-new:empty { display: none; }
+.pr-live { font-size: 0.78rem; font-weight: 600; padding: 5px 8px; border-radius: 6px; background: rgba(128,128,128,0.1); color: var(--text-muted); }
+.pr-live-open { color: var(--color-success); background: rgba(52,209,123,0.1); }
+.pr-live-on { color: var(--color-danger); background: rgba(255,107,107,0.14); }

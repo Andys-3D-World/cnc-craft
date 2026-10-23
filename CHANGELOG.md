@@ -76,6 +76,33 @@
 
 **Fixed**
 - Open sections in the right panel were cut off at 500 px – long sections now show completely
+- **Probing could move up instead of down:** the target was calculated from the work position, but GRBL sends the
+  work offset (WCO) only now and then – with an outdated value the target lay above the bit. Probing and lifting now
+  move relative (G91 G38.2 Z−…, always back to G90 afterwards), so the direction no longer depends on reported
+  positions
+- **Probing safety guard:** while probing runs, the status is polled faster and checked on every report – if the probe
+  reports contact but the machine keeps moving (e.g. during the fast lift/travel to the tool sensor, or when the
+  board does not evaluate the probe input), or Z rises during a downward probe, the machine is stopped at once
+  (feed hold + reset) with a clear message. Each phase is logged (search, measure, lift, travel). The tool sensor
+  only runs after its position was set. New live line in the probing section shows "Probe: open / contact" so you
+  can test the clamp before probing
+- **Tool sensor measurement:** the guard switches itself on again as soon as the probe opens after a measurement (it
+  ignored the probe for the whole lift before, so pressing it did not stop the move); after lifting before the
+  sensor travel the search distance grows by the same amount (it searched only the normal distance and never reached
+  the sensor); lift is limited to 30 mm (100 mm ran into the Z limit switch). Before travelling to the sensor Z only
+  goes up as far as just below the top (machine Z −1 mm) – when it is already up there it goes straight to the
+  sensor and probes downwards
+- **Probing works with interference on the probe input (like Estlcam):** on the Arduino CNC Shield the probe input
+  picks up a pulse from the stepper signals about every 0.3 mm while moving; GRBL's G38.2 stops at every one and a
+  pulse right at the start gives alarm 4. Probing is now done by CNC Craft itself: Z moves down as a jog, the status
+  is polled quickly and only a contact that is closed in two reports in a row counts; then the jog is cancelled
+  cleanly (no reset, no alarm) and the position after stopping is the contact height. If the probe is open again
+  after stopping, the search continues with the rest of the distance. Fast search at most 150 mm/min, the result
+  comes from the slow measurement. After the fast contact Z goes up 2 mm (more, up to 8 mm, while the probe is still
+  closed); if the slow contact lies more than 0.5 mm BELOW the fast one, the fast one was interference and Z is not
+  set. After measuring Z always goes up (at least 2 mm, 5 mm when nothing is set). The guard only stops a move after
+  two reports in a row and stays quiet until the machine has stopped after a contact (it used to reset while the jog
+  was still braking → alarm 3)
 
 ## 0.3.0 Beta
 
