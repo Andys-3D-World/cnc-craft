@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **3D milling result (router):** the 3D view (*Extras → 3D view*) now shows the real milling result for the router
+  (new default view *Milling result (from G-code)*). The material is a fine height grid; every move of the G-code
+  presses in the shape of its cutter – flat end mill, ball nose, bull nose, V-bit, chamfer, countersink and drill
+  (the cutter per section follows the tool changes). Pockets, V-carving with sloped walls, grooves, holes, cut-outs
+  (deeper than the thickness = open) and material left in inside corners become visible. Calm material surface
+  (fine, faint grain), darker with depth relative to the deepest cut; the result is cached while only material or
+  thickness change
 - **Material test grid (laser):** new entry *Material test grid* in the *Extras* group of the left toolbar. It creates
   a grid of squares with rising power (columns) and rising speed or line interval (rows), as fill or line. Every square
   is lasered with its own values (no extra layers per square), the values are written next to the grid with the

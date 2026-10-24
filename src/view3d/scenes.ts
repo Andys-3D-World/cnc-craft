@@ -15,6 +15,7 @@ import { Material, drawMaterialBed, drawMaterialShapes } from "../materialView";
 import { isLaser, isPlasma } from "../machineMode";
 import { layerForShape } from "../laserLayers";
 import { circumference } from "../rotary";
+import type { CarveResult } from "./carveSim";
 
 type RGB = [number, number, number];
 const col = (c: number[], k: number): RGB => [c[0] / 255 * k, c[1] / 255 * k, c[2] / 255 * k];
@@ -151,4 +152,82 @@ export function cylinderScene(shapes: any[], m: Material, diameter: number): Mes
     for (let k = 0; k < 3; k++) caps.nrm.push(nx, 0, 0);
   }
   return [side, caps];
+}
+
+const MAX_QUADS = 160_000;
+
+/**
+ * Fräsergebnis (carveSim.ts) als Körper: Oberfläche mit Holzbild und Schatten nach Tiefe, Unterseite, Seiten.
+ * Durchgefräste Stellen (tiefer als die Materialdicke) bleiben offen.
+ */
+export function carveScene(r: CarveResult, m: Material, thickness: number): Mesh[] {
+  const T = Math.max(0.2, thickness);
+  // gröberes Netz, falls das Raster sehr fein ist (Mittelwert je Block – so behalten V-Nuten ihre Form)
+  const f = Math.max(1, Math.ceil(Math.sqrt((r.nx * r.ny) / MAX_QUADS)));
+  const nx = Math.ceil(r.nx / f), ny = Math.ceil(r.ny / f), cs = r.cell * f;
+  const H = new Float32Array(nx * ny);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    let v = 0, n = 0;
+    for (let b = 0; b < f; b++) for (let a = 0; a < f; a++) {
+      const ii = i * f + a, jj = j * f + b;
+      if (ii < r.nx && jj < r.ny) { v += r.h[jj * r.nx + ii]; n++; }
+    }
+    H[j * nx + i] = Math.max(-T, n ? v / n : 0);
+  }
+  const X = (i: number) => r.x0 + (i + 0.5) * cs, Y = (j: number) => r.y0 + (j + 0.5) * cs;
+  const at = (i: number, j: number) => H[Math.min(ny - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))];
+  const through = (i: number, j: number) => at(i, j) <= -T + 1e-3;
+
+  // Bild: Material (Maserung nur angedeutet – hier zählt die Form) + Schatten nach Tiefe
+  const k = Math.max(1, Math.floor(2048 / Math.max(nx, ny)));
+  const tex = document.createElement("canvas");
+  tex.width = nx * k; tex.height = ny * k;
+  const ctx = tex.getContext("2d")!;
+  // Maserung feiner (eine Kachel = 60 statt 200 mm), sonst wirken die breiten Jahresringe in 3D wie Wellen
+  drawMaterialBed(ctx, 0, 0, tex.width, tex.height, (0.3 * k) / cs / MM_TO_PIXEL, m);
+  ctx.fillStyle = `rgba(${m.base[0]}, ${m.base[1]}, ${m.base[2]}, 0.8)`;
+  ctx.fillRect(0, 0, tex.width, tex.height);
+  const img = ctx.getImageData(0, 0, tex.width, tex.height);
+  // dunkler nach Tiefe, bezogen auf die tiefste gefräste Stelle (sonst sähe man flache Gravuren kaum)
+  const deep = Math.max(0.2, Math.min(T, -r.minZ));
+  for (let py = 0; py < tex.height; py++) for (let px = 0; px < tex.width; px++) {
+    const d = -at(Math.floor(px / k), ny - 1 - Math.floor(py / k)) / deep;
+    if (d <= 0.001) continue;
+    const s = 1 - 0.5 * Math.min(1, d), o = (py * tex.width + px) * 4;
+    img.data[o] *= s; img.data[o + 1] *= s; img.data[o + 2] *= s;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const top: Mesh = { pos: [], nrm: [], uv: [], tex };
+  const bottom: Mesh = { pos: [], nrm: [], color: col(m.base, 0.75) };
+  const side: Mesh = { pos: [], nrm: [], color: col(m.base, 0.8) };
+  const nrm = (i: number, j: number) => {
+    const dx = (at(i + 1, j) - at(i - 1, j)) / (2 * cs), dy = (at(i, j + 1) - at(i, j - 1)) / (2 * cs);
+    const l = Math.hypot(dx, dy, 1);
+    return [-dx / l, -dy / l, 1 / l];
+  };
+  const N: number[][] = [];
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) N.push(nrm(i, j));
+  const vtx = (i: number, j: number) => {
+    top.pos.push(X(i), Y(j), T + at(i, j));
+    const n = N[j * nx + i]; top.nrm.push(n[0], n[1], n[2]);
+    top.uv!.push((i + 0.5) / nx, 1 - (j + 0.5) / ny);
+  };
+  for (let j = 0; j + 1 < ny; j++) for (let i = 0; i + 1 < nx; i++) {
+    const t00 = through(i, j), t10 = through(i + 1, j), t01 = through(i, j + 1), t11 = through(i + 1, j + 1);
+    if (t00 && t10 && t01 && t11) continue; // durchgefräst: offen
+    vtx(i, j); vtx(i + 1, j); vtx(i + 1, j + 1); vtx(i, j); vtx(i + 1, j + 1); vtx(i, j + 1);
+    if (!(t00 || t10 || t01 || t11)) {
+      bottom.pos.push(X(i), Y(j), 0, X(i + 1), Y(j + 1), 0, X(i + 1), Y(j), 0, X(i), Y(j), 0, X(i), Y(j + 1), 0, X(i + 1), Y(j + 1), 0);
+      for (let q = 0; q < 6; q++) bottom.nrm.push(0, 0, -1);
+    }
+  }
+  // Seiten des Blocks (am Rand wird nicht gefräst)
+  const xa = X(0), xb = X(nx - 1), ya = Y(0), yb = Y(ny - 1);
+  const wall = (ax: number, ay: number, bx: number, by: number, nx2: number, ny2: number) => {
+    side.pos.push(ax, ay, 0, bx, by, 0, bx, by, T, ax, ay, 0, bx, by, T, ax, ay, T);
+    for (let q = 0; q < 6; q++) side.nrm.push(nx2, ny2, 0);
+  };
+  wall(xa, ya, xb, ya, 0, -1); wall(xb, ya, xb, yb, 1, 0); wall(xb, yb, xa, yb, 0, 1); wall(xa, yb, xa, ya, -1, 0);
+  return [top, bottom, side];
 }
