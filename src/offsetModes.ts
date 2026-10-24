@@ -10,6 +10,7 @@
  */
 import { isClosedShape, shapeToPaths, pathArea, pointInPath, createPolyline, cloneShape, MM_TO_PIXEL, Pt } from "./shapeTransform";
 import { t } from "./i18n/i18n";
+import { openInlayDialog } from "./editor/inlay";
 
 /** Enden gelten als verbunden, wenn sie höchstens so weit auseinander liegen (0,05 mm) */
 const JOIN_TOL = 0.05 * MM_TO_PIXEL;
@@ -57,8 +58,9 @@ function joinOpenShapes(open: any[]): { closed: { pts: Pt[]; from: any[] }[]; le
 
 export function bindOffsetModes(state: any, redraw: () => void, appendToConsole: (t: string) => void) {
   const labels = (m: string) => t(`mode.${m}`);
+  document.getElementById("cam-inlay")?.addEventListener("click", () => openInlayDialog(state, redraw, appendToConsole));
 
-  ["part", "hole", "engrave", "pocket"].forEach(mode => {
+  ["part", "hole", "engrave", "pocket", "vcarve"].forEach(mode => {
     const btn = document.getElementById(`cam-mode-${mode}`);
     btn?.addEventListener("click", () => {
       const ids = new Set(state.selectedShapeIds);
@@ -89,7 +91,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
           appendToConsole(t("mode.joined", { n: gone.size, k: made.length }));
         }
         // Bögen können auch allein außen/innen gefräst werden (Fräser weg vom bzw. hin zum Mittelpunkt)
-        const onLine = left.filter((s: any) => mode === "pocket" || s.type !== "arc").length;
+        const onLine = left.filter((s: any) => mode === "pocket" || mode === "vcarve" || s.type !== "arc").length;
         if (onLine) appendToConsole(t("mode.openLeft", { n: onLine }));
       }
 
@@ -106,6 +108,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
         if (mode === "hole") s.millingMode = "inside";
         if (mode === "engrave") s.millingMode = "on-line";
         if (mode === "pocket") s.millingMode = "pocket";
+        if (mode === "vcarve") { s.millingMode = "vcarve"; delete s.vStart; }
       });
 
       appendToConsole(t("mode.applied", { n: sel.length, mode: labels(mode) }));

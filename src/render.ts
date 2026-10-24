@@ -29,6 +29,8 @@ export function modeColor(mode: string | undefined): string {
   if (mode === "outside") return "#1e90ff";
   if (mode === "on-line") return "#00ffcc";
   if (mode === "pocket") return "#ff4d4d";
+  if (mode === "vcarve") return "#e05cff";
+  if (mode === "vplug") return "#ff9f1c";
   return "#6d4aff";
 }
 

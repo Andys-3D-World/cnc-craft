@@ -4,6 +4,8 @@ import { activeTool, toolForShape, getTools, MillingTool, DEFAULT_PLUNGE } from 
 import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
 import { pocketPaths, PocketStrategy } from "./pocket";
+import { vcarvePaths } from "./vcarve";
+import { CONE_TYPES } from "./toolLibrary";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
 import { makeEllipsePoints, shapeBounds } from "./shapeTransform";
 import { spindleCode } from "./spindleDir";
@@ -155,7 +157,7 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 3. SORTIERUNG: INNEN VOR AUSSEN (innerhalb eines Werkzeugs) ----
   const priority = (mode: string) =>
-    mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "on-line" ? 2 : 3;
+    mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : 3;
   const groups = orderToolGroups(shapes);
   groups.forEach(g => g.shapes.sort((a: any, b: any) => priority(a.millingMode) - priority(b.millingMode)));
 
@@ -296,8 +298,48 @@ const generateGcodeInner = (shapes: any): string | null => {
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
   };
 
+  /**
+   * V-CARVE / INLAY-STECKER: alle Formen einer Gruppe mit gleicher Art, Tiefe und Start-Tiefe zusammen –
+   * Löcher in Buchstaben und nahe Formen gehören zur selben Fläche (siehe vcarve.ts).
+   * Tiefe in Lagen (Zustellung des Werkzeugs): jede Bahn wird in der Lage gefräst, in der sie ihre Tiefe erreicht;
+   * tiefere Bahnen fahren in den Lagen davor schon auf Lagen-Tiefe.
+   */
+  const VSTEP = 0.12, CLEAR = 1.0;
+  const millVcarve = (list: any[], mode: string, depth: number, start: number) => {
+    const tool = curTool;
+    if (!tool || !CONE_TYPES.includes(tool.type) || !(tool.angle > 0)) {
+      lastGcodeWarnings.push(t("gcw.vNeedsVbit", { n: formCounter }));
+      return;
+    }
+    const loops = list.map(closedMm).filter((x): x is P[] => !!x);
+    if (!loops.length) return;
+    const total = Math.abs(depth);
+    const { paths, flat } = vcarvePaths(loops, {
+      angle: tool.angle, tipDia: tool.tipDia || 0, toolDia: tool.diameter, maxDepth: total, start,
+      step: VSTEP, outside: mode === "vplug"
+    });
+    if (!paths.length) { lastGcodeWarnings.push(t("gcw.vEmpty", { n: formCounter })); return; }
+    const deepest = Math.min(...paths.map(p => p.z));
+    if (mode === "vcarve" && flat && total > 0) lastGcodeWarnings.push(t("gcw.vFlat", { n: formCounter, d: (-deepest).toFixed(2) }));
+    computePasses(deepest);
+    let prev = 0;
+    for (const lz of passes) {
+      const todo = paths.filter(p => p.z < prev - 1e-6);
+      for (const p of todo) {
+        const z = Math.max(p.z, lz), s0 = p.pts[0];
+        gcode += `G0 Z${CLEAR.toFixed(2)}\nG0 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
+        gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+        for (let i = 1; i < p.pts.length; i++) gcode += `G1 X${p.pts[i].x.toFixed(3)} Y${p.pts[i].y.toFixed(3)}\n`;
+        if (p.closed) gcode += `G1 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
+      }
+      prev = lz;
+    }
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+  };
+
   // ---- 6. FORMEN NACHEINANDER ABFAHREN ----
   let formCounter = 0;
+  const computeDepth = (s: any): number => typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallbackDepth;
   const alreadyChained = new Set<string>();
 
   groups.forEach((group, gi) => {
@@ -315,13 +357,24 @@ const generateGcodeInner = (shapes: any): string | null => {
   if (gi > 0) gcode += `G4 P2 ${c("gc.spinUp")}\n`;
   gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
 
+  const vDone = new Set<any>();
   group.shapes.forEach((shape: any) => {
+    if (vDone.has(shape)) return;
     if (shape.parentChainId && alreadyChained.has(shape.parentChainId)) return;
     if (shape.parentChainId) alreadyChained.add(shape.parentChainId);
 
     formCounter++;
-    computePasses(typeof shape.millingDepth === "number" && Number.isFinite(shape.millingDepth) ? shape.millingDepth : fallbackDepth);
+    computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
+    if (mode === "vcarve" || mode === "vplug") {
+      const depth = computeDepth(shape), start = mode === "vplug" ? Math.max(0, shape.vStart ?? 0) : 0;
+      const same = group.shapes.filter((o: any) => (o.millingMode === mode) && computeDepth(o) === depth
+        && (mode !== "vplug" || Math.max(0, o.vStart ?? 0) === start));
+      same.forEach((o: any) => vDone.add(o));
+      gcode += `\n${c(mode === "vplug" ? "gc.vplug" : "gc.vcarve", { n: formCounter, k: same.length })}\n`;
+      millVcarve(same, mode, depth, start);
+      return;
+    }
     // V-Stichel, Bohrer und Senker taugen nicht für Konturen mit Fräser-Versatz/Taschen
     if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "countersink")) {
       const w = t("gcw.toolType", { name: curTool.name, type: t("tl.type." + curTool.type) });

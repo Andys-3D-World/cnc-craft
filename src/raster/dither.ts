@@ -39,6 +39,7 @@ export interface Adjust {
   sharpen: number;    // 0…100
   denoise: number;    // 0…3 (Weichzeichnen vor dem Schärfen)
   invert: boolean;    // für Acryl / dunkles Material
+  local?: number;     // 0…100: lokaler Kontrast (Details in Fell, Haaren, Fassaden), mit Schutz vor hellen Kanten
   curve?: number[][]; // Bildkurve: Punkte [ein, aus] 0…1, sortiert, mit Anfang (x = 0) und Ende (x = 1)
 }
 export const NO_ADJUST: Adjust = { black: 0, white: 1, gamma: 1, brightness: 0, contrast: 0, sharpen: 0, denoise: 0, invert: false };
@@ -231,6 +232,7 @@ export function applyAdjust(src: Float32Array, w: number, h: number, a: Adjust):
       g[i] = lut[k] + (lut[k + 1] - lut[k]) * (f - k);
     }
   }
+  if ((a.local ?? 0) > 0) g = localContrast(g, w, h, a.local!);
   if (a.denoise > 0) g = blur(g, w, h, Math.round(a.denoise));
   if (a.sharpen > 0) {
     const soft = blur(g, w, h, 1), k = a.sharpen / 40;
@@ -240,17 +242,48 @@ export function applyAdjust(src: Float32Array, w: number, h: number, a: Adjust):
   return g;
 }
 
+/**
+ * Lokaler Kontrast: Unterschied zur weichgezeichneten Umgebung (Radius ~4 % der Bildgröße, damit Vorschau und
+ * Gravur gleich aussehen) verstärken. An harten Kanten würde das helle Säume („Halos“) erzeugen – deshalb wird der
+ * Zuwachs weich begrenzt, nach hell viel stärker als nach dunkel, und in fast weißen Bereichen ausgeblendet.
+ */
+function localContrast(g: Float32Array, w: number, h: number, amount: number): Float32Array {
+  const r = Math.max(2, Math.round(Math.max(w, h) * 0.04));
+  amount = Math.min(100, Math.max(0, amount));
+  const base = blur(g, w, h, r), k = (amount / 100) * 1.6;
+  const limUp = 0.06 + 0.06 * (amount / 100), limDown = 0.18;
+  const out = new Float32Array(g.length);
+  for (let i = 0; i < g.length; i++) {
+    const d = (g[i] - base[i]) * k;
+    const lim = d > 0 ? limUp * (1 - 0.7 * Math.max(0, g[i] - 0.8) / 0.2) : limDown;
+    out[i] = Math.min(1, Math.max(0, g[i] + d / (1 + Math.abs(d) / Math.max(0.01, lim))));
+  }
+  return out;
+}
+
+/** Profile für „Automatisch verbessern“: behutsam (natürlich) oder kräftig (mehr Kontrast und Details) */
+export type AutoProfile = "gentle" | "strong";
+
 /** Werte für „Automatisch verbessern“: Tonwerte spreizen, Mitteltöne ausgleichen, etwas schärfen */
-export function autoAdjust(g: Float32Array, base: Partial<Adjust> = {}): Adjust {
+export function autoAdjust(g: Float32Array, base: Partial<Adjust> = {}, profile: AutoProfile = "gentle"): Adjust {
+  const strong = profile === "strong";
   const hist = new Uint32Array(256);
   for (let i = 0; i < g.length; i++) hist[Math.min(255, Math.max(0, Math.round(g[i] * 255)))]++;
   const pct = (p: number) => { let n = 0; const want = p * g.length; for (let i = 0; i < 256; i++) { n += hist[i]; if (n >= want) return i / 255; } return 1; };
-  let black = pct(0.01), white = pct(0.99);
+  // kräftig: mehr abschneiden (ganz dunkle/helle Ränder des Histogramms), behutsam: fast nichts
+  let black = pct(strong ? 0.012 : 0.005), white = pct(strong ? 0.992 : 0.997);
   if (white - black < 0.1) { black = 0; white = 1; }
   const m = Math.min(0.95, Math.max(0.05, (pct(0.5) - black) / Math.max(0.02, white - black)));
   // Mittelton auf etwa 0,55 bringen (eine Laser-Gravur wirkt sonst schnell zu dunkel)
   const gamma = Math.min(2.2, Math.max(0.5, Math.log(m) / Math.log(0.55)));
-  return { ...NO_ADJUST, black: +black.toFixed(3), white: +white.toFixed(3), gamma: +gamma.toFixed(2), sharpen: 25, ...base };
+  // flache Bilder (wenig Streuung) bekommen mehr lokalen Kontrast
+  let s = 0, s2 = 0;
+  for (let i = 0; i < g.length; i++) { s += g[i]; s2 += g[i] * g[i]; }
+  const sd = Math.sqrt(Math.max(0, s2 / g.length - (s / g.length) ** 2));
+  const flat = Math.min(1, Math.max(0, (0.25 - sd) / 0.15));
+  const local = Math.round(strong ? 35 + 25 * flat : 15 + 15 * flat);
+  return { ...NO_ADJUST, black: +black.toFixed(3), white: +white.toFixed(3), gamma: +gamma.toFixed(2),
+    contrast: strong ? 5 : 0, sharpen: strong ? 35 : 20, local, ...base };
 }
 
 /** Kennzahlen für die Bewertung vorher/nachher */

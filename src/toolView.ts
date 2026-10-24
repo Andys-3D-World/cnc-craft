@@ -62,6 +62,7 @@ export function drawToolBands(
     if (!r0 || !(r0.diameter > 0)) continue;
     const tool = r0;
     const mode = shape.millingMode || "outside";
+    if (mode === "vcarve" || mode === "vplug") continue; // V-Carve: Breite hängt von der Tiefe ab – keine Fräserspur
     const rPx = (tool.diameter / 2) * MM_TO_PIXEL;
     const widthScreen = Math.max(1, tool.diameter * MM_TO_PIXEL * scale);
     ctx.strokeStyle = tool.color;

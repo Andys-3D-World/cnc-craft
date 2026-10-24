@@ -7,7 +7,7 @@
  */
 import { t } from "../i18n/i18n";
 import { layerForShape } from "../laserLayers";
-import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, applyAdjust, resample, stats, curveLut, curveIsIdentity } from "./dither";
+import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, AutoProfile, applyAdjust, resample, stats, curveLut, curveIsIdentity } from "./dither";
 import { ImageSettings, imageSizeMm, gridSize, processed, sourceGray } from "./imageShape";
 
 const ICON: Record<EngravePreset, string> = { photo: "📷", graphic: "🎨", bw: "◐", lines: "〰️", dots: "⠿", newspaper: "📰" };
@@ -60,9 +60,11 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
           <div class="dlg-hint" id="eng-pdesc"></div>
           <div class="eng-h">${t("eng.effects")}</div>
           <div class="eng-presets eng-fx">${FX.map(([m, ic]) => `<button type="button" class="eng-pre" data-m="${m}"><span>${ic}</span>${t("eng.m." + m)}</button>`).join("")}</div>
+          <div class="eng-h">${t("eng.auto")}</div>
           <div class="eng-row">
-            <button type="button" id="eng-auto" class="btn-primary" style="flex:2;">${t("eng.auto")}</button>
-            <button type="button" id="eng-reset" class="btn-secondary" style="flex:1;">${t("eng.reset")}</button>
+            <button type="button" id="eng-auto" class="btn-primary" style="flex:1;" title="${t("eng.autoGentleTip")}">🌿 ${t("eng.autoGentle")}</button>
+            <button type="button" id="eng-auto2" class="btn-primary" style="flex:1;" title="${t("eng.autoStrongTip")}">⚡ ${t("eng.autoStrong")}</button>
+            <button type="button" id="eng-reset" class="btn-secondary" style="flex:0 0 auto;">${t("eng.reset")}</button>
           </div>
           <div class="eng-rating" id="eng-rating"></div>
           <div class="eng-sec">
@@ -75,6 +77,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
             ${slider("eng-ct", "eng.contrast", -100, 100, 1)}
             ${slider("eng-ga", "eng.gamma", 0.3, 3, 0.05)}
             ${slider("eng-sh", "eng.sharpen", 0, 100, 1)}
+            ${slider("eng-lc", "eng.local", 0, 100, 1)}
             ${slider("eng-dn", "eng.denoise", 0, 3, 1)}
             ${slider("eng-bk", "eng.black", 0, 100, 1)}
             ${slider("eng-wh", "eng.white", 0, 100, 1)}
@@ -123,6 +126,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     set("eng-ct", a.contrast, String(a.contrast));
     set("eng-ga", a.gamma, a.gamma.toFixed(2));
     set("eng-sh", a.sharpen, String(a.sharpen));
+    set("eng-lc", a.local ?? 0, String(a.local ?? 0));
     set("eng-dn", a.denoise, String(a.denoise));
     set("eng-bk", Math.round(a.black * 100), String(Math.round(a.black * 100)));
     set("eng-wh", Math.round(a.white * 100), String(Math.round(a.white * 100)));
@@ -146,7 +150,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   const read = () => {
     const curve = img.adjust?.curve;
     img.adjust = {
-      brightness: num("eng-br", 0), contrast: num("eng-ct", 0), gamma: num("eng-ga", 1), sharpen: num("eng-sh", 0), denoise: num("eng-dn", 0),
+      brightness: num("eng-br", 0), contrast: num("eng-ct", 0), gamma: num("eng-ga", 1), sharpen: num("eng-sh", 0), local: num("eng-lc", 0), denoise: num("eng-dn", 0),
       black: num("eng-bk", 0) / 100, white: Math.max(num("eng-bk", 0) + 2, num("eng-wh", 100)) / 100, invert: $("eng-inv").checked
     };
     if (curve) img.adjust.curve = curve;
@@ -252,12 +256,13 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     img.adjust = ps.auto ? autoAdjust(small, ps.adjust) : { ...NO_ADJUST, ...ps.adjust };
     fill(); update(true);
   }));
-  $("eng-auto").addEventListener("click", () => {
-    const keep = A();
-    img.adjust = autoAdjust(small, { invert: keep.invert, sharpen: Math.max(25, keep.sharpen) });
+  const auto = (profile: AutoProfile) => {
+    img.adjust = autoAdjust(small, { invert: A().invert }, profile);
     fill(); update(true);
-    log(t("eng.autoDone"));
-  });
+    log(t(profile === "strong" ? "eng.autoDoneStrong" : "eng.autoDone"));
+  };
+  $("eng-auto").addEventListener("click", () => auto("gentle"));
+  $("eng-auto2").addEventListener("click", () => auto("strong"));
   $("eng-mask-off").addEventListener("click", () => { delete img.mask; fill(); update(true); });
   $("eng-reset").addEventListener("click", () => { img.adjust = { ...NO_ADJUST, invert: A().invert }; fill(); update(true); });
   ov.querySelectorAll(".eng-right input, .eng-right select").forEach(el => el.addEventListener("input", () => { read(); fill(); update(); }));

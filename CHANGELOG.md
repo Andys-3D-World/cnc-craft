@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **V-carve (router):** new path mode *V-Carve* – the V-bit follows rings inside the area that get deeper the
+  further they are from the edge (depth = distance / tan(half angle), tip diameter included), giving sharp top edges
+  and pointed corners like Vectric. Letters with holes and nearby shapes are carved as one area. The depth field is the
+  maximum depth; wider parts get a flat bottom. Deep carvings are cut in layers (step-down of the tool). Needs a V-bit
+  with an angle in the tool library
+- **V-carve inlay:** new button *Inlay* makes a pocket from the selection (flat bottom at the pocket depth) and places a
+  mirrored plug next to it. The plug is carved around the outside with a start depth of pocket depth minus glue gap,
+  so it fits upside down into the pocket; the dialog shows all depths
 - **More fonts in the text tool:** 26 free fonts are now included (SIL Open Font License / Apache 2.0, licence texts
   in `public/fonts/`): sans serif (Open Sans, Oswald, Josefin Sans, Nunito), serif (Lora, Libre Baskerville,
   Roboto Slab, Cinzel), script (Dancing Script, Great Vibes, Pacifico, Lobster, Caveat, Permanent Marker),
@@ -17,6 +25,11 @@
   *System*, style tags (serif, script, stencil …)
 
 **Improved**
+- **Auto enhance with two profiles and local contrast:** the engraving window now offers *Gentle* (natural look) and
+  *Strong* (more contrast and detail – fur, hair, fine structures). New slider *Local contrast* boosts detail against
+  the surroundings; bright edges are held back much more than dark ones and almost white areas are left alone, so no
+  bright halos appear around hard edges. Flat pictures automatically get more local contrast. The before/after rating
+  shows the effect
 - Projects remember the font of each text. If it is missing on another computer, the text tool shows a clear
   hint and uses Open Sans instead; the existing shapes in the project stay unchanged
 - Bold/italic of system fonts use the real bold/italic files when the font has them
