@@ -3,6 +3,28 @@
 ## Next version (unreleased)
 
 **New**
+- **Adjust material thickness:** new entry *Adjust material thickness* in the *Edit* group of the toolbar. A
+  slot-together model drawn for e.g. 3 mm is converted to the measured sheet thickness (e.g. 3.6 mm): slots and tabs
+  (rectangular notches and protrusions as wide as the drawn thickness, within a tolerance) and rectangular holes get
+  the new width, both walls move apart by half the difference so the centre stays put. All other sizes stay the same;
+  optionally the whole model can be scaled first and a kerf allowance is added like in the box generator. The dialog
+  suggests the drawn thickness (most common slot width), shows a preview with the changed spots highlighted (slots,
+  tabs, holes in their own colour) and counts them; slots without enough room to widen are skipped and reported
+- **STL for 3D printing:** new entry *STL for 3D printing* in the *Extras* group. The selection (or everything) becomes
+  a 3D solid and is saved as binary STL. The shapes are grouped (laser: per layer, router: cut-outs / pocket / …,
+  plasma: one group) and every group is a *base body* (height), *recess* (depth), *relief* (height) or left out.
+  Cut-outs and holes stay open (even-odd like the cut), laser layers with *Fill* default to a recess, router pockets
+  to a recess with their milling depth. Live 3D preview in the existing viewer with size and triangle count; the
+  solids are closed (watertight) with outward normals, triangulated with earcut
+- **Name generator:** new entry *Name generator* in the *Extras* group. A name becomes one connected lettering that
+  can be cut out in one piece: letters (any font of the font system, letter spacing may be negative to overlap) are
+  merged and connected by overlapping only, a baseline bar or an outline around everything (counters filled; the
+  letters can be engraved on top, cut out, or become a separate part glued onto a backing plate – layered
+  two-colour signs; *Place on bed* then inserts backing and lettering as two groups). Symbols from the shape library (heart, star, moon, paw …) in front
+  and/or behind, hanger as ring (left or on top at the highest letter) or hole. Templates *Christmas bauble* and
+  *Christmas star* with the name engraved or cut out. Live preview with size and a warning when the result falls
+  apart into several pieces; tiny gaps where round letters meet the baseline are filled. *Place on bed* inserts it as
+  one group in the middle of the bed (cut on the strongest line layer, engraving on the fill layer / as pocket)
 - **3D milling result (router):** the 3D view (*Extras → 3D view*) now shows the real milling result for the router
   (new default view *Milling result (from G-code)*). The material is a fine height grid; every move of the G-code
   presses in the shape of its cutter – flat end mill, ball nose, bull nose, V-bit, chamfer, countersink and drill
@@ -67,6 +89,8 @@
   *System*, style tags (serif, script, stencil …)
 
 **Improved**
+- **Font picker:** its styles moved from the text dialog into the main stylesheet, so other dialogs (name generator)
+  can use it too
 - **Auto enhance with two profiles and local contrast:** the engraving window now offers *Gentle* (natural look) and
   *Strong* (more contrast and detail – fur, hair, fine structures). New slider *Local contrast* boosts detail against
   the surroundings; bright edges are held back much more than dark ones and almost white areas are left alone, so no

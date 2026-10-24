@@ -17,6 +17,7 @@
  */
 import { openShapeLibrary } from "./shapeLibrary";
 import { openView3D } from "../ui/view3dDialog";
+import { openStlExport } from "../ui/stlExportDialog";
 import { openNodeEditor } from "../nodes/nodeEditor";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
@@ -35,6 +36,8 @@ import { openBoxDialog } from "./boxGen";
 import { openMaterialTestDialog } from "./materialTest";
 import { openQrDialog } from "./qrTool";
 import { openSerialDialog } from "./serial";
+import { openThicknessDialog } from "./thickness";
+import { openNameGenerator } from "./nameGen";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
@@ -153,10 +156,13 @@ export const commands: Record<string, () => void> = {
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   shapeLib: () => openShapeLibrary(log),
+  nameGen: () => openNameGenerator(log, () => { done(); checkpoint(); }),
   materialTest: () => openMaterialTestDialog(log, () => { done(); checkpoint(); }),
   qrCode: () => openQrDialog(log, () => { done(); checkpoint(); }),
   serial: () => openSerialDialog(log, () => { done(); checkpoint(); }),
+  thickness: () => openThicknessDialog(log, () => { done(); checkpoint(); }),
   view3d: () => openView3D(),
+  stlExport: () => openStlExport(log),
   nodeGraph: () => openNodeEditor(log),
   tiles: () => openTileDialog(),
   duplicateDialog: () => openDuplicateDialog(),
