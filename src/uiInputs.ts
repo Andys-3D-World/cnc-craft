@@ -26,6 +26,7 @@ export function setupUiInputs(redraw: () => void) {
   const dimH = document.getElementById("dim-h") as HTMLInputElement;
   const dimAngle = document.getElementById("dim-angle") as HTMLInputElement;
   const dimDepth = document.getElementById("dim-depth") as HTMLInputElement;
+  const dimFinish = document.getElementById("dim-finish") as HTMLInputElement | null;
   const lockRatio = document.getElementById("dim-lock-ratio") as HTMLInputElement | null;
   const tabN = document.getElementById("dim-tab-n") as HTMLInputElement | null;
   const tabW = document.getElementById("dim-tab-w") as HTMLInputElement | null;
@@ -83,6 +84,10 @@ export function setupUiInputs(redraw: () => void) {
       input.value = "0";
     } else if (input === dimDepth) {
       shapes.forEach(s => { s.millingDepth = value; });
+    } else if (input === dimFinish) {
+      // Schlichtgang: Aufmaß in mm, 0 = aus
+      const a = Math.max(0, Math.min(5, value));
+      shapes.forEach(s => { if (a > 0) s.finishAllow = a; else delete s.finishAllow; });
     } else if (tabInputs.includes(input)) {
       // Haltestege: alle drei Werte zusammen an die Auswahl (Anzahl 0 = keine Stege)
       const num = (el: HTMLInputElement | null, d: number) => { const v = parseFloat(el?.value || ""); return Number.isFinite(v) && v >= 0 ? v : d; };
@@ -98,7 +103,7 @@ export function setupUiInputs(redraw: () => void) {
     redraw();
   };
 
-  [dimX, dimY, dimW, dimH, dimAngle, dimDepth, ...tabInputs].forEach(input => {
+  [dimX, dimY, dimW, dimH, dimAngle, dimDepth, dimFinish, ...tabInputs].forEach(input => {
     if (!input) return;
     input.addEventListener("change", () => apply(input));
     input.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -134,6 +139,8 @@ export function updateDimensionInputs(_shape: any) {
   if (dimDepth && shapes[0] && typeof shapes[0].millingDepth === "number") {
     dimDepth.value = String(shapes[0].millingDepth);
   }
+  const fin = document.getElementById("dim-finish") as HTMLInputElement | null;
+  if (fin && shapes[0]) fin.value = String(Number(shapes[0].finishAllow) > 0 ? shapes[0].finishAllow : 0);
   // Haltestege der ersten Form zeigen (ohne eigene Werte: keine Stege, Länge/Höhe bleiben stehen)
   const s0 = shapes[0];
   const set = (id: string, v: any) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && typeof v === "number") el.value = String(v); };

@@ -1,9 +1,9 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { activeTool, toolForShape, getTools, MillingTool, DEFAULT_PLUNGE } from "./toolLibrary";
+import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE } from "./toolLibrary";
 import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
-import { pocketPaths, PocketStrategy } from "./pocket";
+import { pocketPaths, pocketWallPaths, PocketStrategy } from "./pocket";
 import { vcarvePaths } from "./vcarve";
 import { CONE_TYPES } from "./toolLibrary";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
@@ -44,10 +44,44 @@ export function orderToolGroups(shapes: any[]): ToolGroup[] {
   }
   const lib = getTools();
   const cutsOut = (g: ToolGroup) => g.shapes.some(s => (s.millingMode || "outside") === "outside") ? 1 : 0;
-  return [...map.values()].sort((a, b) =>
+  const sorted = [...map.values()].sort((a, b) =>
     cutsOut(a) - cutsOut(b)
     || (a.tool?.diameter ?? 0) - (b.tool?.diameter ?? 0)
     || lib.indexOf(a.tool as MillingTool) - lib.indexOf(b.tool as MillingTool));
+  return withRestGroups(sorted);
+}
+
+/** Werkzeug für das Restmaterial dieser Form (kleiner als das eigene), sonst null */
+export function restToolFor(s: any): MillingTool | null {
+  const mode = s.millingMode || "outside";
+  if (mode !== "pocket" && mode !== "inside") return null;
+  const rest = getTool(s.restToolId), own = toolForShape(s);
+  return rest && own && rest.id !== own.id && rest.diameter < own.diameter ? rest : null;
+}
+
+/**
+ * RESTMATERIAL: Formen mit restToolId bekommen nach ihrem Werkzeug einen zweiten Durchgang mit dem kleineren
+ * Werkzeug (Eintrag { restOf: Form } in dessen Gruppe). Schneidet eine Gruppe auch Teile aus, wird sie geteilt:
+ * erst innen (großes Werkzeug), dann Restmaterial, dann ausschneiden – sonst wäre das Teil schon lose.
+ */
+function withRestGroups(groups: ToolGroup[]): ToolGroup[] {
+  const out: ToolGroup[] = [];
+  const push = (g: ToolGroup) => {
+    if (!g.shapes.length) return;
+    const last = out[out.length - 1];
+    if (last && last.tool === g.tool) last.shapes.push(...g.shapes); else out.push(g);
+  };
+  for (const g of groups) {
+    const rests = new Map<MillingTool, any[]>();
+    for (const s of g.shapes) { const r = restToolFor(s); if (r) { if (!rests.has(r)) rests.set(r, []); rests.get(r)!.push({ restOf: s, millingMode: s.millingMode, id: s.id + "#rest" }); } }
+    if (!rests.size) { push({ tool: g.tool, shapes: [...g.shapes] }); continue; }
+    const outer = g.shapes.filter(s => (s.millingMode || "outside") === "outside");
+    push({ tool: g.tool, shapes: g.shapes.filter(s => !outer.includes(s)) });
+    // größeres Restwerkzeug zuerst
+    [...rests.entries()].sort((a, b) => b[0].diameter - a[0].diameter).forEach(([tool, list]) => push({ tool, shapes: list }));
+    push({ tool: g.tool, shapes: outer });
+  }
+  return out;
 }
 
 /**
@@ -128,6 +162,8 @@ const generateGcodeInner = (shapes: any): string | null => {
   // ---- 1. WERKZEUG-PARAMETER (werden pro Werkzeug-Gruppe neu gesetzt) ----
   let curTool: MillingTool | null = activeTool;
   let toolDiameter = 3.0, toolRadius = 1.5, stepZ = 1.5, feedXY = 800, rpm = 12000, PLUNGE_FEED = DEFAULT_PLUNGE;
+  /** tan(Eintauchwinkel) – 0 = senkrecht eintauchen (Bohrer, V-Stichel & Co. immer senkrecht) */
+  let rampTan = 0;
   const useTool = (tool: MillingTool | null) => {
     curTool = tool;
     toolDiameter = tool ? tool.diameter : 3.0;
@@ -136,6 +172,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     feedXY = tool ? tool.feedrate : 800;
     rpm = tool ? tool.rpm : 12000;
     PLUNGE_FEED = tool?.plungeFeed ?? DEFAULT_PLUNGE;
+    const ra = tool && !CONE_TYPES.includes(tool.type) ? tool.rampAngle ?? 0 : 0;
+    rampTan = ra > 0 ? Math.tan((Math.min(45, ra) * Math.PI) / 180) : 0;
   };
 
   // ---- 2. FRÄSPARAMETER ----
@@ -157,9 +195,27 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 3. SORTIERUNG: INNEN VOR AUSSEN (innerhalb eines Werkzeugs) ----
   const priority = (mode: string) =>
-    mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : 3;
+    mode === "drill" ? -1 : mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : 3;
   const groups = orderToolGroups(shapes);
+  const restIgnored = shapes.filter((s: any) => getTool(s.restToolId) && !restToolFor(s)).length;
+  if (restIgnored) lastGcodeWarnings.push(t("gcw.restIgnored", { n: restIgnored }));
   groups.forEach(g => g.shapes.sort((a: any, b: any) => priority(a.millingMode) - priority(b.millingMode)));
+  // Bohrungen: immer zur nächsten Bohrung fahren (kurze Wege)
+  groups.forEach(g => {
+    const drills = g.shapes.filter((s: any) => s.millingMode === "drill");
+    if (drills.length < 2) return;
+    const at = (s: any) => { const b = s.type === "circle" ? null : shapeBounds(s); return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : { x: s.x, y: s.y }; };
+    const order: any[] = [];
+    let cur = { x: 0, y: 0 };
+    const left = [...drills];
+    while (left.length) {
+      let bi = 0, bd = Infinity;
+      left.forEach((s, i) => { const p = at(s), d = Math.hypot(p.x - cur.x, p.y - cur.y); if (d < bd) { bd = d; bi = i; } });
+      const [s] = left.splice(bi, 1);
+      order.push(s); cur = at(s);
+    }
+    g.shapes = [...order, ...g.shapes.filter((s: any) => s.millingMode !== "drill")];
+  });
 
   // ---- 4. ZUSTELLUNGEN BERECHNEN (pro Form, weil jede Form ihre eigene Tiefe hat) ----
   let passes: number[] = [];
@@ -173,6 +229,67 @@ const generateGcodeInner = (shapes: any): string | null => {
       passes.push(targetDepth);
     }
   };
+
+  /**
+   * EINTAUCHEN von zTop auf z am Anfang der Bahn pts. Mit Eintauchwinkel als Rampe: schräg entlang der Bahn ein
+   * Stück vor und wieder zurück (bei Bedarf mehrmals) – endet genau am Anfang, danach geht es normal weiter.
+   * maxLen begrenzt die Strecke (Haltestege). Zu kurze Bahnen tauchen senkrecht ein.
+   */
+  const plungeTo = (pts: P[], closed: boolean, zTop: number, z: number, maxLen = Infinity) => {
+    const drop = zTop - z;
+    const straight = () => { gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`; };
+    if (!(rampTan > 0) || drop <= 1e-6 || pts.length < 2) return straight();
+    const seq = closed ? [...pts, pts[0]] : pts;
+    const cum = [0];
+    for (let i = 1; i < seq.length; i++) cum.push(cum[i - 1] + Math.hypot(seq[i].x - seq[i - 1].x, seq[i].y - seq[i - 1].y));
+    const avail = Math.min(cum[cum.length - 1], maxLen);
+    const L = drop / rampTan;
+    const k = Math.ceil(L / (2 * Math.max(avail, 1e-9)));
+    if (avail < 0.5 || k > 50) return straight();
+    const d = L / (2 * k);
+    const at = (sd: number): P => {
+      let i = 1;
+      while (i < cum.length - 1 && cum[i] < sd) i++;
+      const f = (sd - cum[i - 1]) / Math.max(1e-12, cum[i] - cum[i - 1]);
+      return { x: seq[i - 1].x + (seq[i].x - seq[i - 1].x) * f, y: seq[i - 1].y + (seq[i].y - seq[i - 1].y) * f };
+    };
+    // Stützpunkte der Strecke 0 → d (Ecken der Bahn dazwischen), zurück dieselben rückwärts
+    const fwd: number[] = [...cum.filter(x => x > 1e-9 && x < d - 1e-9), d];
+    const back = [...fwd.slice(0, -1).reverse(), 0];
+    gcode += `G1 Z${zTop.toFixed(3)} F${PLUNGE_FEED} ${c("gc.ramp")}\n`;
+    let travelled = 0, pos = 0, first = true;
+    for (let j = 0; j < k; j++) {
+      for (const sd of [...fwd, ...back]) {
+        travelled += Math.abs(sd - pos); pos = sd;
+        const p = at(sd), hz = Math.max(z, zTop - drop * travelled / L);
+        gcode += `G1 X${p.x.toFixed(3)} Y${p.y.toFixed(3)} Z${hz.toFixed(3)}${first ? ` F${feedXY}` : ""}\n`;
+        first = false;
+      }
+    }
+  };
+
+  /**
+   * SCHLICHTGANG: Erst wird mit Aufmaß (shape.finishAllow mm) geschruppt, danach fährt der Fräser die Wand noch
+   * einmal in voller Tiefe auf Maß. Er taucht dafür auf der Schrupp-Bahn ein (dort ist schon alles frei) und fährt
+   * dann seitlich an – so taucht er nie in den stehen gebliebenen Rest.
+   */
+  const finishAllow = (s: any): number => { const a = Number(s.finishAllow); return Number.isFinite(a) && a > 0 ? Math.min(a, 5) : 0; };
+  /** nächster Punkt auf den Bahnen (Eintauchstelle für den Schlichtgang) */
+  const nearestOn = (paths: { pts: P[]; closed: boolean }[], p: P): P | null => {
+    let best: P | null = null, bd = Infinity;
+    for (const { pts, closed } of paths) {
+      const n = pts.length;
+      for (let i = 0; i < (closed ? n : n - 1); i++) {
+        const a = pts[i], b = pts[(i + 1) % n], dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+        const f = l2 > 1e-12 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+        const q = { x: a.x + dx * f, y: a.y + dy * f }, d = Math.hypot(q.x - p.x, q.y - p.y);
+        if (d < bd) { bd = d; best = q; }
+      }
+    }
+    return best;
+  };
+  /** Schlichtgang-Hinweis in den G-Code und nur die Endtiefe fräsen */
+  const finishStart = () => { gcode += `${c("gc.finish")}\n`; const z = passes[passes.length - 1]; passes = [z]; };
 
   // ---- 5. G-CODE HEADER ----
   let gcode = "";
@@ -191,7 +308,7 @@ const generateGcodeInner = (shapes: any): string | null => {
    * Nur die Durchgänge, die tiefer als die Steg-Oberkante gehen, fahren über dem Steg auf Steg-Höhe.
    */
   /** Geschlossene Kontur mit Haltestegen fräsen; false = ging nicht (dann normal fräsen, Hinweis steht schon da) */
-  const millTabbed = (loop: P[], shape: any, tab: TabSettings): boolean => {
+  const millTabbed = (loop: P[], shape: any, tab: TabSettings, lead: P[][] | null = null): boolean => {
     const target = passes[passes.length - 1];
     const zTab = target + tab.h;
     if (zTab >= -0.001) { lastGcodeWarnings.push(t("gcw.tabsTooHigh", { n: formCounter, h: tab.h })); return false; }
@@ -220,9 +337,12 @@ const generateGcodeInner = (shapes: any): string | null => {
       { p: start, s: L }
     ].sort((u, v) => u.s - v.s);
     const inTab = (x: number) => spans.some(([a, b]) => x > a && x < b);
-    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
-    passes.forEach(z => {
-      gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+    const entry = lead ? nearestOn(lead.map(l => ({ pts: l, closed: true })), start) : null;
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${(entry ?? start).x.toFixed(3)} Y${(entry ?? start).y.toFixed(3)}\n`;
+    passes.forEach((z, pi) => {
+      if (entry && pi === 0) gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 X${start.x.toFixed(3)} Y${start.y.toFixed(3)} F${feedXY}\n`;
+      // Rampe nur bis kurz vor den ersten Steg
+      else plungeTo(seq.map(q => q.p), false, pi > 0 ? passes[pi - 1] : 0, z, Math.max(0, gap / 2 - half - toolRadius));
       let up = false;
       for (let j = 1; j < seq.length; j++) {
         const want = z < zTab - 1e-6 && inTab((seq[j - 1].s + seq[j].s) / 2);
@@ -239,18 +359,19 @@ const generateGcodeInner = (shapes: any): string | null => {
    * Fräst einen Punktezug in allen Zustellungen.
    * Geschlossene Konturen: unten bleiben, nur tiefer eintauchen (spart Zeit).
    */
-  const millPath = (pts: P[], closed: boolean) => {
+  const millPath = (pts: P[], closed: boolean, lead: { pts: P[]; closed: boolean }[] | null = null) => {
     if (pts.length < 2) return;
     const start = pts[0];
+    const entry = lead ? nearestOn(lead, start) : null;
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
-    gcode += `G0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
+    gcode += `G0 X${(entry ?? start).x.toFixed(3)} Y${(entry ?? start).y.toFixed(3)}\n`;
     passes.forEach((z, passIdx) => {
       if (!closed && passIdx > 0) {
         gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
         gcode += `G0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
       }
-      gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\n`;
-      gcode += `G1 F${feedXY}\n`;
+      if (entry && passIdx === 0) gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 X${start.x.toFixed(3)} Y${start.y.toFixed(3)} F${feedXY}\n`;
+      else plungeTo(pts, closed, passIdx > 0 ? passes[passIdx - 1] : 0, z);
       for (let i = 1; i < pts.length; i++) {
         gcode += `G1 X${pts[i].x.toFixed(3)} Y${pts[i].y.toFixed(3)}\n`;
       }
@@ -279,7 +400,15 @@ const generateGcodeInner = (shapes: any): string | null => {
     return cand.filter(c => !cand.some(o => o !== c && o.area > c.area && pointInPoly(c.pts[0].x, c.pts[0].y, o.pts))).map(c => c.pts);
   };
   const millPocket = (shape: any, outer: P[]) => {
-    const { paths, tooBig } = pocketPaths(outer, islandsOf(shape, outer), toolRadius, Math.max(0.05, toolDiameter * STEPOVER), pocketStrategy);
+    const islands = islandsOf(shape, outer), step = Math.max(0.05, toolDiameter * STEPOVER);
+    let allow = finishAllow(shape);
+    let { paths, tooBig } = pocketPaths(outer, islands, toolRadius + allow, step, pocketStrategy);
+    if (allow > 0 && (tooBig || !paths.length)) {
+      // mit Aufmaß passt der Fräser nicht mehr hinein → ohne Schlichtgang
+      lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow }));
+      allow = 0;
+      ({ paths, tooBig } = pocketPaths(outer, islands, toolRadius, step, pocketStrategy));
+    }
     if (tooBig || !paths.length) {
       gcode += `${c("gc.toolTooBig")}\n`;
       lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter }));
@@ -305,13 +434,17 @@ const generateGcodeInner = (shapes: any): string | null => {
           gcode += `G1 X${s.x.toFixed(3)} Y${s.y.toFixed(3)} F${feedXY}\n`;
         } else {
           gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
-          gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+          plungeTo(p.pts, p.closed, prevZ, z);
         }
         for (let i = 1; i < p.pts.length; i++) gcode += `G1 X${p.pts[i].x.toFixed(3)} Y${p.pts[i].y.toFixed(3)}\n`;
         if (p.closed) gcode += `G1 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
       }
     });
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+    if (allow > 0) {
+      finishStart();
+      for (const w of pocketWallPaths(outer, islands, toolRadius)) millPath(w.pts, w.closed, paths);
+    }
   };
 
   /**
@@ -353,6 +486,111 @@ const generateGcodeInner = (shapes: any): string | null => {
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
   };
 
+  /**
+   * BOHREN (Spänebrechen): senkrecht in der Mitte der Form, je Zustellung des Werkzeugs ein Stück tiefer,
+   * dazwischen ganz heraus (Späne raus) und im Eilgang zurück bis kurz über die letzte Tiefe.
+   * Ohne G81/G83 – die kennt GRBL nicht.
+   */
+  const DRILL_CLEAR = 0.5;
+  const millDrill = (shape: any) => {
+    const b = shape.type === "circle" ? null : shapeBounds(shape);
+    const cPx = b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : { x: shape.x, y: shape.y };
+    const holeDia = (b ? Math.max(b.maxX - b.minX, b.maxY - b.minY) : 2 * Math.abs(shape.w)) / MM_TO_PIXEL;
+    if (Math.abs(holeDia - toolDiameter) > 0.05) lastGcodeWarnings.push(t("gcw.drillSize", { n: formCounter, h: holeDia.toFixed(2), d: toolDiameter }));
+    const p = toMachine(cPx.x, cPx.y);
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}\nG0 Z${DRILL_CLEAR.toFixed(2)}\n`;
+    passes.forEach((z, i) => {
+      if (i > 0) gcode += `G0 Z${DRILL_CLEAR.toFixed(2)} ${c("gc.peck")}\nG0 Z${(passes[i - 1] + 0.3).toFixed(3)}\n`;
+      gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\n`;
+    });
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+  };
+
+  /**
+   * RESTMATERIAL mit dem aktuellen (kleinen) Werkzeug: Bahnen des kleinen Fräsers wie für die ganze Form,
+   * aber nur die Stücke, an denen das große Werkzeug nicht hinkam (Ecken, enge Stellen). Ein Punkt gilt als
+   * schon frei, wenn der kleine Fräser dort ganz in einen Kreis des großen passt: Abstand zur großen Bahn ≤ R − r.
+   */
+  const millRest = (shape: any) => {
+    const big = toolForShape(shape);
+    if (!big) return;
+    const R = big.diameter / 2, r = toolRadius, mode = shape.millingMode;
+    let bigPaths: { pts: P[]; closed: boolean }[] = [], small: { pts: P[]; closed: boolean }[] = [];
+    if (mode === "pocket") {
+      const outer = closedMm(shape);
+      if (!outer) return;
+      const isl = islandsOf(shape, outer);
+      bigPaths = pocketPaths(outer, isl, R, Math.max(0.05, big.diameter * STEPOVER), pocketStrategy).paths;
+      small = pocketPaths(outer, isl, r, Math.max(0.05, toolDiameter * STEPOVER), "spiral").paths;
+    } else if (shape.type === "polyline" && shape.closed) {
+      const pts: P[] = shape.points.map((p: any) => toMachine(p.x, p.y));
+      bigPaths = offsetPolygon(pts, -R).map(l => ({ pts: l, closed: true }));
+      // innen im Uhrzeigersinn (Gleichlauf wie bei den Konturen)
+      small = offsetPolygon(pts, -r).map(l => ({ pts: [l[0], ...l.slice(1).reverse()], closed: true }));
+    } else { gcode += `${c("gc.restNone")}\n`; return; } // Kreis innen: keine Ecken
+    if (!small.length) { lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter })); return; }
+    // Strecken der großen Bahn in einem Raster (schnelle Abstandsfrage)
+    const thr = R - r + 0.005, cell = Math.max(1, thr);
+    const grid = new Map<string, [P, P][]>();
+    for (const { pts, closed } of bigPaths) {
+      for (let i = 0; i < (closed ? pts.length : pts.length - 1); i++) {
+        const a = pts[i], b = pts[(i + 1) % pts.length];
+        for (let gx = Math.floor(Math.min(a.x, b.x) / cell); gx <= Math.floor(Math.max(a.x, b.x) / cell); gx++)
+          for (let gy = Math.floor(Math.min(a.y, b.y) / cell); gy <= Math.floor(Math.max(a.y, b.y) / cell); gy++) {
+            const k = gx + "," + gy;
+            if (!grid.has(k)) grid.set(k, []);
+            grid.get(k)!.push([a, b]);
+          }
+      }
+    }
+    const cleared = (p: P) => {
+      for (let gx = Math.floor((p.x - thr) / cell); gx <= Math.floor((p.x + thr) / cell); gx++)
+        for (let gy = Math.floor((p.y - thr) / cell); gy <= Math.floor((p.y + thr) / cell); gy++)
+          for (const [a, b] of grid.get(gx + "," + gy) || []) {
+            const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+            const f = l2 > 1e-12 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2)) : 0;
+            if (Math.hypot(a.x + dx * f - p.x, a.y + dy * f - p.y) <= thr) return true;
+          }
+      return false;
+    };
+    const stepS = Math.max(0.02, Math.min(0.2, r / 4));
+    // Abtastpunkte auf geraden Stücken wieder weglassen (kürzerer G-Code)
+    const thin = (q: P[]) => q.filter((p, i) => {
+      if (i === 0 || i === q.length - 1) return true;
+      const a = q[i - 1], b = q[i + 1];
+      return Math.abs((b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x)) > 1e-6;
+    });
+    let pieces = 0;
+    for (const { pts, closed } of small) {
+      // Bahn fein abtasten
+      const seq = closed ? [...pts, pts[0]] : pts;
+      const sm: P[] = [seq[0]];
+      for (let i = 1; i < seq.length; i++) {
+        const a = seq[i - 1], b = seq[i], n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / stepS));
+        for (let k = 1; k <= n; k++) sm.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n });
+      }
+      const need = sm.map(p => !cleared(p));
+      if (!need.some(Boolean)) continue;
+      if (need.every(Boolean) && closed) { millPath(pts, true); pieces++; continue; }
+      // jedes Stück um den Fräserradius verlängern (sauberer Übergang, Eintauchen im Freien)
+      const ext = Math.ceil(r / stepS) + 1, N = sm.length;
+      const keep = need.slice();
+      need.forEach((v, i) => { if (!v) return; for (let k = -ext; k <= ext; k++) { const j = closed ? ((i + k) % N + N) % N : i + k; if (j >= 0 && j < N) keep[j] = true; } });
+      // geschlossene Bahn: am Anfang eines freien Stücks beginnen, damit Stücke nicht über das Ende zerfallen
+      let s0 = 0;
+      if (closed) { const f = keep.indexOf(false); if (f >= 0) s0 = f; }
+      let cur: P[] = [];
+      for (let k = 0; k < N; k++) {
+        const i = (s0 + k) % N;
+        if (keep[i]) cur.push(sm[i]);
+        else if (cur.length) { if (cur.length > 1) { millPath(thin(cur), false); pieces++; } cur = []; }
+        if (!closed && k === N - 1) break;
+      }
+      if (cur.length > 1) { millPath(thin(cur), false); pieces++; }
+    }
+    if (!pieces) gcode += `${c("gc.restNone")}\n`;
+  };
+
   // ---- 6. FORMEN NACHEINANDER ABFAHREN ----
   let formCounter = 0;
   const computeDepth = (s: any): number => typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallbackDepth;
@@ -376,12 +614,24 @@ const generateGcodeInner = (shapes: any): string | null => {
   const vDone = new Set<any>();
   group.shapes.forEach((shape: any) => {
     if (vDone.has(shape)) return;
+    if (shape.restOf) {
+      formCounter++;
+      computePasses(computeDepth(shape.restOf));
+      gcode += `\n${c("gc.rest", { n: formCounter })}\n`;
+      millRest(shape.restOf);
+      return;
+    }
     if (shape.parentChainId && alreadyChained.has(shape.parentChainId)) return;
     if (shape.parentChainId) alreadyChained.add(shape.parentChainId);
 
     formCounter++;
     computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
+    if (mode === "drill") {
+      gcode += `\n${c("gc.drill", { n: formCounter })}\n`;
+      millDrill(shape);
+      return;
+    }
     if (mode === "vcarve" || mode === "vplug") {
       const depth = computeDepth(shape), start = mode === "vplug" ? Math.max(0, shape.vStart ?? 0) : 0;
       const same = group.shapes.filter((o: any) => (o.millingMode === mode) && computeDepth(o) === depth
@@ -410,8 +660,8 @@ const generateGcodeInner = (shapes: any): string | null => {
       const s0 = toMachine(shape.x, shape.y);
       gcode += `G0 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
       const e0 = toMachine(shape.x + shape.w, shape.y + shape.h);
-      passes.forEach((z) => {
-        gcode += `G1 Z${z.toFixed(2)} F${PLUNGE_FEED}\nF${feedXY}\n`;
+      passes.forEach((z, pi) => {
+        plungeTo([s0, e0], false, pi > 0 ? passes[pi - 1] : 0, z);
         gcode += `G1 X${e0.x.toFixed(3)} Y${e0.y.toFixed(3)}\n`;
         if (z !== passes[passes.length - 1]) gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s0.x.toFixed(3)} Y${s0.y.toFixed(3)}\n`;
       });
@@ -420,20 +670,45 @@ const generateGcodeInner = (shapes: any): string | null => {
     else if (shape.type === "circle") {
       const center = toMachine(shape.x, shape.y);
       const radiusPx = Math.abs(shape.w);
-      const radiusMm = radiusPx / MM_TO_PIXEL + offset;
+      const radiusFinal = radiusPx / MM_TO_PIXEL + offset;
+      // Schlichtgang: erst mit Aufmaß (außen größer, innen kleiner), danach auf Maß
+      let allow = mode === "outside" || mode === "inside" ? finishAllow(shape) : 0;
+      if (allow > 0 && mode === "inside" && radiusFinal - allow <= 0.05) { lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow })); allow = 0; }
+      const radiusMm = radiusFinal + (mode === "outside" ? allow : -allow);
       const tab = mode !== "on-line" ? tabSettings(shape) : null;
       // mit Haltestegen: Kreis als Vieleck (außen gegen, innen im Uhrzeigersinn – wie bei den Konturen)
       let ring = tab && radiusMm > 0.05 ? makeEllipsePoints(center.x, center.y, radiusMm, radiusMm) : null;
       if (ring && mode === "inside") ring = [ring[0], ...ring.slice(1).reverse()];
-      if (ring && millTabbed(ring, shape, tab!)) { /* fertig */ }
+      if (ring && millTabbed(ring, shape, tab!)) {
+        if (allow > 0) {
+          let fin = makeEllipsePoints(center.x, center.y, radiusFinal, radiusFinal);
+          if (mode === "inside") fin = [fin[0], ...fin.slice(1).reverse()];
+          finishStart();
+          millTabbed(fin, shape, tab!, [ring]);
+        }
+      }
       else if (radiusMm > 0.05) {
-        passes.forEach((z) => {
+        passes.forEach((z, pi) => {
           const entryX = center.x;
           const entryY = center.y + radiusMm;
+          const full = (zz?: number) => `G2 X${entryX.toFixed(3)} Y${entryY.toFixed(3)}${zz === undefined ? "" : ` Z${zz.toFixed(3)}`} I0.000 J${(-radiusMm).toFixed(3)}\n`;
           gcode += `G0 X${entryX.toFixed(3)} Y${entryY.toFixed(3)}\n`;
-          gcode += `G1 Z${z.toFixed(2)} F${PLUNGE_FEED}\nF${feedXY}\n`;
-          gcode += `G2 X${entryX.toFixed(3)} Y${entryY.toFixed(3)} I0.000 J${(-radiusMm).toFixed(3)}\n`;
+          const zTop = pi > 0 ? passes[pi - 1] : 0, drop = zTop - z;
+          if (rampTan > 0 && drop > 1e-6) {
+            // Rampe als Schraube auf dem Kreis (so viele Runden, dass der Winkel nicht steiler wird)
+            const revs = Math.max(1, Math.ceil(drop / rampTan / (2 * Math.PI * radiusMm)));
+            gcode += `G1 Z${zTop.toFixed(3)} F${PLUNGE_FEED} ${c("gc.ramp")}\nG1 F${feedXY}\n`;
+            for (let k = 1; k <= revs; k++) gcode += full(zTop - (drop * k) / revs);
+          } else gcode += `G1 Z${z.toFixed(2)} F${PLUNGE_FEED}\nF${feedXY}\n`;
+          gcode += full();
         });
+        if (allow > 0) {
+          // auf der Schrupp-Bahn eintauchen, seitlich auf Maß, eine Runde, zurück
+          const z = passes[passes.length - 1], yF = center.y + radiusFinal;
+          gcode += `${c("gc.finish")}\nG1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 X${center.x.toFixed(3)} Y${yF.toFixed(3)} F${feedXY}\n`;
+          gcode += `G2 X${center.x.toFixed(3)} Y${yF.toFixed(3)} I0.000 J${(-radiusFinal).toFixed(3)}\n`;
+          gcode += `G1 X${center.x.toFixed(3)} Y${(center.y + radiusMm).toFixed(3)}\n`;
+        }
         gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
       } else {
         gcode += `${c("gc.circleTooSmall")}\n`;
@@ -478,7 +753,13 @@ const generateGcodeInner = (shapes: any): string | null => {
       if (!shape.closed || mode === "on-line" || mode === "pocket") {
         millPath(pts, !!shape.closed);
       } else {
-        const loops = offsetPolygon(pts, offset);
+        let allow = finishAllow(shape);
+        let loops = offsetPolygon(pts, offset + Math.sign(offset) * allow);
+        if (allow > 0 && loops.length === 0) {
+          lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow }));
+          allow = 0;
+          loops = offsetPolygon(pts, offset);
+        }
         if (loops.length === 0) {
           gcode += `${c("gc.toolTooBig")}\n`;
           lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter }));
@@ -486,16 +767,19 @@ const generateGcodeInner = (shapes: any): string | null => {
         if (loops.length > 1) {
           lastGcodeWarnings.push(t("gcw.split", { n: formCounter, parts: loops.length }));
         }
-        loops.forEach(loop => {
-          // Gleichlauf-Fräsen (bei rechtsdrehender Spindel M3):
-          // außen gegen den Uhrzeigersinn, innen im Uhrzeigersinn
-          let path = loop;
-          const ccw = polygonArea(path) > 0;
-          // umdrehen, aber am selben Punkt anfangen (dann liegen die Haltestege wie in der Vorschau)
-          if ((mode === "outside") !== ccw) path = [path[0], ...path.slice(1).reverse()];
-          const tab = tabSettings(shape);
-          if (!tab || !millTabbed(path, shape, tab)) millPath(path, true);
-        });
+        // Gleichlauf-Fräsen (bei rechtsdrehender Spindel M3):
+        // außen gegen den Uhrzeigersinn, innen im Uhrzeigersinn
+        // umdrehen, aber am selben Punkt anfangen (dann liegen die Haltestege wie in der Vorschau)
+        const orient = (loop: P[]) => ((mode === "outside") !== (polygonArea(loop) > 0) ? [loop[0], ...loop.slice(1).reverse()] : loop);
+        const tab = tabSettings(shape);
+        const rough = loops.map(orient);
+        rough.forEach(path => { if (!tab || !millTabbed(path, shape, tab)) millPath(path, true); });
+        if (allow > 0) {
+          finishStart();
+          offsetPolygon(pts, offset).map(orient).forEach(path => {
+            if (!tab || !millTabbed(path, shape, tab, rough)) millPath(path, true, rough.map(l => ({ pts: l, closed: true })));
+          });
+        }
       }
     }
     else if (shape.type === "rect" || shape.type === "path") {

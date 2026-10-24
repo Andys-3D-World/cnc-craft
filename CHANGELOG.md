@@ -3,6 +3,41 @@
 ## Next version (unreleased)
 
 **New**
+- **Rest machining (router):** new field *Rest material with* in the tool section of the selected shapes. Pockets
+  and holes (inside) can get a second, smaller tool: after the shape's own tool has cleared everything quickly, the
+  small tool mills only the spots the big one could not reach – inside corners and narrow places – so the corners
+  get sharp without milling the whole shape with the small tool. A spot counts as cleared when the small cutter fits
+  completely inside the big one's path there; each remaining piece is extended a little so it starts in cleared
+  space. The small tool comes in its own block with a tool change; if the big tool also cuts parts out, the order is
+  inside → rest material → cut out, so the part is not loose yet. Shapes where it cannot work (outside contours, rest
+  tool not smaller) are reported
+- **Drilling (router):** new path type *Drill* next to outside/inside/pocket. Selected circles and other closed shapes
+  are drilled straight down in their centre, with chip breaking (peck drilling): after every depth per pass of the
+  tool it comes fully out and goes back in rapidly to just above the last depth. Written as plain moves, because GRBL
+  does not know G81/G83. Holes are drilled first within each tool and on the shortest route from hole to hole. A
+  warning shows when the hole size does not match the tool diameter. On the work area the drill spot is shown as a
+  dot of the tool size
+- **Finishing pass (router):** new field *Finishing allowance* in the milling parameters of the selected shapes
+  (0 = off). The roughing passes leave that much material at the wall (e.g. 0.2 mm), then the cutter goes around once
+  more at full depth exactly on size – cleaner edges and more accurate fits. Works for outside and inside contours,
+  circles, pockets (walls and islands) and with holding tabs (the finishing pass lifts over the tabs too). The cutter
+  goes down on the roughing path, where everything is already cleared, and then moves sideways onto the final path, so
+  it never plunges into the remaining material. If the cutter no longer fits with the allowance, the shape is milled
+  without finishing pass and a warning is shown
+- **Ramp entry (router):** new field *Ramp angle* per tool in the tool library. Instead of plunging straight down, the
+  cutter goes into the material at that angle, back and forth along the start of its path (several times if the path
+  is short), and ends exactly where the path starts – for contours, pockets, lines and contours with holding tabs (the
+  ramp stops before the first tab). Circles go in as a helix. New tools get 3°, existing tools keep 0° (= plunge
+  straight as before). Drills, V-bits, chamfer and countersink bits always plunge straight; paths too short for a
+  ramp also plunge straight
+- **Dogbones:** new entry *Dogbones* in the *Edit* group of the toolbar. Inside corners (seen from the material) of
+  closed outlines get a circle with the cutter radius so square tabs and parts fit into milled pockets and slots:
+  holes, cut-outs and pockets get them in their corners, outer contours (and islands in a pocket) in their re-entrant
+  corners. Two types: classic dogbone (circle along the angle bisector) and T-bone (circle along the longer or shorter
+  edge). The radius is suggested from the shape's tool in the tool library, plus an adjustable allowance (default
+  0.05 mm); only corners up to an angle limit (default 100°) with edges of a minimum length are changed, so roundings
+  stay. Preview with the circles highlighted and a count; corners whose edges are too short for the circle are
+  skipped and reported. Rectangles become polylines, the arcs are split finely into points
 - **Adjust material thickness:** new entry *Adjust material thickness* in the *Edit* group of the toolbar. A
   slot-together model drawn for e.g. 3 mm is converted to the measured sheet thickness (e.g. 3.6 mm): slots and tabs
   (rectangular notches and protrusions as wide as the drawn thickness, within a tolerance) and rectangular holes get

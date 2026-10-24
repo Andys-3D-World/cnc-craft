@@ -79,6 +79,18 @@ function mid(p: P[]): P {
  * @param step      seitliche Zustellung (Abstand der Bahnen)
  * @returns Bahnen in Fräs-Reihenfolge; tooBig = Werkzeug passt nicht in die Tasche
  */
+/** Nur die Wand-Bahnen (Wand + Inseln, Fräsermittelpunkt im Abstand r) – für den Schlichtgang */
+export function pocketWallPaths(outer: P[], islands: P[][], r: number): PocketPath[] {
+  const wall = offsetPolygon(outer, -r, 0.01);
+  const isl = islands.flatMap(i => offsetPolygon(i, r, 0.01));
+  const inWall = (p: P) => wall.some(w => pointInPoly(p.x, p.y, w));
+  const inIsl = (p: P, skip?: P[]) => isl.some(i => i !== skip && pointInPoly(p.x, p.y, i));
+  return [
+    ...wall.flatMap(w => clip(w, true, edgesOf(isl), p => !inIsl(p))),
+    ...isl.flatMap(i => clip(i, true, edgesOf([...wall, ...isl.filter(o => o !== i)]), p => inWall(p) && !inIsl(p, i)))
+  ];
+}
+
 export function pocketPaths(outer: P[], islands: P[][], r: number, step: number, strategy: PocketStrategy): { paths: PocketPath[]; tooBig: boolean } {
   const wall = offsetPolygon(outer, -r, 0.01);              // Grenze für den Fräsermittelpunkt
   if (!wall.length) return { paths: [], tooBig: true };

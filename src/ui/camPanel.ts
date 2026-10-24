@@ -77,7 +77,7 @@ export function renderEditorToolbar(container: HTMLElement) {
         ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
       ${flyCmds("edit", "offset", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["patternFill", "patternFill", "tip.cmd.patternFill"],
         ["centerFix", "centerFix", "tip.cmd.centerFix"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"],
-        ["thickness", "thickness", "tip.cmd.thickness"]])}
+        ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"]])}
       ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"]])}
       ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],
         ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"]])}

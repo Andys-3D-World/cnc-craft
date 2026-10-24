@@ -31,6 +31,7 @@ export function modeColor(mode: string | undefined): string {
   if (mode === "pocket") return "#ff4d4d";
   if (mode === "vcarve") return "#e05cff";
   if (mode === "vplug") return "#ff9f1c";
+  if (mode === "drill") return "#7CFC00";
   return "#6d4aff";
 }
 

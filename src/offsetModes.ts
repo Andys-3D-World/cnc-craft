@@ -60,7 +60,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
   const labels = (m: string) => t(`mode.${m}`);
   document.getElementById("cam-inlay")?.addEventListener("click", () => openInlayDialog(state, redraw, appendToConsole));
 
-  ["part", "hole", "engrave", "pocket", "vcarve"].forEach(mode => {
+  ["part", "hole", "engrave", "pocket", "vcarve", "drill"].forEach(mode => {
     const btn = document.getElementById(`cam-mode-${mode}`);
     btn?.addEventListener("click", () => {
       const ids = new Set(state.selectedShapeIds);
@@ -72,7 +72,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
 
       // Außen/Innen/Tasche brauchen geschlossene Konturen: zusammenhängende Linien/Bögen verbinden
       const open = sel.filter((s: any) => !isClosedShape(s));
-      if (mode !== "engrave" && open.length) {
+      if (mode !== "engrave" && mode !== "drill" && open.length) {
         const { closed: joined, left } = joinOpenShapes(open);
         if (joined.length) {
           const gone = new Set(joined.flatMap(c => c.from.map((s: any) => s.id)));
@@ -100,6 +100,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
 
       sel.forEach((s: any) => {
         if (!isClosedShape(s)) {
+          if (mode === "drill") return; // Bohren nur bei geschlossenen Formen (Mitte)
           s.millingMode = s.type === "arc" && mode === "part" ? "outside" : s.type === "arc" && mode === "hole" ? "inside" : "on-line";
           return;
         }
@@ -109,7 +110,9 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
         if (mode === "engrave") s.millingMode = "on-line";
         if (mode === "pocket") s.millingMode = "pocket";
         if (mode === "vcarve") { s.millingMode = "vcarve"; delete s.vStart; }
+        if (mode === "drill") s.millingMode = "drill";
       });
+      if (mode === "drill" && sel.some((s: any) => !isClosedShape(s))) appendToConsole(t("mode.drillOpen", { n: sel.filter((s: any) => !isClosedShape(s)).length }));
 
       appendToConsole(t("mode.applied", { n: sel.length, mode: labels(mode) }));
       redraw();

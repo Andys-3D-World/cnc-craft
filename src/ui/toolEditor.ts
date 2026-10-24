@@ -18,7 +18,7 @@ import {
   MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, TYPE_DEFAULTS, typeGeom, MATERIALS,
   calcCutData, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
   duplicateTool, moveTool, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
-  sanitize, DEFAULT_PLUNGE, TOOLS_CHANGED
+  sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
 } from "../toolLibrary";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
 
@@ -93,6 +93,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
             ${num("tool.rpm", "rpm", src.rpm, "500", esc(t("unit.rpm")))}
             ${num("tool.feed", "feed", src.feedrate, "50", "mm/min")}
             ${num("tool.plunge", "plunge", src.plungeFeed ?? DEFAULT_PLUNGE, "50", "mm/min")}
+            ${num("tool.ramp", "ramp", src.rampAngle ?? 0, "0.5", "°", "", "tool.rampTip")}
             ${num("tool.stepz", "stepz", src.stepZ, "0.1", "mm")}
             <div class="te-calc" data-tip="${esc(t("tl.calcTip"))}">
               <select id="${p}mat">${matOpts}</select>
@@ -116,7 +117,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
 function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: EditorHandlers) {
   const isNew = !tool;
   const src: MillingTool = tool ? { ...tool } : sanitize({
-    id: "", name: "", type: "endmill", ...TYPE_DEFAULTS.endmill, stepZ: 1.5, feedrate: 1000, rpm: 15000, plungeFeed: DEFAULT_PLUNGE
+    id: "", name: "", type: "endmill", ...TYPE_DEFAULTS.endmill, stepZ: 1.5, feedrate: 1000, rpm: 15000, plungeFeed: DEFAULT_PLUNGE, rampAngle: DEFAULT_RAMP
   });
   if (isNew) src.name = ""; // sanitize setzt "?" – neues Werkzeug bekommt einen Namensvorschlag
   root.innerHTML = editorHtml(p, src, isNew, h);
@@ -131,7 +132,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     diameter: val("dia"), shankDia: val("shank"), fluteLen: val("flutelen"), length: val("len"),
     angle: val("angle"), tipDia: val("tip"), cornerR: val("corner"), flutes: val("flutes"),
     helix: q<HTMLSelectElement>("helix").value, toolMat: q<HTMLSelectElement>("tmat").value,
-    rpm: val("rpm"), feedrate: val("feed"), plungeFeed: val("plunge"), stepZ: val("stepz"),
+    rpm: val("rpm"), feedrate: val("feed"), plungeFeed: val("plunge"), rampAngle: val("ramp"), stepZ: val("stepz"),
     notes: q<HTMLTextAreaElement>("notes").value
   });
 

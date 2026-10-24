@@ -29,6 +29,7 @@ export interface MillingTool extends ToolGeom {
   feedrate: number;    // Vorschub in mm/min
   rpm: number;         // Drehzahl
   plungeFeed?: number; // Eintauch-Vorschub in mm/min (Standard 300)
+  rampAngle?: number;  // Eintauchwinkel in ° (Rampe/Schraube), 0 = senkrecht eintauchen
   toolMat: ToolMat;    // Schneidstoff: Hartmetall oder HSS
   notes: string;       // Notiz (Bezugsquelle, Material, …)
 }
@@ -132,6 +133,8 @@ export const TOOLS_CHANGED = "cnc-tools-changed";
 const KEY_TOOLS = "cnc_craft_tool_library";
 const KEY_ACTIVE = "cnc_craft_active_tool_id";
 export const DEFAULT_PLUNGE = 300;
+/** Eintauchwinkel für neue Werkzeuge (°) – schont kleine Fräser; bestehende Werkzeuge ohne Angabe tauchen senkrecht ein */
+export const DEFAULT_RAMP = 3;
 
 export let activeTool: MillingTool | null = null;
 let tools: MillingTool[] = [];
@@ -152,8 +155,8 @@ export function initToolLibrary() {
 
   if (tools.length === 0) {
     tools = [
-      sanitize({ id: "t1", name: t("lib.default1"), type: "endmill", diameter: 3.0, shankDia: 3.175, flutes: 1, stepZ: 1.5, feedrate: 1200, rpm: 18000, plungeFeed: 300 }),
-      sanitize({ id: "t2", name: t("lib.default2"), type: "endmill", diameter: 6.0, shankDia: 6, flutes: 2, fluteLen: 22, length: 50, stepZ: 2.0, feedrate: 1500, rpm: 12000, plungeFeed: 400 })
+      sanitize({ id: "t1", name: t("lib.default1"), type: "endmill", diameter: 3.0, shankDia: 3.175, flutes: 1, stepZ: 1.5, feedrate: 1200, rpm: 18000, plungeFeed: 300, rampAngle: DEFAULT_RAMP }),
+      sanitize({ id: "t2", name: t("lib.default2"), type: "endmill", diameter: 6.0, shankDia: 6, flutes: 2, fluteLen: 22, length: 50, stepZ: 2.0, feedrate: 1500, rpm: 12000, plungeFeed: 400, rampAngle: DEFAULT_RAMP })
     ];
     saveToStorage();
   }
@@ -194,6 +197,7 @@ export function sanitize(x: any): MillingTool {
     feedrate: num(x.feedrate, 1000),
     rpm: Number.isFinite(+x.rpm) && +x.rpm >= 0 ? +x.rpm : 12000,
     plungeFeed: num(x.plungeFeed, DEFAULT_PLUNGE),
+    rampAngle: Math.min(45, num0(x.rampAngle, 0)),
     toolMat: x.toolMat === "hss" ? "hss" : "carbide",
     notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
   };

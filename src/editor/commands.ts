@@ -37,6 +37,7 @@ import { openMaterialTestDialog } from "./materialTest";
 import { openQrDialog } from "./qrTool";
 import { openSerialDialog } from "./serial";
 import { openThicknessDialog } from "./thickness";
+import { openDogboneDialog } from "./dogbone";
 import { openNameGenerator } from "./nameGen";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
@@ -161,6 +162,7 @@ export const commands: Record<string, () => void> = {
   qrCode: () => openQrDialog(log, () => { done(); checkpoint(); }),
   serial: () => openSerialDialog(log, () => { done(); checkpoint(); }),
   thickness: () => openThicknessDialog(log, () => { done(); checkpoint(); }),
+  dogbone: () => openDogboneDialog(log, () => { done(); checkpoint(); }),
   view3d: () => openView3D(),
   stlExport: () => openStlExport(log),
   nodeGraph: () => openNodeEditor(log),

@@ -26,7 +26,7 @@ const KINDS: Kind[] = ["body", "recess", "raise", "skip"];
 const DEF_VALUE: Record<Kind, number> = { body: 3, recess: 0.6, raise: 1, skip: 0 };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
-const MILL_NAME: Record<string, string> = { "on-line": "mode.engrave", pocket: "mode.pocket", vcarve: "mode.vcarve" };
+const MILL_NAME: Record<string, string> = { "on-line": "mode.engrave", pocket: "mode.pocket", vcarve: "mode.vcarve", drill: "mode.drill" };
 
 /** Formen in Gruppen einteilen, mit Vorschlag für die Art */
 function makeGroups(shapes: any[]): Group[] {
@@ -46,7 +46,7 @@ function makeGroups(shapes: any[]): Group[] {
       // außen + innen gehören zusammen, sonst würde ein Loch zu einem eigenen Körper statt frei zu bleiben
       const cut = m === "outside" || m === "inside";
       key = "M:" + (cut ? "cut" : m); name = cut ? `${t("mode.part")} / ${t("mode.hole")}` : MILL_NAME[m] ? t(MILL_NAME[m]) : m;
-      kind = cut ? "body" : m === "pocket" || m === "vcarve" ? "recess" : "skip";
+      kind = cut ? "body" : m === "pocket" || m === "vcarve" || m === "drill" ? "recess" : "skip";
       value = kind === "recess" ? Math.abs(Number(s.millingDepth)) || DEF_VALUE.recess : DEF_VALUE[kind];
     }
     let g = map.get(key);

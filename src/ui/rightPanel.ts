@@ -64,6 +64,7 @@ export function renderRightPanel(container: HTMLElement) {
             <button id="cam-mode-engrave" class="btn-secondary" ${tip("rp.modeOnLineTip")}>✒️ ${T("rp.modeOnLine")}</button>
             <button id="cam-mode-pocket" class="btn-secondary" ${tip("rp.modePocketTip")}>🔲 ${T("rp.modePocket")}</button>
             <button id="cam-mode-vcarve" class="btn-secondary only-mill" ${tip("rp.modeVcarveTip")}>🔻 ${T("rp.modeVcarve")}</button>
+            <button id="cam-mode-drill" class="btn-secondary only-mill" ${tip("rp.modeDrillTip")}>🔩 ${T("rp.modeDrill")}</button>
             <button id="cam-inlay" class="btn-secondary only-mill" ${tip("rp.inlayTip")}>🧩 ${T("rp.inlay")}</button>
           </div>
         </div>
@@ -72,6 +73,7 @@ export function renderRightPanel(container: HTMLElement) {
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
+            <div class="prop-row" ${tip("rp.finishTip")}>${T("rp.finish")}<input type="number" id="dim-finish" value="0" min="0" max="5" step="0.05" class="prop-input"></div>
             <div class="prop-row" ${tip("rp.pocketStrategyTip")}>${T("rp.pocketStrategy")}
               <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
                 <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
@@ -317,10 +319,10 @@ export function renderRightPanel(container: HTMLElement) {
   });
 
   // Aktiv-Markierung für die Bahn-Korrektur-Knöpfe
-  ["part", "hole", "engrave", "pocket", "vcarve"].forEach(mode => {
+  ["part", "hole", "engrave", "pocket", "vcarve", "drill"].forEach(mode => {
     const btn = container.querySelector(`#cam-mode-${mode}`);
     btn?.addEventListener("click", () => {
-      container.querySelectorAll("#cam-mode-part, #cam-mode-hole, #cam-mode-engrave, #cam-mode-pocket, #cam-mode-vcarve")
+      container.querySelectorAll("#cam-mode-part, #cam-mode-hole, #cam-mode-engrave, #cam-mode-pocket, #cam-mode-vcarve, #cam-mode-drill")
         .forEach(b => b.classList.remove("cam-mode-active"));
       btn.classList.add("cam-mode-active");
     });

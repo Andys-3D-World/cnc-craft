@@ -64,6 +64,16 @@ export function drawToolBands(
     const mode = shape.millingMode || "outside";
     if (mode === "vcarve" || mode === "vplug") continue; // V-Carve: Breite hängt von der Tiefe ab – keine Fräserspur
     const rPx = (tool.diameter / 2) * MM_TO_PIXEL;
+    if (mode === "drill") {
+      // Bohrung: Fräser-Kreis in der Mitte der Form
+      const b = shape.type === "circle" ? null : shapeBounds(shape);
+      const cx = b ? (b.minX + b.maxX) / 2 : shape.x, cy = b ? (b.minY + b.maxY) / 2 : shape.y;
+      ctx.fillStyle = tool.color;
+      ctx.beginPath();
+      ctx.arc(sx(cx), sy(cy), Math.max(1, rPx * scale), 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
     const widthScreen = Math.max(1, tool.diameter * MM_TO_PIXEL * scale);
     ctx.strokeStyle = tool.color;
     ctx.lineWidth = widthScreen;

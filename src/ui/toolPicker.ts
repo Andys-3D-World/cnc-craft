@@ -50,6 +50,8 @@ export function toolPickerHtml(): string {
           <button id="cam-tool-new" class="btn-secondary btn-icon" ${tip("tool.newTip")}>＋</button>
         </div>
         <div id="cam-tool-info" class="tool-info"></div>
+        <label class="prop-row needs-sel" ${tip("tool.restTip")}>${T("tool.rest")}
+          <select id="cam-rest-select" class="prop-input" style="width: 140px;"></select></label>
         <div id="cam-tool-scope" class="tool-scope"></div>
       </div>
     </div>`;
@@ -88,6 +90,16 @@ export function initToolPicker(redraw: () => void) {
     }
     sel.blur();
     refreshToolPicker(true);
+  });
+
+  // Restmaterial: zweites, kleineres Werkzeug für Ecken und enge Stellen (Taschen, Löcher)
+  const rest = document.getElementById("cam-rest-select") as HTMLSelectElement | null;
+  rest?.addEventListener("change", () => {
+    if (rest.value === MIXED) return;
+    selectedShapes().forEach(s => { if (rest.value) s.restToolId = rest.value; else delete s.restToolId; });
+    rest.blur();
+    refreshToolPicker(true);
+    redraw();
   });
 
   document.getElementById("cam-tool-edit")?.addEventListener("click", () => {
@@ -142,7 +154,7 @@ export function refreshToolPicker(force = false) {
   if (!st || !sel) return;
   const shapes = selectedShapes();
   const sig = st.selectedShapeIds.join(",") + "|" + st.shapes.length + "|"
-    + st.shapes.map((s: any) => (s.toolId || "") + (s.millingMode || "")).join(",") + "|" + (activeTool?.id || "");
+    + st.shapes.map((s: any) => (s.toolId || "") + (s.millingMode || "") + (s.restToolId || "")).join(",") + "|" + (activeTool?.id || "");
   if (!force && sig === lastSig) return;
   lastSig = sig;
 
@@ -166,6 +178,17 @@ export function refreshToolPicker(force = false) {
   tools.forEach(tl => opts.push(`<option value="${tl.id}">${esc(toolLabel(tl))}</option>`));
   sel.innerHTML = opts.join("");
   sel.value = value;
+
+  // ---- Restmaterial ----
+  const rest = document.getElementById("cam-rest-select") as HTMLSelectElement | null;
+  if (rest && shapes.length) {
+    const ids = new Set(shapes.map(s => (getTool(s.restToolId) ? s.restToolId : "")));
+    const rv = ids.size > 1 ? MIXED : [...ids][0] as string;
+    rest.innerHTML = (rv === MIXED ? `<option value="${MIXED}" disabled>${esc(t("tool.mixed"))}</option>` : "")
+      + `<option value="">${esc(t("tool.restNone"))}</option>`
+      + tools.map(tl => `<option value="${tl.id}">${esc(toolLabel(tl))}</option>`).join("");
+    rest.value = rv;
+  }
 
   // ---- Info + Geltungsbereich ----
   const info = document.getElementById("cam-tool-info");
