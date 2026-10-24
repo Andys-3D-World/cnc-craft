@@ -26,6 +26,7 @@ import {
 } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
+import { openQrDialog } from "./qrTool";
 import { openEngraveDialog } from "../raster/engraveDialog";
 import { dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue } from "./dims";
 import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
@@ -672,6 +673,7 @@ export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
     const w = toWorld(sx, sy);
     const hit = hitTest(w.x, w.y);
     if (hit && hit.textData) editTextGroup(hit);
+    if (hit && hit.qrData) openQrDialog(() => {}, () => finishChange(), hit);
     if (hit && hit.type === "image") openEngraveDialog(hit, undefined, () => finishChange());
   }
 }

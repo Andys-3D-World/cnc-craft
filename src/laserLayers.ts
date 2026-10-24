@@ -151,6 +151,29 @@ export function layerForShape(shape: any): LaserLayer | null {
   return getLayer(shape?.laserLayerId) || activeLayer || layers[0] || null;
 }
 
+/**
+ * Ebene mit eigenen Werten der Form (shape.laserOverride, z. B. Felder des Material-Testrasters).
+ * Ohne eigene Werte = layerForShape. Die ID bekommt "~…" angehängt -> jede Wertekombination wird
+ * im G-Code ein eigener Block (Ebenen-IDs selbst enthalten nie "~", siehe sanitize).
+ */
+export function effectiveLayer(shape: any): LaserLayer | null {
+  const l = layerForShape(shape);
+  const o = shape?.laserOverride;
+  if (!l || !o || typeof o !== "object") return l;
+  const num = (v: any, d: number, min: number, max: number) => {
+    const n = +v;
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : d;
+  };
+  const power = num(o.power, l.power, 0, 100);
+  const speed = num(o.speed, l.speed, 1, 100000);
+  const interval = num(o.interval, l.interval, 0.01, 10);
+  return {
+    ...l, power, speed, fillPower: power, fillSpeed: speed, interval,
+    id: `${l.id}~${power}_${speed}_${interval}`,
+    name: layerHasFill(l) ? `${l.name} ${interval} mm` : l.name
+  };
+}
+
 export function setActiveLayer(id: string) {
   const l = getLayer(id);
   if (!l) return;

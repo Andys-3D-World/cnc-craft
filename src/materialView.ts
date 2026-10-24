@@ -10,7 +10,7 @@
  */
 import { MM_TO_PIXEL } from "./shapeTransform";
 import { isLaser, isPlasma } from "./machineMode";
-import { layerForShape, layerHasFill } from "./laserLayers";
+import { effectiveLayer, layerHasFill } from "./laserLayers";
 import { tracePath } from "./render";
 import { drawImageShape } from "./raster/imageShape";
 
@@ -126,7 +126,7 @@ export function drawMaterialShapes(ctx: CanvasRenderingContext2D, shapes: any[],
   const fills = new Map<string, any[]>();
   for (const s of shapes) {
     if (s.type === "image") continue;
-    const l = laser ? layerForShape(s) : null;
+    const l = laser ? effectiveLayer(s) : null;
     const key = laser ? (l && layerHasFill(l) ? "L:" + l.id : "") : (!plasma && s.millingMode === "pocket" ? "P" : "");
     if (!key) continue;
     if (!fills.has(key)) fills.set(key, []);
@@ -135,13 +135,15 @@ export function drawMaterialShapes(ctx: CanvasRenderingContext2D, shapes: any[],
   for (const [key, list] of fills) {
     ctx.beginPath();
     for (const s of list) tracePath(ctx, s, sx, sy, scale);
-    ctx.fillStyle = key === "P" ? "rgba(0,0,0,0.35)" : rgb(m.burn, 0.88);
+    // eigene Leistung (Testraster): je mehr Leistung, desto dunkler
+    const ov = list[0].laserOverride ? effectiveLayer(list[0]) : null;
+    ctx.fillStyle = key === "P" ? "rgba(0,0,0,0.35)" : rgb(m.burn, ov ? 0.15 + 0.8 * ov.power / 100 : 0.88);
     ctx.fill("evenodd");
   }
   // Linien: gravieren (Brandfarbe) oder schneiden (dunkle Fuge)
   for (const s of shapes) {
     if (s.type === "image") continue;
-    const l = laser ? layerForShape(s) : null;
+    const l = laser ? effectiveLayer(s) : null;
     if (l && l.mode === "fill") continue; // reine Füll-Ebene: keine Kontur
     const cut = plasma || !laser || !l || l.power >= 70;
     ctx.beginPath();

@@ -39,6 +39,7 @@ import { setupToolsHandler } from "./toolsHandler";
 import { initMouseEngine } from "./mouseEngine";
 import { bindOffsetModes } from "./offsetModes";
 import { loadGcodeFromFile, startStreaming, pauseStreaming, stopStreaming } from "./machineStream";
+import { openResumeDialog } from "./ui/resumeDialog";
 import { drawOverlay } from "./editor/overlay";
 import { initHistory } from "./editor/history";
 import { setEngraveLog } from "./raster/engraveDialog";
@@ -165,6 +166,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     if (loadGcodeBtn) loadGcodeBtn.addEventListener("click", () => loadGcodeFromFile(appendToConsole));
     if (jobStartBtn) jobStartBtn.addEventListener("click", () => startStreaming(() => state.isDeviceConnected, appendToConsole));
+    document.getElementById("btn-job-resume")?.addEventListener("click", () => openResumeDialog(appendToConsole));
     if (jobPauseBtn) jobPauseBtn.addEventListener("click", () => pauseStreaming(appendToConsole));
     if (jobStopBtn) jobStopBtn.addEventListener("click", () => stopStreaming());
 

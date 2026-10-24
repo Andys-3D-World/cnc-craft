@@ -72,10 +72,11 @@ export function renderRightPanel(container: HTMLElement) {
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
-            <div class="prop-row">${T("rp.pocketStrategy")}
+            <div class="prop-row" ${tip("rp.pocketStrategyTip")}>${T("rp.pocketStrategy")}
               <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
                 <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
                 <option value="spiral" data-i18n="rp.pocketContour">Kontur</option>
+                <option value="adaptive" data-i18n="rp.pocketAdaptive">Adaptiv</option>
               </select>
             </div>
           </div>
@@ -162,6 +163,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="btn-job-pause" class="btn-secondary" style="flex: 1; padding: 6px;" ${tip("m.pauseTip")}>⏸ ${T("rp.pause")}</button>
               <button id="btn-job-stop" class="btn-secondary" style="flex: 1; padding: 6px; color: var(--color-danger); border-color: var(--color-danger);" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
             </div>
+            <button id="btn-job-resume" class="btn-secondary btn-compact" style="width: 100%;" ${tip("res.btnTip")}>⏭ ${T("res.btn")}</button>
         </div>
 
         <div class="menu-section-unified">

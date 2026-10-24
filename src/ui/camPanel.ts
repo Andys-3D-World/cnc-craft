@@ -37,7 +37,8 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
     ${flyCmds("extras", "boxgen", [["nest", "nest", "tip.cmd.nest"], ["boxgen", "boxgen", "tip.cmd.boxgen"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
-      ["view3d", "view3d", "tip.cmd.view3d"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
+      ["materialTest", "materialTest", "tip.cmd.materialTest"],
+      ["qrCode", "qrCode", "tip.cmd.qrCode"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}

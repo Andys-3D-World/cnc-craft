@@ -17,7 +17,7 @@ import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
 import { tabRuns } from "./tabs";
 import {
-  getLayers, layerForShape, laserSettings, layerHasFill, layerHasLine
+  getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
 import { t, ascii } from "./i18n/i18n";
 import { imageGcode } from "./raster/imageShape";
@@ -33,14 +33,17 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   const sOf = (power: number) => Math.round((power / 100) * laserSettings.sMax);
 
   // ---- Formen nach Ebene sortieren (Reihenfolge wie in der Ebenen-Liste) ----
+  // Formen mit eigenen Werten (Material-Testraster) bilden eigene Blöcke direkt hinter ihrer Ebene
   const byLayer = new Map<string, any[]>();
+  const layerById = new Map<string, LaserLayer>();
   for (const s of shapes) {
-    const l = layerForShape(s);
+    const l = effectiveLayer(s);
     if (!l) continue;
-    if (!byLayer.has(l.id)) byLayer.set(l.id, []);
+    if (!byLayer.has(l.id)) { byLayer.set(l.id, []); layerById.set(l.id, l); }
     byLayer.get(l.id)!.push(s);
   }
-  const order = getLayers().filter(l => byLayer.has(l.id));
+  const rank = new Map(getLayers().map((l, i) => [l.id, i]));
+  const order = [...layerById.values()].sort((a, b) => (rank.get(a.id.split("~")[0]) ?? 0) - (rank.get(b.id.split("~")[0]) ?? 0));
 
   let g = "";
   g += `G21 ${c("gc.unitMm")}\n`;

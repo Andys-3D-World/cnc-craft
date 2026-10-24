@@ -12,6 +12,7 @@ import { SimProgram, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeL
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState } from "../machineStream";
 import { bedSizeMm } from "../editor/editorState";
+import { openResumeDialog } from "../ui/resumeDialog";
 
 type Source = "design" | "job" | "none";
 
@@ -83,6 +84,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
             <button id="sim-job-pause" class="btn-secondary">⏸ ${T("rp.pause")}</button>
             <button id="sim-job-stop" class="btn-secondary sim-stop" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
           </div>
+          <button id="sim-job-resume" class="btn-secondary" ${tip("res.simTip")}>⏭ ${T("res.simBtn")}</button>
           <div class="sim-job-state" id="sim-job-state"></div>
         </div>
         <div class="sim-box sim-code-box">
@@ -134,6 +136,19 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   $("sim-job-start").addEventListener("click", () => document.getElementById("btn-job-start")?.click());
   $("sim-job-pause").addEventListener("click", () => document.getElementById("btn-job-pause")?.click());
   $("sim-job-stop").addEventListener("click", () => document.getElementById("btn-job-stop")?.click());
+  // Fortsetzen ab der Zeile, an der die Simulation gerade steht
+  $("sim-job-resume").addEventListener("click", () => {
+    if (!prog || source !== "job" || streamState.isRunning) { log(t(streamState.isRunning ? "stream.alreadyRunning" : "res.needJob")); return; }
+    const p = positionAt(prog, simTime);
+    openResumeDialog(log, p.i >= 0 ? prog.line[p.i] : undefined);
+  });
+  // Dialog „Job fortsetzen“: Simulation an die gewählte Stelle
+  window.addEventListener("cnc-sim-seek-line", (e: any) => {
+    if (!prog || source !== "job" || live) return;
+    playing = false;
+    seek(timeBeforeLine(prog, e.detail.line));
+    scrollCodeTo(e.detail.line);
+  });
 
   // G-Code-Liste (nur sichtbare Zeilen werden gebaut -> auch riesige Dateien bleiben flüssig)
   const code = $("sim-code");

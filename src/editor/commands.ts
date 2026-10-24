@@ -32,6 +32,9 @@ import {
 } from "../shapeTransform";
 import { offsetPolygon } from "../polyOffset";
 import { openBoxDialog } from "./boxGen";
+import { openMaterialTestDialog } from "./materialTest";
+import { openQrDialog } from "./qrTool";
+import { openSerialDialog } from "./serial";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
@@ -150,6 +153,9 @@ export const commands: Record<string, () => void> = {
   nest: () => openNestDialog(),
   boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
   shapeLib: () => openShapeLibrary(log),
+  materialTest: () => openMaterialTestDialog(log, () => { done(); checkpoint(); }),
+  qrCode: () => openQrDialog(log, () => { done(); checkpoint(); }),
+  serial: () => openSerialDialog(log, () => { done(); checkpoint(); }),
   view3d: () => openView3D(),
   nodeGraph: () => openNodeEditor(log),
   tiles: () => openTileDialog(),

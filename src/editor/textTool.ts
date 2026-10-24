@@ -183,19 +183,25 @@ export function editTextGroup(shape: any) {
   });
 }
 
-function insertText(p: TextParams, traced: TracedText, x0: number, y0: number, mode: string | null) {
-  lastParams = { ...p };
-  if (!traced.loops.length) return;
-  const st = app();
-  const groupId = "text-" + newId();
-  const shapes = traced.loops.map((loop, i) =>
+/** Formen eines Textes, linke untere Ecke bei (x0, y0) in Welt-Pixeln (auch für Seriennummern, serial.ts) */
+export function textShapes(p: TextParams, traced: TracedText, x0: number, y0: number, mode: string | null,
+  extra: Record<string, any> = {}): any[] {
+  const groupId = extra.groupId || "text-" + newId();
+  return traced.loops.map((loop, i) =>
     createPolyline(
       loop.map(q => ({ x: x0 + q.x * MM_TO_PIXEL, y: y0 + q.y * MM_TO_PIXEL })),
       traced.closed?.[i] ?? true,
       mode || "on-line",
-      { groupId, textData: { ...p } }
+      { ...extra, groupId, textData: { ...p } }
     )
   );
+}
+
+function insertText(p: TextParams, traced: TracedText, x0: number, y0: number, mode: string | null) {
+  lastParams = { ...p };
+  if (!traced.loops.length) return;
+  const st = app();
+  const shapes = textShapes(p, traced, x0, y0, mode);
   st.shapes = [...st.shapes, ...shapes];
   st.selectedShapeIds = shapes.map(s => s.id);
   updateDimensionInputs(null);

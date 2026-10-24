@@ -143,7 +143,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   const depthInput = document.getElementById("dim-depth") as HTMLInputElement;
   const fallbackDepth = depthInput && Number.isFinite(parseFloat(depthInput.value)) ? parseFloat(depthInput.value) : -2.0;
   const pocketSel = document.getElementById("dim-pocket-strategy") as HTMLSelectElement | null;
-  const pocketStrategy: PocketStrategy = pocketSel?.value === "spiral" ? "spiral" : "linear";
+  const pocketStrategy: PocketStrategy = pocketSel?.value === "spiral" || pocketSel?.value === "adaptive" ? pocketSel.value : "linear";
   /** seitliche Zustellung in der Tasche: 40 % des Fräserdurchmessers */
   const STEPOVER = 0.4;
 
@@ -286,11 +286,27 @@ const generateGcodeInner = (shapes: any): string | null => {
       return;
     }
     // je Tiefe alle Bahnen; zwischen den Bahnen abheben (sonst ginge es quer durchs Material)
-    passes.forEach(z => {
+    passes.forEach((z, pi) => {
+      const prevZ = pi > 0 ? passes[pi - 1] : 0;
       for (const p of paths) {
         const s = p.pts[0];
-        gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
-        gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+        if (p.helix) {
+          // Adaptiv: schraubenförmig in neues Material (von der letzten Tiefe aus), unten eine volle Runde
+          const { x: hx, y: hy, r: hr } = p.helix;
+          const perRev = Math.max(0.05, Math.min(stepZ, 2 * Math.PI * hr * Math.tan((3 * Math.PI) / 180)));
+          const revs = Math.max(1, Math.ceil((prevZ + 0.5 - z) / perRev));
+          const seg = 24;
+          gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${(hx + hr).toFixed(3)} Y${hy.toFixed(3)}\n`;
+          gcode += `G1 Z${(prevZ + 0.5).toFixed(3)} F${PLUNGE_FEED} ${c("gc.helix")}\nG1 F${Math.max(PLUNGE_FEED, Math.round(feedXY / 2))}\n`;
+          for (let k = 1; k <= (revs + 1) * seg; k++) {
+            const an = (2 * Math.PI * k) / seg, hz = Math.max(z, prevZ + 0.5 - ((prevZ + 0.5 - z) * k) / (revs * seg));
+            gcode += `G1 X${(hx + hr * Math.cos(an)).toFixed(3)} Y${(hy + hr * Math.sin(an)).toFixed(3)} Z${hz.toFixed(3)}\n`;
+          }
+          gcode += `G1 X${s.x.toFixed(3)} Y${s.y.toFixed(3)} F${feedXY}\n`;
+        } else {
+          gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
+          gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+        }
         for (let i = 1; i < p.pts.length; i++) gcode += `G1 X${p.pts[i].x.toFixed(3)} Y${p.pts[i].y.toFixed(3)}\n`;
         if (p.closed) gcode += `G1 X${s.x.toFixed(3)} Y${s.y.toFixed(3)}\n`;
       }

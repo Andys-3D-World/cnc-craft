@@ -21,6 +21,9 @@ const P: Record<string, string> = {
   view3d: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M18.5 3.5a3 3 0 012 2.5" stroke-width="1.4"/><path d="M20.5 6l.4-1.6-1.6.3" stroke-width="1.4"/>`,
   shapeLib: `<path d="M12 3.5l2.3 4.7 5.2.7-3.8 3.6.9 5.1L12 15.2l-4.6 2.4.9-5.1-3.8-3.6 5.2-.7z" stroke-width="1.6"/><circle cx="6" cy="19" r="2.2"/><rect x="15.5" y="16.8" width="4.4" height="4.4" rx="0.8"/>`,
   boxgen: `<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/><path d="M7 9.2v1.6M9.5 10.6v1.6M16.5 10.6v1.6M14 12v1.6" stroke-width="1.6"/>`,
+  materialTest: `<rect x="3" y="3" width="5" height="5" rx=".6"/><rect x="9.5" y="3" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".35"/><rect x="16" y="3" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".7"/><rect x="3" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".2"/><rect x="9.5" y="9.5" width="5" height="5" rx=".6" fill="currentColor" fill-opacity=".5"/><rect x="16" y="9.5" width="5" height="5" rx=".6" fill="currentColor"/><path d="M3 19h18M18 17l3 2-3 2" stroke-width="1.5"/>`,
+  qrCode: `<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M5.8 5.8h1.4v1.4H5.8zM16.8 5.8h1.4v1.4h-1.4zM5.8 16.8h1.4v1.4H5.8z" fill="currentColor"/><path d="M14 14h3v3M21 14v7h-4M14 18v3" stroke-width="1.6"/>`,
+  serial: `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10.5l1.5-1v5.5M11 10a1.5 1.5 0 013 0c0 1.5-3 2.5-3 5h3M16.5 9.5h2.5l-1.5 2a1.6 1.6 0 11-1.3 2.6" stroke-width="1.5"/>`,
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,
 
   // ---- Datei ----

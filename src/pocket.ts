@@ -3,14 +3,17 @@
  *
  *  - „Parallel“ (linear): Zickzack-Bahnen quer durch die Tasche, danach eine Schlichtbahn an der Wand
  *  - „Kontur“ (spiral):   Ringe im Abstand der Zustellung von innen nach außen, zuletzt die Wand
+ *  - „Adaptiv“ (adaptive): gleichmäßige Umschlingung mit Schleifen und Helix-Einstieg (adaptive.ts)
  *
  * Inseln (Formen innerhalb der Tasche, z. B. Text) bleiben stehen: um sie herum wird nur gefräst.
  * Alles in mm. Der Fräsermittelpunkt bleibt immer mindestens den Werkzeugradius von Wand und Inseln weg.
  */
 import { offsetPolygon, pointInPoly, P } from "./polyOffset";
+import { adaptivePaths } from "./adaptive";
 
-export interface PocketPath { pts: P[]; closed: boolean }
-export type PocketStrategy = "linear" | "spiral";
+/** helix: schraubenförmig um (x, y) mit Radius r eintauchen statt senkrecht (nur „Adaptiv“) */
+export interface PocketPath { pts: P[]; closed: boolean; helix?: { x: number; y: number; r: number } }
+export type PocketStrategy = "linear" | "spiral" | "adaptive";
 
 type Edge = [P, P];
 
@@ -92,7 +95,9 @@ export function pocketPaths(outer: P[], islands: P[][], r: number, step: number,
   ];
 
   const rough: PocketPath[] = [];
-  if (strategy === "spiral") {
+  if (strategy === "adaptive") {
+    rough.push(...adaptivePaths(outer, islands, r, wall, isl, clip));
+  } else if (strategy === "spiral") {
     // Ringe immer weiter nach innen (bzw. um die Inseln nach außen), bis nichts mehr übrig ist
     const levels: PocketPath[][] = [];
     for (let k = 1; k < 2000; k++) {

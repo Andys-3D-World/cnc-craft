@@ -3,6 +3,41 @@
 ## Next version (unreleased)
 
 **New**
+- **Material test grid (laser):** new entry *Material test grid* in the *Extras* group of the left toolbar. It creates
+  a grid of squares with rising power (columns) and rising speed or line interval (rows), as fill or line. Every square
+  is lasered with its own values (no extra layers per square), the values are written next to the grid with the
+  single-line font on a separate low-power layer. The material preview shows squares with more power darker
+- **QR codes:** new entry *QR code* in the *Extras* group. Links or text (UTF-8, umlauts) become a QR code made of
+  closed areas (touching dots are merged into one outline, holes included) – fill it with the laser or pocket it with
+  the router. Size and error correction (L/M/Q/H) are adjustable, the dialog shows a preview, the version and the dot
+  size and warns about dots that are too small. Double-click a QR code to edit it. Own small encoder, no extra library
+- **Serial numbers and variable text:** new entry *Serial numbers / CSV* in the *Extras* group. Texts and QR codes in
+  the selection can contain placeholders: `{n}` for a running number (start, step, leading zeros) and `{column name}`
+  or `{1}`, `{2}` … for values from a CSV file (separator `;`, `,` or tab, detected automatically; one copy per row).
+  The copies are arranged in a grid that is sized by the largest copy, frames and other shapes are copied along.
+  The dialog shows the first and last values before creating anything
+- **Adaptive clearing (router):** new pocket strategy *Adaptive* next to *Parallel* and *Contour*. The cutter keeps an
+  even engagement: rings from the inside out, a material map checks before every step how much of the cutter is in
+  the material, and where it would be too much (first cut, corners, narrow spots) it switches to small trochoidal
+  loops (climb). New material is entered with a helix instead of plunging straight down. Loops and helix are sized so
+  they never come closer than the tool radius to walls or islands. In tests the engagement mostly stays around 65–70°
+  (max. about 135°) instead of 180° full-width cuts, the path is about as long as with *Contour*
+- **Probe surface / height map (router, GRBL):** new part *Probe surface* in the probing section of the *Machine*
+  tab. Starting at the current position (front left corner) a grid of up to 20 × 20 points is probed with the same
+  debounced two-step software probing as the touch plate (no G38.2, all moves relative, Z goes up after every point,
+  the guard stops the machine if the probe triggers while travelling). Optionally Z = 0 is set at the first point.
+  Before the way back the bit goes above the highest measured point. A small colour map shows the result.
+  With *Compensate when sending* every job gets Z adjusted to the surface: long lines are split, arcs (G2/G3, I/J or R)
+  become short lines, the job progress still counts the original lines. G-code that cannot be converted safely
+  (G91, G20, G92/G10, G38, drilling cycles, rotary axis, other planes, invalid arcs) is refused instead of milled wrong
+- **Resume a job:** new button *Resume from …* below the job buttons and *Resume from here* in the simulation. Pick a
+  line, a shape/layer from the list or *shortly before the abort* (a few lines earlier, because GRBL acknowledges lines
+  while they are still in its buffer). CNC Craft reads the G-code up to that point and sends a preamble that restores
+  the state: units, G90, plane, coordinate system, safe Z, spindle (M3/M4 with speed and spin-up time), coolant,
+  moving to the position, slowly down to the depth and the feed rate. The laser stays at S0 until the first cutting
+  line, which gets its power back. Plasma can only resume where the torch is off. The dialog shows the preamble,
+  warns about an earlier tool change and moves the simulation to the spot; the job progress keeps the original line
+  numbers (also together with the height map)
 - **V-carve (router):** new path mode *V-Carve* – the V-bit follows rings inside the area that get deeper the
   further they are from the edge (depth = distance / tan(half angle), tip diameter included), giving sharp top edges
   and pointed corners like Vectric. Letters with holes and nearby shapes are carved as one area. The depth field is the

@@ -17,6 +17,8 @@ import { t } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop } from "./machine";
 import { getMachineMode, MachineMode } from "./machineMode";
 import { stockBed } from "./stock";
+import { compensate, getHeightMap, heightMapEnabled, heightRange } from "./heightMap";
+import { buildResume, resumeMarks, ResumeMark } from "./jobResume";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -28,8 +30,18 @@ export const streamState = {
   loadedLines: [] as string[],
   label: "",                // Name des Jobs (Dateiname oder "aktuelle Zeichnung")
   bed: 0,                   // Bett, dessen Material-Platte der Job verbraucht
-  onMachine: false          // läuft gerade an der echten Maschine?
+  onMachine: false,         // läuft gerade an der echten Maschine?
+  sentOrigin: null as number[] | null, // je gesendeter Zeile die Original-Zeile (Höhenkarte, Fortsetzen; sonst 1:1)
+  marks: [] as ResumeMark[],  // Formen/Ebenen im Job (zum Fortsetzen)
+  abortLine: -1               // nach einem Abbruch: so viele Zeilen hatte die Maschine bestätigt (-1 = kein Abbruch)
 };
+
+/** gesendete Zeilen (Rust zählt diese) -> fertige Original-Zeilen (= Original-Zeile der nächsten offenen gesendeten Zeile) */
+function origDone(acked: number, st: typeof streamState = streamState): number {
+  const o = st.sentOrigin;
+  if (!o) return acked;
+  return acked >= o.length ? st.totalLines : o[Math.max(0, acked)];
+}
 
 let logFn: (s: string) => void = () => {};
 
@@ -67,6 +79,9 @@ export function loadGcodeFromText(content: string, label: string, appendToConsol
     .filter(l => l.length > 0 && !l.startsWith("(") && !l.startsWith("%") && !l.startsWith(";"));
   streamState.totalLines = streamState.loadedLines.length;
   streamState.currentLine = 0;
+  streamState.sentOrigin = null;
+  streamState.marks = resumeMarks(content).filter(m => m.line < streamState.totalLines);
+  streamState.abortLine = -1;
   streamState.label = label;
   streamState.bed = stockBed();
   appendToConsole(t("stream.loaded", { n: streamState.totalLines }));
@@ -83,6 +98,7 @@ function emitProgress() {
 }
 
 function emitDone(aborted: boolean, simulated: boolean, s: typeof streamState = streamState, mode: MachineMode = getMachineMode()) {
+  s.abortLine = aborted ? s.currentLine : -1;
   window.dispatchEvent(new CustomEvent("cnc-job-done", {
     detail: {
       aborted, line: s.currentLine, lines: s.loadedLines,
@@ -106,7 +122,7 @@ export function initStreamEvents(appendToConsole: (t: string) => void) {
       parked.delete(data.id);
       if (next) Object.assign(streamState, next);
       else Object.assign(streamState, { isRunning: false, isPaused: false, shouldStop: false, currentLine: 0, onMachine: false });
-      if (streamState.onMachine && machine.job.active) streamState.currentLine = machine.job.acked;
+      if (streamState.onMachine && machine.job.active) streamState.currentLine = origDone(machine.job.acked);
       if (streamState.onMachine && !machine.job.active) { streamState.isRunning = false; streamState.onMachine = false; }
       emitProgress();
       return;
@@ -115,7 +131,7 @@ export function initStreamEvents(appendToConsole: (t: string) => void) {
       // Job einer Maschine im Hintergrund ist fertig: Platte für DEREN Maschinenart markieren
       const s = parked.get(data.conn);
       if (!s || !s.onMachine) return;
-      s.currentLine = data.data?.aborted ? (data.data.acked ?? 0) : s.totalLines;
+      s.currentLine = data.data?.aborted ? origDone(data.data.acked ?? 0, s) : s.totalLines;
       s.isRunning = false; s.isPaused = false; s.onMachine = false;
       emitDone(!!data.data?.aborted, false, s, data.mode || getMachineMode());
       if (data.gone) parked.delete(data.conn);
@@ -123,11 +139,11 @@ export function initStreamEvents(appendToConsole: (t: string) => void) {
     }
     if (!streamState.onMachine) return;
     if (type === "job-progress") {
-      streamState.currentLine = data.acked;
+      streamState.currentLine = origDone(data.acked);
       streamState.isPaused = !!data.paused;
       emitProgress();
     } else if (type === "job-done") {
-      streamState.currentLine = data.aborted ? data.acked : streamState.totalLines;
+      streamState.currentLine = data.aborted ? origDone(data.acked) : streamState.totalLines;
       streamState.isRunning = false;
       streamState.isPaused = false;
       streamState.onMachine = false;
@@ -146,7 +162,7 @@ export function initStreamEvents(appendToConsole: (t: string) => void) {
 /**
  * Startet den Job: an der Maschine (wenn verbunden) oder als Demo.
  */
-export async function startStreaming(_isConnected: () => boolean, appendToConsole: (t: string) => void) {
+export async function startStreaming(_isConnected: () => boolean, appendToConsole: (t: string) => void, resumeFrom = -1) {
   logFn = appendToConsole;
   if (streamState.isRunning) { appendToConsole(t("stream.alreadyRunning")); return; }
   if (streamState.loadedLines.length === 0) { appendToConsole(t("stream.noGcode")); return; }
@@ -154,16 +170,48 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
   // Fertiger Job wird von vorne gestartet
   if (streamState.currentLine >= streamState.totalLines) streamState.currentLine = 0;
 
+  // Fortsetzen: Vorspann (Zustand herstellen) + Job ab der Zeile; jede Zeile merkt sich ihre Original-Nummer
+  let base = streamState.loadedLines;
+  let baseOrigin: number[] | null = null;
+  if (resumeFrom > 0) {
+    try {
+      const plan = buildResume(streamState.loadedLines, resumeFrom, getMachineMode());
+      base = [...plan.pre, ...plan.rest];
+      baseOrigin = [...plan.pre.map(() => resumeFrom), ...plan.rest.map((_, i) => resumeFrom + i)];
+      appendToConsole(t("res.started", { n: resumeFrom + 1, pre: plan.pre.length }));
+    } catch (e) {
+      appendToConsole(t("res.refused", { e: (e as Error).message || String(e) }));
+      return;
+    }
+  }
+
   if (machine.connected) {
     if (machine.status.state === "Alarm") { appendToConsole(t("m.unlockFirst")); return; }
     const refused = aAxisRefused(streamState.loadedLines);
     if (refused) { appendToConsole(refused); return; }
+    // Höhenkarte: Z an die gemessene Oberfläche anpassen (nur Fräse mit GRBL)
+    let send = base;
+    streamState.sentOrigin = baseOrigin;
+    const hm = getHeightMap();
+    if (heightMapEnabled() && hm && getMachineMode() === "mill" && machine.protocol === "grbl") {
+      try {
+        const c = compensate(base, hm);
+        send = c.lines;
+        streamState.sentOrigin = baseOrigin ? c.origin.map(i => baseOrigin![i]) : c.origin;
+        const r = heightRange(hm);
+        appendToConsole(t("hm.applied", { min: r.min.toFixed(2), max: r.max.toFixed(2), n: c.lines.length }));
+        if (c.outside) appendToConsole(t("hm.outside", { n: c.outside }));
+      } catch (e) {
+        appendToConsole(t("hm.refused", { e: (e as Error).message || String(e) }));
+        return;
+      }
+    }
     try {
-      streamState.currentLine = 0;
+      streamState.currentLine = Math.max(0, resumeFrom);
       streamState.isRunning = true;
       streamState.isPaused = false;
       streamState.onMachine = true;
-      const n = await jobStart(streamState.loadedLines);
+      const n = await jobStart(send);
       appendToConsole(t("m.jobStarted", { n }));
       emitProgress();
     } catch (e) {
@@ -177,6 +225,7 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
 
   // ---- DEMO ohne Maschine ----
   appendToConsole(t("stream.simulated"));
+  if (resumeFrom > 0) streamState.currentLine = resumeFrom;
   streamState.isRunning = true;
   streamState.shouldStop = false;
   emitProgress();
