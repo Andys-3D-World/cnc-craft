@@ -13,6 +13,7 @@ import {
   LaserLayer, LaserMode, LAYER_COLORS, LAYERS_CHANGED, getLayers, getLayer, addLayer, updateLayer, removeLayer,
   duplicateLayer, moveLayer, activeLayer, setActiveLayer, layerInfo, laserSettings, setLaserSettings
 } from "../laserLayers";
+import { openLaserPresetDialog } from "./laserPresetDialog";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -99,6 +100,7 @@ export function renderLaserLibPage(withEditor = true) {
             <button id="lp-up" class="btn-secondary" data-tip="${esc(t("llib.upTip"))}">▲</button>
             <button id="lp-down" class="btn-secondary" data-tip="${esc(t("llib.downTip"))}">▼</button>
           </div>
+          <button id="lp-presets" class="btn-secondary" style="width:100%;margin:4px 0;" data-tip="${esc(t("llib.pre.tip"))}">📋 ${esc(t("llib.pre.button"))}</button>
           <div id="lp-list" class="tlp-list"></div>
           <div class="tlp-settings">
             <h4>⚙️ ${esc(t("laser.settings"))}</h4>
@@ -161,6 +163,7 @@ function bindPage(page: HTMLElement) {
     const c = duplicateLayer(sel);
     if (c) { sel = c.id; renderLaserLibPage(); }
   });
+  page.querySelector("#lp-presets")!.addEventListener("click", () => openLaserPresetDialog(id => { sel = id; isNew = false; renderLaserLibPage(); }));
   page.querySelector("#lp-up")!.addEventListener("click", () => { if (sel) moveLayer(sel, -1); });
   page.querySelector("#lp-down")!.addEventListener("click", () => { if (sel) moveLayer(sel, 1); });
   const smax = page.querySelector("#lps-smax") as HTMLInputElement;

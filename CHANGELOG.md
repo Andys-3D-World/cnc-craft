@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Laser material presets:** new button *Material presets* in the laser library. Choose diode or CO₂ laser and its
+  power in watts, then one click creates a layer with start values for e.g. *Poplar plywood 3 mm cut* (power, speed,
+  passes, air, material and thickness) – 19 presets for plywood, hardwood, MDF, acrylic, cardboard, paper, leather,
+  cork, felt, slate, glass and anodized aluminium. The values are given for a 10 W diode / 50 W CO₂ laser and are
+  converted to your power: cutting keeps the power and changes passes and speed (same energy per mm), engraving keeps
+  the speed and changes the power. Presets that would need too many passes are marked as too weak, unsuitable ones
+  (e.g. glass with a diode) are disabled, with notes for acrylic, leather and glass. Engraving layers are put before
+  the cutting layers. A clear note says these are cautious start values to check with the material test grid first
 - **Rest machining (router):** new field *Rest material with* in the tool section of the selected shapes. Pockets
   and holes (inside) can get a second, smaller tool: after the shape's own tool has cleared everything quickly, the
   small tool mills only the spots the big one could not reach – inside corners and narrow places – so the corners
