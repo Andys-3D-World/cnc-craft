@@ -23,6 +23,7 @@ import { pinLedsHtml } from "./pinLeds";
 import { workshopPanelHtml } from "./workshopPanel";
 import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
+import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt";
 
 const CONSOLE_KEY = "cnc_craft_console_collapsed";
 /** Meldungen, bei denen die zugeklappte Konsole von selbst aufgeht (alle Sprachen) */
@@ -85,6 +86,8 @@ export function renderRightPanel(container: HTMLElement) {
                 <option value="adaptive" data-i18n="rp.pocketAdaptive">Adaptiv</option>
               </select>
             </div>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.feedAdaptTip")}><span>${T("rp.feedAdapt")}</span><input type="checkbox" id="feed-adapt-on" style="width:auto;"></label>
+            <div class="prop-row" ${tip("rp.feedAdaptTip")}>${T("rp.feedAdaptMin")}<input type="number" id="feed-adapt-min" min="10" max="100" step="5" class="prop-input"></div>
           </div>
         </div>
 
@@ -289,6 +292,14 @@ export function renderRightPanel(container: HTMLElement) {
       </div>
     </div>
   `;
+
+  // Vorschub in Kurven anpassen (gemerkt, gilt für alle Formen)
+  loadFeedAdapt();
+  const faOn = container.querySelector<HTMLInputElement>("#feed-adapt-on")!, faMin = container.querySelector<HTMLInputElement>("#feed-adapt-min")!;
+  const faShow = () => { faOn.checked = feedAdapt.on; faMin.value = String(feedAdapt.minPct); faMin.disabled = !feedAdapt.on; };
+  faShow();
+  faOn.addEventListener("change", () => { feedAdapt.on = faOn.checked; saveFeedAdapt(); faShow(); });
+  faMin.addEventListener("change", () => { const v = parseFloat(faMin.value); if (Number.isFinite(v)) feedAdapt.minPct = clampPct(v); saveFeedAdapt(); faShow(); });
 
   // Reiter umschalten
   const tabs = container.querySelectorAll<HTMLButtonElement>(".rp-tab");

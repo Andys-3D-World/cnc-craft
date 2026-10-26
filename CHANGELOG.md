@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Milling: slow down in curves and inside corners (adaptive feed rate):** new switch *Slow down in curves* with a
+  *Minimum feed (%)* in *Milling parameters* (on by default, minimum 50 %). In tight curves and inside corners the
+  cutter wraps around more material, which made it chatter or break at the full feed. CNC Craft now measures how
+  sharply the tool path turns within one cutter diameter (corners, G2/G3 arcs and arcs made of many short lines) and
+  lowers F by the inner-arc rule *R / (R + cutter radius)* in 10 % steps, never below the minimum; straights keep the
+  normal feed. The slowdown starts one cutter radius before the corner and ends one cutter radius after it (long lines
+  and arcs are split for that), and F is only written when it changes. Plunges, ramps and helices keep their feed.
+  Applies to contours, pockets and rest machining, not to drilling, V-carve, chamfers and adaptive pockets; G-code in
+  inches, relative mode or another plane is left unchanged. Simulation and time estimate use the adapted feed.
 - **Workshop sync: keep the libraries the same on two computers:** new button *🔄 Workshop sync* in the backup bar
   of the *Tools / Laser library / Plasma library* tab. Choose the same shared folder on both computers (NAS or network
   drive, Dropbox, USB stick) and CNC Craft keeps milling tools, laser layers and plasma cuts in sync through one file

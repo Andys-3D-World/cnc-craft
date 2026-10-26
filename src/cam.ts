@@ -17,6 +17,7 @@ import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
 import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./rotary";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
+import { adaptFeed, feedAdapt } from "./feedAdapt";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -637,6 +638,14 @@ const generateGcodeInner = (shapes: any): string | null => {
   let formCounter = 0;
   const computeDepth = (s: any): number => typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallbackDepth;
   const alreadyChained = new Set<string>();
+  /** Vorschub-Anpassung nur bei Fräsern mit Schneide am Umfang – nicht Bohren, V-Carve, Fase, adaptive Tasche */
+  const adaptsFeed = (shape: any): boolean => {
+    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill")) return false;
+    if (shape.restOf) return true;
+    const mode = shape.millingMode || "outside";
+    if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer") return false;
+    return !(mode === "pocket" && pocketStrategy === "adaptive");
+  };
 
   groups.forEach((group, gi) => {
   useTool(group.tool);
@@ -654,7 +663,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
 
   const vDone = new Set<any>();
-  group.shapes.forEach((shape: any) => {
+  const millShape = (shape: any) => {
     if (vDone.has(shape)) return;
     if (shape.restOf) {
       formCounter++;
@@ -833,6 +842,12 @@ const generateGcodeInner = (shapes: any): string | null => {
       gcode += `${c("gc.unsupported", { type: shape.type })}\n`;
       lastGcodeWarnings.push(t("gcw.unsupported", { n: formCounter, type: shape.type }));
     }
+  };
+  group.shapes.forEach((shape: any) => {
+    const from = gcode.length;
+    millShape(shape);
+    // Vorschub in engen Kurven und Innenecken senken (feedAdapt.ts)
+    if (feedAdapt.on && adaptsFeed(shape)) gcode = gcode.slice(0, from) + adaptFeed(gcode.slice(from), toolRadius, feedAdapt.minPct);
   });
   });
 
