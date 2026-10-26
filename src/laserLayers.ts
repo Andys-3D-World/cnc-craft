@@ -12,6 +12,7 @@
  * Änderungen lösen "cnc-laser-layers-changed" aus.
  */
 import { t } from "./i18n/i18n";
+import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 
 export type LaserMode = "line" | "fill" | "fill+line";
 
@@ -32,6 +33,8 @@ export interface LaserLayer {
   material: string;   // Material (frei, z. B. "Pappel-Sperrholz") – nur zur Übersicht
   thickness: number;  // Materialdicke in mm (0 = keine Angabe)
   notes: string;      // Notiz
+  updated?: number;   // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
+  device?: string;    // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
 export interface LaserSettings {
@@ -117,7 +120,8 @@ function sanitize(x: any): LaserLayer {
     leadIn: num(x.leadIn, 0, 0, 20),
     material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
     thickness: num(x.thickness, 0, 0, 200),
-    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
+    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
+    ...syncFields(x)
   };
 }
 
@@ -186,7 +190,7 @@ export function setActiveLayer(id: string) {
 export function addLayer(data: Partial<LaserLayer>): LaserLayer {
   const used = new Set(layers.map(l => l.color));
   const color = data.color || LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[layers.length % LAYER_COLORS.length];
-  const l = sanitize({ ...data, color, id: newLayerId() });
+  const l = stamp(sanitize({ ...data, color, id: newLayerId() }));
   layers.push(l);
   changed();
   return l;
@@ -195,15 +199,16 @@ export function addLayer(data: Partial<LaserLayer>): LaserLayer {
 export function updateLayer(id: string, data: Partial<LaserLayer>) {
   const i = layers.findIndex(l => l.id === id);
   if (i < 0) return;
-  layers[i] = sanitize({ ...layers[i], ...data, id });
+  layers[i] = stamp(sanitize({ ...layers[i], ...data, id }));
   if (activeLayer && activeLayer.id === id) activeLayer = layers[i];
   changed();
 }
 
 export function removeLayer(id: string) {
-  if (layers.length <= 1) return;
+  if (layers.length <= 1 || !getLayer(id)) return;
   layers = layers.filter(l => l.id !== id);
   if (!activeLayer || activeLayer.id === id) activeLayer = layers[0];
+  noteRemoved("laser", [id]);
   changed();
 }
 
@@ -213,6 +218,7 @@ export function moveLayer(id: string, dir: -1 | 1) {
   const j = i + dir;
   if (i < 0 || j < 0 || j >= layers.length) return;
   [layers[i], layers[j]] = [layers[j], layers[i]];
+  noteOrder("laser");
   changed();
 }
 
@@ -222,8 +228,9 @@ export function duplicateLayer(id: string): LaserLayer | null {
   if (!src) return null;
   const used = new Set(layers.map(l => l.color));
   const color = LAYER_COLORS.find(c => !used.has(c)) || src.color;
-  const copy = sanitize({ ...src, id: newLayerId(), color, name: t("lib.copyName", { name: src.name }) });
+  const copy = stamp(sanitize({ ...src, id: newLayerId(), color, name: t("lib.copyName", { name: src.name }) }));
   layers.splice(layers.indexOf(src) + 1, 0, copy);
+  noteOrder("laser");
   changed();
   return copy;
 }
@@ -239,7 +246,10 @@ export function importLaserLibrary(data: any, replace: boolean): number {
   if (!list.length) return 0;
   if (!replace) return mergeProjectLayers(list, []);
   const seen = new Set<string>();
-  layers = list.map(l => { const id = seen.has(l.id) ? newLayerId() : l.id; seen.add(id); return { ...l, id }; });
+  const before = layers.map(l => l.id);
+  layers = list.map(l => { const id = seen.has(l.id) ? newLayerId() : l.id; seen.add(id); return stamp({ ...l, id }); });
+  noteRemoved("laser", before.filter(id => !seen.has(id)));
+  noteOrder("laser");
   activeLayer = layers.find(l => l.id === data?.active) || layers[0];
   if (data?.settings && typeof data.settings === "object") setLaserSettings({ sMax: data.settings.sMax, dynamic: data.settings.dynamic, avoidCut: data.settings.avoidCut });
   changed();
@@ -264,13 +274,27 @@ export function mergeProjectLayers(list: any, shapes: any[]): number {
     if (same) newId = same.id;
     else {
       if (getLayer(l.id)) newId = newLayerId();
-      layers.push({ ...l, id: newId });
+      layers.push(stamp({ ...l, id: newId }));
       added++;
     }
     if (newId !== l.id) shapes.forEach(s => { if (s.laserLayerId === l.id) s.laserLayerId = newId; });
   }
   if (added) changed();
   return added;
+}
+
+/**
+ * Werkstatt-Sync (libSync.ts): gemeinsamen Stand übernehmen. entries = lebende Einträge aus dem
+ * Abgleich (werden hier mit sanitize geprüft), order = IDs in der gemeinsamen Reihenfolge.
+ * false = nichts übernommen (leere Liste – mindestens ein Eintrag muss bleiben).
+ */
+export function applySyncedLayers(entries: any[], order: string[]): boolean {
+  const list = sortByOrder(sanitizeList(entries), order);
+  if (!list.length) return false;
+  layers = list;
+  activeLayer = getLayer(activeLayer?.id) || layers[0];
+  changed();
+  return true;
 }
 
 export function layersUsedBy(shapes: any[]): LaserLayer[] {

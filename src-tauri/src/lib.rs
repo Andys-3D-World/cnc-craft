@@ -26,6 +26,7 @@ mod fonts;
 mod fwzip;
 mod grbl;
 mod k40;
+mod libsync;
 mod machine;
 mod marlin;
 mod netscan;
@@ -565,6 +566,25 @@ async fn settings_store_write(app: AppHandle, data: String) -> Result<(), String
     store::write_settings(&dir, &data).map_err(|e| e.to_string())
 }
 
+/// Werkstatt-Sync (libsync.rs): eine Bibliothek mit dem gemeinsamen Ordner abgleichen
+#[tauri::command]
+async fn libsync_sync(folder: String, kind: String, local: String, device: String, device_name: String, now: u64) -> Result<libsync::SyncResult, String> {
+    // Netzlaufwerk kann langsam sein + Sperre wartet kurz -> nicht im Haupt-Thread
+    tauri::async_runtime::spawn_blocking(move || {
+        libsync::sync_kind(std::path::Path::new(&folder), &kind, &local, &device, &device_name, now).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Werkstatt-Sync: Sicherung der Bibliotheken, bevor der Abgleich lokal etwas ändert
+#[tauri::command]
+async fn libsync_backup(app: AppHandle, data: String) -> Result<String, String> {
+    let dir = store_dir(&app)?;
+    let secs = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    libsync::write_backup(&dir, &data, secs).map(|p| p.to_string_lossy().to_string()).map_err(|e| e.to_string())
+}
+
 /// Text einer mitgelieferten Firmware (zum Anzeigen/Prüfen in der Oberfläche)
 #[tauri::command]
 async fn bundled_firmware(name: String) -> Result<String, String> {
@@ -799,6 +819,8 @@ pub fn run() {
             app_info,
             settings_store_read,
             settings_store_write,
+            libsync_sync,
+            libsync_backup,
             net_scan,
             camera_snapshot,
             system_fonts,

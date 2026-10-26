@@ -20,6 +20,8 @@ import { t } from "../i18n/i18n";
 import { getMachineMode, setMachineMode, MODE_CHANGED, MachineMode } from "../machineMode";
 import { exportLibrary, importLibrary, LibKind, ALL_KINDS } from "../libraryBackup";
 import { initLaserLibPage, rebuildLaserLibPage } from "./laserLibPage";
+import { openSyncDialog, syncStatusText } from "./syncDialog";
+import { SYNC_CHANGED } from "../libSync";
 import { initPlasmaLibPage, rebuildPlasmaLibPage } from "./plasmaLibPage";
 
 function esc(s: string): string {
@@ -92,12 +94,23 @@ function renderBar() {
     <div class="lib-bar-group">
       <button id="lib-backup" class="btn-secondary" data-tip="${esc(t("lib.io.backupTip"))}">🗄 ${esc(t("lib.io.backup"))}</button>
       <button id="lib-restore" class="btn-secondary" data-tip="${esc(t("lib.io.restoreTip"))}">♻ ${esc(t("lib.io.restore"))}</button>
+    </div>
+    <div class="lib-bar-group">
+      <button id="lib-sync" class="btn-secondary">🔄 ${esc(t("sync.btn"))}</button>
     </div>`;
   syncTips();
   bar.querySelector<HTMLButtonElement>("#lib-export")!.onclick = () => exportLibrary([view], log);
   bar.querySelector<HTMLButtonElement>("#lib-import")!.onclick = () => importLibrary([view], log);
   bar.querySelector<HTMLButtonElement>("#lib-backup")!.onclick = () => exportLibrary(ALL_KINDS, log);
   bar.querySelector<HTMLButtonElement>("#lib-restore")!.onclick = () => importLibrary(ALL_KINDS, log);
+  bar.querySelector<HTMLButtonElement>("#lib-sync")!.onclick = () => openSyncDialog();
+  syncSyncTip();
+}
+
+/** Hinweis am Sync-Knopf: Ordner + letzter Abgleich */
+function syncSyncTip() {
+  const b = document.getElementById("lib-sync");
+  if (b) b.setAttribute("data-tip", `${t("sync.btnTip")} · ${syncStatusText()}`);
 }
 
 /** Tooltips der Einzel-Knöpfe passend zur gezeigten Bibliothek */
@@ -116,6 +129,7 @@ export function initLibraryTab(logFn: (s: string) => void) {
   showLibrary(KIND_OF[getMachineMode()]);
   // Maschinen-Modus gewechselt -> Ansicht springt mit
   window.addEventListener(MODE_CHANGED, () => showLibrary(KIND_OF[getMachineMode()]));
+  window.addEventListener(SYNC_CHANGED, syncSyncTip);
   window.addEventListener("cnc-language-changed", () => {
     renderSwitch();
     renderBar();

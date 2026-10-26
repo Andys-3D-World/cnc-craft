@@ -1239,6 +1239,18 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .lib-io-choice span { font-size: 0.75rem; color: var(--text-muted); line-height: 1.35; }
 .lib-io-choice:hover, .lib-io-choice:focus-visible { border-color: var(--accent-color); outline: none; box-shadow: 0 0 0 1px var(--accent-color) inset; }
 .lib-io-danger:hover, .lib-io-danger:focus-visible { border-color: var(--color-danger); box-shadow: 0 0 0 1px var(--color-danger) inset; }
+/* Werkstatt-Sync (ui/syncDialog.ts) */
+.sync-intro { font-size: 0.8rem; line-height: 1.4; color: var(--text-muted); }
+.sync-row { display: flex; flex-direction: column; gap: 4px; }
+.sync-label { font-size: 0.75rem; color: var(--text-muted); }
+.sync-folder { font-family: var(--font-mono); font-size: 0.75rem; word-break: break-all; padding: 6px 8px; border: 1px solid var(--border-color); border-radius: 6px; }
+.sync-folder.sync-empty { color: var(--text-muted); font-family: var(--font-ui); }
+.sync-row .btn-compact { align-self: flex-start; }
+.sync-row input[type="text"] { padding: 5px 8px; }
+.sync-check { display: flex; gap: 6px; align-items: flex-start; font-size: 0.8rem; line-height: 1.35; }
+.sync-status { font-size: 0.8rem; padding: 6px 8px; border-radius: 6px; background: var(--bg-panel-2, rgba(127,127,127,0.08)); }
+.sync-status.sync-err { color: var(--color-danger); }
+.sync-note { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
 
 .llp-swatch { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 5px; font-size: 0.72rem; color: rgba(0,0,0,0.65); vertical-align: -4px; flex: 0 0 20px; }
 .tlp-ico .llp-swatch { margin-top: 1px; }

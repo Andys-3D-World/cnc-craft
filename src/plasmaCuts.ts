@@ -14,6 +14,7 @@
  */
 import { t } from "./i18n/i18n";
 import { LAYER_COLORS } from "./laserLayers";
+import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 
 export interface PlasmaCut {
   id: string;
@@ -29,6 +30,8 @@ export interface PlasmaCut {
   thickness: number;    // Blechdicke in mm (0 = keine Angabe)
   amps: number;         // Stromstärke am Gerät in A (0 = keine Angabe)
   notes: string;        // Notiz (Düse, Gerät, …)
+  updated?: number;     // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
+  device?: string;      // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
 export interface PlasmaSettings {
@@ -113,7 +116,8 @@ function sanitize(x: any): PlasmaCut {
     material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
     thickness: num(x.thickness, 0, 0, 200),
     amps: num(x.amps, 0, 0, 1000),
-    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
+    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
+    ...syncFields(x)
   };
 }
 
@@ -152,7 +156,7 @@ export function setActiveCut(id: string) {
 export function addCut(data: Partial<PlasmaCut>): PlasmaCut {
   const used = new Set(cuts.map(c => c.color));
   const color = data.color || LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[cuts.length % LAYER_COLORS.length];
-  const c = sanitize({ ...data, color, id: newCutId() });
+  const c = stamp(sanitize({ ...data, color, id: newCutId() }));
   cuts.push(c);
   changed();
   return c;
@@ -161,15 +165,16 @@ export function addCut(data: Partial<PlasmaCut>): PlasmaCut {
 export function updateCut(id: string, data: Partial<PlasmaCut>) {
   const i = cuts.findIndex(c => c.id === id);
   if (i < 0) return;
-  cuts[i] = sanitize({ ...cuts[i], ...data, id });
+  cuts[i] = stamp(sanitize({ ...cuts[i], ...data, id }));
   if (activeCut && activeCut.id === id) activeCut = cuts[i];
   changed();
 }
 
 export function removeCut(id: string) {
-  if (cuts.length <= 1) return;
+  if (cuts.length <= 1 || !getCut(id)) return;
   cuts = cuts.filter(c => c.id !== id);
   if (!activeCut || activeCut.id === id) activeCut = cuts[0];
+  noteRemoved("plasma", [id]);
   changed();
 }
 
@@ -178,6 +183,7 @@ export function moveCut(id: string, dir: -1 | 1) {
   const j = i + dir;
   if (i < 0 || j < 0 || j >= cuts.length) return;
   [cuts[i], cuts[j]] = [cuts[j], cuts[i]];
+  noteOrder("plasma");
   changed();
 }
 
@@ -187,8 +193,9 @@ export function duplicateCut(id: string): PlasmaCut | null {
   if (!src) return null;
   const used = new Set(cuts.map(c => c.color));
   const color = LAYER_COLORS.find(c => !used.has(c)) || src.color;
-  const copy = sanitize({ ...src, id: newCutId(), color, name: t("lib.copyName", { name: src.name }) });
+  const copy = stamp(sanitize({ ...src, id: newCutId(), color, name: t("lib.copyName", { name: src.name }) }));
   cuts.splice(cuts.indexOf(src) + 1, 0, copy);
+  noteOrder("plasma");
   changed();
   return copy;
 }
@@ -204,7 +211,10 @@ export function importPlasmaLibrary(data: any, replace: boolean): number {
   if (!list.length) return 0;
   if (!replace) return mergeProjectCuts(list, []);
   const seen = new Set<string>();
-  cuts = list.map(c => { const id = seen.has(c.id) ? newCutId() : c.id; seen.add(id); return { ...c, id }; });
+  const before = cuts.map(c => c.id);
+  cuts = list.map(c => { const id = seen.has(c.id) ? newCutId() : c.id; seen.add(id); return stamp({ ...c, id }); });
+  noteRemoved("plasma", before.filter(id => !seen.has(id)));
+  noteOrder("plasma");
   activeCut = cuts.find(c => c.id === data?.active) || cuts[0];
   if (data?.settings && typeof data.settings === "object") setPlasmaSettings(data.settings, false);
   changed();
@@ -235,13 +245,27 @@ export function mergeProjectCuts(list: any, shapes: any[]): number {
     if (same) newId = same.id;
     else {
       if (getCut(c.id)) newId = newCutId();
-      cuts.push({ ...c, id: newId });
+      cuts.push(stamp({ ...c, id: newId }));
       added++;
     }
     if (newId !== c.id) shapes.forEach(s => { if (s.plasmaCutId === c.id) s.plasmaCutId = newId; });
   }
   if (added) changed();
   return added;
+}
+
+/**
+ * Werkstatt-Sync (libSync.ts): gemeinsamen Stand übernehmen. entries = lebende Einträge aus dem
+ * Abgleich (werden hier mit sanitize geprüft), order = IDs in der gemeinsamen Reihenfolge.
+ * false = nichts übernommen (leere Liste – mindestens ein Eintrag muss bleiben).
+ */
+export function applySyncedCuts(entries: any[], order: string[]): boolean {
+  const list = sortByOrder(sanitizeList(entries), order);
+  if (!list.length) return false;
+  cuts = list;
+  activeCut = getCut(activeCut?.id) || cuts[0];
+  changed();
+  return true;
 }
 
 export function cutsUsedBy(shapes: any[]): PlasmaCut[] {

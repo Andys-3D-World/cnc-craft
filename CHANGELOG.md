@@ -3,6 +3,20 @@
 ## Next version (unreleased)
 
 **New**
+- **Workshop sync: keep the libraries the same on two computers:** new button *🔄 Workshop sync* in the backup bar
+  of the *Tools / Laser library / Plasma library* tab. Choose the same shared folder on both computers (NAS or network
+  drive, Dropbox, USB stick) and CNC Craft keeps milling tools, laser layers and plasma cuts in sync through one file
+  per library in `cnc-craft-sync/` – no network discovery and no open port. Every entry now carries a change time and
+  the computer that changed it: the newer change wins per entry, deleted entries stay deleted (tombstones, cleaned up
+  after 90 days), the list order is synced too, and old entries with the same ID but different content on both
+  computers are both kept (one as a copy). Automatic sync when the window gets focus, shortly after a change and every
+  minute (can be switched off), or *Sync now*. The files are written safely (temporary file + rename) with a lock
+  against both computers writing at once; a damaged file in the folder is moved aside and ignored, and everything read
+  from the folder goes through the libraries' normal checks. Before the first sync and before every sync that changes
+  something locally a backup is written to `backups/library-sync-….json` in the app data folder (library backup
+  format, last 20 kept). The console shows a short summary ("Milling tools: 3 changed, 1 new"). Machine settings
+  (laser/plasma settings, spindle limits) and the default entry are not synced; the laser material presets are
+  built in and need no sync, and box/nesting have no saved templates yet.
 - **Smart workshop: switch the dust extractor, compressor … with the job:** new section *Workshop* in the *Machine*
   tab. Add devices on smart plugs (templates for Shelly Gen 1, Shelly Plus/Pro, Tasmota via HTTP or MQTT, Home
   Assistant webhook, or any HTTP/MQTT device): HTTP GET/POST/PUT with an optional body and bearer token, or an MQTT

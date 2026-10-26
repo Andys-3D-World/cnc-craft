@@ -18,6 +18,7 @@
  */
 import { t } from "./i18n/i18n";
 import { ToolType, Helix, ToolGeom } from "./toolGraphics";
+import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 
 export type { ToolType, Helix } from "./toolGraphics";
 export type ToolMat = "carbide" | "hss";
@@ -32,6 +33,8 @@ export interface MillingTool extends ToolGeom {
   rampAngle?: number;  // Eintauchwinkel in ° (Rampe/Schraube), 0 = senkrecht eintauchen
   toolMat: ToolMat;    // Schneidstoff: Hartmetall oder HSS
   notes: string;       // Notiz (Bezugsquelle, Material, …)
+  updated?: number;    // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
+  device?: string;     // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
 export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "facemill"];
@@ -199,7 +202,8 @@ export function sanitize(x: any): MillingTool {
     plungeFeed: num(x.plungeFeed, DEFAULT_PLUNGE),
     rampAngle: Math.min(45, num0(x.rampAngle, 0)),
     toolMat: x.toolMat === "hss" ? "hss" : "carbide",
-    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : ""
+    notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
+    ...syncFields(x)
   };
 }
 
@@ -241,7 +245,7 @@ export function setActiveTool(id: string) {
 }
 
 export function addTool(data: Partial<MillingTool>): MillingTool {
-  const tool = sanitize({ ...data, id: newToolId() });
+  const tool = stamp(sanitize({ ...data, id: newToolId() }));
   tools.push(tool);
   changed();
   return tool;
@@ -250,15 +254,17 @@ export function addTool(data: Partial<MillingTool>): MillingTool {
 export function updateTool(id: string, data: Partial<MillingTool>) {
   const i = tools.findIndex(x => x.id === id);
   if (i < 0) return;
-  tools[i] = sanitize({ ...tools[i], ...data, id });
+  tools[i] = stamp(sanitize({ ...tools[i], ...data, id }));
   if (activeTool && activeTool.id === id) activeTool = tools[i];
   changed();
 }
 
 export function removeTool(id: string) {
   if (tools.length <= 1) return; // mindestens ein Werkzeug muss bleiben
+  if (!getTool(id)) return;
   tools = tools.filter(x => x.id !== id);
   if (!activeTool || activeTool.id === id) activeTool = tools[0];
+  noteRemoved("tools", [id]);
   changed();
 }
 
@@ -276,7 +282,7 @@ export function mergeProjectTools(list: any, shapes: any[]): number {
     if (same) newId = same.id;
     else {
       if (getTool(tool.id)) newId = newToolId();
-      tools.push({ ...tool, id: newId });
+      tools.push(stamp({ ...tool, id: newId }));
       added++;
     }
     if (newId !== tool.id) shapes.forEach(s => { if (s.toolId === tool.id) s.toolId = newId; });
@@ -301,8 +307,9 @@ function sameTool(a: MillingTool, b: MillingTool) {
 export function duplicateTool(id: string): MillingTool | null {
   const src = getTool(id);
   if (!src) return null;
-  const copy = sanitize({ ...src, id: newToolId(), name: t("lib.copyName", { name: src.name }) });
+  const copy = stamp(sanitize({ ...src, id: newToolId(), name: t("lib.copyName", { name: src.name }) }));
   tools.splice(tools.indexOf(src) + 1, 0, copy);
+  noteOrder("tools");
   changed();
   return copy;
 }
@@ -312,6 +319,7 @@ export function moveTool(id: string, dir: -1 | 1) {
   const i = tools.findIndex(x => x.id === id), j = i + dir;
   if (i < 0 || j < 0 || j >= tools.length) return;
   [tools[i], tools[j]] = [tools[j], tools[i]];
+  noteOrder("tools");
   changed();
 }
 
@@ -377,7 +385,10 @@ export function importToolLibrary(data: any, replace: boolean): number {
   if (!replace) return mergeProjectTools(list, []);
   // doppelte IDs in der Datei abfangen
   const seen = new Set<string>();
-  tools = list.map(x => { const id = seen.has(x.id) ? newToolId() : x.id; seen.add(id); return { ...x, id }; });
+  const before = tools.map(x => x.id);
+  tools = list.map(x => { const id = seen.has(x.id) ? newToolId() : x.id; seen.add(id); return stamp({ ...x, id }); });
+  noteRemoved("tools", before.filter(id => !seen.has(id)));
+  noteOrder("tools");
   activeTool = tools.find(x => x.id === data?.active) || tools[0];
   if (data?.settings && typeof data.settings === "object") {
     const s = data.settings;
@@ -385,6 +396,20 @@ export function importToolLibrary(data: any, replace: boolean): number {
   }
   changed();
   return tools.length;
+}
+
+/**
+ * Werkstatt-Sync (libSync.ts): gemeinsamen Stand übernehmen. entries = lebende Einträge aus dem
+ * Abgleich (werden hier mit sanitize geprüft), order = IDs in der gemeinsamen Reihenfolge.
+ * false = nichts übernommen (leere Liste – mindestens ein Eintrag muss bleiben).
+ */
+export function applySyncedTools(entries: any[], order: string[]): boolean {
+  const list = sortByOrder(sanitizeList(entries), order);
+  if (!list.length) return false;
+  tools = list;
+  activeTool = getTool(activeTool?.id) || tools[0];
+  changed();
+  return true;
 }
 
 // Bearbeiten-Dialog, Seite "Werkzeuge" und Schnittdaten-Rechner-Bedienung: ui/toolEditor.ts

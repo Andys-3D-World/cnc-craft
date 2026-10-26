@@ -55,6 +55,7 @@ import { initImports, importBytes } from "./importers/importManager";
 import { initLanguageMenu } from "./ui/languageMenu";
 import { renderToolTable, initToolPage } from "./ui/toolEditor";
 import { initLibraryTab } from "./ui/libraryTab";
+import { initLibSync } from "./libSync";
 import { initCamera } from "./camera/camera";
 import { restoreSettings, startSettingsMirror } from "./settingsStore";
 import type { ToolName } from "./editor/editorState";
@@ -233,6 +234,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLaserPanel(redraw);
     initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
     initPlasmaPanel(redraw);
+    initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
     initMachineWizard(redraw, appendToConsole);
     initJobTools(appendToConsole);      // Rahmen abfahren, .rd speichern
