@@ -3394,5 +3394,8 @@
   "ws.err.no-answer": "keine Antwort vom Gerät",
   "ws.err.bad-topic": "ungültiges Thema (kein + oder #)",
   "ws.err.mqtt-login-refused": "Broker hat die Anmeldung abgelehnt (Benutzer/Passwort)",
-  "ws.err.mqtt-bad-answer": "unter dieser Adresse antwortet kein MQTT-Broker"
+  "ws.err.mqtt-bad-answer": "unter dieser Adresse antwortet kein MQTT-Broker",
+  "cam.avoidCut": "Ausgeschnittene Teile umfahren",
+  "cam.avoidCutTip": "Leerfahrten (G0) fahren um schon ausgeschnittene Teile und Löcher herum (Rahmen + Abstand), statt gerade darüber – gekippte oder hochstehende Teile können sonst den Kopf treffen. Ist nichts im Weg, bleibt die Fahrt gerade",
+  "gc.avoid": "Umweg um ausgeschnittenes Teil"
 }

@@ -59,6 +59,7 @@ export function laserSettingsHtml(): string {
       <div class="menu-body rp-box">
         <div class="prop-row" ${tip("laser.sMaxTip")}>${T("laser.sMax")}<input type="number" id="laser-smax" min="1" step="1" class="prop-input"></div>
         <label class="prop-row" style="cursor:pointer;" ${tip("laser.dynamicTip")}><span>${T("laser.dynamic")}</span><input type="checkbox" id="laser-dynamic" style="width:auto;"></label>
+        <label class="prop-row" style="cursor:pointer;" ${tip("cam.avoidCutTip")}><span>${T("cam.avoidCut")}</span><input type="checkbox" id="laser-avoid" style="width:auto;"></label>
         <div class="tool-scope">${T("laser.grblHint")}</div>
       </div>
     </div>`;
@@ -122,6 +123,7 @@ export function initLaserPanel(redraw: () => void) {
   // ---- Laser-Einstellungen ----
   const smax = document.getElementById("laser-smax") as HTMLInputElement | null;
   const dyn = document.getElementById("laser-dynamic") as HTMLInputElement | null;
+  const avoid = document.getElementById("laser-avoid") as HTMLInputElement | null;
   if (smax) {
     smax.value = String(laserSettings.sMax);
     smax.addEventListener("change", () => { setLaserSettings({ sMax: parseFloat(smax.value) }); smax.value = String(laserSettings.sMax); });
@@ -130,11 +132,16 @@ export function initLaserPanel(redraw: () => void) {
     dyn.checked = laserSettings.dynamic;
     dyn.addEventListener("change", () => setLaserSettings({ dynamic: dyn.checked }));
   }
+  if (avoid) {
+    avoid.checked = laserSettings.avoidCut;
+    avoid.addEventListener("change", () => setLaserSettings({ avoidCut: avoid.checked }));
+  }
 
   // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
   const syncFields = () => {
     if (smax && document.activeElement !== smax) smax.value = String(laserSettings.sMax);
     if (dyn) dyn.checked = laserSettings.dynamic;
+    if (avoid) avoid.checked = laserSettings.avoidCut;
   };
   window.addEventListener(LAYERS_CHANGED, () => { syncFields(); refreshLaserPanel(true); });
   window.addEventListener("cnc-language-changed", () => refreshLaserPanel(true));

@@ -49,6 +49,7 @@ export function plasmaSettingsHtml(): string {
         <label class="prop-row" style="cursor:pointer;" ${tip("plasma.probeTip")}><span>${T("plasma.probe")}</span><input type="checkbox" id="plasma-probe" style="width:auto;"></label>
         <div class="prop-row" ${tip("plasma.probeOffsetTip")}>${T("plasma.probeOffset")}<input type="number" id="plasma-probe-offset" step="0.1" class="prop-input"></div>
         <div class="prop-row" ${tip("plasma.overcutTip")}>${T("plasma.overcut")}<input type="number" id="plasma-overcut" min="0" step="0.5" class="prop-input"></div>
+        <label class="prop-row" style="cursor:pointer;" ${tip("cam.avoidCutTip")}><span>${T("cam.avoidCut")}</span><input type="checkbox" id="plasma-avoid" style="width:auto;"></label>
         <div class="tool-scope">${T("plasma.hint")}</div>
       </div>
     </div>
@@ -131,7 +132,7 @@ export function initPlasmaPanel(redraw: () => void) {
     el.value = String(plasmaSettings[key]);
     el.addEventListener("change", () => { setPlasmaSettings({ [key]: parseFloat(el.value) }); el.value = String(plasmaSettings[key]); });
   };
-  const bindCheck = (id: string, key: "useZ" | "probe") => {
+  const bindCheck = (id: string, key: "useZ" | "probe" | "avoidCut") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.checked = plasmaSettings[key];
@@ -149,6 +150,7 @@ export function initPlasmaPanel(redraw: () => void) {
   bindNum("plasma-overcut", "overcut");
   bindCheck("plasma-usez", "useZ");
   bindCheck("plasma-probe", "probe");
+  bindCheck("plasma-avoid", "avoidCut");
   bindNum("plasma-antidive", "antiDive");
   bindNum("plasma-smallhole", "smallHole");
   bindNum("plasma-holespeed", "holeSpeed");
@@ -176,6 +178,8 @@ export function initPlasmaPanel(redraw: () => void) {
     const pr = document.getElementById("plasma-probe") as HTMLInputElement | null;
     if (uz) uz.checked = plasmaSettings.useZ;
     if (pr) pr.checked = plasmaSettings.probe;
+    const av = document.getElementById("plasma-avoid") as HTMLInputElement | null;
+    if (av) av.checked = plasmaSettings.avoidCut;
     syncEnabled();
     syncThc();
   };

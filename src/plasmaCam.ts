@@ -28,9 +28,11 @@ import { offsetPolygon, polygonArea, pointInPoly } from "./polyOffset";
 import { getCuts, cutForShape, plasmaSettings, PlasmaCut } from "./plasmaCuts";
 import { t, ascii } from "./i18n/i18n";
 import { tabRuns } from "./tabs";
+import { RapidPlanner } from "./rapidAvoid";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
+const AVOID_MARGIN = 5; // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
 
 export interface PlasmaPlan {
   pts: Pt[];          // Kontur in Schneid-Richtung, beginnt am Startpunkt (mm)
@@ -274,6 +276,14 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   g += `${c("pgc.header", { n: order.length })}\n`;
   if (S.useZ) g += `G0 Z${n(S.safeZ)} ${c("gc.safeZ")}\n`;
   let pierces = 0, smallHoles = 0;
+  // Leerfahrten um schon ausgeschnittene Teile herum (sie können kippen)
+  const avoid = S.avoidCut ? new RapidPlanner(AVOID_MARGIN) : null;
+  let pos: Pt | null = null;
+  const rapid = (to: Pt, note = "") => {
+    if (avoid && pos) for (const v of avoid.route(pos, to)) g += `G0 X${n(v.x)} Y${n(v.y)} ${c("gc.avoid")}\n`;
+    g += `G0 X${n(to.x)} Y${n(to.y)}${note}\n`;
+    pos = to;
+  };
 
   order.forEach((cut, ci) => {
     g += `\n${c("pgc.cut", { i: ci + 1, name: cut.name, f: cut.speed, k: cut.kerf })}\n`;
@@ -306,7 +316,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
         const start = pc.start;
         pierces++;
         g += `${c("pgc.pierce", { n: pierces })}${small ? " " + c("pgc.smallHole", { d: n(p.size), p: S.holeSpeed }) : ""}${k > 0 ? " " + c("gc.tab") : ""}\n`;
-        g += `G0 X${n(start.x)} Y${n(start.y)}\n`;
+        rapid(start);
         if (S.useZ) {
           if (S.probe) {
             g += `G38.2 Z${n(-(S.safeZ + 50))} F${PROBE_FEED} ${c("pgc.probe")}\n`;
@@ -330,7 +340,10 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
         g += `M5 ${c("pgc.torchOff")}\n`;
         if (thc && sp.at < 0) g += `${thcOff}\n`;
         if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
+        pos = sp.pts[sp.pts.length - 1] || start;
       });
+      // ganz ausgeschnitten (ohne Haltestege) -> kann kippen, ab jetzt umfahren
+      if (avoid && p.closed && !p.runs) avoid.addCut(p.pts);
     }
   });
 
@@ -340,7 +353,8 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
   // Verschiebung durchs Abtasten (G92) wieder aufheben – sonst stimmt Z beim nächsten Job nicht
   if (S.useZ && S.probe) g += `G92.1 ${c("pgc.probeClear")}\n`;
-  g += `G0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
+  rapid({ x: 0, y: 0 }, " " + c("gc.park"));
+  g += `M30 ${c("gc.end")}\n`;
   return { gcode: g, warnings };
 }
 

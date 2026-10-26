@@ -23,6 +23,15 @@
   active height map.
 - **Click a toolpath to find its G-code line:** clicking a path in the simulation view jumps to the matching line in
   the G-code list and highlights it; clicking a line highlights its path in yellow.
+- **Plasma and laser: rapids go around parts that are already cut (tip-up / collision avoidance):** cut-out parts
+  and hole slugs can tip up. When a rapid move (G0) between two cuts – or the final move to the park position – would
+  cross a closed contour that has already been cut in this job, it now goes around that contour's bounding box with a
+  margin (plasma 5 mm, laser 3 mm), via the shortest way past all cut pieces. If nothing is in the way, the move stays
+  straight as before; start and end points never change. Contours with holding tabs stay in place and are not avoided.
+  Detour lines are marked with a comment in the G-code and show up in the simulation. New setting *Avoid cut-out
+  parts*: on by default for plasma (*Plasma settings*), off by default for laser (*Laser settings*, line cuts only).
+  Written in TypeScript (`rapidAvoid.ts`) because the plasma and laser CAM run entirely in TypeScript; tests run with
+  the new `npm test` (`node --test`).
 
 **Improved**
 - **Tool change: choose how far Z lifts – also in “Manual” mode:** new setting *Lift Z at the change* (section

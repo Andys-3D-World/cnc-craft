@@ -3219,5 +3219,8 @@
   "ws.err.no-answer": "el aparato no responde",
   "ws.err.bad-topic": "tema no válido (sin + ni #)",
   "ws.err.mqtt-login-refused": "el broker rechazó el inicio de sesión (usuario/contraseña)",
-  "ws.err.mqtt-bad-answer": "no hay ningún broker MQTT en esta dirección"
+  "ws.err.mqtt-bad-answer": "no hay ningún broker MQTT en esta dirección",
+  "cam.avoidCut": "Esquivar piezas cortadas",
+  "cam.avoidCutTip": "Los movimientos rápidos (G0) rodean las piezas y agujeros ya cortados (marco + margen) en vez de pasar por encima – una pieza levantada podría golpear el cabezal. Si nada estorba, el movimiento sigue recto",
+  "gc.avoid": "rodeo alrededor de pieza cortada"
 }

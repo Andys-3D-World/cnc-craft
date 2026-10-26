@@ -3219,5 +3219,8 @@
   "ws.err.no-answer": "brak odpowiedzi urządzenia",
   "ws.err.bad-topic": "nieprawidłowy temat (bez + i #)",
   "ws.err.mqtt-login-refused": "broker odrzucił logowanie (użytkownik/hasło)",
-  "ws.err.mqtt-bad-answer": "pod tym adresem nie ma brokera MQTT"
+  "ws.err.mqtt-bad-answer": "pod tym adresem nie ma brokera MQTT",
+  "cam.avoidCut": "Omijaj wycięte detale",
+  "cam.avoidCutTip": "Ruchy szybkie (G0) omijają już wycięte detale i otwory (ramka + odstęp) zamiast jechać nad nimi – uniesiony detal mógłby uderzyć w głowicę. Gdy nic nie przeszkadza, ruch pozostaje prosty",
+  "gc.avoid": "objazd wycietego detalu"
 }

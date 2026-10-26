@@ -3219,5 +3219,8 @@
   "ws.err.no-answer": "pas de réponse de l’appareil",
   "ws.err.bad-topic": "sujet invalide (pas de + ni de #)",
   "ws.err.mqtt-login-refused": "le broker a refusé la connexion (utilisateur/mot de passe)",
-  "ws.err.mqtt-bad-answer": "aucun broker MQTT à cette adresse"
+  "ws.err.mqtt-bad-answer": "aucun broker MQTT à cette adresse",
+  "cam.avoidCut": "Contourner les pièces découpées",
+  "cam.avoidCutTip": "Les déplacements rapides (G0) contournent les pièces et trous déjà découpés (cadre + marge) au lieu de passer dessus – une pièce basculée pourrait sinon heurter la tête. Si rien ne gêne, le trajet reste droit",
+  "gc.avoid": "detour autour d'une piece decoupee"
 }

@@ -16,6 +16,7 @@ import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
 import { tabRuns } from "./tabs";
+import { RapidPlanner } from "./rapidAvoid";
 import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
@@ -23,6 +24,7 @@ import { t, ascii } from "./i18n/i18n";
 import { imageGcode } from "./raster/imageShape";
 
 const MAX_SCANLINES = 40000; // Schutz vor riesigen Dateien
+const AVOID_MARGIN = 3;      // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
 
 export function generateLaserGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
   const warnings: string[] = [];
@@ -51,6 +53,15 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   g += `${c("lgc.header", { n: order.length, s: laserSettings.sMax })}\n`;
   g += `${laserSettings.dynamic ? "M4" : "M3"} S0 ${c(laserSettings.dynamic ? "lgc.m4" : "lgc.m3")}\n`;
 
+  // Leerfahrten (Linien-Modus) um schon ausgeschnittene Teile herum (sie können kippen)
+  const avoid = laserSettings.avoidCut ? new RapidPlanner(AVOID_MARGIN) : null;
+  let pos: Pt | null = null;
+  const rapid = (to: Pt, note = "") => {
+    if (avoid && pos) for (const v of avoid.route(pos, to)) g += `G0 X${n(v.x)} Y${n(v.y)} S0 ${c("gc.avoid")}\n`;
+    g += `G0 X${n(to.x)} Y${n(to.y)} S0${note}\n`;
+    pos = to;
+  };
+
   order.forEach((layer, li) => {
     const list = byLayer.get(layer.id)!;
     // „Füllen + Linie“: Fläche und Linie haben eigene Leistung/Geschwindigkeit (z. B. leicht gravieren, kräftig schneiden)
@@ -73,6 +84,7 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
         if (both) g += `F${n(fillF)}\n`;
         g += r.g;
       }
+      pos = null; // Position nach dem Bild unbekannt -> nächste Leerfahrt gerade
       if (both) g += `F${n(layer.speed)}\n`;
     }
 
@@ -103,6 +115,8 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
             g += `G0 X${n(sg[0])} Y${n(sg[1])} S0\n`;
             g += `G1 X${n(sg[2])} Y${n(sg[3])} S${fillS}\n`;
           }
+          const last = res.segs[res.segs.length - 1];
+          if (last) pos = { x: last[2], y: last[3] };
         }
       }
     }
@@ -128,34 +142,40 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
             // mit Haltestegen: jedes Stück schneiden, über den Steg mit Laser aus springen
             p.runs.forEach((run, ri) => {
               if (ri === 0 && p.lead) {
-                g += `G0 X${n(p.lead.x)} Y${n(p.lead.y)} S0 ${c("lgc.leadIn")}\n`;
+                rapid(p.lead, " " + c("lgc.leadIn"));
                 g += `G1 X${n(run[0].x)} Y${n(run[0].y)} S${S}\n`;
               } else {
-                g += `G0 X${n(run[0].x)} Y${n(run[0].y)} S0${ri > 0 ? " " + c("gc.tab") : ""}\n`;
+                rapid(run[0], ri > 0 ? " " + c("gc.tab") : "");
               }
               g += `G1 X${n(run[1].x)} Y${n(run[1].y)} S${S}\n`;
               for (let i = 2; i < run.length; i++) g += `G1 X${n(run[i].x)} Y${n(run[i].y)}\n`;
+              pos = run[run.length - 1];
             });
             continue;
           }
           const pts = p.pts;
           // Freischnitt: im Abfall einstechen und zur Kontur fahren
           if (p.lead) {
-            g += `G0 X${n(p.lead.x)} Y${n(p.lead.y)} S0 ${c("lgc.leadIn")}\n`;
+            rapid(p.lead, " " + c("lgc.leadIn"));
             g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)} S${S}\n`;
           } else {
-            g += `G0 X${n(pts[0].x)} Y${n(pts[0].y)} S0\n`;
+            rapid(pts[0]);
           }
           g += `G1 X${n(pts[1].x)} Y${n(pts[1].y)} S${S}\n`;
           for (let i = 2; i < pts.length; i++) g += `G1 X${n(pts[i].x)} Y${n(pts[i].y)}\n`;
           if (p.closed) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)}\n`;
+          pos = p.closed ? pts[0] : pts[pts.length - 1];
+          // ganz ausgeschnitten (ohne Haltestege) -> kann kippen, ab jetzt umfahren (einmal reicht)
+          if (avoid && p.closed && pass === 0) avoid.addCut(pts);
         }
       }
     }
     if (layer.air) g += `M9 ${c("lgc.airOff")}\n`;
   });
 
-  g += `\nS0\nM5 ${c("lgc.laserOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
+  g += `\nS0\nM5 ${c("lgc.laserOff")}\n`;
+  rapid({ x: 0, y: 0 }, " " + c("gc.park"));
+  g += `M30 ${c("gc.end")}\n`;
   return { gcode: g, warnings };
 }
 
