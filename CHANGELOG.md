@@ -3,6 +3,16 @@
 ## Next version (unreleased)
 
 **New**
+- **Smart workshop: switch the dust extractor, compressor … with the job:** new section *Workshop* in the *Machine*
+  tab. Add devices on smart plugs (templates for Shelly Gen 1, Shelly Plus/Pro, Tasmota via HTTP or MQTT, Home
+  Assistant webhook, or any HTTP/MQTT device): HTTP GET/POST/PUT with an optional body and bearer token, or an MQTT
+  message (broker, port, optional user/password, topic, on/off payload). When a job starts on any machine (GRBL,
+  Marlin, Ruida, K40) every enabled device is switched on; when the job ends (done, stopped, aborted or disconnected)
+  and no other machine is still running a job, each device is switched off after its own run-on time (e.g. 30 s). A
+  new job during the run-on time keeps the devices on. The requests run in their own threads with short timeouts in
+  the Rust part (`workshop.rs`, no new dependencies) – a device that does not answer never affects the job, the result
+  is only shown in the console (without addresses, passwords or tokens). *Test on/Test off* buttons per device. Only
+  plain `http://` and MQTT without TLS (devices in the local network).
 - **G-code editor in the Simulation tab:** click *Edit* above the G-code list to change lines (double-click or
   Enter), delete them (Del) or insert new ones after the selected line (empty line, `M0` pause, `F` feed rate, `G4 P1`
   wait), with undo/redo (Ctrl+Z / Ctrl+Shift+Z). The 3D view is re-read and redrawn after every change; *Apply* makes

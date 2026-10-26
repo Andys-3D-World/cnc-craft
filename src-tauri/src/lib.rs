@@ -11,11 +11,12 @@
 //!   elfimg.rs  – .elf-Programme in flashbare ESP-Abbilder umwandeln (wie esptool elf2image)
 //!   flash.rs   – Firmware flashen: ESP32/ESP32-S3 (MKS DLC32 …) und Arduino (GRBL) – ohne Zusatzprogramm
 //!   fonts.rs   – Systemschriften für das Text-Werkzeug auflisten und laden
+//!   workshop.rs – Werkstatt-Geräte (Absaugung, Kompressor …) per HTTP/MQTT mit dem Job schalten
 //!
 //! Die Oberfläche ruft die Befehle unten per invoke(...) auf und bekommt Ereignisse:
 //!   machine-welcome, machine-status, machine-line, machine-alarm, machine-disconnected,
 //!   machine-job-progress, machine-job-error, machine-job-toolchange, machine-job-done,
-//!   flash-progress
+//!   flash-progress, workshop-action
 //! GRBL und Ruida melden dieselben Ereignisse – die Oberfläche muss kaum unterscheiden.
 
 mod cam3d;
@@ -34,6 +35,7 @@ mod serial;
 mod store;
 mod update;
 mod usb_k40;
+mod workshop;
 
 use machine::{Emit, Machine};
 use k40::{K40Options, K40};
@@ -134,7 +136,10 @@ fn close_slots(taken: Vec<Slot>) {
         if s.conn.is_alive() { wait = wait.max(s.conn.stop_for_close()); }
     }
     if !wait.is_zero() { std::thread::sleep(wait); }
-    for s in taken { s.conn.shutdown(); }
+    for s in taken {
+        s.conn.shutdown();
+        workshop::job_ended(&s.id); // Werkstatt-Geräte: Nachlauf starten (falls ein Job lief)
+    }
 }
 
 fn close_id(id: &str) {
@@ -199,6 +204,8 @@ fn emitter(app: &AppHandle, id: &str) -> Emit {
     let app2 = app.clone();
     let id = id.to_string();
     Arc::new(move |name: &str, json: String| {
+        // Job zu Ende (fertig/abgebrochen) oder Verbindung weg: Werkstatt-Geräte nach dem Nachlauf aus
+        if name == "machine-job-done" || name == "machine-disconnected" { workshop::job_ended(&id); }
         let mut value: serde_json::Value = serde_json::from_str(&json).unwrap_or(serde_json::Value::Null);
         if let serde_json::Value::Object(map) = &mut value {
             map.insert("conn".into(), serde_json::Value::String(id.clone()));
@@ -404,7 +411,22 @@ async fn machine_realtime(code: u8) -> Result<(), String> {
 
 #[tauri::command]
 async fn machine_job_start(lines: Vec<String>) -> Result<usize, String> {
-    current()?.start_job(lines)
+    let id = active_id();
+    let n = current()?.start_job(lines)?;
+    workshop::job_started(&id); // Werkstatt-Geräte ein (eigene Threads, blockiert den Job nicht)
+    Ok(n)
+}
+
+/// Werkstatt-Geräte aus den Einstellungen übernehmen
+#[tauri::command]
+async fn workshop_set_devices(devices: Vec<workshop::Device>) {
+    if let Some(w) = workshop::global() { w.set_devices(devices); }
+}
+
+/// „Test Ein/Aus“ für ein Gerät (auch nicht aktivierte)
+#[tauri::command]
+async fn workshop_test(device: workshop::Device, on: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || workshop::send_real(&device, on)).await.map_err(|e| e.to_string())?
 }
 
 /// Laufenden Job ändern (nur noch nicht gesendete Zeilen, siehe Machine::patch_job)
@@ -739,6 +761,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .setup(|app| {
+            // Werkstatt: Ergebnisse als Ereignis an die Oberfläche (Konsole) – ohne Adressen/Passwörter
+            let handle = app.handle().clone();
+            workshop::init(Arc::new(move |d: &workshop::Device, on: bool, why: &str, err: Option<String>| {
+                let _ = handle.emit("workshop-action", serde_json::json!({ "id": d.id, "name": d.name, "on": on, "why": why, "error": err }));
+            }));
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             list_ports,
             machine_connect,
@@ -777,6 +807,8 @@ pub fn run() {
             cam3d_load,
             cam3d_compute,
             cam3d_cancel,
+            workshop_set_devices,
+            workshop_test,
             update::update_install,
             update::update_restart
         ])

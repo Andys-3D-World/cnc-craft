@@ -20,6 +20,7 @@ import { machineLineHtml } from "./machineWizard";
 import { spindlePanelHtml } from "./spindlePanel";
 import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
+import { workshopPanelHtml } from "./workshopPanel";
 import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
 
@@ -266,6 +267,8 @@ export function renderRightPanel(container: HTMLElement) {
         ${spindlePanelHtml()}
 
         ${probePanelHtml()}
+
+        ${workshopPanelHtml()}
 
       </div>
     </div>

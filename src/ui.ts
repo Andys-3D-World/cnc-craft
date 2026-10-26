@@ -6,7 +6,7 @@
  */
 const KEY = "cnc_craft_sections";
 /** zu Beginn zugeklappt, bis man sie einmal öffnet */
-const START_CLOSED = new Set(["rp.origin", "rp.workArea", "rot.title", "stock.title", "pr.title"]);
+const START_CLOSED = new Set(["rp.origin", "rp.workArea", "rot.title", "stock.title", "pr.title", "ws.title"]);
 
 let state: Record<string, boolean> = {};   // true = offen
 try { state = JSON.parse(localStorage.getItem(KEY) || "{}") || {}; } catch { state = {}; }
