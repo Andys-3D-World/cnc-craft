@@ -11,7 +11,8 @@
  *                    Längenunterschied verschieben (G10 L20 P0, aktives Koordinatensystem) → zurück → Nutzer bestätigt → weiter
  *   Mobile Platte:   M5 → Z hoch → [Wechselposition] → Nutzer wechselt, legt Platte unter, Klemme dran, klickt „Antasten“
  *                    → antasten → Z = Plattendicke → hoch → „Platte entfernen“ bestätigen → zurück → bestätigen → weiter
- *   Von Hand:        nur Hinweis mit dem neuen Werkzeug, der Nutzer nullt selbst und klickt „Weiter“
+ *   Von Hand:        Z hoch (Einstellung tcLift) → Hinweis mit dem neuen Werkzeug, der Nutzer nullt selbst und
+ *                    klickt „Weiter“ → zurück wie unten → weiter
  *
  * Referenz (fester Sensor): Maschinen-Z beim Kontakt des Werkzeugs, das gerade in der Spindel steckt. Nach jedem
  * Wechsel ist das neue Werkzeug die Referenz. Gelöscht bei Alarm, Reset, Trennen und Job-Ende.
@@ -139,12 +140,34 @@ function toolInfo(note: string, num: number | null): TcTool {
 const f3 = (v: number) => v.toFixed(3);
 const feed = () => Math.max(100, Math.min(10000, s.tcFeed || 1500));
 
+/**
+ * Zielhöhe beim Anheben (Maschinen-Z).
+ * „Ganz nach oben“ geht nur mit Referenzfahrt nach oben ($22 an, Z nicht umgekehrt in $23): dann liegt die
+ * Endschalter-Stelle bei Maschinen-Z 0 und die Referenzfahrt endet um den Abzug ($27) darunter – genau dorthin
+ * (höher würde den Endschalter auslösen). Ohne Referenzfahrt: Höhe über dem Werkstück-Nullpunkt (tcWorkZ).
+ * Mit Referenzfahrt wird jede Höhe auf diese oberste Stelle begrenzt.
+ */
+let noTopLogged = false;
+async function liftZ(): Promise<number> {
+  // Einstellungen noch nicht gelesen ($$)? Dann jetzt – sonst wüssten wir nichts über die Referenzfahrt
+  if (!machine.settings.has("$22")) await sendAndWait("$$", 5000, true).catch(() => undefined);
+  const num = (k: string) => parseFloat(machine.settings.get(k) || "");
+  const homing = (num("$22") | 0) & 1, zDown = (num("$23") | 0) & 4;
+  const top = homing && !zDown ? -Math.max(1, Number.isFinite(num("$27")) ? num("$27") : 1) : null;
+  if (s.tcLift === 1 && top !== null) return top;
+  if (s.tcLift === 1 && !noTopLogged) { noTopLogged = true; log(t("tc.log.noTop", { z: s.tcWorkZ })); }
+  // Werkstück-Höhe -> Maschinen-Z (Versatz aus dem letzten Statusbericht)
+  const z = s.tcLift === 1 || s.tcLift === 3 ? s.tcWorkZ + (machine.status.mpos[2] - machine.status.wpos[2]) : s.tcSafe;
+  return top !== null ? Math.min(z, top) : z;
+}
+
 /** Z auf die sichere Höhe – nur nach oben, nie runter (ohne Referenzfahrt kann Maschinen-Z irgendwo liegen) */
 async function goSafe(): Promise<boolean> {
   await freshStatus();
-  if (machine.status.mpos[2] >= s.tcSafe - 0.01) return true;
-  log(t("tc.log.safe", { z: s.tcSafe }));
-  return await step(`$J=G53 G21 Z${f3(s.tcSafe)} F${feed()}`) && await settled();
+  const z = await liftZ();
+  if (machine.status.mpos[2] >= z - 0.01) return true;
+  log(t("tc.log.safe", { z: z.toFixed(2) }));
+  return await step(`$J=G53 G21 Z${f3(z)} F${feed()}`) && await settled();
 }
 async function moveXY(x: number, y: number): Promise<boolean> {
   await freshStatus();
@@ -198,32 +221,106 @@ function onJobToolChange(p: { note?: string; tool?: number | null; m6?: boolean 
   tc.tool = toolInfo(note, p?.tool ?? null);
   tc.note = note;
   tc.delta = null; tc.zSet = null; tc.spindle = "";
+  manualStart = null;
+  noTopLogged = false;
   const auto = machine.protocol === "grbl" && (s.tcMode === 1 || s.tcMode === 2);
-  if (!auto) { set(TcState.Manual); return; }
+  if (!auto) {
+    if (machine.protocol === "grbl" && s.tcLift !== 2) manualLift();
+    else set(TcState.Manual);
+    return;
+  }
   run(s.tcMode === 1 ? "sensor" : "plate");
+}
+
+/** Lage vor dem Wechsel (Maschinen-XY, Werkstück-Z) und Programm-Zustand ($G) */
+interface TcStart { x: number; y: number; wz: number; gc: string }
+/** Von Hand: hier stand die Maschine vor dem Anheben (null = nicht angehoben) */
+let manualStart: TcStart | null = null;
+
+async function readStart(): Promise<TcStart> {
+  // zwei frische Berichte, damit der Versatz sicher stimmt
+  await freshStatus(); await freshStatus();
+  const pos = { x: machine.status.mpos[0], y: machine.status.mpos[1], wz: machine.status.wpos[2] };
+  return { ...pos, gc: await parserState() };
+}
+
+/** Von Hand: erst Z hoch, dann den Hinweis zeigen. Geht das Anheben nicht, bleibt es beim Hinweis (wie früher). */
+async function manualLift() {
+  cancelled = false;
+  set(TcState.Parking);
+  startGuard();
+  try {
+    const st = await readStart();
+    must(await goSafe(), "safe");
+    manualStart = st;
+    stopGuard();
+    set(TcState.Manual);
+  } catch (e) {
+    stopGuard();
+    if (cancelled) return;
+    if (guard.tripped) { tcAbort(t("tc.why.guard"), true); return; }
+    log(t("tc.err.lift", { e: (e as Error).message || String(e) }));
+    set(TcState.Manual);
+  }
 }
 
 /** Von Hand: doch mit der Tastplatte messen (Knopf im Dialog) */
 export function tcManualPlate() {
   if (tc.state !== TcState.Manual || machine.protocol !== "grbl") return;
-  run("plate");
+  const st = manualStart;
+  manualStart = null;
+  run("plate", st);
 }
-/** Von Hand: Weiter (Nutzer hat selbst genullt) */
+/** Von Hand: Weiter (Nutzer hat selbst genullt) – war angehoben, erst zurück an die alte Stelle */
 export async function tcManualResume() {
   if (tc.state !== TcState.Manual) return;
+  const st = manualStart;
+  manualStart = null;
+  if (st && machine.protocol === "grbl") {
+    cancelled = false;
+    set(TcState.Returning);
+    startGuard();
+    try {
+      await returnTo(st);
+    } catch (e) {
+      if (!(e instanceof Cancel) && !cancelled) tcAbort(t("tc.err.step", { e: (e as Error).message || String(e) }), true);
+      else if (guard.tripped && (tc.state as TcState) !== TcState.Aborted) tcAbort(t("tc.why.guard"), true);
+      return;
+    } finally {
+      stopGuard();
+    }
+  }
   set(TcState.Idle);
   try { await jobResume(); } catch (e) { log(`${t("log.error")} ${e}`); }
 }
 
-async function run(mode: "sensor" | "plate") {
+/** Zurück: erst sicher hoch, dann XY, dann auf die alte Werkstück-Höhe (mit dem neuen Nullpunkt, nie höher als jetzt) */
+async function returnTo(start: TcStart) {
+  const gc = start.gc;
+  must(await goSafe(), "safe");
+  must(await moveXY(start.x, start.y), "back");
+  await freshStatus(); await freshStatus();
+  const wco = machine.status.mpos[2] - machine.status.wpos[2];
+  const target = Math.min(start.wz + wco, machine.status.mpos[2]);
+  // Stand der Fräser beim Wechsel IM Material (Wechsel ohne Hochfahren, z. B. fremde Datei mit M6), nicht wieder
+  // runter – ein dickerer Fräser stieße in die schmale Nut. Oben bleiben, das Programm fährt selbst runter.
+  // Ausnahme relative Maße (G91): da zählt die genaue Lage.
+  const g91 = /\bG91\b/.test(gc);
+  if (start.wz < 0 && !g91) log(t("tc.log.stayHigh", { z: start.wz.toFixed(2) }));
+  else if (target < machine.status.mpos[2] - 0.05) must(await step(`$J=G53 G21 Z${f3(target)} F${feed()}`) && await settled(), "z");
+  // Programm-Zustand wieder herstellen (die Antast-Routine endet mit G90, G10 brauchte G21)
+  if (g91) must(await step("G91"), "G91");
+  if (/\bG20\b/.test(gc)) must(await step("G20"), "G20");
+}
+
+async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
   cancelled = false;
   set(TcState.Parking);
   startGuard();
   try {
-    // Lage vor dem Wechsel (zwei frische Berichte, damit der Versatz sicher stimmt)
-    await freshStatus(); await freshStatus();
-    const start = { x: machine.status.mpos[0], y: machine.status.mpos[1], wz: machine.status.wpos[2] };
-    const gc = await parserState();
+    // Lage vor dem Wechsel (von Hand schon angehoben: die Lage von davor)
+    const start = from ?? await readStart();
+    const gc = start.gc;
     const sp = gc.match(/\b(M[34])\b/), sv = gc.match(/\bS([\d.]+)/);
     tc.spindle = sp ? `${sp[1]} S${sv ? sv[1] : "0"}` : "";
     log(t("tc.log.start", { tool: toolLabel() }));
@@ -286,22 +383,8 @@ async function run(mode: "sensor" | "plate") {
       }
     }
 
-    // zurück: erst sicher hoch, dann XY, dann auf die alte Werkstück-Höhe (mit dem neuen Nullpunkt, nie höher als jetzt)
     set(TcState.Returning);
-    must(await goSafe(), "safe");
-    must(await moveXY(start.x, start.y), "back");
-    await freshStatus(); await freshStatus();
-    const wco = machine.status.mpos[2] - machine.status.wpos[2];
-    const target = Math.min(start.wz + wco, s.tcSafe);
-    // Stand der Fräser beim Wechsel IM Material (Wechsel ohne Hochfahren, z. B. fremde Datei mit M6), nicht wieder
-    // runter – ein dickerer Fräser stieße in die schmale Nut. Oben bleiben, das Programm fährt selbst runter.
-    // Ausnahme relative Maße (G91): da zählt die genaue Lage.
-    const g91 = /\bG91\b/.test(gc);
-    if (start.wz < 0 && !g91) log(t("tc.log.stayHigh", { z: start.wz.toFixed(2) }));
-    else if (target < machine.status.mpos[2] - 0.05) must(await step(`$J=G53 G21 Z${f3(target)} F${feed()}`) && await settled(), "z");
-    // Programm-Zustand wieder herstellen (die Antast-Routine endet mit G90, G10 brauchte G21)
-    if (g91) must(await step("G91"), "G91");
-    if (/\bG20\b/.test(gc)) must(await step("G20"), "G20");
+    await returnTo(start);
     stopGuard();
 
     if ((await waitUser(TcState.WaitResume)) !== "go") throw new Cancel();
@@ -333,6 +416,7 @@ export function tcAbort(reason: string, stopJob: boolean, sendCancel = true) {
   if (tc.state === TcState.Idle && !tc.refBusy) return;
   if (tc.state === TcState.Aborted) return;
   cancelled = true;
+  manualStart = null;
   abortProbe(sendCancel);
   stopGuard();
   const p = pending; pending = null; p?.("cancel");

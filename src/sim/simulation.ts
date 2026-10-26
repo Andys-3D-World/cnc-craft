@@ -17,7 +17,7 @@ import { t, T, tip } from "../i18n/i18n";
 import { SimProgram, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
-import { machine, setOverride } from "../machine";
+import { machine, setOverride, MACHINE_EVENT } from "../machine";
 import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
 
@@ -40,6 +40,19 @@ let log: (s: string) => void = () => {};
 let $: <T extends HTMLElement>(id: string) => T;
 let hiLine = -1;            // hervorgehobene Zeile (Bahn gelb)
 let keepViewOnce = false;   // nächstes geladenes Programm: Kamera nicht neu einpassen (nach „Übernehmen“)
+
+// Live mit echter Maschine: „ok“ heißt bei GRBL nur „im Puffer“, nicht „gefahren“ – grblHAL puffert viele Zeilen voraus.
+// Deshalb folgt das Werkzeug der gemeldeten Position (Statusbericht, ~5× pro Sekunde). Dazwischen läuft es mit dem
+// GEMESSENEN Tempo weiter (die Zeitschätzung kennt keine Beschleunigung – bei vielen kurzen Linien ist die Maschine
+// langsamer) und gleitet weich zum Ziel, statt zu springen.
+const LIVE_TOL = 0.1;       // mm: so nah muss die Position an einer Bahn liegen
+const LIVE_EASE = 0.12;     // s: Zeitkonstante, mit der die Anzeige dem Ziel folgt
+let liveIdx = 0;            // frühestmögliche Bewegung (die Maschine fährt im Programm nie zurück)
+let liveMaxLine = 0;        // bis zu dieser Zeile hat die Maschine Zeilen angenommen (Puffer)
+let liveT = 0;              // zuletzt gemessene Programmzeit
+let liveAt = 0;             // wann gemessen (performance.now, 0 = noch nie)
+let liveRate = 1;           // gemessenes Tempo: Programm-Sekunden je echter Sekunde
+let liveFrame = 0;
 
 // Bearbeiten
 let editing = false;
@@ -265,6 +278,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     if (live || started) { simTime = timeBeforeLine(prog, streamState.currentLine); }
     updateInfo();
     applyTime(false);
+    if (live && streamState.onMachine) followMachine();
   });
   window.addEventListener("cnc-job-progress", (e: any) => {
     const d = e.detail;
@@ -274,9 +288,17 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
       else if (!d.running && editLive) editLive = false; // Job fertig: weiter bearbeiten, „Übernehmen“ lädt dann neu
     }
     if (source !== "job" || !prog) { updateJobState(); updateEditUI(); return; }
+    if (d.running && !live) { liveIdx = 0; liveAt = 0; liveRate = 1; }
     live = d.running;
     view.live = live;
-    if (d.running || d.line > 0) {
+    if (live && streamState.onMachine) {
+      // echte Maschine: Puffer-Grenze merken, Position kommt aus dem Statusbericht
+      playing = false;
+      started = true;
+      liveMaxLine = d.line;
+      followMachine();
+    } else if (d.running || d.line > 0) {
+      liveAt = 0;
       playing = false;
       started = true;
       simTime = timeBeforeLine(prog, d.line);
@@ -284,6 +306,11 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     }
     updateJobState();
     updateEditUI();
+  });
+
+  window.addEventListener(MACHINE_EVENT, (e: Event) => {
+    const { type } = (e as CustomEvent).detail || {};
+    if (type === "status" && live && streamState.onMachine) followMachine();
   });
 
   window.addEventListener("keydown", e => {
@@ -330,6 +357,8 @@ export function setSimProgram(lines: string[], name: string, src: Source) {
   live = false;
   view.live = false;
   hiLine = -1;
+  liveIdx = 0;
+  liveAt = 0;
   view.setHighlight(-1);
   if (keepViewOnce) view.replaceProgram(prog); else view.setProgram(prog);
   keepViewOnce = false;
@@ -368,20 +397,84 @@ function tick(now: number) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     simTime += dt * speed;
     if (simTime >= prog.totalTime) { simTime = prog.totalTime; playing = false; }
-    applyTime(true);
+    applyTime(true, true);
+  } else if (live && prog && liveAt && streamState.onMachine && now - liveFrame >= liveFrameGap()) {
+    // Ziel = letzte Messung + gemessenes Tempo seit der Messung (höchstens 1 s voraus, nie über die Puffer-Grenze)
+    const dt = Math.min(0.25, (now - (liveFrame || now)) / 1000);
+    liveFrame = now;
+    const run = machine.status.state === "Run";
+    const ahead = run ? Math.min(1, ((now - liveAt) / 1000) * liveRate) : 0;
+    const target = Math.min(liveT + ahead, timeBeforeLine(prog, liveMaxLine));
+    const diff = target - simTime;
+    if (Math.abs(diff) > 2) simTime = target;                       // großer Sprung (Start, Fortsetzen): sofort
+    else if (Math.abs(diff) > 1e-4) simTime += diff * (1 - Math.exp(-dt / LIVE_EASE));
+    else { requestAnimationFrame(tick); lastFrame = now; return; }   // steht: nichts neu zeichnen
+    applyTime(!editing, true);
   }
   lastFrame = now;
   requestAnimationFrame(tick);
 }
 
-function applyTime(scrollList: boolean) {
+/** Abstand zwischen zwei Live-Bildern: so oft wie möglich, bei großen Programmen (langsames Zeichnen) seltener */
+function liveFrameGap(): number {
+  return Math.max(0, Math.min(200, view.drawMs * 2 - 16));
+}
+
+function applyTime(scrollList: boolean, fromTick = false) {
   if (!prog) return;
   if (!started) { view.setProgress(-1, 0, 0, 0, 0); updateUI(); return; }
   const p = positionAt(prog, simTime);
   view.setProgress(p.i, p.frac, p.x, p.y, p.z);
   updateUI();
-  if (scrollList) scrollCodeTo(p.i >= 0 ? prog.line[p.i] : 0);
+  // Liste nur neu bauen, wenn sich die Zeile ändert (Abspielen/Live laufen mit voller Bildrate)
+  const line = p.i >= 0 ? prog.line[p.i] : 0;
+  if (fromTick && line === appliedLine && prog === appliedProg) return;
+  appliedLine = line;
+  appliedProg = prog;
+  if (scrollList) scrollCodeTo(line);
   else renderCodeList();
+}
+let appliedLine = -1;
+let appliedProg: SimProgram | null = null;
+
+/**
+ * Werkzeug auf die gemeldete Maschinen-Position setzen: erste Bahn ab liveIdx (bis zur Puffer-Grenze),
+ * die durch die Position geht. Passt nichts (z. B. andere Einheit/Versatz), wie früher die Puffer-Grenze zeigen.
+ */
+function followMachine() {
+  if (!prog) return;
+  const p = prog;
+  const [x, y, z] = machine.status.wpos;
+  const hi = Math.min(p.n, firstMoveOfLine(p, liveMaxLine) + 1);
+  const lo = Math.max(liveIdx, hi - 20000);
+  let best = -1, bestU = 0;
+  const tol2 = LIVE_TOL * LIVE_TOL;
+  for (let i = lo; i < hi; i++) {
+    const ax = p.x0[i], ay = p.y0[i], az = p.z0[i];
+    const dx = p.x1[i] - ax, dy = p.y1[i] - ay, dz = p.z1[i] - az;
+    const l2 = dx * dx + dy * dy + dz * dz;
+    const u = l2 > 1e-12 ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy + (z - az) * dz) / l2)) : 0;
+    const ex = ax + u * dx - x, ey = ay + u * dy - y, ez = az + u * dz - z;
+    if (ex * ex + ey * ey + ez * ez <= tol2) { best = i; bestU = u; break; }
+  }
+  const now = performance.now();
+  if (best >= 0) {
+    const t = p.t0[best] + bestU * p.dur[best];
+    // Tempo aus zwei Messungen (geglättet); Stillstand (Halt, Werkzeugwechsel) zählt nicht
+    const dtReal = (now - liveAt) / 1000;
+    if (liveAt && machine.status.state === "Run" && dtReal > 0.05 && dtReal < 2 && t >= liveT) {
+      liveRate = Math.max(0.05, Math.min(3, 0.6 * liveRate + 0.4 * ((t - liveT) / dtReal)));
+    }
+    const first = !liveAt;
+    liveIdx = best;
+    liveT = t;
+    liveAt = now;
+    if (first) { simTime = t; applyTime(!editing); }
+    // sonst gleitet tick() dorthin
+  } else if (!liveAt) {
+    simTime = timeBeforeLine(p, liveMaxLine);
+    applyTime(!editing);
+  }
 }
 
 function fmtTime(sec: number): string {

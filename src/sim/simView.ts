@@ -41,6 +41,8 @@ export class SimView {
   hiLine = -1;
 
   private dirty = true;
+  /** wie lange das Zeichnen dauert (ms, geglättet) – danach richtet sich die Bildrate im Live-Betrieb */
+  drawMs = 0;
   onChange: () => void = () => {};
   /** Klick auf eine Bahn: Zeile (0-basiert) und Index der nächsten Bewegung, -1 = daneben */
   onPick: (line: number, move: number) => void = () => {};
@@ -50,7 +52,12 @@ export class SimView {
     this.ctx = canvas.getContext("2d")!;
     this.bindMouse();
     const loop = () => {
-      if (this.dirty) { this.dirty = false; this.draw(); }
+      if (this.dirty) {
+        this.dirty = false;
+        const t0 = performance.now();
+        this.draw();
+        this.drawMs = 0.8 * this.drawMs + 0.2 * (performance.now() - t0);
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);

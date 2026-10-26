@@ -24,8 +24,12 @@ export function toolChangeSettingsHtml(): string {
         <div class="pr-sub">${T("tc.title")}</div>
         <div class="prop-row" ${tip("tc.modeTip")}>${T("tc.mode")}<select id="tc-mode" class="prop-input" style="width:auto;">
           <option value="0">${T("tc.mode0")}</option><option value="1">${T("tc.mode1")}</option><option value="2">${T("tc.mode2")}</option></select></div>
+        <div class="prop-row" ${tip("tc.liftTip")}>${T("tc.lift")}<select id="tc-lift" class="prop-input" style="width:auto;">
+          <option value="3">${T("tc.lift3")}</option><option value="1">${T("tc.lift1")}</option><option value="0">${T("tc.lift0")}</option><option value="2">${T("tc.lift2")}</option></select></div>
+        <div id="tc-workz-row">${num("tc-workz", "tc.workZ", "1", "0")}</div>
+        <div id="tc-safe-row">${num("tc-safe", "tc.safe", "0.5")}</div>
+        ${num("tc-feed", "tc.feed", "100", "100")}
         <div id="tc-auto">
-          ${num("tc-safe", "tc.safe", "0.5")}
           ${num("tc-travel", "tc.travel", "1", "1")}
           <div id="tc-sensor-only">${num("tc-sz", "tc.sz", "0.5")}</div>
           <div class="prop-row" ${tip("tc.posTip")}>${T("tc.pos")}<select id="tc-pos" class="prop-input" style="width:auto;">
@@ -34,7 +38,6 @@ export function toolChangeSettingsHtml(): string {
             <div class="rp-grid2">${num("tc-x", "tc.x")}${num("tc-y", "tc.y")}</div>
             <button id="tc-here" class="btn-secondary btn-compact" ${tip("tc.hereTip")}>📍 ${T("tc.here")}</button>
           </div>
-          ${num("tc-feed", "tc.feed", "100", "100")}
           <div class="tool-scope" id="tc-reuse"></div>
           <div id="tc-ref-box">
             <div class="tool-scope" id="tc-ref"></div>
@@ -48,16 +51,21 @@ export function initToolChangeSettings(log: (s: string) => void) {
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => document.getElementById(id) as E | null;
   initToolChange(log);
   const fields: [string, keyof ProbeSettings][] = [
-    ["tc-safe", "tcSafe"], ["tc-travel", "tcTravel"], ["tc-sz", "tcSz"], ["tc-x", "tcX"], ["tc-y", "tcY"], ["tc-feed", "tcFeed"]
+    ["tc-safe", "tcSafe"], ["tc-workz", "tcWorkZ"], ["tc-travel", "tcTravel"], ["tc-sz", "tcSz"], ["tc-x", "tcX"], ["tc-y", "tcY"], ["tc-feed", "tcFeed"]
   ];
   const show = () => {
     fields.forEach(([id, k]) => { const el = $(id); if (el) el.value = String(s[k]); });
     const mode = $<HTMLSelectElement>("tc-mode"), pos = $<HTMLSelectElement>("tc-pos"), m6 = $("tc-m6");
     if (mode) mode.value = String(s.tcMode);
     if (pos) pos.value = String(s.tcPos);
+    const lift = $<HTMLSelectElement>("tc-lift");
+    if (lift) lift.value = String(s.tcLift);
     if (m6) m6.checked = !!s.tcM6;
     const vis = (id: string, on: boolean) => { const el = $(id); if (el) el.style.display = on ? "" : "none"; };
     vis("tc-auto", s.tcMode !== 0);
+    // „ganz nach oben“ braucht die Höhe nur als Ersatz (ohne Referenzfahrt); „nicht anheben“ gilt nur von Hand
+    vis("tc-safe-row", s.tcLift === 0 || (s.tcLift === 2 && s.tcMode !== 0));
+    vis("tc-workz-row", s.tcLift === 1 || s.tcLift === 3);
     vis("tc-sensor-only", s.tcMode === 1);
     vis("tc-ref-box", s.tcMode === 1);
     vis("tc-pos-box", s.tcPos === 1);
@@ -73,12 +81,13 @@ export function initToolChangeSettings(log: (s: string) => void) {
   fields.forEach(([id, k]) => $(id)?.addEventListener("change", () => {
     const v = parseFloat(($(id) as HTMLInputElement).value);
     if (Number.isFinite(v)) {
-      s[k] = k === "tcTravel" ? Math.min(300, Math.max(1, v)) : k === "tcFeed" ? Math.min(10000, Math.max(100, v)) : v;
+      s[k] = k === "tcWorkZ" ? Math.min(500, Math.max(0, v)) : k === "tcTravel" ? Math.min(300, Math.max(1, v)) : k === "tcFeed" ? Math.min(10000, Math.max(100, v)) : v;
       saveProbe();
     }
     show();
   }));
   $<HTMLSelectElement>("tc-mode")?.addEventListener("change", e => { s.tcMode = +(e.target as HTMLSelectElement).value; saveProbe(); show(); });
+  $<HTMLSelectElement>("tc-lift")?.addEventListener("change", e => { s.tcLift = +(e.target as HTMLSelectElement).value; saveProbe(); show(); });
   $<HTMLSelectElement>("tc-pos")?.addEventListener("change", e => { s.tcPos = +(e.target as HTMLSelectElement).value; saveProbe(); show(); });
   $("tc-m6")?.addEventListener("change", e => { s.tcM6 = (e.target as HTMLInputElement).checked ? 1 : 0; saveProbe(); });
   $("tc-here")?.addEventListener("click", () => {

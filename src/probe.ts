@@ -36,6 +36,9 @@ export interface ProbeSettings {
   // ---- Werkzeugwechsel (toolChange.ts) ----
   tcMode: number;     // 0 = von Hand (nur Hinweis), 1 = fester Sensor, 2 = mobile Tastplatte
   tcSafe: number;     // sichere Höhe (Maschinen-Z) – es wird nur hoch-, nie runtergefahren
+  tcLift: number;     // Anheben beim Wechsel: 0 = auf tcSafe, 1 = ganz nach oben (unter den Endschalter), 2 = nicht (nur „von Hand“),
+                      // 3 = auf tcWorkZ über dem Werkstück-Nullpunkt (geht auch ohne Referenzfahrt)
+  tcWorkZ: number;    // Höhe über dem Werkstück-Nullpunkt (mm) für tcLift 3 (und Ersatz für 1 ohne Referenzfahrt)
   tcSz: number;       // Maschinen-Z, bis zu der über dem Sensor zügig runtergefahren wird (≥ tcSafe = gar nicht)
   tcTravel: number;   // höchste Antast-Distanz beim Werkzeugwechsel (mm)
   tcPos: number;      // 0 = XY bleibt, 1 = zur Wechselposition fahren
@@ -45,7 +48,7 @@ export interface ProbeSettings {
 }
 const DEF: ProbeSettings = { plate: 20, sx: 0, sy: 0, sensorH: 30, material: 10, travel: 50, fast: 200, slow: 25, lift: 10, sensorSet: 0,
   mx: 100, my: 100, mnx: 5, mny: 5, hop: 3, mzero: 1,
-  tcMode: 0, tcSafe: -2, tcSz: -2, tcTravel: 80, tcPos: 0, tcX: 0, tcY: 0, tcFeed: 1500, tcM6: 0 };
+  tcMode: 0, tcSafe: -2, tcLift: 0, tcWorkZ: 40, tcSz: -2, tcTravel: 80, tcPos: 0, tcX: 0, tcY: 0, tcFeed: 1500, tcM6: 0 };
 
 function load(): ProbeSettings {
   try {

@@ -14,6 +14,23 @@
 - **Click a toolpath to find its G-code line:** clicking a path in the simulation view jumps to the matching line in
   the G-code list and highlights it; clicking a line highlights its path in yellow.
 
+**Improved**
+- **Tool change: choose how far Z lifts – also in “Manual” mode:** new setting *Lift Z at the change* (section
+  *Probing* → *Tool change*): *height above work zero* (e.g. 40 mm – works on every machine), *all the way up* (to just
+  below the limit switch: the homing position, `-$27` – needs homing upwards via `$22`, otherwise the height above work
+  zero is used; the settings are read with `$$` first if needed), *safe height* (machine Z, as before) or *don't lift*.
+  With homing no height goes above the homing position. Until now “Manual” did not lift at all, so the tool stayed at
+  the program's own safe height (e.g. Z 5 – too low for a 19 mm touch plate). Now it lifts first and, after *Resume
+  job*, moves back to the old XY position and height before the job continues (like the automatic modes).
+
+**Fixed**
+- **Live simulation follows the real machine:** during a job the simulation used the lines GRBL had confirmed – but
+  "ok" only means "in the buffer", and grblHAL buffers many lines ahead. The tool was shown ahead of the real machine
+  and jumped 4 times per second. Now the tool follows the position from the status reports (nearest path in program
+  order, never past the buffered lines). Between two reports it moves on with the measured speed (the time estimate
+  knows no acceleration, so short segments run slower on the machine) and glides to the target instead of jumping,
+  at full frame rate (lower automatically for very large programs).
+
 ## 0.3.2 Beta
 
 **New**

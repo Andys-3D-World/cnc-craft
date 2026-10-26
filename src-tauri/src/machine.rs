@@ -393,7 +393,8 @@ impl Machine {
         Ok(total)
     }
 
-    /// Erste Zeile, die `patch_job` gerade noch ändern darf (None = kein Job)
+    /// Erste Zeile, die `patch_job` gerade noch ändern darf (None = kein Job) – nur für die Tests
+    #[cfg(test)]
     pub fn patch_floor(&self) -> Option<usize> {
         let inner = self.sh.inner.lock().unwrap();
         inner.job.as_ref().map(|j| j.next + PATCH_MARGIN)
