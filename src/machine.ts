@@ -301,8 +301,13 @@ async function activate(id: string, s: MachineState, mode: MachineMode | null, f
 }
 
 /** Andere (verbundene) Maschine auswählen */
+/** Darf gerade nicht gewechselt werden? (Werkzeugwechsel läuft – Befehle gingen sonst an die andere Maschine) */
+let switchGuard: () => boolean = () => false;
+export function setSwitchGuard(fn: () => boolean) { switchGuard = fn; }
+
 export async function selectMachine(id: string): Promise<void> {
   if (id === activeId) return;
+  if (switchGuard()) { log(t("tc.noSwitch")); return; }
   const o = others.get(id);
   if (!o) return;
   others.delete(id);
@@ -313,6 +318,7 @@ export async function selectMachine(id: string): Promise<void> {
 /** Leeren Platz für eine weitere Verbindung anlegen und auswählen */
 export async function newMachineSlot(): Promise<void> {
   if (!machine.connected) return; // der ausgewählte Platz ist schon frei
+  if (switchGuard()) { log(t("tc.noSwitch")); return; }
   parkActive();
   let n = idCounter;
   do n++; while (others.has("m" + n));

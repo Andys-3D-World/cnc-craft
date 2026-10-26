@@ -26,6 +26,7 @@ const P: Record<string, string> = {
   serial: `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10.5l1.5-1v5.5M11 10a1.5 1.5 0 013 0c0 1.5-3 2.5-3 5h3M16.5 9.5h2.5l-1.5 2a1.6 1.6 0 11-1.3 2.6" stroke-width="1.5"/>`,
   thickness: `<path d="M3 8h6v5h4V8h8M3 16h18"/><path d="M11 3v3M8.5 4.5L11 6l2.5-1.5" stroke-width="1.5"/><path d="M9 13V8M13 13V8" stroke-width="2.2"/>`,
   dogbone: `<path d="M3 4v16h18V4"/><path d="M7 4v8a1 1 0 001 1h8a1 1 0 001-1V4"/><circle cx="7.6" cy="12.4" r="1.8" stroke-width="1.5"/><circle cx="16.4" cy="12.4" r="1.8" stroke-width="1.5"/>`,
+  cost: `<circle cx="12" cy="12" r="9"/><path d="M15.5 8.6a4.2 4.2 0 100 6.8M7 10.6h6M7 13.4h6"/>`,
   stlExport: `<path d="M4 15l8 4 8-4M4 15V9l8-4 8 4v6M12 19v-6M4 9l8 4 8-4"/><path d="M12 2v3" stroke-width="1.5"/><path d="M3 21h18" stroke-width="1.5"/>`,
   nameGen: `<path d="M3 15c2-6 4-9 5-9s-1 9 1 9 3-6 4-6-1 6 1 6 2-4 3-4"/><path d="M3 18h16" stroke-width="2.2"/><circle cx="21" cy="12" r="1.6"/>`,
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,

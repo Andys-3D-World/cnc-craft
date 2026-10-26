@@ -15,6 +15,9 @@ import { updateDimensionInputs } from "./uiInputs";
 import { assignPartGroups } from "./editor/parts";
 import { parse3mf, parseStep, MODEL_EXTENSIONS } from "./importers/meshImport";
 import { t } from "./i18n/i18n";
+import { recognizeFeatures, FeatureResult } from "./meshFeatures";
+import { openCam3D } from "./ui/cam3dDialog";
+import { isLaser, isPlasma } from "./machineMode";
 
 export function setupStlLoader(
   btn: HTMLElement | null,
@@ -129,11 +132,13 @@ function showStlDialog(
         <label class="stl-dlg-mono">${t("stl.scale")} <input type="number" id="stl-scale" value="100" min="1" step="1" style="width:64px;"> %</label>
       </div>
       <label class="stl-dlg-check"><input type="checkbox" id="stl-holes" checked> ${t("stl.holes")}</label>
+      <label class="stl-dlg-check" data-tip="${escapeHtml(t("stl.autoFeatTip"))}"><input type="checkbox" id="stl-feat"> 🧩 ${t("stl.autoFeat")}</label>
 
       <div id="stl-warning" class="stl-dlg-warn" style="display:none;"></div>
 
       <div class="stl-dlg-row" style="margin-top:14px;">
         <button id="stl-cancel" class="stl-btn-cancel">${t("dlg.cancel")}</button>
+        ${isLaser() || isPlasma() ? "" : `<button id="stl-cam3d" class="stl-btn-cancel" data-tip="${escapeHtml(t("c3d.openTip"))}">🏔 ${t("c3d.open")}</button>`}
         <button id="stl-insert" class="stl-btn-ok">✔ ${t("stl.insert")}</button>
       </div>
     </div>
@@ -182,6 +187,13 @@ function showStlDialog(
   const info = $<HTMLDivElement>("#stl-info");
   const warning = $<HTMLDivElement>("#stl-warning");
   const insertBtn = $<HTMLButtonElement>("#stl-insert");
+  const featCheck = $<HTMLInputElement>("#stl-feat");
+  // Zerlegen dauert etwas – nur einmal je Ansicht rechnen
+  let feat: FeatureResult | null = null, featView: StlView | null = null;
+  const features = () => {
+    if (!feat || featView !== view) { feat = recognizeFeatures(mesh, vc); featView = view; }
+    return feat;
+  };
 
   const preview3d = new Mesh3DPreview(canvas3d, mesh);
   let view: StlView = "top";
@@ -197,6 +209,7 @@ function showStlDialog(
 
   const update = () => {
     pending = false;
+    if (featCheck.checked) return updateFeatures();
     const h = heightFromSlider();
     slice = sliceMesh(mesh, vc, h);
     heightVal.textContent = t("stl.aboveBed", { v: (h - vc.minW).toFixed(2) });
@@ -223,6 +236,31 @@ function showStlDialog(
     }
     insertBtn.disabled = slice.loops.length === 0;
   };
+  /** Ansicht „Automatisch zerlegen“: alle erkannten Formen zeigen, Höhe spielt keine Rolle */
+  const updateFeatures = () => {
+    const f = features();
+    const pct = parseFloat(scaleInput.value) || 100, k = pct / 100;
+    const shown: SliceResult = {
+      height: vc.maxW, outerCount: 0, holeCount: 0, openCount: 0,
+      minU: f.minU, maxU: f.maxU, minV: f.minV, maxV: f.maxV,
+      loops: f.features.map(x => ({ points: x.points, closed: true, isHole: x.kind !== "outside", area: 0 }))
+    };
+    render2D(canvas2d, shown, pct);
+    const n = (k2: string) => f.features.filter(x => x.kind === k2).length;
+    const depths = [...new Set(f.features.filter(x => x.kind === "pocket").map(x => +(x.depth * k).toFixed(2)))].sort((a, b) => a - b);
+    heightVal.textContent = "–";
+    info.innerHTML = f.features.length
+      ? t("stl.featInfo", { o: n("outside"), h: n("inside"), p: n("pocket"), t: (f.thickness * k).toFixed(2) })
+        + (depths.length ? `<br>${t("stl.featDepths", { d: depths.join(" / ") })}` : "")
+      : t("stl.noContour");
+    const warn = [f.steps ? t("stl.featSteps", { n: f.steps }) : "", f.fromBelow ? t("stl.featBelow", { n: f.fromBelow }) : "",
+      f.open ? t("stl.openWarning", { n: f.open }) : ""].filter(Boolean).join(" ");
+    warning.style.display = warn ? "block" : "none";
+    warning.textContent = warn;
+    insertBtn.disabled = !f.features.length;
+  };
+  featCheck.addEventListener("change", () => { slider.disabled = holesCheck.disabled = featCheck.checked; update(); });
+
   const scheduleUpdate = () => {
     if (pending) return;
     pending = true;
@@ -262,7 +300,32 @@ function showStlDialog(
   $("#stl-cancel").addEventListener("click", close);
   overlay.addEventListener("mousedown", e => { if (e.target === overlay) close(); });
 
+  // 3D-Fräsen: ganzes Modell in der gewählten Blickrichtung (w = Höhe) an den 3D-Dialog geben
+  overlay.querySelector("#stl-cam3d")?.addEventListener("click", () => {
+    const pos = new Float32Array(mesh.triangleCount * 9);
+    for (let i = 0; i < mesh.triangleCount * 3; i++) {
+      const id = mesh.tris[i];
+      pos[i * 3] = vc.u[id]; pos[i * 3 + 1] = vc.v[id]; pos[i * 3 + 2] = vc.w[id];
+    }
+    close();
+    openCam3D(fileName, pos, appendToConsole);
+  });
+
   insertBtn.addEventListener("click", () => {
+    if (featCheck.checked) {
+      const f = features();
+      if (!f.features.length) return;
+      const pct = parseFloat(scaleInput.value) || 100;
+      const shapes = featuresToShapes(f, pct / 100, fileName);
+      state.shapes = [...state.shapes, ...shapes];
+      state.selectedShapeIds = shapes.map((s: any) => s.id);
+      const n = (k: string) => shapes.filter((s: any) => s.millingMode === k).length;
+      appendToConsole(t("stl.featInserted", { o: n("outside"), h: n("inside"), p: n("pocket") }));
+      close();
+      updateDimensionInputs(null);
+      redraw();
+      return;
+    }
     if (!slice || slice.loops.length === 0) return;
     const pct = parseFloat(scaleInput.value) || 100;
     const shapes = sliceToShapes(slice, pct / 100, holesCheck.checked, fileName);
@@ -299,6 +362,21 @@ function sliceToShapes(slice: SliceResult, factor: number, withHoles: boolean, f
     shapes.push(createPolyline(points, loop.closed, mode, { source: fileName }));
   }
   // Jedes Teil (Außenkontur + Löcher) als eigene Gruppe
+  assignPartGroups(shapes);
+  return shapes;
+}
+
+/** Erkannte Formen → Fräs-Formen mit Art und Tiefe (Taschen zuerst, dann Löcher, Umriss zuletzt) */
+function featuresToShapes(f: FeatureResult, factor: number, fileName: string): any[] {
+  const MARGIN_MM = 10;
+  const order = { pocket: 0, inside: 1, outside: 2 };
+  const shapes = [...f.features].sort((a, b) => order[a.kind] - order[b.kind] || a.depth - b.depth).map(x => {
+    const points = x.points.map(p => ({
+      x: ((p.u - f.minU) * factor + MARGIN_MM) * MM_TO_PIXEL,
+      y: ((p.v - f.minV) * factor + MARGIN_MM) * MM_TO_PIXEL
+    }));
+    return createPolyline(points, true, x.kind, { source: fileName, millingDepth: -+(x.depth * factor).toFixed(3) });
+  });
   assignPartGroups(shapes);
   return shapes;
 }

@@ -19,6 +19,7 @@ import { getMachineMode, MachineMode } from "./machineMode";
 import { stockBed } from "./stock";
 import { compensate, getHeightMap, heightMapEnabled, heightRange } from "./heightMap";
 import { buildResume, resumeMarks, ResumeMark } from "./jobResume";
+import { toolChangeBusy, tcAbort } from "./toolChange";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -255,6 +256,8 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
 export async function pauseStreaming(appendToConsole: (t: string) => void) {
   if (!streamState.isRunning) return;
   if (streamState.onMachine) {
+    // Werkzeugwechsel läuft: weiter geht es nur über dessen Fenster (nach dem Messen und deiner Bestätigung)
+    if (toolChangeBusy()) { appendToConsole(t("tc.useDialog")); return; }
     try {
       if (machine.job.paused) { await jobResume(); appendToConsole(t("stream.resumed")); }
       else { await jobPause(); appendToConsole(t("stream.paused")); }
@@ -269,6 +272,8 @@ export async function pauseStreaming(appendToConsole: (t: string) => void) {
 export async function stopStreaming() {
   if (!streamState.isRunning) return;
   if (streamState.onMachine) {
+    // läuft gerade ein Werkzeugwechsel: Antast-Fahrt sofort beenden, nichts mehr schicken
+    tcAbort(t("tc.why.user"), false);
     try { await jobStop(); logFn(t("m.stopping")); } catch (e) { logFn(`${t("log.error")} ${e}`); }
     return;
   }

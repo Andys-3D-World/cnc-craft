@@ -53,6 +53,7 @@ export function toolPickerHtml(): string {
         <label class="prop-row needs-sel" ${tip("tool.restTip")}>${T("tool.rest")}
           <select id="cam-rest-select" class="prop-input" style="width: 140px;"></select></label>
         <div id="cam-tool-scope" class="tool-scope"></div>
+        <button id="cam-assign-tools" class="btn-secondary" style="width:100%;margin-top:6px;" ${tip("ops.assignTip")}>🔧 ${T("ops.assignTitle")}</button>
       </div>
     </div>`;
 }

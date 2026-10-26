@@ -43,6 +43,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
     ${action("simulate", "simulate", "rp.simulateTip")}
+    ${action("cost", "cost", "cost.tip")}
   `;
   // Abkürzungen zu den Knöpfen im rechten Panel (G-Code-Bereich) – gleiche Funktion
   container.querySelectorAll<HTMLElement>("[data-click]").forEach(b =>

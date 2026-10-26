@@ -295,7 +295,7 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
   const sym = [["", t("ng.symNone")] as [string, string], ...NAME_SYMBOLS.map(s => [s, t("sl." + s)] as [string, string])];
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>✍ ${t("ng.title")}</h3>
+      <h3>✍ ${t("ngen.title")}</h3>
       <div class="dlg-hint">${t("ng.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

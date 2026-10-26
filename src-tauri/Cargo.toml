@@ -1,6 +1,6 @@
 [package]
 name = "cnc-craft"
-version = "0.3.1"
+version = "0.3.2"
 description = "Open-Source CNC Control für Fräse, Plasma und Laser"
 edition = "2021"
 license = "GPL-3.0-or-later"
@@ -29,3 +29,5 @@ serde_json = "1"
 serialport = "4"
 # USB für das K40-Original-Board (CH341). "vendored" baut libusb gleich mit – keine Extra-Installation nötig
 rusb = { version = "0.9", features = ["vendored"] }
+# 3D-Fräsen (cam3d.rs): Drop-Cutter und Höhenraster auf allen Kernen rechnen
+rayon = "1"

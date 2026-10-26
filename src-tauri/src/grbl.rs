@@ -201,7 +201,34 @@ pub fn clean_line(line: &str) -> Option<String> {
 pub fn is_tool_change(cleaned: &str) -> bool {
     let u = cleaned.to_uppercase();
     let u = u.trim();
-    u == "M0" || u == "M00" || u == "M1" || u == "M01"
+    u == "M0" || u == "M00" || u == "M1" || u == "M01" || is_m6(cleaned)
+}
+
+/// Wörter einer G-Code-Zeile: Buchstabe + Zahl ("M6 T2" -> [('M', 6.0), ('T', 2.0)]). Leer bei $-Befehlen.
+fn words(cleaned: &str) -> Vec<(char, f64)> {
+    let u: String = cleaned.to_uppercase().chars().filter(|c| !c.is_whitespace()).collect();
+    if u.starts_with('$') || u.starts_with('[') { return Vec::new(); }
+    let mut out = Vec::new();
+    let mut it = u.chars().peekable();
+    while let Some(c) = it.next() {
+        if !c.is_ascii_alphabetic() { continue; }
+        let mut num = String::new();
+        while let Some(&d) = it.peek() {
+            if d.is_ascii_digit() || d == '.' || d == '-' || d == '+' { num.push(d); it.next(); } else { break; }
+        }
+        if let Ok(v) = num.parse::<f64>() { out.push((c, v)); }
+    }
+    out
+}
+
+/// Werkzeugwechsel M6 / M06 (auch "T2 M6", "M6T2") – GRBL 1.1 kennt M6 nicht (Fehler 20), CNC Craft hält selbst an
+pub fn is_m6(cleaned: &str) -> bool {
+    words(cleaned).iter().any(|&(c, v)| c == 'M' && v == 6.0)
+}
+
+/// Werkzeugnummer aus dem T-Wort ("M6 T3" -> 3)
+pub fn tool_word(cleaned: &str) -> Option<u32> {
+    words(cleaned).iter().find(|&&(c, v)| c == 'T' && v >= 0.0 && v.fract() == 0.0 && v < 100000.0).map(|&(_, v)| v as u32)
 }
 
 /// Kommentar aus der Originalzeile (für die Werkzeugwechsel-Meldung)
@@ -359,6 +386,11 @@ mod tests {
         assert!(is_tool_change("m01"));
         assert!(!is_tool_change("M03"));
         assert!(!is_tool_change("M0 X1"));
+        assert!(is_tool_change("M6 T2") && is_tool_change("t3 m06") && is_tool_change("M6T4") && is_tool_change("M6"));
+        assert!(!is_tool_change("M62 P2") && !is_tool_change("T2") && !is_tool_change("$J=G91 Z-6 F100"));
+        assert_eq!(tool_word("M6 T12"), Some(12));
+        assert_eq!(tool_word("T03 M6"), Some(3));
+        assert_eq!(tool_word("M6"), None);
         assert_eq!(comment_of("M0 (WERKZEUGWECHSEL 2: 6 mm)"), "WERKZEUGWECHSEL 2: 6 mm");
         // Einstellungen: nichts entfernen (WLAN-Passwörter mit ( ) ; % und Leerzeichen)
         assert_eq!(clean_line("$Sta/Password=ab(c);d%21  e\r\n"), Some("$Sta/Password=ab(c);d%21  e".into()));

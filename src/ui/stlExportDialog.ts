@@ -82,7 +82,7 @@ export function openStlExport(log: (s: string) => void) {
     </div>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(900px, calc(100vw - 32px));">
-      <h3>🖨 ${t("stl.title")}</h3>
+      <h3>🖨 ${t("stlx.title")}</h3>
       <div class="dlg-hint">${t(sel.length ? "stl.descSel" : "stl.descAll", { n: groups.reduce((a, g) => a + g.shapes.length, 0) })}</div>
       <div style="display:grid;grid-template-columns:minmax(280px, 360px) 1fr;gap:12px;align-items:start;">
         <div style="display:flex;flex-direction:column;gap:6px;">

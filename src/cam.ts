@@ -1,13 +1,15 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE } from "./toolLibrary";
+import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber } from "./toolLibrary";
+import { toolChangeGcode } from "./toolChange";
 import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
 import { pocketPaths, pocketWallPaths, PocketStrategy } from "./pocket";
 import { vcarvePaths } from "./vcarve";
 import { CONE_TYPES } from "./toolLibrary";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
-import { makeEllipsePoints, shapeBounds } from "./shapeTransform";
+import { makeEllipsePoints, shapeBounds, shapeToPaths } from "./shapeTransform";
+import { expandOps } from "./ops";
 import { spindleCode } from "./spindleDir";
 import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
@@ -36,7 +38,8 @@ export interface ToolGroup { tool: MillingTool | null; shapes: any[] }
  */
 export function orderToolGroups(shapes: any[]): ToolGroup[] {
   const map = new Map<string, ToolGroup>();
-  for (const s of shapes) {
+  // weitere Bearbeitungen je Form (Tasche, Fase, Ausschneiden …) – jede wie eine eigene Form (ops.ts)
+  for (const s of expandOps(shapes)) {
     const tool = toolForShape(s);
     const key = tool ? tool.id : "";
     if (!map.has(key)) map.set(key, { tool, shapes: [] });
@@ -195,7 +198,7 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 3. SORTIERUNG: INNEN VOR AUSSEN (innerhalb eines Werkzeugs) ----
   const priority = (mode: string) =>
-    mode === "drill" ? -1 : mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : 3;
+    mode === "drill" ? -1 : mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : mode === "chamfer" ? 2.5 : 3;
   const groups = orderToolGroups(shapes);
   const restIgnored = shapes.filter((s: any) => getTool(s.restToolId) && !restToolFor(s)).length;
   if (restIgnored) lastGcodeWarnings.push(t("gcw.restIgnored", { n: restIgnored }));
@@ -591,6 +594,45 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (!pieces) gcode += `${c("gc.restNone")}\n`;
   };
 
+  /**
+   * FASE mit Fasen- oder V-Fräser (halber Winkel θ, Spitze d0): Tiefe h = Breite / tan θ, die Spitze läuft d0/2
+   * neben der Kante (außen bei Außenkonturen, innen bei Löchern/Taschen) – dann trifft der Kegel die Wand genau an
+   * der Kante und die Oberseite in Fasenbreite daneben.
+   */
+  const millChamfer = (shape: any) => {
+    const tool = curTool;
+    if (!tool || !CONE_TYPES.includes(tool.type) || !(tool.angle > 0) || tool.angle >= 180) {
+      lastGcodeWarnings.push(t("gcw.chamferTool", { n: formCounter }));
+      return;
+    }
+    const w = Math.max(0.05, Number(shape.chamferW) || 1), th = (tool.angle / 2) * Math.PI / 180;
+    const h = w / Math.tan(th), o = (tool.tipDia || 0) / 2;
+    if (o + w > tool.diameter / 2 + 1e-6) { lastGcodeWarnings.push(t("gcw.chamferWide", { n: formCounter, w, d: tool.diameter })); return; }
+    computePasses(-h);
+    const side = Number(shape.chamferSide) || 0;
+    if (shape.type === "circle") {
+      const c0 = toMachine(shape.x, shape.y), r = Math.abs(shape.w) / MM_TO_PIXEL + side * o;
+      if (r <= 0.05) { lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter })); return; }
+      gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${c0.x.toFixed(3)} Y${(c0.y + r).toFixed(3)}\n`;
+      passes.forEach(z => {
+        gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`;
+        gcode += `G2 X${c0.x.toFixed(3)} Y${(c0.y + r).toFixed(3)} I0.000 J${(-r).toFixed(3)}\n`;
+      });
+      gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+      return;
+    }
+    if (shape.type === "polyline" && shape.closed && side !== 0) {
+      const pts: P[] = shape.points.map((p: any) => toMachine(p.x, p.y));
+      const loops = o > 1e-9 ? offsetPolygon(pts, side * o) : [pts];
+      if (!loops.length) { lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter })); return; }
+      // Gleichlauf wie bei den Konturen: außen gegen, innen im Uhrzeigersinn
+      for (const l of loops) millPath((side > 0) !== (polygonArea(l) > 0) ? [l[0], ...l.slice(1).reverse()] : l, true);
+      return;
+    }
+    // offene Linien, Bögen, Gravur-Formen: auf der Linie
+    for (const p of shapeToPaths(shape)) if (p.pts.length > 1) millPath(p.pts.map(q => toMachine(q.x, q.y)), p.closed);
+  };
+
   // ---- 6. FORMEN NACHEINANDER ABFAHREN ----
   let formCounter = 0;
   const computeDepth = (s: any): number => typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallbackDepth;
@@ -603,7 +645,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     // ---- WERKZEUGWECHSEL ----
     gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\n`;
     gcode += `M5 ${c("gc.spindleOff")}\n`;
-    gcode += `M0 ${c("gc.toolChange", { i: gi + 1, name: toolName, d: toolDiameter.toFixed(1) })}\n`;
+    gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolChange", { i: gi + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
   }
   gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
   // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
@@ -627,6 +669,11 @@ const generateGcodeInner = (shapes: any): string | null => {
     formCounter++;
     computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
+    if (mode === "chamfer") {
+      gcode += `\n${c("gc.chamfer", { n: formCounter, w: Number(shape.chamferW) || 1 })}\n`;
+      millChamfer(shape);
+      return;
+    }
     if (mode === "drill") {
       gcode += `\n${c("gc.drill", { n: formCounter })}\n`;
       millDrill(shape);

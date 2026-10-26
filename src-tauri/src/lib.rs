@@ -18,6 +18,7 @@
 //!   flash-progress
 //! GRBL und Ruida melden dieselben Ereignisse – die Oberfläche muss kaum unterscheiden.
 
+mod cam3d;
 mod elfimg;
 mod flash;
 mod fonts;
@@ -667,6 +668,52 @@ async fn flash_zip(app: AppHandle, port: String, path: String, baud: u32, usb_jt
     .map_err(|e| e.to_string())?
 }
 
+// ---- 3D-Fräsen (cam3d.rs) ----
+
+/// zuletzt übergebenes 3D-Modell (Dreiecke in den Maßen der Datei)
+static CAM3D_MODEL: Mutex<Option<Arc<Vec<cam3d::Tri>>>> = Mutex::new(None);
+/// Abbruch-Schalter für die 3D-Berechnung
+static CAM3D_CANCEL: AtomicBool = AtomicBool::new(false);
+
+/// 3D-Fräsen: Modell als STL-Bytes (binär oder Text) übernehmen. Antwort: Anzahl Dreiecke
+#[tauri::command]
+async fn cam3d_load(request: tauri::ipc::Request<'_>) -> Result<usize, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else { return Err("expected STL bytes".into()) };
+    let data = data.clone();
+    let tris = tauri::async_runtime::spawn_blocking(move || cam3d::parse_stl(&data)).await.map_err(|e| e.to_string())??;
+    let n = tris.len();
+    *CAM3D_MODEL.lock().unwrap() = Some(Arc::new(tris));
+    Ok(n)
+}
+
+/// 3D-Fräsen: Schrupp- und Schlicht-Bahnen rechnen (Fortschritt: Ereignis "cam3d-progress").
+/// Antwort: Bahnen als Bytes (Aufbau siehe cam3d::encode)
+#[tauri::command]
+async fn cam3d_compute(app: AppHandle, job: cam3d::Job) -> Result<tauri::ipc::Response, String> {
+    let tris = CAM3D_MODEL.lock().unwrap().clone().ok_or("no model loaded")?;
+    CAM3D_CANCEL.store(false, Ordering::SeqCst);
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        let last = Mutex::new(-1.0f64);
+        let prog = |f: f64, stage: &str| {
+            let mut l = last.lock().unwrap();
+            // höchstens alle 1 % melden
+            if f - *l >= 0.01 || f >= 1.0 {
+                *l = f;
+                let _ = app.emit("cam3d-progress", serde_json::json!({ "p": f, "stage": stage }));
+            }
+        };
+        cam3d::compute(&tris, &job, &CAM3D_CANCEL, &prog).map(|p| cam3d::encode(&p))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+fn cam3d_cancel() {
+    CAM3D_CANCEL.store(true, Ordering::SeqCst);
+}
+
 #[tauri::command]
 async fn flash_cancel() {
     FLASH_CANCEL.store(true, Ordering::SeqCst);
@@ -713,6 +760,9 @@ pub fn run() {
             system_fonts,
             system_font_data,
             esp_web_command,
+            cam3d_load,
+            cam3d_compute,
+            cam3d_cancel,
             update::update_install,
             update::update_restart
         ])

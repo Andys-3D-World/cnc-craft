@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.3.1 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.3.2 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 

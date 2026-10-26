@@ -5,6 +5,8 @@ import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
 import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings, noGcodeMessage } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
+import { openCostDialog } from "./ui/costCalc";
+import { initOpsPanel, refreshOps } from "./ui/opsPanel";
 import { streamState } from "./machineStream";
 import { drawEverything } from "./render";
 import { initCollapsibleMenus } from "./ui";
@@ -129,6 +131,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
+        refreshOps();        // Bearbeitungen der Auswahl
         refreshLaserPanel(); // Laser-Ebenen ebenso
         refreshPlasmaPanel(); // und Plasma-Schnitte
         refreshBeds();        // Reiter der Betten (Anzahl Teile)
@@ -211,6 +214,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();
     });
+    document.getElementById("btn-cost")?.addEventListener("click", () => openCostDialog(state.shapes, appendToConsole));
     document.getElementById("btn-sim-job")?.addEventListener("click", () => {
       if (!streamState.loadedLines.length) { appendToConsole(t("stream.noGcode")); return; }
       setSimProgram(streamState.loadedLines, t("sim.loadedJob"), "job");
@@ -223,6 +227,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initToolPage();                    // Reiter "Werkzeuge": Fräswerkzeuge
     initLibraryTab(appendToConsole);   // im selben Reiter: Laser-/Plasma-Bibliothek + Export/Import/Sicherung
     initToolPicker(redraw);
+    initOpsPanel(redraw, appendToConsole);
     initLaserPanel(redraw);
     initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
     initPlasmaPanel(redraw);

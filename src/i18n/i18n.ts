@@ -65,6 +65,11 @@ function allPacks(): Record<string, Dict> {
   return { ...BUILTIN, ...custom };
 }
 
+/** Text eines Schlüssels in allen eingebauten Sprachen (z. B. um eigene G-Code-Kommentare wiederzuerkennen) */
+export function allBuiltinTexts(key: string): string[] {
+  return Object.values(BUILTIN).map(d => (d as Dict)[key]).filter((v): v is string => typeof v === "string");
+}
+
 /** Beim Start: gespeicherte Sprache, sonst Systemsprache, sonst Englisch */
 export function initI18n() {
   loadCustom();

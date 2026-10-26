@@ -1,8 +1,69 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.2 Beta
 
 **New**
+- **Tool change with tool length measurement (router, GRBL/grblHAL):** when a job reaches a tool change (`M6 T<n>`
+  or CNC Craft's own `M0` with the tool change comment) the job stops, the spindle turns off, Z moves up to a safe
+  height (machine Z, only upwards) and a small window shows the new tool (number, name and diameter from the tool
+  list). The window floats at the bottom right, so you can still jog. New setting *Tool change* in the section
+  *Probing*: *Manual* (just the notice, as before – with a button to probe with the touch plate), *Fixed sensor* or
+  *Mobile touch plate*. Fixed sensor: if there is no reference yet, the old tool is measured on the sensor first; then
+  move to the change position, you swap the tool and click *Measure tool*, CNC Craft measures it on the sensor and
+  shifts the Z zero of the active coordinate system by the length difference (`G10 L20 P0`). Mobile touch plate: you
+  insert the tool, place the plate and clamp, click *Probe*, Z is set to the plate thickness, then you confirm that
+  the plate is removed. Afterwards the machine moves back to the position before the change and the job only
+  continues after you click *Resume job* (the spindle turns on again if it was on). Uses the same software probing
+  as the probing section (jog with debouncing instead of G38.2) with the existing plate thickness, sensor position and
+  probing speeds; new: safe height, max. probing distance (no contact → nothing is set), start height above the
+  sensor, change position and travel feed, plus *Measure reference now*. Safety: alarm, reset/E-stop, lost connection
+  or Stop end the probing immediately and the job does not continue; switching machines is blocked meanwhile. All
+  moves are jogs, so the program's modal state stays the same (inch and incremental mode are restored). Option
+  *G-code: tool change as "M6 T…"* writes `M6 T<n>` instead of `M0` (also in 3D milling)
+- **3D milling from STL models (router):** new button *3D milling* in the 3D import window (STL, 3MF, STEP) for
+  reliefs, signs with a raised relief, bowls and other freeform shapes. Set the position and size on the bed, the model
+  height and the material thickness (top of the model = top of the material, Z 0), then pick one cutter for roughing
+  and one for finishing from the tool list. *Roughing* clears the material in Z layers (step down) with rings at the
+  step-over distance and leaves a stock allowance; ramp entry when the tool has a ramp angle. *Finishing* follows the
+  surface in lines along X, Y or both with drop-cutter geometry: ball end mills (sphere against faces, edges and
+  corners) and flat end mills (flat disk) are calculated exactly, other types like a flat end mill (never too deep).
+  Points on straight stretches are thinned out within the tolerance. Without roughing the finishing pass works in
+  layers from the top. The calculation runs in the app core on all CPU cores, shows its progress and can be
+  cancelled. The G-code follows the normal format (safe height, spindle, feed, plunge feed, tool change with M0) and
+  can be loaded as a job or saved; the dialog shows the milled result from this G-code in 3D (same material removal
+  simulation as the 3D view) together with path lengths and an estimated time
+- **Split 3D models automatically (router):** new option *Split automatically* in the 3D import window (STL, 3MF,
+  STEP). Instead of one slice height the whole part is analysed (milled from the view direction): the outline becomes
+  a cut-out, through holes become inside cuts (both full thickness), and recesses become pockets with the depth of
+  their floor – also stepped pockets one inside the other. Floors are found from the flat, upward-facing faces of the
+  model. The window shows the counts, the thickness and the pocket depths; then choose the cutters with *Assign
+  tools*. Not recognised yet: slopes and roundings (chamfers, radii), steps at the outer edge (reported) and holes only
+  from below (reported)
+- **Several operations per shape (router):** new section *Operations* for the selected shapes, like in Fusion: the
+  first operation is the shape itself (cut side, tool, depth as before), further ones are added with ＋ – e.g. pocket
+  with the 6 mm cutter, then chamfer with the 90° chamfer bit, then cut out with the 3 mm cutter, each with its own
+  tool and depth. In the G-code every operation is milled like its own shape, so the order and tool changes follow
+  automatically (holes and pockets first, then chamfers, cutting out last). Old projects stay as they are. When the
+  selection has different types (e.g. outline and holes of an imported part), *Applies to* chooses which ones get the
+  operations – e.g. only the holes get a chamfer
+- **Chamfer operation:** new operation type *Chamfer* with a chamfer width. With a chamfer or V-bit the depth is
+  calculated from the bit angle (width ÷ tan(angle/2)) and the tip runs half the tip diameter beside the edge –
+  outside on outer contours, inside on holes, pockets and drill holes (countersink), on the line otherwise. Warnings
+  when the bit has no angle or the chamfer is wider than the bit
+- **Assign tools:** new button *Assign tools* in the tool section: one tool per operation type (cut out, holes,
+  pockets, engraving, V-carve, drilling, chamfer) for the whole design or the selection, with a count per type
+- **Cost calculator:** new button *Calculate costs* next to *Simulate*. For the current design it shows what the part
+  costs and what it should cost: machine time from the G-code (same estimate as the simulation) × machine rate,
+  material (outline of the parts + 5 mm margin, or the whole sheet) × price per m² plus waste %, labour (setup once per
+  job + finishing per piece) × your hourly rate, extras per piece, quantity and markup %. Result: cost in total and per
+  piece, sale price per piece and in total, and the profit. Rates and currency are remembered; *Copy as text* puts the
+  calculation on the clipboard, e.g. for a quote. Prices without VAT. Also in the left toolbar (€ button below G-code
+  and simulation). Extras:
+  - *Material price list:* save prices per m² under a name (e.g. *Poplar 4 mm*) and pick them again; with the laser
+    the entry matching the material and thickness of the layers in use is chosen automatically
+  - *Quantity discount:* up to three tiers „from n pieces → markup %“, the result shows which markup was used
+  - *Save as CSV:* the calculation as a table for Excel or an invoicing program (semicolon-separated with decimal
+    comma in languages that use it)
 - **Laser material presets:** new button *Material presets* in the laser library. Choose diode or CO₂ laser and its
   power in watts, then one click creates a layer with start values for e.g. *Poplar plywood 3 mm cut* (power, speed,
   passes, air, material and thickness) – 19 presets for plywood, hardwood, MDF, acrylic, cardboard, paper, leather,
@@ -142,6 +203,10 @@
 - Projects remember the font of each text. If it is missing on another computer, the text tool shows a clear
   hint and uses Open Sans instead; the existing shapes in the project stay unchanged
 - Bold/italic of system fonts use the real bold/italic files when the font has them
+
+**Fixed**
+- The 3D import window was titled *STL for 3D printing* and the node graph window *Name generator* – the new STL
+  export and name generator had reused their text keys. Each window has its own title again
 
 ## 0.3.1 Beta
 

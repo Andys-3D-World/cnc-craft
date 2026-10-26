@@ -11,6 +11,7 @@
 import { icon } from "./icons";
 import { t, T, tip, ph } from "../i18n/i18n";
 import { toolPickerHtml, toolSummaryHtml } from "./toolPicker";
+import { opsPanelHtml } from "./opsPanel";
 import { modeSwitchHtml, laserLayersHtml, laserSettingsHtml } from "./laserPanel";
 import { rotarySectionHtml } from "./rotaryPanel";
 import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
@@ -69,6 +70,8 @@ export function renderRightPanel(container: HTMLElement) {
           </div>
         </div>
 
+        ${opsPanelHtml()}
+
         <div class="menu-section-unified only-mill">
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
@@ -109,6 +112,7 @@ export function renderRightPanel(container: HTMLElement) {
           <div class="menu-body" style="display: flex; flex-direction: column; gap: 6px;">
             <button id="btn-generate-gcode" class="btn-primary" ${tip("rp.genGcodeTip")}>🚀 ${T("rp.genGcode")}</button>
             <button id="btn-simulate" class="btn-secondary" ${tip("rp.simulateTip")}>🎬 ${T("rp.simulate")}</button>
+            <button id="btn-cost" class="btn-secondary" ${tip("cost.tip")}>💶 ${T("cost.button")}</button>
             <button id="btn-save-gcode" class="btn-secondary" ${tip("rp.saveGcodeTip")}>💾 ${T("rp.saveGcode")}</button>
             <button id="btn-save-rd" class="btn-secondary only-ruida" ${tip("rd.saveTip")}>💾 ${T("rd.save")}</button>
           </div>

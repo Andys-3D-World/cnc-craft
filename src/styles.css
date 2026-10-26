@@ -1480,6 +1480,16 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .eng-curve { width: 100%; height: auto; aspect-ratio: 300 / 220; border-radius: 6px; border: 1px solid var(--border-color); cursor: crosshair; display: block; }
 .v3d-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.82rem; }
 .v3d-bar label { display: flex; align-items: center; gap: 6px; }
+/* 3D-Fräsen – ui/cam3dDialog.ts */
+.c3d-grid { display: grid; grid-template-columns: 300px 1fr; gap: 14px; align-items: start; min-height: 0; }
+.c3d-form { display: flex; flex-direction: column; gap: 5px; max-height: calc(100vh - 200px); overflow: auto; padding-right: 4px; }
+.c3d-form .dlg-num input { width: 80px; }
+.c3d-sec { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); margin-top: 8px; }
+#c3d-rough-box, #c3d-finish-box { display: flex; flex-direction: column; gap: 5px; }
+.c3d-view { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.c3d-view canvas { width: 100%; height: min(520px, calc(100vh - 260px)); border-radius: 10px; cursor: grab; display: block; }
+.c3d-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-size: 0.82rem; }
+@media (max-width: 760px) { .c3d-grid { grid-template-columns: 1fr; } .c3d-form { max-height: none; } }
 /* Knoten-Editor */
 .ng-box { width: calc(100vw - 32px); max-width: 1500px; height: calc(100vh - 32px); padding: 12px; gap: 8px; overflow: hidden; }
 .ng-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1602,3 +1612,14 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .fp-file { background: transparent; border: 1px solid var(--border-color, #35353f); color: var(--text-main, #e6e6ee);
   border-radius: 5px; padding: 5px; cursor: pointer; font-size: 0.8rem; }
 .fp-hint { font-size: 0.7rem; color: var(--text-muted, #8d8d9c); line-height: 1.35; }
+
+/* Werkzeugwechsel-Fenster (toolChangeDialog.ts): schwebt unten rechts, sperrt die Oberfläche nicht (Joggen bleibt möglich) */
+.tc-float { position: fixed; right: 16px; bottom: 16px; z-index: 5200; width: 380px; box-shadow: 0 10px 34px rgba(0,0,0,0.5); border-color: #ff9f43; }
+.tc-tool { font-weight: 700; font-size: 0.92rem; color: #ff9f43; }
+.tc-step { font-size: 0.84rem; line-height: 1.45; }
+.tc-busy::before { content: ""; display: inline-block; width: 10px; height: 10px; margin-right: 7px; border-radius: 50%;
+  border: 2px solid var(--text-muted); border-top-color: transparent; animation: tc-spin 0.9s linear infinite; vertical-align: -1px; }
+@keyframes tc-spin { to { transform: rotate(360deg); } }
+.tc-msg { font-size: 0.8rem; color: var(--color-danger); line-height: 1.4; }
+.tc-result { font-size: 0.84rem; font-weight: 600; color: var(--color-success); }
+.tc-buttons { flex-wrap: wrap; }

@@ -13,7 +13,7 @@
 //! Der Port ist hier nur "etwas zum Lesen/Schreiben" – so lässt sich alles ohne Hardware testen.
 //! Ereignisse gehen über `emit(name, json)` an die Oberfläche (siehe lib.rs).
 
-use crate::grbl::{classify, clean_line, comment_of, is_tool_change, CharCounter, Incoming, Sender, Status};
+use crate::grbl::{classify, clean_line, comment_of, is_m6, is_tool_change, tool_word, CharCounter, Incoming, Sender, Status};
 use std::io::{ErrorKind, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -36,6 +36,9 @@ struct Job {
     acked: usize,            // bestätigte Zeilen
     paused: bool,
     tool_change: Option<String>,
+    tc_tool: Option<u32>,    // Werkzeugnummer des Wechsels (T-Wort, bei "T2" + "M6" in zwei Zeilen das letzte T)
+    tc_m6: bool,             // Wechsel kam von M6 (sonst M0/M1)
+    last_t: Option<u32>,     // zuletzt gesehenes T-Wort im Job
     tc_announced: bool,
     stopping: bool,
     errors: usize,
@@ -306,8 +309,11 @@ impl Machine {
             let Some(job) = job.as_mut() else { return };
             if job.paused || job.stopping || job.tool_change.is_some() || job.next >= job.lines.len() { return; }
             let idx = job.next;
+            if let Some(n) = tool_word(&job.lines[idx]) { job.last_t = Some(n); }
             if is_tool_change(&job.lines[idx]) {
                 job.tool_change = Some(job.notes[idx].clone());
+                job.tc_m6 = is_m6(&job.lines[idx]);
+                job.tc_tool = if job.tc_m6 { job.last_t } else { None };
                 job.tc_announced = false;
                 job.next += 1;
                 return;
@@ -347,7 +353,7 @@ impl Machine {
             let mut inner = self.sh.inner.lock().unwrap();
             if inner.job.is_some() { return Err("busy".into()); }
             if inner.state == "Alarm" { return Err("alarm".into()); }
-            inner.job = Some(Job { lines, notes, next: 0, acked: 0, paused: false, tool_change: None, tc_announced: false, stopping: false, errors: 0 });
+            inner.job = Some(Job { lines, notes, next: 0, acked: 0, paused: false, tool_change: None, tc_tool: None, tc_m6: false, last_t: None, tc_announced: false, stopping: false, errors: 0 });
             inner.last_progress = Instant::now() - Duration::from_secs(1);
         }
         self.pump();
@@ -425,7 +431,7 @@ impl Machine {
 
     /// Takt: Werkzeugwechsel ankündigen, Job-Ende erkennen, Fortschritt melden
     fn tick(&self) {
-        let mut announce: Option<String> = None;
+        let mut announce: Option<(String, Option<u32>, bool)> = None;
         let mut finished: Option<(usize, usize)> = None;
         let mut stale: Vec<u64> = Vec::new();
         {
@@ -442,7 +448,7 @@ impl Machine {
                     if job.tool_change.is_some() && !job.tc_announced && buffer_empty && fresh && idle {
                         job.tc_announced = true;
                         job.paused = true;
-                        announce = job.tool_change.clone();
+                        announce = job.tool_change.clone().map(|n| (n, job.tc_tool, job.tc_m6));
                     } else if job.tool_change.is_none() && job.next >= job.lines.len() && buffer_empty && fresh && idle {
                         finished = Some((job.lines.len(), job.errors));
                     }
@@ -453,8 +459,9 @@ impl Machine {
         for id in stale {
             self.emit("machine-line", format!("{{\"kind\":\"timeout\",\"id\":{}}}", id));
         }
-        if let Some(note) = announce {
-            self.emit("machine-job-toolchange", format!("{{\"note\":{}}}", jstr(&note)));
+        if let Some((note, tool, m6)) = announce {
+            let tool = tool.map(|n| n.to_string()).unwrap_or_else(|| "null".into());
+            self.emit("machine-job-toolchange", format!("{{\"note\":{},\"tool\":{},\"m6\":{}}}", jstr(&note), tool, m6));
             self.progress(true);
         }
         if let Some((total, errors)) = finished {
@@ -676,6 +683,34 @@ mod tests {
         let done = wait_for(&ev, "machine-job-done", 5).expect("done");
         assert!(done.contains("\"aborted\":false"));
         assert!(received.lock().unwrap().iter().any(|l| l == "M3 S12000"));
+        m.shutdown();
+    }
+
+    #[test]
+    fn m6_tool_change_reports_tool_number() {
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let (r, w) = spawn_board(Board { max_used: Arc::new(Mutex::new(0)), received: received.clone(), error_on: None, silent_on: None });
+        let (emit, ev) = collect();
+        let m = Machine::start(r, w, emit);
+        wait_for(&ev, "machine-status", 2).unwrap();
+        let mut lines = job(3);
+        lines.push("T4".into());
+        lines.push("M6 (TOOL CHANGE 2)".into());
+        lines.push("M3 S12000".into());
+        lines.push("M6 T7".into());
+        lines.push("G1 X9 Y9".into());
+        m.start_job(lines).unwrap();
+        let tc = wait_for(&ev, "machine-job-toolchange", 5).expect("tool change");
+        assert!(tc.contains("\"tool\":4") && tc.contains("\"m6\":true"), "{}", tc);
+        assert!(!received.lock().unwrap().iter().any(|l| l.starts_with("M6")), "M6 must not be sent");
+        ev.lock().unwrap().retain(|(n, _)| n != "machine-job-toolchange");
+        m.resume_job().unwrap();
+        let tc = wait_for(&ev, "machine-job-toolchange", 5).expect("second tool change");
+        assert!(tc.contains("\"tool\":7"), "{}", tc);
+        m.resume_job().unwrap();
+        let done = wait_for(&ev, "machine-job-done", 5).expect("done");
+        assert!(done.contains("\"aborted\":false"));
+        assert!(received.lock().unwrap().iter().any(|l| l == "G1 X9 Y9"));
         m.shutdown();
     }
 
