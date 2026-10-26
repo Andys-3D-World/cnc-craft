@@ -69,6 +69,13 @@ impl Conn {
     fn pause_job(&self) -> Result<(), String> { each!(self, c => c.pause_job()) }
     fn resume_job(&self) -> Result<(), String> { each!(self, c => c.resume_job()) }
     fn stop_job(&self) -> Result<(), String> { each!(self, c => c.stop_job()) }
+    /// Live-Bearbeitung nur bei GRBL (Zeilen werden einzeln gesendet; Ruida/K40 bekommen die Datei als Ganzes)
+    fn patch_job(&self, from: usize, delete: usize, insert: Vec<String>, expect_total: usize) -> Result<usize, String> {
+        match self {
+            Conn::Grbl(m) => m.patch_job(from, delete, insert, expect_total),
+            _ => Err("unsupported".into()),
+        }
+    }
 
     /// Vor dem Trennen/Beenden: laufenden Job sicher anhalten, damit die Maschine nicht mit
     /// gepuffertem G-Code weiterfährt und Laser/Spindel danach nicht eingeschaltet bleiben.
@@ -398,6 +405,12 @@ async fn machine_realtime(code: u8) -> Result<(), String> {
 #[tauri::command]
 async fn machine_job_start(lines: Vec<String>) -> Result<usize, String> {
     current()?.start_job(lines)
+}
+
+/// Laufenden Job ändern (nur noch nicht gesendete Zeilen, siehe Machine::patch_job)
+#[tauri::command]
+async fn machine_job_patch(from: usize, delete: usize, insert: Vec<String>, expect_total: usize) -> Result<usize, String> {
+    current()?.patch_job(from, delete, insert, expect_total)
 }
 
 #[tauri::command]
@@ -743,6 +756,7 @@ pub fn run() {
             machine_send,
             machine_realtime,
             machine_job_start,
+            machine_job_patch,
             machine_job_pause,
             machine_job_resume,
             machine_job_stop,

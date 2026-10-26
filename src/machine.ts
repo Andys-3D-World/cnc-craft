@@ -730,6 +730,12 @@ export async function jobStart(lines: string[]): Promise<number> {
   fire("job-progress", machine.job);
   return n;
 }
+/** Laufenden Job ändern: gesendete Zeilen [from, from+del) durch insert ersetzen (nur noch nicht gesendete, nur GRBL) */
+export async function jobPatch(from: number, del: number, insert: string[], expectTotal: number): Promise<number> {
+  const n = await invoke<number>("machine_job_patch", { from, delete: del, insert, expectTotal });
+  machine.job.total = n;
+  return n;
+}
 export async function jobPause() { await invoke("machine_job_pause"); }
 export async function jobResume() { await invoke("machine_job_resume"); }
 export async function jobStop() { await invoke("machine_job_stop"); }

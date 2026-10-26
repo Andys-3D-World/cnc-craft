@@ -1,5 +1,19 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **G-code editor in the Simulation tab:** click *Edit* above the G-code list to change lines (double-click or
+  Enter), delete them (Del) or insert new ones after the selected line (empty line, `M0` pause, `F` feed rate, `G4 P1`
+  wait), with undo/redo (Ctrl+Z / Ctrl+Shift+Z). The 3D view is re-read and redrawn after every change; *Apply* makes
+  the edited text the job. While a job is running (GRBL) only lines the machine has not received yet can be changed:
+  everything already sent plus a safety margin of 5 lines is locked (🔒), the change needs a confirmation and is
+  checked again by the sender (new command `machine_job_patch`); progress and the resume mapping stay correct. For
+  speed changes the editor offers the feed and spindle overrides instead of rewriting lines. Not available with an
+  active height map.
+- **Click a toolpath to find its G-code line:** clicking a path in the simulation view jumps to the matching line in
+  the G-code list and highlights it; clicking a line highlights its path in yellow.
+
 ## 0.3.2 Beta
 
 **New**

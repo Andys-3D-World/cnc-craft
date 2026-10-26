@@ -28,6 +28,8 @@ pub const RT_RESUME: u8 = b'~';
 pub const RT_RESET: u8 = 0x18;
 /// Wartet eine Handzeile länger als das auf "ok", obwohl die Maschine steht, ging die Antwort verloren
 pub const STALE_MANUAL: Duration = Duration::from_secs(5);
+/// Live-Bearbeitung: so viele Zeilen hinter der nächsten zu sendenden bleiben gesperrt (Sicherheitsabstand)
+pub const PATCH_MARGIN: usize = 5;
 
 struct Job {
     lines: Vec<String>,      // bereinigte Zeilen
@@ -359,6 +361,42 @@ impl Machine {
         self.pump();
         self.progress(true);
         Ok(n)
+    }
+
+    /// Laufenden Job ändern: Zeilen [from, from+delete) durch `insert` ersetzen.
+    /// Nur Zeilen, die noch nicht gesendet sind – mit Sicherheitsabstand (`PATCH_MARGIN`) hinter `next`.
+    /// `expect_total` = Zeilenzahl, von der die Oberfläche ausgeht (sonst wurde inzwischen etwas anderes geändert).
+    /// Gibt die neue Zeilenzahl zurück.
+    pub fn patch_job(&self, from: usize, delete: usize, insert: Vec<String>, expect_total: usize) -> Result<usize, String> {
+        let mut lines = Vec::with_capacity(insert.len());
+        let mut notes = Vec::with_capacity(insert.len());
+        for l in &insert {
+            // jede neue Zeile muss etwas zum Senden enthalten, sonst verrutscht die Zuordnung in der Oberfläche
+            let c = clean_line(l).ok_or("empty line")?;
+            notes.push(comment_of(l));
+            lines.push(c);
+        }
+        let total = {
+            let mut inner = self.sh.inner.lock().unwrap();
+            let job = inner.job.as_mut().ok_or("no job")?;
+            if job.stopping { return Err("stopping".into()); }
+            if job.lines.len() != expect_total { return Err("changed".into()); }
+            let end = from.checked_add(delete).ok_or("range")?;
+            if end > job.lines.len() { return Err("range".into()); }
+            if from < job.next + PATCH_MARGIN { return Err("locked".into()); }
+            job.lines.splice(from..end, lines);
+            job.notes.splice(from..end, notes);
+            job.lines.len()
+        };
+        self.pump();
+        self.progress(true);
+        Ok(total)
+    }
+
+    /// Erste Zeile, die `patch_job` gerade noch ändern darf (None = kein Job)
+    pub fn patch_floor(&self) -> Option<usize> {
+        let inner = self.sh.inner.lock().unwrap();
+        inner.job.as_ref().map(|j| j.next + PATCH_MARGIN)
     }
 
     pub fn pause_job(&self) -> Result<(), String> {
@@ -774,6 +812,70 @@ mod tests {
         }
         assert!(ok_for_id2, "answer must carry the right id");
         assert_eq!(m.send_line("(nur Kommentar)").unwrap(), 0);
+        m.shutdown();
+    }
+
+    #[test]
+    fn patch_cannot_touch_sent_lines() {
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let (r, w) = spawn_board(Board { max_used: Arc::new(Mutex::new(0)), received: received.clone(), error_on: None, silent_on: None });
+        let (emit, ev) = collect();
+        let m = Machine::start(r, w, emit);
+        wait_for(&ev, "machine-status", 2).unwrap();
+        let mut lines = job(3);
+        lines.push("M0 (WECHSEL)".into()); // hält den Job an, damit nichts weiterläuft
+        for i in 0..20 { lines.push(format!("G1 X{} Y1", i)); }
+        let total = m.start_job(lines).unwrap();
+        wait_for(&ev, "machine-job-toolchange", 5).expect("paused at M0");
+        let floor = m.patch_floor().unwrap();
+        assert_eq!(floor, 6 + PATCH_MARGIN); // 5 Zeilen + M0 sind "weg", dahinter der Abstand
+        // gesendete oder zu nahe Zeilen: abgelehnt, nichts verändert
+        assert_eq!(m.patch_job(2, 1, vec!["G0 X0".into()], total), Err("locked".into()));
+        assert_eq!(m.patch_job(floor - 1, 1, vec!["G0 X0".into()], total), Err("locked".into()));
+        assert_eq!(m.patch_job(floor, 0, vec!["(nur Kommentar)".into()], total), Err("empty line".into()));
+        assert_eq!(m.patch_job(floor, 100, vec![], total), Err("range".into()));
+        assert_eq!(m.patch_job(floor, 1, vec![], total + 1), Err("changed".into()));
+        // erlaubt: eine Zeile ersetzen, eine löschen, zwei einfügen -> Zeilenzahl stimmt
+        let t2 = m.patch_job(floor, 2, vec!["G1 X99 Y99 F500 (neu)".into(), "M0 (PAUSE)".into(), "G1 X98".into()], total).unwrap();
+        assert_eq!(t2, total + 1);
+        let t3 = m.patch_job(t2, 0, vec!["G0 Z5".into()], t2).unwrap(); // am Ende anhängen
+        assert_eq!(t3, t2 + 1);
+        // Fortschritt meldet die neue Gesamtzahl
+        ev.lock().unwrap().clear();
+        m.resume_job().unwrap();
+        let p = wait_for(&ev, "machine-job-progress", 2).expect("progress");
+        assert!(p.contains(&format!("\"total\":{}", t3)), "{}", p);
+        // die eingefügte Pause hält an
+        let tc = wait_for(&ev, "machine-job-toolchange", 5).expect("inserted M0");
+        assert!(tc.contains("PAUSE"), "{}", tc);
+        m.resume_job().unwrap();
+        let done = wait_for(&ev, "machine-job-done", 5).expect("done");
+        assert!(done.contains(&format!("\"total\":{}", t3)), "{}", done);
+        let rec = received.lock().unwrap().clone();
+        // alte Zeilen vor dem Bereich unverändert gesendet, ersetzte nie
+        assert!(rec.iter().any(|l| l == "G1 X0 Y1"));
+        assert!(!rec.iter().any(|l| l == &format!("G1 X{} Y1", floor - 6)), "replaced line must not be sent");
+        assert!(!rec.iter().any(|l| l == &format!("G1 X{} Y1", floor - 5)), "deleted line must not be sent");
+        let pos = |s: &str| rec.iter().position(|l| l == s).unwrap_or_else(|| panic!("{} missing", s));
+        assert!(pos("G1 X99 Y99 F500") < pos("G1 X98"));
+        assert_eq!(rec.last().unwrap(), "G0 Z5");
+        // alle Zeilen außer den zwei M0 wurden genau einmal gesendet
+        assert_eq!(rec.len(), t3 - 2);
+        m.shutdown();
+    }
+
+    #[test]
+    fn patch_without_job_or_while_stopping() {
+        let (r, w) = spawn_board(Board { max_used: Arc::new(Mutex::new(0)), received: Arc::new(Mutex::new(Vec::new())), error_on: None, silent_on: None });
+        let (emit, ev) = collect();
+        let m = Machine::start(r, w, emit);
+        wait_for(&ev, "machine-status", 2).unwrap();
+        assert_eq!(m.patch_job(0, 0, vec!["G0 X0".into()], 0), Err("no job".into()));
+        assert!(m.patch_floor().is_none());
+        let total = m.start_job(job(5000)).unwrap();
+        m.stop_job().unwrap();
+        assert_eq!(m.patch_job(4000, 1, vec![], total), Err("stopping".into()));
+        wait_for(&ev, "machine-job-done", 5).expect("done");
         m.shutdown();
     }
 

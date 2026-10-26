@@ -14,7 +14,7 @@ import { aAxisRefused } from "./rotary";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
-import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop } from "./machine";
+import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop, jobPatch } from "./machine";
 import { getMachineMode, MachineMode } from "./machineMode";
 import { stockBed } from "./stock";
 import { compensate, getHeightMap, heightMapEnabled, heightRange } from "./heightMap";
@@ -33,6 +33,7 @@ export const streamState = {
   bed: 0,                   // Bett, dessen Material-Platte der Job verbraucht
   onMachine: false,         // läuft gerade an der echten Maschine?
   sentOrigin: null as number[] | null, // je gesendeter Zeile die Original-Zeile (Höhenkarte, Fortsetzen; sonst 1:1)
+  compensated: false,       // mit Höhenkarte gesendet? (dann keine Live-Bearbeitung: neue Zeilen wären nicht angepasst)
   marks: [] as ResumeMark[],  // Formen/Ebenen im Job (zum Fortsetzen)
   abortLine: -1               // nach einem Abbruch: so viele Zeilen hatte die Maschine bestätigt (-1 = kein Abbruch)
 };
@@ -73,14 +74,11 @@ export async function loadGcodeFromFile(appendToConsole: (t: string) => void): P
  */
 export function loadGcodeFromText(content: string, label: string, appendToConsole: (t: string) => void): boolean {
   if (streamState.isRunning) { appendToConsole(t("stream.alreadyRunning")); return false; }
-  // Leerzeilen und reine Kommentarzeilen raus (Werkzeugwechsel "M0 (…)" bleibt drin)
-  streamState.loadedLines = content
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l.length > 0 && !l.startsWith("(") && !l.startsWith("%") && !l.startsWith(";"));
+  streamState.loadedLines = jobLines(content.split(/\r?\n/));
   streamState.totalLines = streamState.loadedLines.length;
   streamState.currentLine = 0;
   streamState.sentOrigin = null;
+  streamState.compensated = false;
   streamState.marks = resumeMarks(content).filter(m => m.line < streamState.totalLines);
   streamState.abortLine = -1;
   streamState.label = label;
@@ -89,6 +87,81 @@ export function loadGcodeFromText(content: string, label: string, appendToConsol
   updateJobDisplay();
   window.dispatchEvent(new CustomEvent("cnc-job-loaded", { detail: { lines: streamState.loadedLines, label } }));
   return true;
+}
+
+/** Leerzeilen und reine Kommentarzeilen raus (Werkzeugwechsel "M0 (…)" bleibt drin) – so zählt auch der Rust-Teil */
+export function jobLines(lines: string[]): string[] {
+  return lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("(") && !l.startsWith("%") && !l.startsWith(";"));
+}
+
+// ---------------- Live-Bearbeitung eines laufenden Jobs ----------------
+
+/** Sicherheitsabstand hinter der nächsten zu sendenden Zeile (wie PATCH_MARGIN in machine.rs) */
+export const PATCH_MARGIN = 5;
+
+/**
+ * Erste Original-Zeile, die im laufenden Job noch geändert werden darf.
+ * 0 = kein Job läuft (alles frei), null = Live-Bearbeitung hier nicht möglich (Höhenkarte, kein GRBL).
+ */
+export function liveEditFloor(): number | null {
+  const st = streamState;
+  if (!st.isRunning) return 0;
+  if (!st.onMachine) return Math.min(st.totalLines, st.currentLine + PATCH_MARGIN); // Demo
+  if (st.compensated || machine.protocol !== "grbl" || machine.job.stopping) return null;
+  const sentFloor = machine.job.sent + PATCH_MARGIN;
+  const o = st.sentOrigin;
+  if (!o) return Math.min(st.totalLines, sentFloor);
+  // Fortsetzen: Vorspann + Rest 1:1 -> nur der 1:1-Rest am Ende ist änderbar
+  const off = o.length - st.totalLines;
+  let tail = o.length;
+  while (tail > 0 && o[tail - 1] === tail - 1 - off) tail--;
+  if (tail === o.length) return null;
+  return Math.min(st.totalLines, Math.max(sentFloor, tail) - off);
+}
+
+/**
+ * Laufenden Job auf neue Zeilen umstellen. Geändert werden darf nur ab liveEditFloor()
+ * (der Rust-Teil prüft das noch einmal, während er sendet). Gibt "" oder einen Fehler-Schlüssel zurück.
+ */
+export async function patchRunningJob(edited: string[]): Promise<string> {
+  const st = streamState;
+  if (!st.isRunning) return "notRunning";
+  const next = jobLines(edited);
+  const old = st.loadedLines;
+  // eine zusammenhängende Änderung: gleicher Anfang, gleiches Ende
+  let a = 0;
+  while (a < old.length && a < next.length && old[a] === next[a]) a++;
+  let b = 0;
+  while (b < old.length - a && b < next.length - a && old[old.length - 1 - b] === next[next.length - 1 - b]) b++;
+  const del = old.length - a - b;
+  const ins = next.slice(a, next.length - b);
+  if (!del && !ins.length) return "";
+  const floor = liveEditFloor();
+  if (floor === null) return "unsupported";
+  if (a < floor) return "locked";
+  if (st.onMachine) {
+    const o = st.sentOrigin;
+    const off = o ? o.length - st.totalLines : 0;
+    try {
+      await jobPatch(a + off, del, ins, o ? o.length : st.totalLines);
+    } catch (e) {
+      return String(e);
+    }
+    if (o) {
+      // Rest bleibt 1:1 (gleicher Versatz), nur länger/kürzer
+      const n = next.length;
+      st.sentOrigin = [...o.slice(0, a + off), ...Array.from({ length: n - a }, (_, i) => a + i)];
+    }
+  } else if (a < st.currentLine + PATCH_MARGIN) {
+    return "locked";
+  }
+  st.loadedLines = next;
+  st.totalLines = next.length;
+  const shift = ins.length - del;
+  st.marks = st.marks.map(m => m.line >= a + del ? { ...m, line: m.line + shift } : m).filter(m => m.line < st.totalLines);
+  updateJobDisplay();
+  window.dispatchEvent(new CustomEvent("cnc-job-patched", { detail: { lines: next, from: a, del, ins: ins.length } }));
+  return "";
 }
 
 function emitProgress() {
@@ -193,11 +266,13 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
     // Höhenkarte: Z an die gemessene Oberfläche anpassen (nur Fräse mit GRBL)
     let send = base;
     streamState.sentOrigin = baseOrigin;
+    streamState.compensated = false;
     const hm = getHeightMap();
     if (heightMapEnabled() && hm && getMachineMode() === "mill" && machine.protocol === "grbl") {
       try {
         const c = compensate(base, hm);
         send = c.lines;
+        streamState.compensated = true;
         streamState.sentOrigin = baseOrigin ? c.origin.map(i => baseOrigin![i]) : c.origin;
         const r = heightRange(hm);
         appendToConsole(t("hm.applied", { min: r.min.toFixed(2), max: r.max.toFixed(2), n: c.lines.length }));

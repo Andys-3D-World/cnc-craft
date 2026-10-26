@@ -2,6 +2,7 @@
  * 3D-ANSICHT DER FRÄSBAHNEN (ohne Zusatz-Bibliotheken, reines Canvas)
  *
  * Maus:  links ziehen = drehen · rechts/mittel ziehen oder Shift+links = verschieben · Rad = Zoom
+ *        links klicken (ohne Ziehen) = Bahn anklicken -> onPick(Zeile)
  * Farben: Schnitte nach Tiefe (hell = flach, dunkel = tief), Eilgänge orange gestrichelt,
  *         Leerfahrten grau. Bereits gefahrene Bahnen kräftig, noch kommende blass.
  */
@@ -12,6 +13,9 @@ export type ViewPreset = "top" | "iso" | "front";
 const DEPTH_COLORS = ["#7ff3ff", "#4fd8ff", "#36b3ff", "#3b8cff", "#5a68ff", "#7a4dff", "#9b3dff", "#c03ce0"];
 const RAPID_COLOR = "#ff9a3c";
 const TRAVEL_COLOR = "#9aa0b4";
+const HILITE_COLOR = "#ffd23c";
+/** so nah (Pixel) muss ein Klick an einer Bahn liegen */
+const PICK_PX = 8;
 
 export class SimView {
   canvas: HTMLCanvasElement;
@@ -33,9 +37,13 @@ export class SimView {
   private tool = { x: 0, y: 0, z: 0 };
   showRapids = true;
   live = false;
+  /** hervorgehobene G-Code-Zeile (-1 = keine) */
+  hiLine = -1;
 
   private dirty = true;
   onChange: () => void = () => {};
+  /** Klick auf eine Bahn: Zeile (0-basiert) und Index der nächsten Bewegung, -1 = daneben */
+  onPick: (line: number, move: number) => void = () => {};
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -62,6 +70,50 @@ export class SimView {
     this.curIdx = i;
     this.tool = { x, y, z };
     this.invalidate();
+  }
+
+  /** Zeile hervorheben (ihre Bahnen kräftig gelb) */
+  setHighlight(line: number) {
+    if (line === this.hiLine) return;
+    this.hiLine = line;
+    this.invalidate();
+  }
+
+  /** Programm tauschen ohne die Kamera zu verstellen (nach dem Bearbeiten) */
+  replaceProgram(p: SimProgram | null) {
+    this.prog = p;
+    this.invalidate();
+  }
+
+  /** Welche Bewegung liegt am Punkt (Pixel im Canvas)? Nächstes Stück in Bildschirm-Abstand, -1 = keine */
+  pick(sx: number, sy: number): number {
+    const p = this.prog;
+    if (!p) return -1;
+    const { PX, PY } = this.projection();
+    let best = -1, bestD = PICK_PX * PICK_PX;
+    for (let i = 0; i < p.n; i++) {
+      if (!this.showRapids && p.type[i] !== MOVE_CUT) continue;
+      const ax = PX(p.x0[i], p.y0[i]), ay = PY(p.x0[i], p.y0[i], p.z0[i]);
+      const bx = PX(p.x1[i], p.y1[i]), by = PY(p.x1[i], p.y1[i], p.z1[i]);
+      const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+      const u = l2 > 1e-9 ? Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / l2)) : 0;
+      const ex = ax + u * dx - sx, ey = ay + u * dy - sy;
+      const d = ex * ex + ey * ey;
+      // bei Gleichstand gewinnt der Schnitt vor Eilgang/Leerfahrt
+      if (d < bestD || (d === bestD && best >= 0 && p.type[i] === MOVE_CUT && p.type[best] !== MOVE_CUT)) { bestD = d; best = i; }
+    }
+    return best;
+  }
+
+  /** Welt (mm) -> Canvas-Pixel */
+  private projection() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const ox = W / 2 + this.panX, oy = H / 2 + this.panY, s = this.scale;
+    const cyaw = Math.cos(this.yaw), syaw = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const cx0 = this.center.x, cy0 = this.center.y, cz0 = this.center.z;
+    const PX = (x: number, y: number) => ox + ((x - cx0) * cyaw - (y - cy0) * syaw) * s;
+    const PY = (x: number, y: number, z: number) => oy - (((x - cx0) * syaw + (y - cy0) * cyaw) * cp + (z - cz0) * sp) * s;
+    return { PX, PY };
   }
 
   setView(v: ViewPreset) {
@@ -107,17 +159,18 @@ export class SimView {
 
   private bindMouse() {
     const c = this.canvas;
-    let drag: null | { x: number; y: number; mode: "orbit" | "pan" } = null;
+    let drag: null | { x: number; y: number; mode: "orbit" | "pan"; moved: number } = null;
     c.addEventListener("contextmenu", e => e.preventDefault());
     c.addEventListener("mousedown", e => {
       const mode = e.button === 0 && !e.shiftKey ? "orbit" : "pan";
-      drag = { x: e.clientX, y: e.clientY, mode };
+      drag = { x: e.clientX, y: e.clientY, mode, moved: 0 };
       e.preventDefault();
     });
     window.addEventListener("mousemove", e => {
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       drag.x = e.clientX; drag.y = e.clientY;
+      drag.moved += Math.abs(dx) + Math.abs(dy);
       if (drag.mode === "orbit") {
         this.yaw -= dx * 0.008;
         this.pitch = Math.max(0, Math.min(Math.PI / 2, this.pitch - dy * 0.008));
@@ -126,7 +179,17 @@ export class SimView {
       }
       this.invalidate();
     });
-    window.addEventListener("mouseup", () => { drag = null; });
+    window.addEventListener("mouseup", e => {
+      // kaum bewegt = Klick (kein Drehen) -> Bahn suchen
+      if (drag && drag.mode === "orbit" && drag.moved < 4 && e.target === c) {
+        const r = c.getBoundingClientRect();
+        const sx = (e.clientX - r.left) * (c.width / Math.max(1, r.width));
+        const sy = (e.clientY - r.top) * (c.height / Math.max(1, r.height));
+        const i = this.pick(sx, sy);
+        this.onPick(i >= 0 && this.prog ? this.prog.line[i] : -1, i);
+      }
+      drag = null;
+    });
     c.addEventListener("wheel", e => {
       e.preventDefault();
       const r = c.getBoundingClientRect();
@@ -146,11 +209,8 @@ export class SimView {
     ctx.fillStyle = "#0e0e12";
     ctx.fillRect(0, 0, W, H);
 
-    const ox = W / 2 + this.panX, oy = H / 2 + this.panY, s = this.scale;
-    const cyaw = Math.cos(this.yaw), syaw = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
-    const cx0 = this.center.x, cy0 = this.center.y, cz0 = this.center.z;
-    const PX = (x: number, y: number) => ox + ((x - cx0) * cyaw - (y - cy0) * syaw) * s;
-    const PY = (x: number, y: number, z: number) => oy - (((x - cx0) * syaw + (y - cy0) * cyaw) * cp + (z - cz0) * sp) * s;
+    const s = this.scale;
+    const { PX, PY } = this.projection();
 
     // ---- Bett mit Raster ----
     ctx.lineWidth = 1;
@@ -238,6 +298,27 @@ export class SimView {
       ctx.moveTo(PX(p.x0[i], p.y0[i]), PY(p.x0[i], p.y0[i], p.z0[i]));
       ctx.lineTo(PX(this.tool.x, this.tool.y), PY(this.tool.x, this.tool.y, this.tool.z));
       ctx.stroke();
+    }
+
+    // Hervorgehobene Zeile (angeklickt in der Bahn oder in der G-Code-Liste)
+    if (this.hiLine >= 0) {
+      let lo = 0, hi = p.n;
+      while (lo < hi) { const mid = (lo + hi) >> 1; if (p.line[mid] < this.hiLine) lo = mid + 1; else hi = mid; }
+      if (lo < p.n && p.line[lo] === this.hiLine) {
+        ctx.strokeStyle = HILITE_COLOR;
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        for (let i = lo; i < p.n && p.line[i] === this.hiLine; i++) {
+          ctx.moveTo(PX(p.x0[i], p.y0[i]), PY(p.x0[i], p.y0[i], p.z0[i]));
+          ctx.lineTo(PX(p.x1[i], p.y1[i]), PY(p.x1[i], p.y1[i], p.z1[i]));
+        }
+        ctx.stroke();
+        ctx.lineCap = "butt";
+        // Startpunkt markieren (bei sehr kurzen Stücken sonst kaum zu sehen)
+        ctx.fillStyle = HILITE_COLOR;
+        ctx.beginPath(); ctx.arc(PX(p.x0[lo], p.y0[lo]), PY(p.x0[lo], p.y0[lo], p.z0[lo]), 3.5, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
     // ---- Werkzeug ----

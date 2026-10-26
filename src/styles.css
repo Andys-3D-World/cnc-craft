@@ -681,6 +681,24 @@ input:not([type]) {
 .sim-row:hover { background: rgba(255,255,255,0.04); }
 .sim-row.done { color: #6f7385; }
 .sim-row.cur { background: rgba(109, 74, 255, 0.3); color: #fff; }
+.sim-row.hi { box-shadow: inset 3px 0 0 #ffd23c; color: #ffe58a; }
+.sim-row.locked { opacity: 0.45; cursor: not-allowed; }
+.sim-row.edit { overflow: visible; display: flex; align-items: center; }
+.sim-ed-input { flex: 1; min-width: 0; height: 18px; padding: 0 4px; border: 1px solid var(--accent-color); border-radius: 3px; background: var(--bg-panel-2); color: #fff; font: 12px/16px var(--font-mono); }
+.sim-box h4 .sim-ed-toggle { height: 22px; padding: 0 7px; text-transform: none; letter-spacing: 0; font-size: 0.72rem; }
+.sim-box h4 .sim-ed-toggle span { font-family: inherit; color: inherit; }
+.sim-ed-toggle.active { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+.sim-ed-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.sim-ed-bar .sim-btn { min-width: 28px; height: 26px; padding: 0 6px; }
+.sim-ed-bar select { height: 26px; padding: 1px 4px; max-width: 150px; font-size: 0.75rem; }
+.sim-ed-bar .btn-primary, .sim-ed-bar .btn-secondary { padding: 4px 9px; font-size: 0.75rem; }
+.sim-ed-note { display: flex; flex-direction: column; gap: 4px; font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; }
+.sim-ed-note .sim-warn { margin-top: 0; }
+.sim-ed-ov { display: flex; flex-direction: column; gap: 3px; padding: 5px 6px; border-radius: var(--radius-sm); background: var(--bg-panel-2); }
+.sim-ed-ov-row { display: flex; align-items: center; gap: 3px; }
+.sim-ed-ov-row b { min-width: 64px; font-weight: 600; color: var(--text-main); }
+.sim-ed-ov-row .sim-btn { height: 22px; min-width: 0; padding: 0 6px; font-size: 0.7rem; }
+.sim-ed-ov-row i { font-style: normal; font-family: var(--font-mono); color: var(--text-main); margin-left: 4px; }
 
 /* =====================================================================
    WERKZEUG-AUSWAHL IM CAM-BEREICH + WERKZEUG-DIALOG
