@@ -14,8 +14,18 @@
   estimate show the drilling moves of these cycles too.
 - **Thread mill as a tool type:** new type *Thread mill* in the tool library with pitch and flank angle (metric 60°),
   drawn with its teeth, named e.g. *Thread mill P1.25 Ø6*. The cutting data calculator uses half the feed and one
-  pitch as step-down. CNC Craft warns when a thread mill is used for normal contours (no thread milling operation
-  yet).
+  pitch as step-down. CNC Craft warns when a thread mill is used for normal contours.
+- **Thread milling (internal and external threads):** new operation *Thread milling* in *Operations* for circles,
+  e.g. drill or mill the core hole first, then add *Thread milling* with the thread mill. Holes get an internal
+  thread, studs (outside) an external thread. Settings: thread length, thread Ø (0 = automatic: core hole + pitch,
+  so 6.8 mm becomes M8) and left-hand thread. The tool runs a helix with G2/G3 and one pitch per turn, always
+  climb milling, entering and leaving radially at plunge feed; the feed is corrected for the tool centre. Metric
+  ISO profile (60°): internal threads reach the nominal Ø, external threads the minor Ø. Thread operations always
+  run after all other tools, so the hole or stud is finished first. The core hole does not have to be drilled: it can
+  be milled with an end mill as *Inside* or *Pocket* (CNC Craft warns when an *Inside* contour would leave a core
+  in the middle). Circles drawn with the ellipse tool or imported as polygons count as circles when they are round.
+  Clear warnings when the tool is not a thread mill, the shape is not round, or the tool does not fit into the core
+  hole.
 - **Spindle inverter (VFD) over Modbus:** CNC Craft can now talk to a spindle inverter directly over
   Modbus RTU (RS-485 adapter) or Modbus TCP: set the speed, run forward / reverse / stop, and read the actual speed
   and the fault code. Small built-in Modbus engine (no extra libraries) with timeouts, retries after timeouts or

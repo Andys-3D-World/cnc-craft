@@ -18,6 +18,7 @@ import { generateLaserGcode } from "./laserCam";
 import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./rotary";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 import { adaptFeed, feedAdapt } from "./feedAdapt";
+import { threadPath } from "./threadMill";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -48,8 +49,11 @@ export function orderToolGroups(shapes: any[]): ToolGroup[] {
   }
   const lib = getTools();
   const cutsOut = (g: ToolGroup) => g.shapes.some(s => (s.millingMode || "outside") === "outside") ? 1 : 0;
+  // Gewinde immer zum Schluss: das Kern-Loch bzw. der Bolzen muss vorher fertig sein
+  const threads = (g: ToolGroup) => g.shapes.some(s => s.millingMode === "thread") ? 1 : 0;
   const sorted = [...map.values()].sort((a, b) =>
-    cutsOut(a) - cutsOut(b)
+    threads(a) - threads(b)
+    || cutsOut(a) - cutsOut(b)
     || (a.tool?.diameter ?? 0) - (b.tool?.diameter ?? 0)
     || lib.indexOf(a.tool as MillingTool) - lib.indexOf(b.tool as MillingTool));
   return withRestGroups(sorted);
@@ -596,6 +600,54 @@ const generateGcodeInner = (shapes: any): string | null => {
   };
 
   /**
+   * Ist die Form ein Kreis? Echte Kreise – und runde Linienzüge (Ellipse mit gleicher Breite/Höhe, DXF/SVG-Kreise
+   * als Vieleck): alle Ecken und Kantenmitten höchstens 1,5 % (mind. 0,05 mm) vom Radius entfernt. Ergebnis in Pixeln
+   * (Radius = mittlerer Abstand der Ecken – die liegen auf dem Kreis).
+   */
+  const roundOf = (shape: any): { x: number; y: number; r: number } | null => {
+    if (shape.type === "circle") return { x: shape.x, y: shape.y, r: Math.abs(shape.w) };
+    const path = shapeToPaths(shape)[0];
+    if (!path || !path.closed || path.pts.length < 12) return null;
+    const pts = path.pts;
+    // Mittelpunkt = Mittelwert der Ecken (Kreise als Vieleck haben gleichmäßig verteilte Ecken)
+    const x = pts.reduce((a, p) => a + p.x, 0) / pts.length, y = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+    const rs: number[] = [];
+    pts.forEach((p, i) => {
+      const q = pts[(i + 1) % pts.length];
+      rs.push(Math.hypot(p.x - x, p.y - y), Math.hypot((p.x + q.x) / 2 - x, (p.y + q.y) / 2 - y));
+    });
+    const rMax = Math.max(...rs), rMin = Math.min(...rs);
+    if (rMax - rMin > Math.max(0.05 * MM_TO_PIXEL, 0.015 * rMax)) return null;
+    return { x, y, r: pts.reduce((a, p) => a + Math.hypot(p.x - x, p.y - y), 0) / pts.length };
+  };
+
+  /** GEWINDE FRÄSEN an einem Kreis (threadMill.ts): innen bei Löchern, außen bei Bolzen */
+  const millThread = (shape: any) => {
+    const tool = curTool;
+    const warn = (key: string, p: Record<string, string | number> = {}) => lastGcodeWarnings.push(t(key, { n: formCounter, ...p }));
+    if (!tool || tool.type !== "threadmill") { warn("gcw.threadTool"); return; }
+    const round = roundOf(shape);
+    if (!round) { warn("gcw.threadCircle"); return; }
+    const side = Number(shape.chamferSide) || 0;
+    if (!side) { warn("gcw.threadSide"); return; }
+    const c0 = toMachine(round.x, round.y), holeD = 2 * round.r / MM_TO_PIXEL;
+    // Loch nur als Kontur „Innen“ gefräst: ab Loch-Ø > 2 × Fräser-Ø bleibt in der Mitte ein Kern stehen
+    const first = shape.opOf, firstTool = first ? toolForShape(first) : null;
+    if (side < 0 && first?.millingMode === "inside" && firstTool && holeD > 2 * firstTool.diameter - 0.01) {
+      warn("gcw.threadCore", { h: holeD.toFixed(2), d: firstTool.diameter });
+    }
+    const r = threadPath({
+      cx: c0.x, cy: c0.y, holeD, internal: side < 0,
+      D: Number(shape.threadD) || 0, pitch: tool.pitch || 1, toolD: tool.diameter,
+      length: Math.abs(typeof shape.millingDepth === "number" ? shape.millingDepth : 0),
+      left: !!shape.threadLeft, feed: feedXY, plunge: PLUNGE_FEED, safeZ: SAFE_Z,
+    });
+    if (!r.ok) { warn("gcw.thread." + r.why, { d: tool.diameter }); return; }
+    gcode += `\n${c("gc.thread", { n: formCounter, d: r.D, p: tool.pitch || 1, l: Math.abs(shape.millingDepth), side: t(side < 0 ? "gc.threadIn" : "gc.threadOut"), hand: t(shape.threadLeft ? "gc.threadLeft" : "gc.threadRight") })}\n`;
+    gcode += r.lines.join("\n") + "\n";
+  };
+
+  /**
    * FASE mit Fasen- oder V-Fräser (halber Winkel θ, Spitze d0): Tiefe h = Breite / tan θ, die Spitze läuft d0/2
    * neben der Kante (außen bei Außenkonturen, innen bei Löchern/Taschen) – dann trifft der Kegel die Wand genau an
    * der Kante und die Oberseite in Fasenbreite daneben.
@@ -681,6 +733,10 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (mode === "chamfer") {
       gcode += `\n${c("gc.chamfer", { n: formCounter, w: Number(shape.chamferW) || 1 })}\n`;
       millChamfer(shape);
+      return;
+    }
+    if (mode === "thread") {
+      millThread(shape);
       return;
     }
     if (mode === "drill") {

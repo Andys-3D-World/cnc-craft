@@ -8,10 +8,12 @@
  *
  * Neue Art „chamfer“ (Fase): Fasen- oder V-Fräser fährt die Kante in der Tiefe ab, die die Fasenbreite ergibt –
  * außen bei Außenkonturen, innen bei Löchern/Taschen, auf der Linie sonst (siehe cam.ts → millChamfer).
+ * Art „thread“ (Gewinde fräsen): nur an Kreisen mit dem Gewindefräser – innen bei Löchern, außen bei Bolzen
+ * (gleiche Seite wie die Fase); Tiefe = Gewindelänge (siehe threadMill.ts).
  */
 
-export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer";
-export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer"];
+export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread";
+export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread"];
 
 export interface ShapeOp {
   kind: OpKind;
@@ -19,6 +21,8 @@ export interface ShapeOp {
   depth: number;        // Frästiefe (negativ, wie millingDepth); bei der Fase unbenutzt
   chamferW?: number;    // Fase: Breite in mm
   finishAllow?: number; // Schlicht-Aufmaß in mm
+  threadD?: number;     // Gewinde: Nenn-Ø in mm (0 = aus dem Kreis)
+  threadLeft?: boolean; // Gewinde: Linksgewinde
 }
 
 const num = (v: any, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d);
@@ -31,7 +35,8 @@ export function extraOps(s: any): ShapeOp[] {
     toolId: typeof o.toolId === "string" ? o.toolId : undefined,
     depth: Math.min(0, num(o.depth, -1)),
     chamferW: Math.max(0.05, num(o.chamferW, 1)),
-    finishAllow: Math.max(0, num(o.finishAllow, 0))
+    finishAllow: Math.max(0, num(o.finishAllow, 0)),
+    ...(o.kind === "thread" ? { threadD: Math.max(0, Math.min(500, num(o.threadD, 0))), threadLeft: o.threadLeft === true } : {})
   }));
 }
 
@@ -58,6 +63,8 @@ export function expandOps(shapes: any[]): any[] {
         finishAllow: o.finishAllow || undefined,
         chamferW: o.chamferW,
         chamferSide: chamferSide(s),
+        threadD: o.threadD,
+        threadLeft: o.threadLeft,
         restToolId: undefined,
         parentChainId: undefined,
         ops: undefined

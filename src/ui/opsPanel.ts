@@ -72,10 +72,16 @@ export function initOpsPanel(redraw: () => void, log: (s: string) => void) {
     const tool = q("ops-tool")?.value || "";
     const depth = parseFloat(q("ops-depth")?.value || "");
     const cw = parseFloat(q("ops-cw")?.value || "");
+    const td = parseFloat(q("ops-td")?.value || "");
+    const left = q("ops-left");
     return {
       kind, toolId: tool || undefined,
       depth: Number.isFinite(depth) ? Math.min(0, depth) : prev?.depth ?? -1,
-      chamferW: Number.isFinite(cw) && cw > 0 ? cw : prev?.chamferW ?? 1
+      chamferW: Number.isFinite(cw) && cw > 0 ? cw : prev?.chamferW ?? 1,
+      ...(kind === "thread" ? {
+        threadD: Number.isFinite(td) && td >= 0 ? td : prev?.threadD ?? 0,
+        threadLeft: left ? left.checked : prev?.threadLeft ?? false
+      } : {})
     };
   });
   list.addEventListener("change", () => apply(readRows()));
@@ -144,6 +150,10 @@ export function refreshOps(force = false) {
       <select class="prop-input ops-tool" style="width:100%;">${toolOpts(o.toolId)}</select>
       ${o.kind === "chamfer"
         ? `<div class="prop-row" ${tip("ops.cwTip")}>${T("ops.cw")}<input type="number" class="prop-input ops-cw" min="0.05" step="0.1" value="${o.chamferW}"></div>`
+        : o.kind === "thread"
+        ? `<div class="prop-row" ${tip("ops.threadLenTip")}>${T("ops.threadLen")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>
+           <div class="prop-row" ${tip("ops.threadDTip")}>${T("ops.threadD")}<input type="number" class="prop-input ops-td" min="0" step="0.5" value="${o.threadD || 0}"></div>
+           <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadLeftTip")}>${T("ops.threadLeft")}<input type="checkbox" class="ops-left" style="width:auto;"${o.threadLeft ? " checked" : ""}></label>`
         : `<div class="prop-row">${T("rp.depth")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
     </div>`).join("");
   list.innerHTML = first + rows;
