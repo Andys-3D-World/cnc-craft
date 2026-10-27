@@ -12,6 +12,11 @@
 - **Tool coating:** tools have a *Coating* field (uncoated, TiN, TiAlN, AlTiN, AlCrN, CrN, ZrN, DLC), shown in the
   tool list. For information only – cutting data are not changed. The Fusion 360 import detects the coating from
   the tool name.
+- **Face stock on both sides (against warping):** new button *Face both sides …* in 3D milling. Wood, plastics
+  and aluminium have internal stresses – if a 3D job removes a lot of material from one side only, the part warps.
+  The wizard makes a facing job (zigzag rows over the area, several depths, plunging next to the stock): mill side 1,
+  flip the plate, zero Z again, mill the same job for side 2. The material thickness in 3D milling is reduced
+  automatically, with a warning if the stock would become thinner than the model.
 
 **Improved**
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),

@@ -15,6 +15,7 @@ import { carveScene } from "../view3d/scenes";
 import { MATERIALS, materialView } from "../materialView";
 import { getTools, MillingTool } from "../toolLibrary";
 import { loadGcodeFromText } from "../machineStream";
+import { openFacingDialog } from "./facingDialog";
 import { Job3D, Path3D, loadModel3d, computePaths3d, cancelPaths3d, gcode3d, stats3d } from "../cam3d";
 
 const KEY = "cnc_craft_cam3d";
@@ -114,6 +115,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
         <button id="c3d-stop" class="btn-secondary" style="display:none;">■ ${t("c3d.cancel")}</button>
         <button id="c3d-load" class="btn-secondary" disabled>${t("c3d.load")}</button>
         <button id="c3d-save" class="btn-secondary" disabled>💾 ${t("c3d.save")}</button>
+        <button id="c3d-face" class="btn-secondary" data-tip="${esc(t("face.btnTip"))}">🪵 ${t("face.btn")}</button>
         <button id="c3d-close" class="btn-secondary" style="margin-left:auto;">${t("dlg.close")}</button>
       </div>
     </div>`;
@@ -262,6 +264,10 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   for (const [id, k] of [["c3d-keep", "keep"], ["c3d-margin", "margin"], ["c3d-rough", "rough"], ["c3d-finish", "finish"]] as [string, keyof Opts][]) {
     $(id).addEventListener("change", () => { (o as any)[k] = $(id).checked; fill(); save_(); stale(); });
   }
+  // Rohteil vorher beidseitig planen (gegen Verzug); danach ist das Material dünner
+  $<HTMLButtonElement>("c3d-face").onclick = () => openFacingDialog(
+    { x0: o.x0, y0: o.y0, w: o.sizeX, h: o.sizeY, thick: o.thick, height: o.height }, log,
+    depth => { o.thick = +Math.max(0.1, o.thick - 2 * depth).toFixed(2); fill(); save_(); stale(); });
   $<HTMLSelectElement>("c3d-rtool").addEventListener("change", e => {
     o.roughTool = (e.target as HTMLSelectElement).value;
     const r = tool(o.roughTool);
