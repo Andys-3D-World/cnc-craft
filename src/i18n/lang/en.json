@@ -3525,5 +3525,17 @@
   "vfd.log.fwd": "Inverter: forward.",
   "vfd.log.rev": "Inverter: reverse.",
   "vfd.log.stop": "Inverter: stop.",
-  "m.ruidaUsbNone": "no port found – plug in the cable, switch the laser on, then 🔄"
+  "m.ruidaUsbNone": "no port found – plug in the cable, switch the laser on, then 🔄",
+  "cyc.expanded": "Drilling cycles: {n} holes converted into plain G0/G1 moves ({lines} lines will be sent).",
+  "cyc.tapWarn": "⚠ Tapping ({n}×): GRBL cannot sync the spindle with the feed – use a floating tap holder (length compensation) only! At the bottom it reverses with M4 to back out.",
+  "cyc.refused": "Job not started – drilling cycle in line {n} cannot be converted: {line} – {why}",
+  "cyc.err.incremental": "Cycles with G91 (incremental) are not supported – please post with G90.",
+  "cyc.err.noR": "R (retract plane) is missing.",
+  "cyc.err.noZ": "Z (hole depth) is missing.",
+  "cyc.err.rBelowZ": "Hole depth Z is above the retract plane R.",
+  "cyc.err.noQ": "Q (peck depth) is missing or 0.",
+  "cyc.err.noF": "No feed rate (F) set.",
+  "cyc.err.dwellMs": "Dwell P over 60 s – probably given in milliseconds. Switch the post processor to seconds.",
+  "cyc.err.unknownZ": "Start height unknown (e.g. after G28) – move to a Z height before the cycle or use G99.",
+  "cyc.err.unsupported": "Cycle G{code} is not supported."
 }

@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Drilling cycles for GRBL (G81, G82, G83, G73, G84, G74, G85, G89):** G-code from Fusion 360 and other CAM
+  programs often contains canned drilling cycles, which GRBL does not know (error:20 in the middle of the job).
+  CNC Craft now converts them into plain G0/G1/G4 moves just before the job is sent: simple drilling, dwell, peck
+  drilling with full retract (G83) or chip breaking (G73), boring (G85/G89) and tapping (G84/G74: spindle reverses
+  at the bottom – only with a floating tap holder, GRBL cannot sync the spindle). R/Z/Q/P stay valid for the
+  following holes, G98 returns to the start height, G99 to R. Progress, *Resume from line* and the height map keep
+  working on the loaded file. Programs with G91 cycles, missing R/Z/Q/F or a dwell that looks like milliseconds
+  are refused with a clear message instead of guessing.
 - **Spindle inverter (VFD) over Modbus:** CNC Craft can now talk to a spindle inverter directly over
   Modbus RTU (RS-485 adapter) or Modbus TCP: set the speed, run forward / reverse / stop, and read the actual speed
   and the fault code. Small built-in Modbus engine (no extra libraries) with timeouts, retries after timeouts or

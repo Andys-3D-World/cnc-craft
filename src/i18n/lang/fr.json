@@ -3350,5 +3350,17 @@
   "vfd.log.fwd": "Variateur : avant.",
   "vfd.log.rev": "Variateur : arrière.",
   "vfd.log.stop": "Variateur : arrêt.",
-  "m.ruidaUsbNone": "aucun port trouvé – branchez le câble, allumez le laser, puis 🔄"
+  "m.ruidaUsbNone": "aucun port trouvé – branchez le câble, allumez le laser, puis 🔄",
+  "cyc.expanded": "Cycles de perçage : {n} trous convertis en simples mouvements G0/G1 ({lines} lignes seront envoyées).",
+  "cyc.tapWarn": "⚠ Taraudage ({n}×) : GRBL ne peut pas synchroniser la broche avec l'avance – utilisez uniquement un porte-taraud flottant (compensation de longueur) ! En bas, la broche s'inverse (M4) pour ressortir.",
+  "cyc.refused": "Job non démarré – le cycle de perçage de la ligne {n} ne peut pas être converti : {line} – {why}",
+  "cyc.err.incremental": "Les cycles en G91 (relatif) ne sont pas pris en charge – utilisez G90.",
+  "cyc.err.noR": "R (plan de retrait) manquant.",
+  "cyc.err.noZ": "Z (profondeur) manquant.",
+  "cyc.err.rBelowZ": "La profondeur Z est au-dessus du plan de retrait R.",
+  "cyc.err.noQ": "Q (profondeur de débourrage) manquant ou nul.",
+  "cyc.err.noF": "Aucune avance (F) définie.",
+  "cyc.err.dwellMs": "Temporisation P supérieure à 60 s – probablement en millisecondes. Réglez le post-processeur en secondes.",
+  "cyc.err.unknownZ": "Hauteur de départ inconnue (p. ex. après G28) – allez à une hauteur Z avant le cycle ou utilisez G99.",
+  "cyc.err.unsupported": "Le cycle G{code} n'est pas pris en charge."
 }

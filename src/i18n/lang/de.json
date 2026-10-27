@@ -3525,5 +3525,17 @@
   "vfd.log.fwd": "Umrichter: vorwärts.",
   "vfd.log.rev": "Umrichter: rückwärts.",
   "vfd.log.stop": "Umrichter: Stopp.",
-  "m.ruidaUsbNone": "kein Port gefunden – Kabel einstecken, Laser einschalten, dann 🔄"
+  "m.ruidaUsbNone": "kein Port gefunden – Kabel einstecken, Laser einschalten, dann 🔄",
+  "cyc.expanded": "Bohrzyklen: {n} Bohrungen in einfache G0/G1-Bewegungen umgewandelt ({lines} Zeilen werden gesendet).",
+  "cyc.tapWarn": "⚠ Gewindebohren ({n}×): GRBL kann die Spindel nicht mit dem Vorschub koppeln – nur mit Ausgleichsfutter (Längenausgleich) benutzen! Unten wird mit M4 rückwärts herausgefahren.",
+  "cyc.refused": "Job nicht gestartet – Bohrzyklus in Zeile {n} lässt sich nicht umwandeln: {line} – {why}",
+  "cyc.err.incremental": "Zyklen mit G91 (relativ) werden nicht unterstützt – bitte mit G90 ausgeben.",
+  "cyc.err.noR": "R (Rückzugsebene) fehlt.",
+  "cyc.err.noZ": "Z (Bohrtiefe) fehlt.",
+  "cyc.err.rBelowZ": "Bohrtiefe Z liegt über der Rückzugsebene R.",
+  "cyc.err.noQ": "Q (Zustelltiefe beim Tieflochbohren) fehlt oder ist 0.",
+  "cyc.err.noF": "Kein Vorschub (F) gesetzt.",
+  "cyc.err.dwellMs": "Verweilzeit P über 60 s – vermutlich in Millisekunden angegeben. Postprozessor auf Sekunden umstellen.",
+  "cyc.err.unknownZ": "Starthöhe unbekannt (z. B. nach G28) – vor dem Zyklus eine Z-Höhe anfahren oder G99 benutzen.",
+  "cyc.err.unsupported": "Zyklus G{code} wird nicht unterstützt."
 }

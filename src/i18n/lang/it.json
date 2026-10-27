@@ -3350,5 +3350,17 @@
   "vfd.log.fwd": "Inverter: avanti.",
   "vfd.log.rev": "Inverter: indietro.",
   "vfd.log.stop": "Inverter: stop.",
-  "m.ruidaUsbNone": "nessuna porta trovata – collega il cavo, accendi il laser, poi 🔄"
+  "m.ruidaUsbNone": "nessuna porta trovata – collega il cavo, accendi il laser, poi 🔄",
+  "cyc.expanded": "Cicli di foratura: {n} fori convertiti in semplici movimenti G0/G1 (verranno inviate {lines} righe).",
+  "cyc.tapWarn": "⚠ Maschiatura ({n}×): GRBL non può sincronizzare il mandrino con l'avanzamento – usa solo un portamaschi flottante (compensazione di lunghezza)! In fondo inverte con M4 per uscire.",
+  "cyc.refused": "Lavoro non avviato – il ciclo di foratura alla riga {n} non può essere convertito: {line} – {why}",
+  "cyc.err.incremental": "I cicli in G91 (incrementale) non sono supportati – genera il codice in G90.",
+  "cyc.err.noR": "Manca R (piano di ritorno).",
+  "cyc.err.noZ": "Manca Z (profondità).",
+  "cyc.err.rBelowZ": "La profondità Z è sopra il piano di ritorno R.",
+  "cyc.err.noQ": "Manca Q (profondità di scarico) o è 0.",
+  "cyc.err.noF": "Nessun avanzamento (F) impostato.",
+  "cyc.err.dwellMs": "Sosta P oltre 60 s – probabilmente in millisecondi. Imposta il post-processore in secondi.",
+  "cyc.err.unknownZ": "Quota di partenza sconosciuta (ad es. dopo G28) – porta Z a una quota prima del ciclo o usa G99.",
+  "cyc.err.unsupported": "Il ciclo G{code} non è supportato."
 }

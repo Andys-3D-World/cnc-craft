@@ -12,6 +12,7 @@
 //!   flash.rs   – Firmware flashen: ESP32/ESP32-S3 (MKS DLC32 …) und Arduino (GRBL) – ohne Zusatzprogramm
 //!   fonts.rs   – Systemschriften für das Text-Werkzeug auflisten und laden
 //!   workshop.rs – Werkstatt-Geräte (Absaugung, Kompressor …) per HTTP/MQTT mit dem Job schalten
+//!   cycles.rs  – Bohrzyklen (G81/G83/G84 …) vor dem Senden in G0/G1 umwandeln (GRBL kennt sie nicht)
 //!   controller.rs – gemeinsame Schnittstelle aller Steuerungen (MachineController)
 //!   modbus.rs  – Modbus TCP/RTU (async, Zeitlimit + Wiederholen) – Rahmen/CRC mit Tests
 //!   vfd.rs     – Frequenzumrichter (Spindel) per Modbus: Drehzahl, Richtung, Störung – Profile
@@ -24,6 +25,7 @@
 
 mod cam3d;
 mod controller;
+mod cycles;
 mod elfimg;
 mod flash;
 mod fonts;
@@ -837,6 +839,7 @@ pub fn run() {
             cam3d_cancel,
             workshop_set_devices,
             workshop_test,
+            cycles::gcode_expand_cycles,
             vfd::vfd_profiles,
             vfd::vfd_connect,
             vfd::vfd_disconnect,

@@ -11,6 +11,7 @@
  *   "cnc-job-done"     – Job fertig/abgebrochen (Material-Platte wird markiert)
  */
 import { aAxisRefused } from "./rotary";
+import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
@@ -244,14 +245,41 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
   // Fertiger Job wird von vorne gestartet
   if (streamState.currentLine >= streamState.totalLines) streamState.currentLine = 0;
 
+  // Bohrzyklen (G81/G83/G84 …): kennt GRBL nicht -> vorher in G0/G1 umwandeln (cycles.rs).
+  // Jede neue Zeile merkt sich ihre Original-Zeile, Fortschritt/Fortsetzen zeigen weiter auf die Datei
+  let src = streamState.loadedLines;
+  let srcOrigin: number[] | null = null;
+  if (machine.connected) {
+    try {
+      const e = await invoke<{ lines: string[]; origin: number[]; holes: number; taps: number; changed: boolean }>("gcode_expand_cycles", { lines: src });
+      if (e.changed) {
+        src = e.lines;
+        srcOrigin = e.origin;
+        if (e.holes) appendToConsole(t("cyc.expanded", { n: e.holes, lines: e.lines.length }));
+        if (e.taps) appendToConsole(t("cyc.tapWarn", { n: e.taps }));
+      }
+    } catch (e) {
+      // "Zeilenindex:Grund"
+      const m = String(e).match(/^(\d+):(.*)$/);
+      if (!m) { appendToConsole(t("cyc.refused", { n: "?", line: "", why: String(e) })); return; }
+      const idx = Number(m[1]);
+      const why = m[2].startsWith("unsupported") ? t("cyc.err.unsupported", { code: m[2].slice(12) }) : t("cyc.err." + m[2]);
+      appendToConsole(t("cyc.refused", { n: idx + 1, line: streamState.loadedLines[idx] || "", why }));
+      return;
+    }
+  }
+
   // Fortsetzen: Vorspann (Zustand herstellen) + Job ab der Zeile; jede Zeile merkt sich ihre Original-Nummer
-  let base = streamState.loadedLines;
-  let baseOrigin: number[] | null = null;
+  let base = src;
+  let baseOrigin: number[] | null = srcOrigin;
   if (resumeFrom > 0) {
     try {
-      const plan = buildResume(streamState.loadedLines, resumeFrom, getMachineMode());
+      // umgewandelte Bohrzyklen: ab der ersten neuen Zeile, die zur gewählten Original-Zeile gehört
+      const from = srcOrigin ? Math.max(0, srcOrigin.findIndex(o => o >= resumeFrom)) : resumeFrom;
+      const plan = buildResume(src, from, getMachineMode());
       base = [...plan.pre, ...plan.rest];
-      baseOrigin = [...plan.pre.map(() => resumeFrom), ...plan.rest.map((_, i) => resumeFrom + i)];
+      baseOrigin = [...plan.pre.map(() => from), ...plan.rest.map((_, i) => from + i)];
+      if (srcOrigin) baseOrigin = baseOrigin.map(i => srcOrigin![i]);
       appendToConsole(t("res.started", { n: resumeFrom + 1, pre: plan.pre.length }));
     } catch (e) {
       appendToConsole(t("res.refused", { e: (e as Error).message || String(e) }));

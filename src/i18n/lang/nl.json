@@ -3350,5 +3350,17 @@
   "vfd.log.fwd": "Regelaar: vooruit.",
   "vfd.log.rev": "Regelaar: achteruit.",
   "vfd.log.stop": "Regelaar: stop.",
-  "m.ruidaUsbNone": "geen poort gevonden – kabel aansluiten, laser aanzetten, dan 🔄"
+  "m.ruidaUsbNone": "geen poort gevonden – kabel aansluiten, laser aanzetten, dan 🔄",
+  "cyc.expanded": "Boorcycli: {n} gaten omgezet in eenvoudige G0/G1-bewegingen ({lines} regels worden verzonden).",
+  "cyc.tapWarn": "⚠ Draadtappen ({n}×): GRBL kan de spindel niet met de voeding synchroniseren – gebruik alleen een zwevende tappenhouder (lengtecompensatie)! Onderaan draait hij met M4 terug naar buiten.",
+  "cyc.refused": "Job niet gestart – boorcyclus in regel {n} kan niet worden omgezet: {line} – {why}",
+  "cyc.err.incremental": "Cycli met G91 (incrementeel) worden niet ondersteund – exporteer met G90.",
+  "cyc.err.noR": "R (terugtrekvlak) ontbreekt.",
+  "cyc.err.noZ": "Z (boordiepte) ontbreekt.",
+  "cyc.err.rBelowZ": "Boordiepte Z ligt boven het terugtrekvlak R.",
+  "cyc.err.noQ": "Q (pikdiepte) ontbreekt of is 0.",
+  "cyc.err.noF": "Geen voeding (F) ingesteld.",
+  "cyc.err.dwellMs": "Wachttijd P boven 60 s – waarschijnlijk in milliseconden. Zet de postprocessor op seconden.",
+  "cyc.err.unknownZ": "Starthoogte onbekend (bijv. na G28) – ga vóór de cyclus naar een Z-hoogte of gebruik G99.",
+  "cyc.err.unsupported": "Cyclus G{code} wordt niet ondersteund."
 }

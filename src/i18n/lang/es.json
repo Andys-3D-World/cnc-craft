@@ -3350,5 +3350,17 @@
   "vfd.log.fwd": "Variador: adelante.",
   "vfd.log.rev": "Variador: atrás.",
   "vfd.log.stop": "Variador: parar.",
-  "m.ruidaUsbNone": "ningún puerto encontrado – conecta el cable, enciende el láser y pulsa 🔄"
+  "m.ruidaUsbNone": "ningún puerto encontrado – conecta el cable, enciende el láser y pulsa 🔄",
+  "cyc.expanded": "Ciclos de taladrado: {n} agujeros convertidos en movimientos simples G0/G1 (se enviarán {lines} líneas).",
+  "cyc.tapWarn": "⚠ Roscado ({n}×): GRBL no puede sincronizar el husillo con el avance – ¡usa solo un portamachos flotante (compensación de longitud)! Abajo invierte con M4 para salir.",
+  "cyc.refused": "Trabajo no iniciado – el ciclo de taladrado de la línea {n} no se puede convertir: {line} – {why}",
+  "cyc.err.incremental": "Los ciclos con G91 (incremental) no se admiten – genera el código con G90.",
+  "cyc.err.noR": "Falta R (plano de retirada).",
+  "cyc.err.noZ": "Falta Z (profundidad).",
+  "cyc.err.rBelowZ": "La profundidad Z está por encima del plano de retirada R.",
+  "cyc.err.noQ": "Falta Q (profundidad de picoteo) o es 0.",
+  "cyc.err.noF": "No hay avance (F) definido.",
+  "cyc.err.dwellMs": "Espera P de más de 60 s – probablemente en milisegundos. Ajusta el postprocesador a segundos.",
+  "cyc.err.unknownZ": "Altura inicial desconocida (p. ej. tras G28) – mueve a una altura Z antes del ciclo o usa G99.",
+  "cyc.err.unsupported": "El ciclo G{code} no es compatible."
 }
