@@ -1,0 +1,126 @@
+# CNC Craft – licence texts of all libraries built into the app
+# Usage:  python3 tools/licenses/generate.py        (from the repository root, needs cargo + node_modules)
+# Writes public/licenses/THIRD_PARTY_LICENSES.txt (Rust crates + npm runtime packages, grouped by identical text)
+# and copies LICENSE, THIRD_PARTY_NOTICES.md next to it. Vite copies public/ into the app, the ⓘ dialog shows them.
+# Run it again after changing dependencies (the release workflow does this before building).
+import json, os, re, shutil, subprocess, sys
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+OUT = os.path.join(ROOT, "public", "licenses")
+TARGETS = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu"]
+LIC_FILE = re.compile(r"^(licen[cs]e|copying|notice|unlicense|copyright)([-._].*)?$", re.I)
+
+
+def licence_files(folder):
+    """Licence/notice files directly in the package folder (sorted, readable text only)."""
+    out = []
+    for f in sorted(os.listdir(folder)):
+        p = os.path.join(folder, f)
+        if os.path.isfile(p) and LIC_FILE.match(f) and not f.endswith((".rs", ".js", ".ts", ".json", ".toml")):
+            try:
+                out.append((f, open(p, encoding="utf-8").read().strip()))
+            except UnicodeDecodeError:
+                pass
+    return out
+
+
+def rust_packages():
+    """All crates that end up in the app (no dev-dependencies, no build-only tools of the root), any platform."""
+    pk, used = {}, set()
+    for t in TARGETS:
+        meta = json.loads(subprocess.check_output(
+            ["cargo", "metadata", "--format-version", "1", "--locked", "--filter-platform", t],
+            cwd=os.path.join(ROOT, "src-tauri")))
+        for p in meta["packages"]:
+            pk[p["id"]] = p
+        nodes = {n["id"]: n for n in meta["resolve"]["nodes"]}
+        todo = [meta["resolve"]["root"]]
+        while todo:
+            i = todo.pop()
+            if i in used:
+                continue
+            used.add(i)
+            for d in nodes[i]["deps"]:
+                if any(k["kind"] != "dev" for k in d["dep_kinds"]):
+                    todo.append(d["pkg"])
+    res = []
+    for i in used:
+        p = pk[i]
+        if p["name"] == "cnc-craft":
+            continue
+        folder = os.path.dirname(p["manifest_path"])
+        files = licence_files(folder)
+        # libusb is compiled in from the vendored sources of libusb1-sys
+        if p["name"] == "libusb1-sys" and os.path.isdir(os.path.join(folder, "libusb")):
+            res.append(("libusb (C library, built in by libusb1-sys)", "LGPL-2.1-or-later",
+                        [("libusb/" + f, t) for f, t in licence_files(os.path.join(folder, "libusb"))]))
+        res.append((f'{p["name"]} {p["version"]}', p.get("license") or "see licence file", files))
+    return res
+
+
+def npm_packages():
+    """npm packages that are bundled into the app (runtime dependencies, not the build tools)."""
+    lock = json.load(open(os.path.join(ROOT, "package-lock.json")))
+    res = []
+    for k, v in lock["packages"].items():
+        if not k or v.get("dev") or v.get("optional"):
+            continue
+        folder = os.path.join(ROOT, k)
+        if not os.path.isdir(folder):
+            sys.exit(f"missing {k} – run npm ci first")
+        name = k.split("node_modules/")[-1]
+        res.append((f'{name} {v.get("version", "")} (npm)', v.get("license") or "see licence file", licence_files(folder)))
+    return res
+
+
+def main():
+    pkgs = sorted(rust_packages() + npm_packages(), key=lambda x: x[0].lower())
+    # same text → one block with all package names; packages without a file: listed with their SPDX licence
+    groups, nofile = {}, []
+    for name, spdx, files in pkgs:
+        if not files:
+            nofile.append((name, spdx))
+            continue
+        # each licence file on its own: the same text (apart from line breaks/spaces) is printed only once
+        for f, t in files:
+            key = re.sub(r"\s+", " ", t)
+            if key not in groups:
+                groups[key] = (t, [])
+            groups[key][1].append(f"{name} ({spdx}) – {f}")
+    # standard texts for packages that ship no licence file: take the first matching file from another package
+    std = {}
+    for name, spdx, files in pkgs:
+        for f, t in files:
+            key = ("Apache-2.0" if re.search(r"apache", f, re.I) else "MIT" if re.search(r"mit", f, re.I) else None)
+            if key and key not in std:
+                std[key] = t
+
+    lines = [
+        "CNC Craft – licences of the libraries built into this program",
+        "=" * 64,
+        "",
+        "CNC Craft itself is licensed under the GNU General Public License v3.0 or later (LICENSE.txt).",
+        "Bundled firmware, fonts and the STEP importer are listed in THIRD_PARTY_NOTICES.md.",
+        "This file lists every Rust crate and npm package compiled into the program, with its licence text.",
+        "Generated by tools/licenses/generate.py – do not edit by hand.",
+        "",
+        f"{len(pkgs)} packages.",
+        "",
+    ]
+    for text, names in sorted(groups.values(), key=lambda g: g[1][0].lower()):
+        lines += ["", "#" * 78, "Used by:"] + [f"  - {n}" for n in names] + ["", text, ""]
+    if nofile:
+        lines += ["", "#" * 78, "Packages without their own licence file (licence as declared by the package):"]
+        lines += [f"  - {n}: {s}" for n, s in nofile]
+        for key in ("MIT", "Apache-2.0"):
+            if key in std and any(key in s for _, s in nofile):
+                lines += ["", f"Standard text of the {key} licence:", "", std[key], ""]
+
+    os.makedirs(OUT, exist_ok=True)
+    open(os.path.join(OUT, "THIRD_PARTY_LICENSES.txt"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    shutil.copyfile(os.path.join(ROOT, "LICENSE"), os.path.join(OUT, "LICENSE.txt"))
+    shutil.copyfile(os.path.join(ROOT, "THIRD_PARTY_NOTICES.md"), os.path.join(OUT, "THIRD_PARTY_NOTICES.md"))
+    print(f"{len(pkgs)} packages, {len(groups)} licence texts, {len(nofile)} without own file")
+
+
+main()

@@ -51,6 +51,11 @@ jobs:
       - name: Frontend-Pakete installieren
         run: npm ci
 
+      # Lizenztexte aller eingebauten Bibliotheken (public/licenses/) – ⓘ → „Lizenzen“ in der App
+      - name: Lizenztexte erzeugen
+        shell: bash
+        run: python3 tools/licenses/generate.py || python tools/licenses/generate.py
+
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

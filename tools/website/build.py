@@ -13,10 +13,10 @@ T = {
  "en": dict(
   base="", path="", ogimg="assets/og-en.png", shots="en",
   title="CNC Craft – free software for laser engravers, CNC routers & plasma cutters",
-  desc="Free, open-source alternative to LightBurn, Estlcam and OpenBuilds: design, CAM and machine control for laser, CNC router and plasma in one app. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.",
+  desc="Free, open-source software for laser engravers, CNC routers and plasma cutters: design, CAM and machine control in one app. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.",
   nav=["Features", "Screenshots", "Download", "FAQ"], langlink=("de/", "Deutsch"),
   h1='Laser, CNC router &amp; plasma.<br><span>One free app.</span>',
-  sub="Design, CAM and machine control in one program – like LightBurn, Estlcam and OpenBuilds together. Open source, no subscription, no account.",
+  sub="Design, CAM and machine control in one program – no more switching between three programs. Open source, no subscription, no account.",
   chips=["100 % free", "Open source (GPL-3.0)", "macOS · Windows · Linux", "7 languages"],
   dl="Download", dlmac="Download for Mac", dlwin="Download for Windows", dllinux="Download for Linux (AppImage)",
   gh="★ Star on GitHub", note="Version", notemac="Mac with Apple chip (M1–M4). Intel Mac: see Download below.",
@@ -42,7 +42,7 @@ T = {
   nh="New in 0.3.0", nl="Image engraving with 14 styles and auto enhance, material preview, shape tools, Bézier curves, dimensions, several beds per project and new box types.",
   nlink="All changes", vid="whatsnew-en.mp4", vpost="en/08-image-engraving",
   ch="Built for makers", cl="CNC Craft combines what usually needs three programs:",
-  cmp=["LightBurn", "Estlcam", "OpenBuilds", "CNC Craft"],
+  cmp=["Design", "CAM", "Machine control", "CNC Craft"],
   sh="Screenshots", sl="Click a picture to enlarge it.",
   shotlist=[("01-design-router", "Design &amp; CAM", "drawing with router toolpaths"), ("02-simulation", "Simulation", "toolpaths in 3D with time and G-code"),
             ("03-laser", "Laser", "layers for engraving and cutting"), ("04-plasma", "Plasma", "cuts, pierce points and lead-ins"),
@@ -70,16 +70,16 @@ T = {
   kofi="☕ Ko-fi", spons="💜 GitHub Sponsors", issues="🐞 Report a bug",
   foot=['Made by Andreas Piaszek – <a href="https://www.youtube.com/results?search_query=Andys+3D+World">Andys 3D World</a> on YouTube, TikTok and Instagram.',
         'Developed with the help of the AI tool <a href="https://claude.com/claude-code">Claude Code</a> by Anthropic; every change is reviewed and tested on real machines.',
-        'Free software under the <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="' + GH + '/blob/main/PRIVACY.md">Privacy</a>: no tracking and no cookies on this page.',
-        'Product names (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) belong to their owners and are only used for comparison. CNC Craft is not affiliated with them.'],
+        'Free software under the <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="{legal}">Privacy</a>: no tracking and no cookies on this page.{imprint}',
+        'Product names (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) belong to their owners and are only used to describe similar workflows and compatibility. CNC Craft is not affiliated with or endorsed by them.'],
  ),
  "de": dict(
   base="../", path="de/", ogimg="assets/og-de.png", shots="de",
   title="CNC Craft – kostenlose Software für Laser, CNC-Fräse und Plasma",
-  desc="Kostenlose Open-Source-Alternative zu LightBurn, Estlcam und OpenBuilds: Design, CAM und Maschinensteuerung für Laser, CNC-Fräse und Plasma in einem Programm. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.",
+  desc="Kostenlose Open-Source-Software für Laser, CNC-Fräse und Plasma: Design, CAM und Maschinensteuerung in einem Programm. GRBL, grblHAL, FluidNC, Marlin, Ruida, K40. macOS, Windows, Linux.",
   nav=["Funktionen", "Bilder", "Download", "Fragen"], langlink=("../", "English"),
   h1='Laser, CNC-Fräse &amp; Plasma.<br><span>Ein kostenloses Programm.</span>',
-  sub="Design, CAM und Maschinensteuerung in einem – wie LightBurn, Estlcam und OpenBuilds zusammen. Open Source, ohne Abo, ohne Konto.",
+  sub="Design, CAM und Maschinensteuerung in einem – kein Wechseln mehr zwischen drei Programmen. Open Source, ohne Abo, ohne Konto.",
   chips=["100 % kostenlos", "Open Source (GPL-3.0)", "macOS · Windows · Linux", "7 Sprachen"],
   dl="Herunterladen", dlmac="Für Mac herunterladen", dlwin="Für Windows herunterladen", dllinux="Für Linux herunterladen (AppImage)",
   gh="★ Stern auf GitHub", note="Version", notemac="Mac mit Apple-Chip (M1–M4). Intel-Mac: siehe Download weiter unten.",
@@ -105,7 +105,7 @@ T = {
   nh="Neu in 0.3.0", nl="Bildgravur mit 14 Gravurtypen und „Automatisch verbessern“, Materialansicht, Form-Werkzeuge, Bézier-Kurven, Bemaßung, mehrere Betten pro Projekt und neue Kisten-Arten.",
   nlink="Alle Änderungen", vid="whatsnew-de.mp4", vpost="de/08-bildgravur",
   ch="Für Maker gebaut", cl="CNC Craft vereint, wofür man sonst drei Programme braucht:",
-  cmp=["LightBurn", "Estlcam", "OpenBuilds", "CNC Craft"],
+  cmp=["Design", "CAM", "Maschinensteuerung", "CNC Craft"],
   sh="Bilder", sl="Bild anklicken zum Vergrößern.",
   shotlist=[("01-design-fraese", "Design &amp; CAM", "Zeichnung mit Fräsbahnen"), ("02-simulation", "Simulation", "Fräsbahnen in 3D mit Zeit und G-Code"),
             ("03-laser", "Laser", "Ebenen zum Gravieren und Schneiden"), ("04-plasma", "Plasma", "Schnitte, Einstichpunkte und Anfahrbahnen"),
@@ -133,8 +133,8 @@ T = {
   kofi="☕ Ko-fi", spons="💜 GitHub Sponsors", issues="🐞 Fehler melden",
   foot=['Gemacht von Andreas Piaszek – <a href="https://www.youtube.com/results?search_query=Andys+3D+World">Andys 3D World</a> auf YouTube, TikTok und Instagram.',
         'Entwickelt mit Hilfe des KI-Werkzeugs <a href="https://claude.com/claude-code">Claude Code</a> von Anthropic; jede Änderung wird geprüft und an echten Maschinen getestet.',
-        'Freie Software unter der <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="' + GH + '/blob/main/PRIVACY.md">Datenschutz</a>: kein Tracking und keine Cookies auf dieser Seite.',
-        'Produktnamen (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) gehören ihren Inhabern und dienen nur zum Vergleich. CNC Craft ist mit ihnen nicht verbunden.'],
+        'Freie Software unter der <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="{legal}">Datenschutz</a>: kein Tracking und keine Cookies auf dieser Seite.{imprint}',
+        'Produktnamen (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) gehören ihren Inhabern und beschreiben nur ähnliche Arbeitsweisen und Kompatibilität. CNC Craft ist mit ihnen nicht verbunden und wird von ihnen nicht unterstützt.'],
  ),
 }
 
@@ -168,7 +168,9 @@ def page(lang):
         for h, links, hint in t["dcards"])
     faq = "\n".join(f'      <details class="card"><summary><b>{q}</b></summary><p style="margin-top:8px">{a}</p></details>' for q, a in t["faq"])
     safety = "".join(f"<li>{x}</li>" for x in t["safety"][1])
-    foot = "\n".join(f"    <p>{x}</p>" for x in t["foot"])
+    legal = LEGAL[lang]["privacy"][0]
+    imp = f' · <a href="{LEGAL[lang]["imprint"][0]}">{LEGAL[lang]["imprint"][1]}</a>' if CONTACT["address"] else ""
+    foot = "\n".join(f"    <p>{x}</p>".replace("{legal}", legal).replace("{imprint}", imp) for x in t["foot"])
     chips = "".join(f'<span class="chip">{c}</span>' for c in t["chips"])
     first = t["shotlist"][0]
     return f'''<!doctype html>
@@ -311,8 +313,127 @@ def page(lang):
 </html>
 '''
 
+# Privacy policy and imprint of this website (the app has its own PRIVACY.md).
+# The imprint page is only written once CONTACT["address"] is filled in (German law: § 5 DDG).
+CONTACT = dict(
+    name="Andreas Piaszek",
+    address="",   # street, postcode, town – one line per entry separated by "<br>"
+    email="",     # e-mail address for the imprint and privacy policy
+)
+LEGAL = {
+ "en": dict(privacy=("privacy.html", "Privacy policy"), imprint=("imprint.html", "Imprint"), back="← Back to CNC Craft",
+  body=lambda c: f'''
+<h2>Who is responsible</h2>
+<p>{c}</p>
+<h2>Hosting</h2>
+<p>This website is hosted by GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. St, San Francisco, CA 94107, USA).
+When you open a page, GitHub processes the usual connection data (IP address, time, requested page, browser) to deliver
+the page and to keep the service secure. GitHub may process this data in the USA. Legal basis: Art. 6 (1) (f) GDPR
+(legitimate interest in a reliable website). Details:
+<a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">GitHub Privacy Statement</a>.</p>
+<h2>Latest version</h2>
+<p>To show the current version and the right download links, the page asks the public GitHub API
+(<code>api.github.com</code>) for the latest release. Your browser connects to GitHub for this; no other data is sent.</p>
+<h2>No cookies, no tracking</h2>
+<p>This website sets no cookies and uses no analytics, no tracking and no embedded third-party content.
+Fonts, images and videos are served from this website itself.</p>
+<h2>Links</h2>
+<p>Links to GitHub, Ko-fi, GitHub Sponsors and YouTube only take effect when you click them. From then on, the privacy
+policy of that website applies.</p>
+<h2>The app</h2>
+<p>What the CNC Craft program itself does (and does not) send is described in
+<a href="{GH}/blob/main/PRIVACY.md">PRIVACY.md</a>.</p>
+<h2>Your rights</h2>
+<p>You have the right to information, correction, deletion and restriction of processing, to object and to data
+portability, and to complain to a data protection supervisory authority. This website itself stores no personal
+data; for data processed by GitHub, please contact GitHub.</p>'''),
+ "de": dict(privacy=("datenschutz.html", "Datenschutzerklärung"), imprint=("impressum.html", "Impressum"), back="← Zurück zu CNC Craft",
+  body=lambda c: f'''
+<h2>Verantwortlich</h2>
+<p>{c}</p>
+<h2>Hosting</h2>
+<p>Diese Webseite liegt bei GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. St, San Francisco, CA 94107, USA).
+Beim Aufruf einer Seite verarbeitet GitHub die üblichen Verbindungsdaten (IP-Adresse, Uhrzeit, aufgerufene Seite,
+Browser), um die Seite auszuliefern und den Dienst abzusichern. GitHub kann diese Daten in den USA verarbeiten.
+Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (berechtigtes Interesse an einer zuverlässigen Webseite). Mehr dazu:
+<a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement">Datenschutzerklärung von GitHub</a>.</p>
+<h2>Aktuelle Version</h2>
+<p>Damit die aktuelle Version und die passenden Download-Links angezeigt werden, fragt die Seite die öffentliche
+GitHub-Schnittstelle (<code>api.github.com</code>) nach dem neuesten Release. Dein Browser verbindet sich dafür mit
+GitHub; weitere Daten werden nicht gesendet.</p>
+<h2>Keine Cookies, kein Tracking</h2>
+<p>Diese Webseite setzt keine Cookies und nutzt keine Statistik, kein Tracking und keine eingebetteten Inhalte
+anderer Anbieter. Schriften, Bilder und Videos kommen von dieser Webseite selbst.</p>
+<h2>Links</h2>
+<p>Links zu GitHub, Ko-fi, GitHub Sponsors und YouTube wirken erst, wenn du sie anklickst. Ab dann gilt die
+Datenschutzerklärung der jeweiligen Seite.</p>
+<h2>Das Programm</h2>
+<p>Was das Programm CNC Craft selbst sendet (und was nicht), steht in
+<a href="{GH}/blob/main/PRIVACY.md">PRIVACY.md</a>.</p>
+<h2>Deine Rechte</h2>
+<p>Du hast das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung, auf Widerspruch und
+Datenübertragbarkeit sowie auf Beschwerde bei einer Datenschutz-Aufsichtsbehörde. Diese Webseite selbst speichert
+keine personenbezogenen Daten; für die bei GitHub verarbeiteten Daten wende dich bitte an GitHub.</p>'''),
+}
+
+
+def contact_html(with_address):
+    parts = [CONTACT["name"]]
+    if with_address and CONTACT["address"]:
+        parts.append(CONTACT["address"])
+    if CONTACT["email"]:
+        parts.append(f'<a href="mailto:{CONTACT["email"]}">{CONTACT["email"]}</a>')
+    else:
+        parts.append(f'<a href="{GH}/issues">{GH}/issues</a>')
+    return "<br>".join(parts)
+
+
+def legal_page(lang, kind):
+    t, L = T[lang], LEGAL[lang]
+    b = t["base"]
+    title = L[kind][1]
+    if kind == "privacy":
+        body = L["body"](contact_html(True))
+    else:
+        body = f'<h2>{"Angaben gemäß § 5 DDG" if lang == "de" else "Information according to § 5 DDG (German law)"}</h2><p>{contact_html(True)}</p>'
+    return f'''<!doctype html>
+<html lang="{lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{title} – CNC Craft</title>
+<meta name="robots" content="noindex">
+<link rel="icon" type="image/png" href="{b}assets/favicon.png">
+<style>{CSS}</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="{b}assets/icon-68.webp" alt="" width="34" height="34">CNC <b>Craft</b></a>
+  </div>
+</header>
+<main>
+<section>
+  <div class="wrap" style="max-width:760px">
+    <h1 style="font-size:2rem">{title}</h1>
+{body}
+    <p style="margin-top:28px"><a href="./">{L["back"]}</a></p>
+  </div>
+</section>
+</main>
+</body>
+</html>
+'''
+
+
 import os
 os.makedirs(OUT + "/de", exist_ok=True)
+for lang, folder in (("en", OUT), ("de", OUT + "/de")):
+    open(folder + "/" + LEGAL[lang]["privacy"][0], "w").write(legal_page(lang, "privacy"))
+    if CONTACT["address"]:
+        open(folder + "/" + LEGAL[lang]["imprint"][0], "w").write(legal_page(lang, "imprint"))
+    else:
+        print(f"imprint ({lang}) not written – fill in CONTACT['address'] in tools/website/build.py")
 open(OUT + "/index.html", "w").write(page("en"))
 open(OUT + "/de/index.html", "w").write(page("de"))
 import datetime

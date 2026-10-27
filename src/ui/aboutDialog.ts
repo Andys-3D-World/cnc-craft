@@ -83,6 +83,16 @@ export async function openAboutDialog(log: (s: string) => void) {
         <button id="about-kofi" class="btn-secondary">☕ ${esc(t("about.supportBtn"))}</button>
       </div>
       <div class="about-section">
+        <h4>📜 ${esc(t("about.licTitle"))}</h4>
+        <div class="about-status">${esc(t("about.licText"))}</div>
+        <div class="upd-btns">
+          <button class="btn-secondary" data-lic="LICENSE.txt">${esc(t("about.licGpl"))}</button>
+          <button class="btn-secondary" data-lic="THIRD_PARTY_NOTICES.md">${esc(t("about.licNotices"))}</button>
+          <button class="btn-secondary" data-lic="THIRD_PARTY_LICENSES.txt">${esc(t("about.licLibs"))}</button>
+        </div>
+        <pre id="about-lic" class="upd-notes about-lic" style="display:none;"></pre>
+      </div>
+      <div class="about-section">
         <h4>💾 ${esc(t("store.title"))}</h4>
         <div class="about-status">${esc(t(settingsDir() ? "store.info" : "store.noFile"))}</div>
         ${settingsDir() ? `<div class="about-path" title="${esc(settingsDir())}">${esc(settingsDir())}</div>` : ""}
@@ -97,6 +107,20 @@ export async function openAboutDialog(log: (s: string) => void) {
   ov.querySelector<HTMLButtonElement>("#about-kofi")!.onclick = async () => {
     try { await openUrl(SUPPORT_URL); } catch { window.open(SUPPORT_URL, "_blank"); }
   };
+  // Lizenztexte liegen in public/licenses/ (tools/licenses/generate.py) und kommen mit der App mit
+  const lic = ov.querySelector("#about-lic") as HTMLElement;
+  ov.querySelectorAll<HTMLButtonElement>("[data-lic]").forEach(b => b.onclick = async () => {
+    lic.style.display = "";
+    lic.textContent = "…";
+    try {
+      const r = await fetch(`/licenses/${b.dataset.lic}`);
+      if (!r.ok) throw new Error(String(r.status));
+      lic.textContent = await r.text();
+      lic.scrollTop = 0;
+    } catch {
+      lic.textContent = t("about.licError");
+    }
+  });
   if (!on) return;
 
   const status = ov.querySelector("#upd-status") as HTMLElement;

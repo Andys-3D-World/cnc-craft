@@ -30,3 +30,6 @@ CLAUDE.local.md
 
 # graphify (Wissens-Graph, nur lokal)
 graphify-out/
+
+# Promo-Videos, Texte und Test-Firmware (nicht ins Repository)
+promo/

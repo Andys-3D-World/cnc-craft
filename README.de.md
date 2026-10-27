@@ -3,7 +3,7 @@
 🇬🇧 [English](README.md) · 🇩🇪 **Deutsch** · 🌐 **Webseite: [andys-3d-world.github.io/cnc-craft/de](https://andys-3d-world.github.io/cnc-craft/de/)**
 
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
-(Idee: LightBurn + Estlcam + OpenBuilds zusammen). Läuft auf macOS, Windows und Linux.
+(kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
 **Status: 0.3.2 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
