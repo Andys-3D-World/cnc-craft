@@ -18,6 +18,7 @@
  */
 import { t } from "./i18n/i18n";
 import { ToolType, Helix, ToolGeom } from "./toolGraphics";
+import { Coating, COATINGS } from "./toolCoating";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 
 export type { ToolType, Helix } from "./toolGraphics";
@@ -33,6 +34,7 @@ export interface MillingTool extends ToolGeom {
   rampAngle?: number;  // Eintauchwinkel in ° (Rampe/Schraube), 0 = senkrecht eintauchen
   wearOffset?: number; // Verschleiß-Ausgleich in mm: so viel kleiner schneidet der Fräser als sein Ø (negativ = größer)
   toolMat: ToolMat;    // Schneidstoff: Hartmetall oder HSS
+  coating?: Coating;   // Beschichtung (nur Info), "none" = blank
   notes: string;       // Notiz (Bezugsquelle, Material, …)
   updated?: number;    // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
   device?: string;     // Werkstatt-Sync: Rechner der letzten Änderung
@@ -216,6 +218,7 @@ export function sanitize(x: any): MillingTool {
     // höchstens ±1 mm und nie mehr als der halbe Ø
     wearOffset: Number.isFinite(+x.wearOffset) ? Math.max(-1, Math.min(1, diameter / 2, +x.wearOffset)) : 0,
     toolMat: x.toolMat === "hss" ? "hss" : "carbide",
+    coating: COATINGS.includes(x.coating) ? x.coating : "none",
     notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
     ...syncFields(x)
   };

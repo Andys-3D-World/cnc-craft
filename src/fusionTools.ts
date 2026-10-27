@@ -12,6 +12,7 @@
  * (Fusion 360 ist eine Marke von Autodesk; CNC Craft liest nur das Dateiformat.)
  */
 import type { ToolType } from "./toolGraphics";
+import { coatingFromText } from "./toolCoating.ts";
 
 /** Fusion-Werkzeugart -> unsere Art (fehlt = wird übersprungen) */
 const TYPE_MAP: Record<string, ToolType> = {
@@ -72,6 +73,8 @@ export function fusionToTools(data: any, material = "softwood"): FusionImport {
       length: mm(g.OAL),
       flutes: num(g.NOF),
       toolMat: String(x.BMC || "").toLowerCase() === "hss" ? "hss" : "carbide",
+      // Beschichtung steht in Fusion-Bibliotheken meist nur im Namen oder in GRADE
+      coating: coatingFromText(`${x.description || ""} ${x.GRADE || ""}`),
     };
     if (type === "bullnose") t.cornerR = mm(g.RE);
     if (type === "chamfer") {

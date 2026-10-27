@@ -20,6 +20,7 @@ import {
   duplicateTool, swapTools, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
   sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
 } from "../toolLibrary";
+import { COATINGS, COATING_LABEL } from "../toolCoating";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
 
 function esc(s: string): string {
@@ -75,6 +76,8 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
         <div class="te-fields">
           <fieldset><legend>${esc(t("tl.geometry"))}</legend>
             ${num("tool.dia", "dia", src.diameter, "0.1", "mm", "", "tl.diaTip")}
+            <label class="te-row te-wear" data-tip="${esc(t("tl.realDiaTip"))}"><span>${esc(t("tl.g.realDia"))}</span>
+              <span class="dlg-num"><input id="${p}real" type="number" value="${src.wearOffset ? +(src.diameter - src.wearOffset).toFixed(4) : ""}" placeholder="${src.diameter}" min="0" step="0.01"><em>mm</em></span></label>
             ${num("tl.g.wear", "wear", src.wearOffset ?? 0, "0.01", "mm", "te-wear", "tl.wearTip")}
             ${num("tl.g.shank", "shank", src.shankDia, "0.1", "mm")}
             ${num("tl.g.fluteLen", "flutelen", src.fluteLen, "0.5", "mm", "", "tl.fluteLenTip")}
@@ -96,6 +99,10 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
               <select id="${p}tmat">
                 <option value="carbide"${src.toolMat !== "hss" ? " selected" : ""}>${esc(t("tl.tmat.carbide"))}</option>
                 <option value="hss"${src.toolMat === "hss" ? " selected" : ""}>${esc(t("tl.tmat.hss"))}</option>
+              </select></label>
+            <label class="te-row" data-tip="${esc(t("tl.coatTip"))}"><span>${esc(t("tl.g.coating"))}</span>
+              <select id="${p}coat">
+                ${COATINGS.map(c => `<option value="${c}"${c === (src.coating || "none") ? " selected" : ""}>${esc(c === "none" ? t("tl.coat.none") : COATING_LABEL[c])}</option>`).join("")}
               </select></label>
           </fieldset>
           <fieldset><legend>${esc(t("tl.cutting"))}</legend>
@@ -144,7 +151,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     diameter: val("dia"), shankDia: val("shank"), fluteLen: val("flutelen"), length: val("len"),
     angle: val("angle"), tipDia: val("tip"), cornerR: val("corner"), flutes: val("flutes"), pitch: val("pitch"),
     threadSingle: q("single").checked, neckDia: val("neck"), wearOffset: val("wear"),
-    helix: q<HTMLSelectElement>("helix").value, toolMat: q<HTMLSelectElement>("tmat").value,
+    helix: q<HTMLSelectElement>("helix").value, toolMat: q<HTMLSelectElement>("tmat").value, coating: q<HTMLSelectElement>("coat").value,
     rpm: val("rpm"), feedrate: val("feed"), plungeFeed: val("plunge"), rampAngle: val("ramp"), stepZ: val("stepz"),
     notes: q<HTMLTextAreaElement>("notes").value
   });
@@ -198,11 +205,22 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
   root.querySelectorAll("input, select, textarea").forEach(el => el.addEventListener("input", () => {
     const id = (el as HTMLElement).id;
     if (id === p + "name") { lastAuto = null; return; }
+    // Gemessener Ø und Verschleiß hängen zusammen: Verschleiß = Nenn-Ø − gemessener Ø
+    if (id === p + "real" || id === p + "dia") {
+      const real = val("real"), d = val("dia");
+      if (real > 0 && d > 0) q("wear").value = String(+(d - real).toFixed(4));
+      else if (id === p + "real") q("wear").value = "0";
+    }
+    if (id === p + "wear") {
+      const w = val("wear"), d = val("dia");
+      q("real").value = w && d > 0 ? String(+(d - w).toFixed(4)) : "";
+    }
     if (id === p + "dia") {
       const d = val("dia");
       const cone = type === "vbit" || type === "chamfer" || type === "countersink" || type === "facemill";
       if (!cone && d > 0 && Math.abs(val("shank") - prevDia) < 1e-6) q("shank").value = String(d);
       if (d > 0) prevDia = d;
+      q("real").placeholder = d > 0 ? String(d) : "";
     }
     refresh();
   }));
@@ -224,6 +242,8 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     if (!name) { q("name").focus(); q("name").classList.add("dlg-invalid"); return; }
     const dia = val("dia");
     if (!(dia > 0)) { q("dia").focus(); q("dia").classList.add("dlg-invalid"); return; }
+    const w = val("wear");
+    if (w && !(Math.abs(w) <= Math.min(1, dia / 2))) { const f = q("real").value ? q("real") : q("wear"); f.focus(); f.classList.add("dlg-invalid"); return; }
     const g = read();
     if ((type === "vbit" || type === "chamfer") && !(g.tipDia < g.diameter)) { q("tip").focus(); q("tip").classList.add("dlg-invalid"); return; }
     if ((CONE_TYPES.includes(type) || type === "threadmill") && !(val("angle") >= 10 && val("angle") <= 170)) { q("angle").focus(); q("angle").classList.add("dlg-invalid"); return; }
@@ -390,7 +410,7 @@ export function renderToolPage(withEditor = true) {
         <div class="tlp-ico">${toolIconSvg(tl, 22, 44, toolColor(tl))}</div>
         <div class="tlp-txt">
           <div class="tlp-name"><b style="color:${toolColor(tl)}">T${toolNumber(tl)}</b> ${esc(tl.name)}</div>
-          <div class="tlp-info">${esc(toolTypeName(tl))} · Ø${fmt(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))} · S${tl.rpm} · F${tl.feedrate}</div>
+          <div class="tlp-info">${esc(toolTypeName(tl))} · Ø${fmt(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))}${tl.coating && tl.coating !== "none" ? ` · ${COATING_LABEL[tl.coating]}` : ""} · S${tl.rpm} · F${tl.feedrate}</div>
         </div>
         <button class="tlp-star${def ? " on" : ""}" data-act="default" data-tip="${esc(t(def ? "tl.isDefault" : "tl.makeDefault"))}">${def ? "★" : "☆"}</button>
       </div>`;

@@ -85,3 +85,12 @@ test(".tools (ZIP) entpacken", async () => {
   assert.equal(await unzipJson(zip("tools.json", text)), text);
   await assert.rejects(unzipJson(new Uint8Array([1, 2, 3])), /lib-invalid/);
 });
+
+test("Beschichtung aus dem Namen erkennen", async () => {
+  const { coatingFromText } = await import("../src/toolCoating.ts");
+  assert.equal(coatingFromText("VHM Zweischneider für Stahl, TiAlN-Beschichtung"), "tialn");
+  assert.equal(coatingFromText("Stufenbohrer TiN-Beschichtung"), "tin");
+  assert.equal(coatingFromText("Einschneider CrN-Prisma"), "crn");
+  assert.equal(coatingFromText("Alu-Fräser zrn"), "zrn");
+  assert.equal(coatingFromText("Schaftfräser 6 mm"), undefined);
+});

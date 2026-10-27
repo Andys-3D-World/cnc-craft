@@ -7,7 +7,11 @@
   with the nominal Ø minus this value, so a worn cutter can be corrected without changing its real Ø – part too big
   or hole too small: increase the value; negative if the cutter cuts bigger (e.g. runout). Used for contours,
   pockets, rest machining, thread milling and 3D milling; not for V-bits, chamfer mills, countersinks and drills.
-  The tool list shows the corrected Ø (“cuts Ø2.95”).
+  The tool list shows the corrected Ø (“cuts Ø2.95”). Instead of the offset you can also enter the *Measured Ø*
+  (calipers or test cut – a 4 mm cutter is rarely exactly 4.00 mm); both fields update each other.
+- **Tool coating:** tools have a *Coating* field (uncoated, TiN, TiAlN, AlTiN, AlCrN, CrN, ZrN, DLC), shown in the
+  tool list. For information only – cutting data are not changed. The Fusion 360 import detects the coating from
+  the tool name.
 
 ## 0.3.3 Beta
 
