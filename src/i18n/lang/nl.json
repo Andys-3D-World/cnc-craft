@@ -1128,7 +1128,7 @@
   "res.btn": "Hervatten vanaf …",
   "res.btnTip": "Een afgebroken job vanaf een regel of vorm voortzetten: spindel, veilige hoogte, positie en voeding worden eerst hersteld.",
   "res.simBtn": "Vanaf hier hervatten",
-  "res.simTip": "De job hervatten op de plek waar de simulatie nu staat.",
+  "res.simTip": "De job hervatten vanaf de aangeklikte G-code-regel (lijst of baan) – anders op de plek waar de simulatie nu staat.",
   "res.needJob": "[Hervatten] Laad eerst een job („Als job overnemen”).",
   "res.title": "Job hervatten",
   "res.job": "Job „{name}” met {n} regels.",

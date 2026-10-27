@@ -13,6 +13,10 @@
   tool list. For information only – cutting data are not changed. The Fusion 360 import detects the coating from
   the tool name.
 
+**Improved**
+- **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),
+  then *Resume from here* starts the resume dialog at exactly that line.
+
 ## 0.3.3 Beta
 
 **New**

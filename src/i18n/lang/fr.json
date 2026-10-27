@@ -1128,7 +1128,7 @@
   "res.btn": "Reprendre à partir de …",
   "res.btnTip": "Reprendre un job interrompu à partir d’une ligne ou d’une forme : broche, hauteur de sécurité, position et avance sont rétablies d’abord.",
   "res.simBtn": "Reprendre ici",
-  "res.simTip": "Reprendre le job à l’endroit où se trouve la simulation.",
+  "res.simTip": "Reprendre le job à la ligne de G-code cliquée (liste ou trajectoire) – sinon à l’endroit où se trouve la simulation.",
   "res.needJob": "[Reprise] Charge d’abord un job (« Utiliser comme job »).",
   "res.title": "Reprendre le job",
   "res.job": "Job « {name} » avec {n} lignes.",

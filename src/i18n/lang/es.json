@@ -1128,7 +1128,7 @@
   "res.btn": "Continuar desde …",
   "res.btnTip": "Continuar un trabajo interrumpido desde una línea o forma: antes se restablecen husillo, altura segura, posición y avance.",
   "res.simBtn": "Continuar desde aquí",
-  "res.simTip": "Continuar el trabajo en el punto donde está la simulación.",
+  "res.simTip": "Continuar el trabajo desde la línea de G-code pulsada (lista o trayectoria) – si no, desde el punto donde está la simulación.",
   "res.needJob": "[Continuar] Carga primero un trabajo («Usar como trabajo»).",
   "res.title": "Continuar trabajo",
   "res.job": "Trabajo «{name}» con {n} líneas.",

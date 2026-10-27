@@ -1218,7 +1218,7 @@
   "res.btn": "Fortsetzen ab …",
   "res.btnTip": "Abgebrochenen Job ab einer Zeile oder Form weitermachen: Spindel, sichere Höhe, Position und Vorschub werden vorher hergestellt.",
   "res.simBtn": "Ab hier fortsetzen",
-  "res.simTip": "Job ab der Stelle fortsetzen, an der die Simulation gerade steht.",
+  "res.simTip": "Job ab der angeklickten G-Code-Zeile fortsetzen (Liste oder Bahn) – sonst ab der Stelle, an der die Simulation gerade steht.",
   "res.needJob": "[Fortsetzen] Erst einen Job laden („Als Job übernehmen“).",
   "res.title": "Job fortsetzen",
   "res.job": "Job „{name}“ mit {n} Zeilen.",

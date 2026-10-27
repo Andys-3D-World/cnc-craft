@@ -1218,7 +1218,7 @@
   "res.btn": "Resume from …",
   "res.btnTip": "Continue an aborted job from a line or shape: spindle, safe height, position and feed are restored first.",
   "res.simBtn": "Resume from here",
-  "res.simTip": "Resume the job at the point where the simulation currently is.",
+  "res.simTip": "Resume the job from the clicked G-code line (list or toolpath) – otherwise from the point where the simulation currently is.",
   "res.needJob": "[Resume] Load a job first (“Use as job”).",
   "res.title": "Resume job",
   "res.job": "Job “{name}” with {n} lines.",

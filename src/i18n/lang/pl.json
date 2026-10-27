@@ -1128,7 +1128,7 @@
   "res.btn": "Wznów od …",
   "res.btnTip": "Kontynuuj przerwane zadanie od linii lub kształtu: najpierw przywracane są wrzeciono, bezpieczna wysokość, pozycja i posuw.",
   "res.simBtn": "Wznów stąd",
-  "res.simTip": "Wznów zadanie w miejscu, w którym jest teraz symulacja.",
+  "res.simTip": "Wznów zadanie od klikniętej linii G-code (lista lub ścieżka) – w przeciwnym razie w miejscu, w którym jest teraz symulacja.",
   "res.needJob": "[Wznów] Najpierw wczytaj zadanie („Użyj jako zadanie”).",
   "res.title": "Wznów zadanie",
   "res.job": "Zadanie „{name}” z {n} liniami.",

@@ -211,6 +211,8 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   // Fortsetzen ab der Zeile, an der die Simulation gerade steht
   $("sim-job-resume").addEventListener("click", () => {
     if (!prog || source !== "job" || streamState.isRunning) { log(t(streamState.isRunning ? "stream.alreadyRunning" : "res.needJob")); return; }
+    // angeklickte Zeile (G-Code-Liste oder Bahn) hat Vorrang, sonst die Stelle der Simulation
+    if (hiLine >= 0) { openResumeDialog(log, hiLine); return; }
     const p = positionAt(prog, simTime);
     openResumeDialog(log, p.i >= 0 ? prog.line[p.i] : undefined);
   });

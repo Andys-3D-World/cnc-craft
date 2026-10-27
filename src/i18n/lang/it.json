@@ -1128,7 +1128,7 @@
   "res.btn": "Riprendi da …",
   "res.btnTip": "Riprendere un job interrotto da una riga o forma: prima vengono ripristinati mandrino, quota sicura, posizione e avanzamento.",
   "res.simBtn": "Riprendi da qui",
-  "res.simTip": "Riprende il job dal punto in cui si trova la simulazione.",
+  "res.simTip": "Riprende il job dalla riga di G-code cliccata (elenco o percorso) – altrimenti dal punto in cui si trova la simulazione.",
   "res.needJob": "[Ripresa] Carica prima un job («Usa come job»).",
   "res.title": "Riprendi job",
   "res.job": "Job «{name}» con {n} righe.",
