@@ -1828,6 +1828,11 @@
   "tl.dupTip": "Gereedschap kopiëren",
   "tl.upTip": "Omhoog (lager T-nummer)",
   "tl.downTip": "Omlaag (hoger T-nummer)",
+  "tl.filterAll": "Alle",
+  "tl.filterTip": "Alleen gereedschap van dit type tonen",
+  "tl.searchPh": "🔍 Zoeken: naam, Ø, notitie, T-nummer …",
+  "tl.noMatch": "Geen passend gereedschap",
+  "tl.groupTip": "Groep uit- of inklappen",
   "tl.isDefault": "Standaardgereedschap",
   "tl.makeDefault": "Als standaardgereedschap instellen",
   "tl.settings": "Gereedschapsinstellingen",
@@ -2190,7 +2195,7 @@
   "lib.io.exportTip.tools": "Alle freesgereedschappen met instellingen in een bestand opslaan – als back-up of om te delen.",
   "lib.io.exportTip.laser": "Alle laserlagen met laserinstellingen in een bestand opslaan – als back-up of om te delen.",
   "lib.io.exportTip.plasma": "Alle plasmasneden met plasma-instellingen in een bestand opslaan – als back-up of om te delen.",
-  "lib.io.importTip.tools": "Freesgereedschappen uit een bestand laden (losse export of volledige back-up). Toevoegen of vervangen.",
+  "lib.io.importTip.tools": "Freesgereedschap uit een bestand laden: CNC Craft-export/back-up of een Fusion 360-gereedschapsbibliotheek (.tools / .json, bijv. van je leverancier). Je kunt toevoegen of vervangen.",
   "lib.io.importTip.laser": "Laserlagen uit een bestand laden (losse export of volledige back-up). Toevoegen of vervangen.",
   "lib.io.importTip.plasma": "Plasmasneden uit een bestand laden (losse export of volledige back-up). Toevoegen of vervangen.",
   "lib.io.backup": "Volledige back-up",
@@ -3406,5 +3411,7 @@
   "ops.threadPassesTip": "Hoe vaak de frees rond de draad gaat, telkens iets dieper – spaart kleine frezen (aluminium: 2–3).",
   "ops.threadSpring": "Lege doorgang",
   "ops.threadSpringTip": "Op het eind de laatste baan nog eens rijden – maakt de flanken glad.",
-  "gcw.threadReach": "Vorm {n}: de draad is {l} mm lang maar de hals van de eentandsfrees reikt maar {r} mm – de schacht zou raken."
+  "gcw.threadReach": "Vorm {n}: de draad is {l} mm lang maar de hals van de eentandsfrees reikt maar {r} mm – de schacht zou raken.",
+  "lib.io.filterFusion": "CNC Craft- of Fusion 360-bibliotheek",
+  "lib.io.fusionSkipped": "Fusion 360: {n} items overgeslagen (houders, tasters, tappen of iets dergelijks – bestaan niet in CNC Craft)."
 }

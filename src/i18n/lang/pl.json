@@ -1828,6 +1828,11 @@
   "tl.dupTip": "Kopiuj narzędzie",
   "tl.upTip": "W górę (niższy numer T)",
   "tl.downTip": "W dół (wyższy numer T)",
+  "tl.filterAll": "Wszystkie",
+  "tl.filterTip": "Pokaż tylko narzędzia tego typu",
+  "tl.searchPh": "🔍 Szukaj: nazwa, Ø, notatka, numer T …",
+  "tl.noMatch": "Brak pasujących narzędzi",
+  "tl.groupTip": "Rozwiń lub zwiń grupę",
   "tl.isDefault": "Narzędzie domyślne",
   "tl.makeDefault": "Ustaw jako domyślne",
   "tl.settings": "Ustawienia narzędzi",
@@ -2190,7 +2195,7 @@
   "lib.io.exportTip.tools": "Zapisz wszystkie narzędzia z ustawieniami do pliku – jako kopię lub do udostępnienia.",
   "lib.io.exportTip.laser": "Zapisz wszystkie warstwy lasera z ustawieniami do pliku – jako kopię lub do udostępnienia.",
   "lib.io.exportTip.plasma": "Zapisz wszystkie cięcia plazmą z ustawieniami do pliku – jako kopię lub do udostępnienia.",
-  "lib.io.importTip.tools": "Wczytaj narzędzia z pliku (pojedynczy eksport lub pełna kopia). Możesz dodać lub zastąpić.",
+  "lib.io.importTip.tools": "Wczytaj frezy z pliku: eksport/kopia CNC Craft lub biblioteka narzędzi Fusion 360 (.tools / .json, np. od sprzedawcy narzędzi). Możesz dodać lub zastąpić.",
   "lib.io.importTip.laser": "Wczytaj warstwy lasera z pliku (pojedynczy eksport lub pełna kopia). Możesz dodać lub zastąpić.",
   "lib.io.importTip.plasma": "Wczytaj cięcia plazmą z pliku (pojedynczy eksport lub pełna kopia). Możesz dodać lub zastąpić.",
   "lib.io.backup": "Pełna kopia",
@@ -3406,5 +3411,7 @@
   "ops.threadPassesTip": "Ile razy frez okrąża gwint, za każdym razem trochę głębiej – oszczędza małe frezy (aluminium: 2–3).",
   "ops.threadSpring": "Przejście jałowe",
   "ops.threadSpringTip": "Na koniec jeszcze raz ostatni tor – wygładza boki.",
-  "gcw.threadReach": "Kształt {n}: gwint ma {l} mm, a szyjka frezu jednozębnego sięga tylko {r} mm – trzonek by uderzył."
+  "gcw.threadReach": "Kształt {n}: gwint ma {l} mm, a szyjka frezu jednozębnego sięga tylko {r} mm – trzonek by uderzył.",
+  "lib.io.filterFusion": "Biblioteka CNC Craft lub Fusion 360",
+  "lib.io.fusionSkipped": "Fusion 360: pominięto {n} pozycji (oprawki, sondy, gwintowniki itp. – nie ma ich w CNC Craft)."
 }

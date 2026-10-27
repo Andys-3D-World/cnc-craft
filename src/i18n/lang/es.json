@@ -1828,6 +1828,11 @@
   "tl.dupTip": "Duplicar herramienta",
   "tl.upTip": "Subir (número T menor)",
   "tl.downTip": "Bajar (número T mayor)",
+  "tl.filterAll": "Todas",
+  "tl.filterTip": "Mostrar solo herramientas de este tipo",
+  "tl.searchPh": "🔍 Buscar: nombre, Ø, nota, número T …",
+  "tl.noMatch": "Ninguna herramienta coincide",
+  "tl.groupTip": "Desplegar o plegar el grupo",
   "tl.isDefault": "Herramienta estándar",
   "tl.makeDefault": "Usar como herramienta estándar",
   "tl.settings": "Ajustes de herramientas",
@@ -2190,7 +2195,7 @@
   "lib.io.exportTip.tools": "Guardar todas las herramientas con sus ajustes en un archivo, para copia o para compartir.",
   "lib.io.exportTip.laser": "Guardar todas las capas láser con sus ajustes en un archivo, para copia o para compartir.",
   "lib.io.exportTip.plasma": "Guardar todos los cortes de plasma con sus ajustes en un archivo, para copia o para compartir.",
-  "lib.io.importTip.tools": "Cargar herramientas desde un archivo (exportación o copia completa). Puedes añadir o reemplazar.",
+  "lib.io.importTip.tools": "Cargar fresas desde un archivo: exportación/copia de CNC Craft o una biblioteca de herramientas de Fusion 360 (.tools / .json, p. ej. de tu proveedor). Puedes añadir o reemplazar.",
   "lib.io.importTip.laser": "Cargar capas láser desde un archivo (exportación o copia completa). Puedes añadir o reemplazar.",
   "lib.io.importTip.plasma": "Cargar cortes de plasma desde un archivo (exportación o copia completa). Puedes añadir o reemplazar.",
   "lib.io.backup": "Copia completa",
@@ -3406,5 +3411,7 @@
   "ops.threadPassesTip": "Cuántas veces rodea la rosca, cada vez algo más hondo – protege herramientas pequeñas (aluminio: 2–3).",
   "ops.threadSpring": "Pasada en vacío",
   "ops.threadSpringTip": "Repetir la última trayectoria al final – alisa los flancos.",
-  "gcw.threadReach": "Forma {n}: la rosca mide {l} mm pero el cuello de la fresa de un diente solo llega a {r} mm – el mango chocaría."
+  "gcw.threadReach": "Forma {n}: la rosca mide {l} mm pero el cuello de la fresa de un diente solo llega a {r} mm – el mango chocaría.",
+  "lib.io.filterFusion": "Biblioteca de CNC Craft o Fusion 360",
+  "lib.io.fusionSkipped": "Fusion 360: {n} entradas omitidas (portaherramientas, palpadores, machos de roscar o similares – no existen en CNC Craft)."
 }

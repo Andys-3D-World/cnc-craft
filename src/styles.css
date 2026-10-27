@@ -997,6 +997,18 @@ body.mode-plasma .not-plasma { display: none !important; }
 .tlp-txt { flex: 1; min-width: 0; }
 .tlp-name { font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tlp-info { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tlp-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.tlp-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border: 1px solid var(--border-color); border-radius: 999px; background: var(--bg-panel); color: var(--text-muted); font-size: 0.72rem; cursor: pointer; }
+.tlp-chip:hover { border-color: var(--text-muted); color: var(--text-main); }
+.tlp-chip.on { border-color: var(--accent-color); background: var(--accent-color); color: #fff; }
+.tlp-chip svg { flex: none; }
+.tlp-chip em, .tlp-group em { font-style: normal; opacity: 0.75; font-variant-numeric: tabular-nums; }
+.tlp-search { width: 100%; box-sizing: border-box; padding: 5px 8px; font-size: 0.8rem; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: var(--radius-sm); outline: none; }
+.tlp-search:focus { border-color: var(--accent-color); }
+.tlp-group { display: flex; align-items: center; gap: 6px; padding: 4px 4px 2px; font-size: 0.74rem; font-weight: 600; color: var(--text-muted); cursor: pointer; user-select: none; position: sticky; top: 0; background: var(--bg-app); z-index: 1; }
+.tlp-group:hover { color: var(--text-main); }
+.tlp-caret { width: 10px; }
+.tlp-empty { padding: 12px 8px; font-size: 0.8rem; color: var(--text-muted); text-align: center; }
 .tlp-star { background: transparent; border: none; color: var(--text-muted); font-size: 1.05rem; cursor: pointer; padding: 2px 4px; }
 .tlp-star.on { color: #ffc043; }
 .tlp-settings { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }

@@ -13,6 +13,7 @@
  *     "plasma": { "cuts": [...],   "settings": {...}, "active": "P1" }    // Plasma
  *   }
  * Eine Datei kann einen oder alle drei Teile enthalten (Einzel-Export bzw. Komplett-Sicherung).
+ * Fräswerkzeuge lassen sich außerdem aus Fusion-360-Bibliotheken einlesen (.tools / .json, siehe fusionTools.ts).
  * Beim Einlesen werden nur bekannte Felder übernommen und alle Werte geprüft (sanitize).
  *
  * Einlesen, zwei Arten:
@@ -20,9 +21,10 @@
  *   Ersetzen   – Liste, Einstellungen und Standard-Eintrag werden durch die aus der Datei ersetzt
  */
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { writeFile, readTextFile } from "@tauri-apps/plugin-fs";
+import { writeFile, readTextFile, readFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
-import { exportToolLibrary, importToolLibrary, getTools } from "./toolLibrary";
+import { exportToolLibrary, importToolLibrary, getTools, toolSettings } from "./toolLibrary";
+import { isFusionLibrary, fusionToTools, unzipJson } from "./fusionTools";
 import { exportLaserLibrary, importLaserLibrary, getLayers } from "./laserLayers";
 import { exportPlasmaLibrary, importPlasmaLibrary, getCuts } from "./plasmaCuts";
 import { appInfo } from "./update/updater";
@@ -39,6 +41,8 @@ export interface LibFile {
   tools?: { tools: any[]; settings?: any; active?: string | null };
   laser?: { layers: any[]; settings?: any; active?: string | null };
   plasma?: { cuts: any[]; settings?: any; active?: string | null };
+  /** aus einer Fusion-360-Bibliothek: so viele Einträge waren keine passenden Fräser (Halter, Taster …) */
+  fusionSkipped?: number;
 }
 
 /** Anzahl Einträge je Teil (für Meldungen) */
@@ -72,6 +76,11 @@ export function parseLibFile(text: string): LibFile {
     if ("kerf" in first || "pierceDelay" in first) f.plasma = { cuts: data };
     else if ("power" in first || "interval" in first) f.laser = { layers: data };
     else if ("diameter" in first || "feedrate" in first) f.tools = { tools: data };
+  } else if (isFusionLibrary(data)) {
+    const r = fusionToTools(data, toolSettings.material);
+    f.app = "Fusion 360";
+    f.tools = { tools: r.tools };
+    f.fusionSkipped = r.skipped;
   } else if (data && typeof data === "object") {
     if (data.format && data.format !== LIB_FORMAT) throw new Error("lib-invalid");
     f.app = typeof data.app === "string" ? data.app : undefined;
@@ -147,11 +156,16 @@ export async function importLibrary(kinds: LibKind[], log: (s: string) => void) 
     const p = await open({
       multiple: false, directory: false,
       title: t(kinds.length === 1 ? "lib.io.importTitle." + kinds[0] : "lib.io.restoreTitle"),
-      filters: [{ name: t("lib.io.filter"), extensions: ["json"] }]
+      filters: kinds.includes("tools")
+        ? [{ name: t("lib.io.filterFusion"), extensions: ["json", "tools"] }]
+        : [{ name: t("lib.io.filter"), extensions: ["json"] }]
     });
     if (!p) return;
-    const path = typeof p === "object" && p !== null ? (p as any).path : p;
-    f = parseLibFile(await readTextFile(String(path)));
+    const path = String(typeof p === "object" && p !== null ? (p as any).path : p);
+    // Fusion 360 „.tools“ = ZIP mit tools.json
+    const text = /\.tools$/i.test(path) ? await unzipJson(await readFile(path)) : await readTextFile(path);
+    f = parseLibFile(text);
+    if (f.fusionSkipped) log(t("lib.io.fusionSkipped", { n: f.fusionSkipped }));
   } catch (e) {
     const m = e instanceof Error ? e.message : String(e);
     const text = m === "lib-invalid" ? t("lib.io.invalid") : `${t("log.error")} ${m}`;

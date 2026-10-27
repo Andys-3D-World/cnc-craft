@@ -2003,6 +2003,11 @@
   "tl.dupTip": "Duplicate tool",
   "tl.upTip": "Move up (lower T number)",
   "tl.downTip": "Move down (higher T number)",
+  "tl.filterAll": "All",
+  "tl.filterTip": "Show only tools of this type",
+  "tl.searchPh": "🔍 Search: name, Ø, note, T number …",
+  "tl.noMatch": "No matching tools",
+  "tl.groupTip": "Expand or collapse group",
   "tl.isDefault": "Default tool",
   "tl.makeDefault": "Set as default tool",
   "tl.settings": "Tool settings",
@@ -2365,7 +2370,7 @@
   "lib.io.exportTip.tools": "Save all milling tools with tool settings to a file – for backup or sharing.",
   "lib.io.exportTip.laser": "Save all laser layers with laser settings to a file – for backup or sharing.",
   "lib.io.exportTip.plasma": "Save all plasma cuts with plasma settings to a file – for backup or sharing.",
-  "lib.io.importTip.tools": "Load milling tools from a file (single export or full backup). You can add or replace.",
+  "lib.io.importTip.tools": "Load milling tools from a file: CNC Craft export/backup or a Fusion 360 tool library (.tools / .json, e.g. from your tool dealer). You can add or replace.",
   "lib.io.importTip.laser": "Load laser layers from a file (single export or full backup). You can add or replace.",
   "lib.io.importTip.plasma": "Load plasma cuts from a file (single export or full backup). You can add or replace.",
   "lib.io.backup": "Full backup",
@@ -3581,5 +3586,7 @@
   "ops.threadPassesTip": "How often the tool goes round the thread, a bit deeper each time – protects small tools (aluminium: 2–3).",
   "ops.threadSpring": "Spring pass",
   "ops.threadSpringTip": "Run the last path once more at the end – smooths the flanks.",
-  "gcw.threadReach": "Shape {n}: the thread is {l} mm long but the neck of the single-tooth mill only reaches {r} mm – the shank would hit."
+  "gcw.threadReach": "Shape {n}: the thread is {l} mm long but the neck of the single-tooth mill only reaches {r} mm – the shank would hit.",
+  "lib.io.filterFusion": "CNC Craft or Fusion 360 library",
+  "lib.io.fusionSkipped": "Fusion 360: {n} entries skipped (holders, probes, taps or similar – not available in CNC Craft)."
 }

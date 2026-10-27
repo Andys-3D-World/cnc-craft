@@ -1828,6 +1828,11 @@
   "tl.dupTip": "Duplica utensile",
   "tl.upTip": "Su (numero T più basso)",
   "tl.downTip": "Giù (numero T più alto)",
+  "tl.filterAll": "Tutti",
+  "tl.filterTip": "Mostra solo utensili di questo tipo",
+  "tl.searchPh": "🔍 Cerca: nome, Ø, nota, numero T …",
+  "tl.noMatch": "Nessun utensile corrispondente",
+  "tl.groupTip": "Espandi o comprimi il gruppo",
   "tl.isDefault": "Utensile predefinito",
   "tl.makeDefault": "Imposta come utensile predefinito",
   "tl.settings": "Impostazioni utensili",
@@ -2190,7 +2195,7 @@
   "lib.io.exportTip.tools": "Salva tutti gli utensili con le impostazioni in un file – per backup o condivisione.",
   "lib.io.exportTip.laser": "Salva tutti i livelli laser con le impostazioni in un file – per backup o condivisione.",
   "lib.io.exportTip.plasma": "Salva tutti i tagli plasma con le impostazioni in un file – per backup o condivisione.",
-  "lib.io.importTip.tools": "Carica utensili da un file (esportazione singola o backup completo). Puoi aggiungere o sostituire.",
+  "lib.io.importTip.tools": "Carica frese da un file: esportazione/backup di CNC Craft o una libreria utensili di Fusion 360 (.tools / .json, ad es. dal tuo rivenditore). Puoi aggiungere o sostituire.",
   "lib.io.importTip.laser": "Carica livelli laser da un file (esportazione singola o backup completo). Puoi aggiungere o sostituire.",
   "lib.io.importTip.plasma": "Carica tagli plasma da un file (esportazione singola o backup completo). Puoi aggiungere o sostituire.",
   "lib.io.backup": "Backup completo",
@@ -3406,5 +3411,7 @@
   "ops.threadPassesTip": "Quante volte l'utensile gira attorno al filetto, ogni volta un po' più a fondo – protegge gli utensili piccoli (alluminio: 2–3).",
   "ops.threadSpring": "Passata a vuoto",
   "ops.threadSpringTip": "Ripetere l'ultimo percorso alla fine – leviga i fianchi.",
-  "gcw.threadReach": "Forma {n}: il filetto è lungo {l} mm ma il collo della fresa monodente arriva solo a {r} mm – il gambo urterebbe."
+  "gcw.threadReach": "Forma {n}: il filetto è lungo {l} mm ma il collo della fresa monodente arriva solo a {r} mm – il gambo urterebbe.",
+  "lib.io.filterFusion": "Libreria CNC Craft o Fusion 360",
+  "lib.io.fusionSkipped": "Fusion 360: {n} voci saltate (portautensili, tastatori, maschi o simili – non presenti in CNC Craft)."
 }

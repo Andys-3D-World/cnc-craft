@@ -17,7 +17,7 @@ import { t } from "../i18n/i18n";
 import {
   MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, TYPE_DEFAULTS, typeGeom, MATERIALS,
   calcCutData, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
-  duplicateTool, moveTool, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
+  duplicateTool, swapTools, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
   sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
 } from "../toolLibrary";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
@@ -47,6 +47,7 @@ interface EditorHandlers {
   onCancel?: () => void;
   onDelete?: () => void;
   compact?: boolean;
+  newType?: ToolType;   // neues Werkzeug mit dieser Art beginnen (aktiver Filter)
 }
 
 function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandlers): string {
@@ -123,8 +124,9 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
 /** Editor in `root` aufbauen. Gibt eine Funktion zurück, die die aktuellen Werte liefert. */
 function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: EditorHandlers) {
   const isNew = !tool;
+  const nt = h.newType || "endmill";
   const src: MillingTool = tool ? { ...tool } : sanitize({
-    id: "", name: "", type: "endmill", ...TYPE_DEFAULTS.endmill, stepZ: 1.5, feedrate: 1000, rpm: 15000, plungeFeed: DEFAULT_PLUNGE, rampAngle: DEFAULT_RAMP
+    id: "", name: "", type: nt, ...TYPE_DEFAULTS[nt], stepZ: 1.5, feedrate: 1000, rpm: 15000, plungeFeed: DEFAULT_PLUNGE, rampAngle: DEFAULT_RAMP
   });
   if (isNew) src.name = ""; // sanitize setzt "?" – neues Werkzeug bekommt einen Namensvorschlag
   root.innerHTML = editorHtml(p, src, isNew, h);
@@ -277,6 +279,42 @@ export function openToolDialog(tool: MillingTool | null, onDone?: (tool: Milling
 let pageSel: string | null = null;   // gerade bearbeitetes Werkzeug (null = neues)
 let pageNew = false;
 
+// Filter nach Art + Suche (viele Werkzeuge, z. B. aus einer Fusion-360-Bibliothek)
+const FILTER_KEY = "cnc_craft_tool_filter";
+const CLOSED_KEY = "cnc_craft_tool_groups_closed";
+const lsGet = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* egal */ } };
+let typeFilter: ToolType | "all" = (TOOL_TYPES as string[]).includes(lsGet(FILTER_KEY) || "") ? lsGet(FILTER_KEY) as ToolType : "all";
+let search = "";
+const closedGroups = new Set<string>(((): string[] => { try { return JSON.parse(lsGet(CLOSED_KEY) || "[]"); } catch { return []; } })());
+
+function setTypeFilter(f: ToolType | "all") { typeFilter = f; lsSet(FILTER_KEY, f); }
+
+/** Passt das Werkzeug zur Suche? Alle Wörter müssen vorkommen (Name, Notiz, Art, Ø, T-Nummer) */
+function matchesSearch(tl: MillingTool): boolean {
+  const words = search.toLowerCase().replace(/,/g, ".").split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  const hay = `t${toolNumber(tl)} ${tl.name} ${tl.notes || ""} ${toolTypeName(tl)} ø${fmt(tl.diameter)} ${fmt(tl.diameter)}mm`.toLowerCase().replace(/,/g, ".");
+  return words.every(w => hay.includes(w));
+}
+
+/** Sichtbare Werkzeuge in Anzeige-Reihenfolge; grouped = in "Alle" nach Art gruppiert */
+function visibleTools(tools: MillingTool[], types: ToolType[]) {
+  const grouped = typeFilter === "all" && types.length > 1;
+  let vis = tools.filter(tl => (typeFilter === "all" || tl.type === typeFilter) && matchesSearch(tl));
+  if (grouped) vis = types.flatMap(ty => vis.filter(tl => tl.type === ty));
+  return { vis, grouped };
+}
+
+/** Nachbar für ▲▼ in der sichtbaren Liste (in Gruppen nur innerhalb derselben Art) */
+function moveNeighbor(tools: MillingTool[], types: ToolType[], dir: -1 | 1): MillingTool | null {
+  const { vis, grouped } = visibleTools(tools, types);
+  const i = vis.findIndex(tl => tl.id === pageSel);
+  const n = i < 0 ? undefined : vis[i + dir];
+  if (!n || (grouped && n.type !== vis[i].type)) return null;
+  return n;
+}
+
 /** Sprache gewechselt: Seite komplett neu aufbauen */
 export function renderToolTable() {
   const page = document.getElementById("tool-page");
@@ -306,6 +344,8 @@ export function renderToolPage(withEditor = true) {
             <button id="tp-up" class="btn-secondary" data-tip="${esc(t("tl.upTip"))}">▲</button>
             <button id="tp-down" class="btn-secondary" data-tip="${esc(t("tl.downTip"))}">▼</button>
           </div>
+          <div id="tp-chips" class="tlp-chips"></div>
+          <input id="tp-search" class="tlp-search" type="search" placeholder="${esc(t("tl.searchPh"))}">
           <div id="tp-list" class="tlp-list"></div>
           <div class="tlp-settings">
             <h4>⚙️ ${esc(t("tl.settings"))}</h4>
@@ -325,9 +365,20 @@ export function renderToolPage(withEditor = true) {
     bindPage(page);
   }
 
+  // Arten in der Bibliothek (Reihenfolge wie die Bild-Knöpfe im Editor)
+  const types = TOOL_TYPES.filter(ty => tools.some(tl => tl.type === ty));
+  if (typeFilter !== "all" && !types.includes(typeFilter)) setTypeFilter("all");
+  const chips = page.querySelector("#tp-chips") as HTMLElement;
+  const chip = (f: ToolType | "all", label: string, n: number, ico = "") =>
+    `<button type="button" class="tlp-chip${typeFilter === f ? " on" : ""}" data-filter="${f}"${f === "all" ? "" : ` data-tip="${esc(t("tl.filterTip"))}"`}>${ico}<span>${esc(label)}</span><em>${n}</em></button>`;
+  chips.innerHTML = types.length > 1 ? chip("all", t("tl.filterAll"), tools.length)
+    + types.map(ty => chip(ty, t("tl.type." + ty), tools.filter(tl => tl.type === ty).length, toolIconSvg(typeGeom(ty), 10, 20))).join("") : "";
+  chips.style.display = types.length > 1 ? "" : "none";
+
   // Liste
+  const { vis, grouped } = visibleTools(tools, types);
   const list = page.querySelector("#tp-list") as HTMLElement;
-  list.innerHTML = tools.map(tl => {
+  const item = (tl: MillingTool) => {
     const sel = !pageNew && tl.id === pageSel;
     const def = activeTool?.id === tl.id;
     return `
@@ -339,15 +390,25 @@ export function renderToolPage(withEditor = true) {
         </div>
         <button class="tlp-star${def ? " on" : ""}" data-act="default" data-tip="${esc(t(def ? "tl.isDefault" : "tl.makeDefault"))}">${def ? "★" : "☆"}</button>
       </div>`;
-  }).join("") + (pageNew ? `<div class="tlp-item sel tlp-newitem"><div class="tlp-txt"><div class="tlp-name">＋ ${esc(t("tool.newTitle"))}</div></div></div>` : "");
+  };
+  // Gruppen auf-/zuklappbar; beim Suchen immer offen, damit man die Treffer sieht
+  const body = grouped ? types.map(ty => {
+    const g = vis.filter(tl => tl.type === ty);
+    if (!g.length) return "";
+    const open = !!search.trim() || !closedGroups.has(ty);
+    return `<div class="tlp-group${open ? "" : " closed"}" data-group="${ty}" data-tip="${esc(t("tl.groupTip"))}">
+        <span class="tlp-caret">${open ? "▾" : "▸"}</span>${toolIconSvg(typeGeom(ty), 10, 20)}<span>${esc(t("tl.type." + ty))}</span><em>${g.length}</em></div>`
+      + (open ? g.map(item).join("") : "");
+  }).join("") : vis.map(item).join("");
+  list.innerHTML = (body || `<div class="tlp-empty">${esc(t("tl.noMatch"))}</div>`) + (pageNew ? `<div class="tlp-item sel tlp-newitem"><div class="tlp-txt"><div class="tlp-name">＋ ${esc(t("tool.newTitle"))}</div></div></div>` : "");
 
   // Einstellungen
   const setv = (id: string, v: string) => { const e = page.querySelector("#" + id) as HTMLInputElement; if (e && document.activeElement !== e) e.value = v; };
   setv("tps-maxrpm", String(toolSettings.maxRpm)); setv("tps-minrpm", String(toolSettings.minRpm));
   setv("tps-maxfeed", String(toolSettings.maxFeed)); setv("tps-mat", toolSettings.material);
   (page.querySelector("#tp-dup") as HTMLButtonElement).disabled = pageNew || !pageSel;
-  (page.querySelector("#tp-up") as HTMLButtonElement).disabled = pageNew || tools[0]?.id === pageSel;
-  (page.querySelector("#tp-down") as HTMLButtonElement).disabled = pageNew || tools[tools.length - 1]?.id === pageSel;
+  (page.querySelector("#tp-up") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, -1);
+  (page.querySelector("#tp-down") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, 1);
 
   if (!withEditor) return;
   const tool = pageNew ? null : getTool(pageSel);
@@ -359,8 +420,11 @@ export function renderToolPage(withEditor = true) {
     onSave: (data) => {
       if (tool) { updateTool(tool.id, data); pageSel = tool.id; }
       else { const n = addTool(data); pageSel = n.id; pageNew = false; }
+      // Art geändert/neu: Filter folgt, damit das Werkzeug sichtbar bleibt
+      if (typeFilter !== "all" && data.type && data.type !== typeFilter) setTypeFilter(data.type);
       renderToolPage();
     },
+    newType: typeFilter === "all" ? undefined : typeFilter,
     onCancel: pageNew ? () => { pageNew = false; renderToolPage(); } : undefined,
     onDelete: tool && getTools().length > 1 ? () => {
       if (!window.confirm(t("tool.confirmDelete", { name: tool.name }))) return;
@@ -373,7 +437,30 @@ export function renderToolPage(withEditor = true) {
 }
 
 function bindPage(page: HTMLElement) {
+  page.querySelector("#tp-chips")!.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest(".tlp-chip") as HTMLElement | null;
+    if (!b) return;
+    const f = b.dataset.filter as ToolType | "all";
+    setTypeFilter(f);
+    // gewähltes Werkzeug passt nicht zum Filter: erstes passendes zeigen; neues Werkzeug bekommt die Art des Filters
+    const sel = getTool(pageSel);
+    const swap = !pageNew && f !== "all" && sel?.type !== f;
+    if (swap) pageSel = getTools().find(tl => tl.type === f)?.id || pageSel;
+    renderToolPage(pageNew || swap);
+  });
+  page.querySelector("#tp-search")!.addEventListener("input", (e) => {
+    search = (e.target as HTMLInputElement).value;
+    renderToolPage(false);
+  });
   page.querySelector("#tp-list")!.addEventListener("click", (e) => {
+    const grp = (e.target as HTMLElement).closest(".tlp-group") as HTMLElement | null;
+    if (grp) {
+      const ty = grp.dataset.group!;
+      if (!closedGroups.delete(ty)) closedGroups.add(ty);
+      lsSet(CLOSED_KEY, JSON.stringify([...closedGroups]));
+      renderToolPage(false);
+      return;
+    }
     const item = (e.target as HTMLElement).closest(".tlp-item[data-id]") as HTMLElement | null;
     if (!item) return;
     const id = item.dataset.id!;
@@ -387,8 +474,15 @@ function bindPage(page: HTMLElement) {
     const c = duplicateTool(pageSel);
     if (c) { pageSel = c.id; renderToolPage(); }
   });
-  page.querySelector("#tp-up")!.addEventListener("click", () => { if (pageSel) moveTool(pageSel, -1); renderToolPage(); });
-  page.querySelector("#tp-down")!.addEventListener("click", () => { if (pageSel) moveTool(pageSel, 1); renderToolPage(); });
+  // ▲▼ tauscht mit dem Nachbarn in der sichtbaren Liste (gefiltert/gruppiert: gleiche Art)
+  const move = (dir: -1 | 1) => {
+    const tools = getTools();
+    const n = pageSel ? moveNeighbor(tools, TOOL_TYPES.filter(ty => tools.some(tl => tl.type === ty)), dir) : null;
+    if (n && pageSel) swapTools(pageSel, n.id);
+    renderToolPage();
+  };
+  page.querySelector("#tp-up")!.addEventListener("click", () => move(-1));
+  page.querySelector("#tp-down")!.addEventListener("click", () => move(1));
   const bind = (id: string, key: "maxRpm" | "minRpm" | "maxFeed" | "material") => {
     const el = page.querySelector("#" + id) as HTMLInputElement;
     el.addEventListener("change", () => setToolSettings({ [key]: key === "material" ? el.value : parseFloat(el.value) } as any));

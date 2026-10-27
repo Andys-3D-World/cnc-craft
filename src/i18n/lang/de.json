@@ -2003,6 +2003,11 @@
   "tl.dupTip": "Werkzeug kopieren",
   "tl.upTip": "Nach oben (kleinere T-Nummer)",
   "tl.downTip": "Nach unten (größere T-Nummer)",
+  "tl.filterAll": "Alle",
+  "tl.filterTip": "Nur Werkzeuge dieser Art zeigen",
+  "tl.searchPh": "🔍 Suchen: Name, Ø, Notiz, T-Nummer …",
+  "tl.noMatch": "Keine passenden Werkzeuge",
+  "tl.groupTip": "Gruppe auf- oder zuklappen",
   "tl.isDefault": "Standard-Werkzeug",
   "tl.makeDefault": "Als Standard-Werkzeug setzen",
   "tl.settings": "Werkzeug-Einstellungen",
@@ -2365,7 +2370,7 @@
   "lib.io.exportTip.tools": "Alle Fräswerkzeuge mit Werkzeug-Einstellungen als Datei speichern – zum Sichern oder Weitergeben.",
   "lib.io.exportTip.laser": "Alle Laser-Ebenen mit Laser-Einstellungen als Datei speichern – zum Sichern oder Weitergeben.",
   "lib.io.exportTip.plasma": "Alle Plasma-Schnitte mit Plasma-Einstellungen als Datei speichern – zum Sichern oder Weitergeben.",
-  "lib.io.importTip.tools": "Fräswerkzeuge aus einer Datei laden (Einzel-Export oder Komplett-Sicherung). Du kannst hinzufügen oder ersetzen.",
+  "lib.io.importTip.tools": "Fräswerkzeuge aus einer Datei laden: CNC-Craft-Export/Sicherung oder eine Fusion-360-Werkzeugbibliothek (.tools / .json, z. B. vom Werkzeug-Händler). Du kannst hinzufügen oder ersetzen.",
   "lib.io.importTip.laser": "Laser-Ebenen aus einer Datei laden (Einzel-Export oder Komplett-Sicherung). Du kannst hinzufügen oder ersetzen.",
   "lib.io.importTip.plasma": "Plasma-Schnitte aus einer Datei laden (Einzel-Export oder Komplett-Sicherung). Du kannst hinzufügen oder ersetzen.",
   "lib.io.backup": "Komplett-Sicherung",
@@ -3581,5 +3586,7 @@
   "ops.threadPassesTip": "Wie oft der Fräser das Gewinde umrundet, jedes Mal etwas tiefer – schont kleine Fräser (Alu: 2–3).",
   "ops.threadSpring": "Leerdurchgang",
   "ops.threadSpringTip": "Am Ende die letzte Bahn noch einmal fahren – glättet die Flanken.",
-  "gcw.threadReach": "Form {n}: Das Gewinde ist {l} mm lang, der Hals des Einzahn-Fräsers reicht nur {r} mm – der Schaft würde anstoßen."
+  "gcw.threadReach": "Form {n}: Das Gewinde ist {l} mm lang, der Hals des Einzahn-Fräsers reicht nur {r} mm – der Schaft würde anstoßen.",
+  "lib.io.filterFusion": "CNC-Craft- oder Fusion-360-Bibliothek",
+  "lib.io.fusionSkipped": "Fusion 360: {n} Einträge übersprungen (Halter, Taster, Gewindebohrer o. Ä. – gibt es in CNC Craft nicht)."
 }

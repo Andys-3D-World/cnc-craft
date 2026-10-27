@@ -334,6 +334,15 @@ export function moveTool(id: string, dir: -1 | 1) {
   changed();
 }
 
+/** Zwei Werkzeuge tauschen ihre Plätze (T-Nummern) – für ▲▼ in einer gefilterten Liste */
+export function swapTools(a: string, b: string) {
+  const i = tools.findIndex(x => x.id === a), j = tools.findIndex(x => x.id === b);
+  if (i < 0 || j < 0 || i === j) return;
+  [tools[i], tools[j]] = [tools[j], tools[i]];
+  noteOrder("tools");
+  changed();
+}
+
 function newToolId() {
   let id = "";
   do { id = "t" + Math.random().toString(36).substring(2, 9); } while (getTool(id));

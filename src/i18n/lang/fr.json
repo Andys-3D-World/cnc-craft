@@ -1828,6 +1828,11 @@
   "tl.dupTip": "Dupliquer l'outil",
   "tl.upTip": "Monter (numéro T plus petit)",
   "tl.downTip": "Descendre (numéro T plus grand)",
+  "tl.filterAll": "Tous",
+  "tl.filterTip": "Afficher uniquement les outils de ce type",
+  "tl.searchPh": "🔍 Rechercher : nom, Ø, note, numéro T …",
+  "tl.noMatch": "Aucun outil correspondant",
+  "tl.groupTip": "Déplier ou replier le groupe",
   "tl.isDefault": "Outil par défaut",
   "tl.makeDefault": "Définir comme outil par défaut",
   "tl.settings": "Réglages outils",
@@ -2190,7 +2195,7 @@
   "lib.io.exportTip.tools": "Enregistrer tous les outils et leurs réglages dans un fichier – pour sauvegarder ou partager.",
   "lib.io.exportTip.laser": "Enregistrer tous les calques laser et leurs réglages dans un fichier – pour sauvegarder ou partager.",
   "lib.io.exportTip.plasma": "Enregistrer toutes les coupes plasma et leurs réglages dans un fichier – pour sauvegarder ou partager.",
-  "lib.io.importTip.tools": "Charger des outils depuis un fichier (export seul ou sauvegarde complète). Ajouter ou remplacer.",
+  "lib.io.importTip.tools": "Charger des outils de fraisage depuis un fichier : export/sauvegarde CNC Craft ou bibliothèque d'outils Fusion 360 (.tools / .json, p. ex. de votre revendeur). Vous pouvez ajouter ou remplacer.",
   "lib.io.importTip.laser": "Charger des calques laser depuis un fichier (export seul ou sauvegarde complète). Ajouter ou remplacer.",
   "lib.io.importTip.plasma": "Charger des coupes plasma depuis un fichier (export seul ou sauvegarde complète). Ajouter ou remplacer.",
   "lib.io.backup": "Sauvegarde complète",
@@ -3406,5 +3411,7 @@
   "ops.threadPassesTip": "Nombre de tours autour du filetage, un peu plus profond à chaque fois – ménage les petits outils (alu : 2–3).",
   "ops.threadSpring": "Passe à vide",
   "ops.threadSpringTip": "Refaire la dernière trajectoire à la fin – lisse les flancs.",
-  "gcw.threadReach": "Forme {n} : le filetage fait {l} mm, mais le col de la fraise monodent n'atteint que {r} mm – la queue toucherait."
+  "gcw.threadReach": "Forme {n} : le filetage fait {l} mm, mais le col de la fraise monodent n'atteint que {r} mm – la queue toucherait.",
+  "lib.io.filterFusion": "Bibliothèque CNC Craft ou Fusion 360",
+  "lib.io.fusionSkipped": "Fusion 360 : {n} entrées ignorées (porte-outils, palpeurs, tarauds ou similaires – absents de CNC Craft)."
 }
