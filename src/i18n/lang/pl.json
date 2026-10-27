@@ -3362,5 +3362,10 @@
   "cyc.err.noF": "Nie ustawiono posuwu (F).",
   "cyc.err.dwellMs": "Postój P ponad 60 s – prawdopodobnie w milisekundach. Ustaw postprocesor na sekundy.",
   "cyc.err.unknownZ": "Nieznana wysokość startowa (np. po G28) – przed cyklem najedź na wysokość Z lub użyj G99.",
-  "cyc.err.unsupported": "Cykl G{code} nie jest obsługiwany."
+  "cyc.err.unsupported": "Cykl G{code} nie jest obsługiwany.",
+  "tl.type.threadmill": "Frez do gwintów",
+  "tl.typeTip.threadmill": "Frezuje gwinty wewnętrzne i zewnętrzne po torze śrubowym. Kąt = kąt boku (metryczny 60°) oraz skok. Nie do zwykłych konturów.",
+  "tl.g.pitch": "Skok",
+  "tl.pitchTip": "Skok gwintu w mm, np. 1 dla M6, 1,25 dla M8, 1,5 dla M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

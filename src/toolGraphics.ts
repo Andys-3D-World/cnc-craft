@@ -10,7 +10,7 @@
  * Alles ohne Bibliothek, nur SVG-Text – funktioniert in der App und im Test-Browser.
  */
 
-export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "facemill";
+export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "facemill" | "threadmill";
 export type Helix = "up" | "down" | "compression" | "straight";
 
 /** Die Maße, die man zum Zeichnen braucht (Teil von MillingTool) */
@@ -25,6 +25,7 @@ export interface ToolGeom {
   angle: number;      // Spitzenwinkel (V, Fase, Senker, Bohrer)
   tipDia: number;     // Spitzen-Ø (V-Stichel/Fase)
   cornerR: number;    // Eckenradius (Torusfräser)
+  pitch?: number;     // Steigung (Gewindefräser), z. B. 1 für M6
 }
 
 type P = [number, number];
@@ -73,6 +74,18 @@ function cutterProfile(g: ToolGeom): { pts: P[]; top: number } {
       pts.push([0, 0], [R, h]);
       top = Math.max(top, h);
       pts.push([R, top]);
+      break;
+    }
+    case "threadmill": {
+      // Zähne wie ein Gewinde: Flankenwinkel = angle (meist 60°), Zahnhöhe aus der Steigung
+      const P = Math.max(0.2, g.pitch || 1);
+      const half = Math.max(10, Math.min(170, g.angle || 60)) / 2 * Math.PI / 180;
+      const Ri = Math.max(R * 0.35, R - (P / 2) / Math.tan(half));
+      const teeth = Math.max(1, Math.floor(Math.max(g.fluteLen, P) / P));
+      pts.push([0, 0], [Ri, 0]);
+      for (let k = 0; k < teeth && k < 60; k++) pts.push([R, k * P + P / 2], [Ri, (k + 1) * P]);
+      top = Math.max(top, teeth * P);
+      if (top > teeth * P + 1e-6) pts.push([Ri, top]);
       break;
     }
     default: // endmill, facemill
@@ -175,6 +188,10 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
     // Winkel
     if (conical || g.type === "drill") {
       dims += `<text x="${n(cx)}" y="${n(Y(coneHeight(g) * 0.5) + 4)}" text-anchor="middle" class="tg-angle">${fmt(g.angle)}°</text>`;
+    }
+    if (g.type === "threadmill") {
+      // neben die Schneiden (oberhalb der Schneidenlänge), damit die Zähne sichtbar bleiben
+      dims += `<text x="${n(X(R) + 6)}" y="${n(Y(top) - 8)}" class="tg-angle">P${fmt(g.pitch || 1)} · ${fmt(g.angle)}°</text>`;
     }
     if (g.type === "bullnose" && g.cornerR > 0) {
       dims += `<text x="${n(X(R) + 4)}" y="${n(Y(0) - 2)}" class="tg-angle">R${fmt(g.cornerR)}</text>`;

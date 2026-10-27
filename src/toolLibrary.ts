@@ -6,7 +6,7 @@
  * "Standard-Werkzeug" (activeTool).
  *
  * Ein Werkzeug hat wie in Estlcam eine Art (Schaftfräser, Kugelfräser, Torusfräser,
- * V-Stichel, Fasenfräser, Senker, Bohrer, Planfräser), Schneidenzahl, Spiral-Richtung,
+ * V-Stichel, Fasenfräser, Senker, Bohrer, Planfräser, Gewindefräser), Schneidenzahl, Spiral-Richtung,
  * Maße (Ø, Schaft, Schneidenlänge, Gesamtlänge, Winkel, Spitze, Eckenradius) und
  * Schnittdaten. Der Schnittdaten-Rechner schlägt Drehzahl, Vorschub und Zustellung vor
  * (Material + Werkzeug + Grenzen der Maschine aus den Werkzeug-Einstellungen).
@@ -37,7 +37,7 @@ export interface MillingTool extends ToolGeom {
   device?: string;     // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
-export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "facemill"];
+export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "facemill", "threadmill"];
 /** Arten mit Kegel-Spitze (Winkel zählt) */
 export const CONE_TYPES: ToolType[] = ["vbit", "chamfer", "countersink", "drill"];
 
@@ -50,7 +50,9 @@ export const TYPE_DEFAULTS: Record<ToolType, Omit<ToolGeom, "type">> = {
   chamfer:     { diameter: 12, shankDia: 6,     fluteLen: 0,  length: 50, flutes: 2, helix: "straight", angle: 90,  tipDia: 1,   cornerR: 0 },
   countersink: { diameter: 12, shankDia: 6,     fluteLen: 0,  length: 45, flutes: 3, helix: "straight", angle: 90,  tipDia: 0,   cornerR: 0 },
   drill:       { diameter: 3,  shankDia: 3,     fluteLen: 20, length: 61, flutes: 2, helix: "up",       angle: 118, tipDia: 0,   cornerR: 0 },
-  facemill:    { diameter: 25, shankDia: 8,     fluteLen: 3,  length: 45, flutes: 2, helix: "straight", angle: 0,   tipDia: 0,   cornerR: 0 }
+  facemill:    { diameter: 25, shankDia: 8,     fluteLen: 3,  length: 45, flutes: 2, helix: "straight", angle: 0,   tipDia: 0,   cornerR: 0 },
+  // Gewindefräser (mehrzahnig) für M8 × 1,25 – angle = Flankenwinkel (metrisch 60°), pitch = Steigung
+  threadmill:  { diameter: 6,  shankDia: 6,     fluteLen: 10, length: 57, flutes: 3, helix: "straight", angle: 60,  tipDia: 0,   cornerR: 0, pitch: 1.25 }
 };
 
 export function typeGeom(type: ToolType): ToolGeom {
@@ -112,6 +114,8 @@ export function calcCutData(tool: ToolGeom & { toolMat?: ToolMat }, materialId: 
   if (feed > maxFeed) { feed = maxFeed; limited = true; }
   let stepZ = m.ap * dEff * (conical ? 0.5 : 1);
   if (tool.type === "drill") stepZ = Math.max(0.5, dEff * (m.ap >= 0.5 ? 1 : 0.5)); // Spanbrech-Tiefe
+  // Gewindefräser: das ganze Zahnprofil schneidet gleichzeitig -> halber Vorschub, Zustellung = eine Steigung
+  if (tool.type === "threadmill") { feed *= 0.5; stepZ = Math.max(0.2, tool.pitch || 1); }
   if (tool.fluteLen > 0 && !conical) stepZ = Math.min(stepZ, tool.fluteLen);
   stepZ = Math.max(0.05, stepZ);
   const plunge = tool.type === "drill" ? feed * 0.5 : feed * 0.3;
@@ -196,6 +200,7 @@ export function sanitize(x: any): MillingTool {
     angle: Math.max(0, Math.min(179, num0(x.angle, d.angle))),
     tipDia: Math.min(num0(x.tipDia, d.tipDia), diameter),
     cornerR: Math.min(num0(x.cornerR, d.cornerR), diameter / 2),
+    ...(type === "threadmill" ? { pitch: Math.min(10, Math.max(0.2, num(x.pitch, d.pitch ?? 1))) } : {}),
     stepZ: Math.abs(num(x.stepZ, 1.5)),
     feedrate: num(x.feedrate, 1000),
     rpm: Number.isFinite(+x.rpm) && +x.rpm >= 0 ? +x.rpm : 12000,
@@ -352,7 +357,7 @@ export function toolLabel(tool: MillingTool): string {
 
 /** Kurzinfo: "Schaftfräser · 2 Schneiden · Ø 3 mm · 1.5 mm/Durchgang · F1200 · S18000" */
 export function toolInfo(tool: MillingTool): string {
-  return `${toolTypeName(tool)} · ${t("tl.flutesN", { n: tool.flutes })}${CONE_TYPES.includes(tool.type) ? ` · ${fmt(tool.angle)}°` : ""} · `
+  return `${toolTypeName(tool)} · ${t("tl.flutesN", { n: tool.flutes })}${CONE_TYPES.includes(tool.type) ? ` · ${fmt(tool.angle)}°` : ""}${tool.type === "threadmill" ? ` · P${fmt(tool.pitch || 1)}` : ""} · `
     + t("tool.info", { d: fmt(tool.diameter), z: fmt(tool.stepZ), f: tool.feedrate, s: tool.rpm });
 }
 

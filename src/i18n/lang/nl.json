@@ -3362,5 +3362,10 @@
   "cyc.err.noF": "Geen voeding (F) ingesteld.",
   "cyc.err.dwellMs": "Wachttijd P boven 60 s – waarschijnlijk in milliseconden. Zet de postprocessor op seconden.",
   "cyc.err.unknownZ": "Starthoogte onbekend (bijv. na G28) – ga vóór de cyclus naar een Z-hoogte of gebruik G99.",
-  "cyc.err.unsupported": "Cyclus G{code} wordt niet ondersteund."
+  "cyc.err.unsupported": "Cyclus G{code} wordt niet ondersteund.",
+  "tl.type.threadmill": "Draadfrees",
+  "tl.typeTip.threadmill": "Freest binnen- en buitendraad op een schroeflijnbaan. Hoek = flankhoek (metrisch 60°), plus de spoed. Niet voor gewone contouren.",
+  "tl.g.pitch": "Spoed",
+  "tl.pitchTip": "Draadspoed in mm, bijv. 1 voor M6, 1,25 voor M8, 1,5 voor M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

@@ -3537,5 +3537,10 @@
   "cyc.err.noF": "No feed rate (F) set.",
   "cyc.err.dwellMs": "Dwell P over 60 s – probably given in milliseconds. Switch the post processor to seconds.",
   "cyc.err.unknownZ": "Start height unknown (e.g. after G28) – move to a Z height before the cycle or use G99.",
-  "cyc.err.unsupported": "Cycle G{code} is not supported."
+  "cyc.err.unsupported": "Cycle G{code} is not supported.",
+  "tl.type.threadmill": "Thread mill",
+  "tl.typeTip.threadmill": "Mills internal and external threads on a helical path. Angle = flank angle (metric 60°), plus the pitch. Not for normal contours.",
+  "tl.g.pitch": "Pitch",
+  "tl.pitchTip": "Thread pitch in mm, e.g. 1 for M6, 1.25 for M8, 1.5 for M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

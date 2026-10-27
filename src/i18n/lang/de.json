@@ -3537,5 +3537,10 @@
   "cyc.err.noF": "Kein Vorschub (F) gesetzt.",
   "cyc.err.dwellMs": "Verweilzeit P über 60 s – vermutlich in Millisekunden angegeben. Postprozessor auf Sekunden umstellen.",
   "cyc.err.unknownZ": "Starthöhe unbekannt (z. B. nach G28) – vor dem Zyklus eine Z-Höhe anfahren oder G99 benutzen.",
-  "cyc.err.unsupported": "Zyklus G{code} wird nicht unterstützt."
+  "cyc.err.unsupported": "Zyklus G{code} wird nicht unterstützt.",
+  "tl.type.threadmill": "Gewindefräser",
+  "tl.typeTip.threadmill": "Fräst Innen- und Außengewinde auf Zirkularbahnen (Schraubenlinie). Winkel = Flankenwinkel (metrisch 60°), dazu die Steigung eintragen. Nicht für normale Konturen.",
+  "tl.g.pitch": "Steigung",
+  "tl.pitchTip": "Gewindesteigung in mm, z. B. 1 für M6, 1,25 für M8, 1,5 für M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

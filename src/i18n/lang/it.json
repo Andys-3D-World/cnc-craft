@@ -3362,5 +3362,10 @@
   "cyc.err.noF": "Nessun avanzamento (F) impostato.",
   "cyc.err.dwellMs": "Sosta P oltre 60 s – probabilmente in millisecondi. Imposta il post-processore in secondi.",
   "cyc.err.unknownZ": "Quota di partenza sconosciuta (ad es. dopo G28) – porta Z a una quota prima del ciclo o usa G99.",
-  "cyc.err.unsupported": "Il ciclo G{code} non è supportato."
+  "cyc.err.unsupported": "Il ciclo G{code} non è supportato.",
+  "tl.type.threadmill": "Fresa per filettare",
+  "tl.typeTip.threadmill": "Fresa filetti interni ed esterni su un percorso elicoidale. Angolo = angolo del fianco (metrico 60°), più il passo. Non per contorni normali.",
+  "tl.g.pitch": "Passo",
+  "tl.pitchTip": "Passo del filetto in mm, ad es. 1 per M6, 1,25 per M8, 1,5 per M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

@@ -10,7 +10,12 @@
   at the bottom – only with a floating tap holder, GRBL cannot sync the spindle). R/Z/Q/P stay valid for the
   following holes, G98 returns to the start height, G99 to R. Progress, *Resume from line* and the height map keep
   working on the loaded file. Programs with G91 cycles, missing R/Z/Q/F or a dwell that looks like milliseconds
-  are refused with a clear message instead of guessing.
+  are refused with a clear message instead of guessing. The simulation, the 3D material view and the time
+  estimate show the drilling moves of these cycles too.
+- **Thread mill as a tool type:** new type *Thread mill* in the tool library with pitch and flank angle (metric 60°),
+  drawn with its teeth, named e.g. *Thread mill P1.25 Ø6*. The cutting data calculator uses half the feed and one
+  pitch as step-down. CNC Craft warns when a thread mill is used for normal contours (no thread milling operation
+  yet).
 - **Spindle inverter (VFD) over Modbus:** CNC Craft can now talk to a spindle inverter directly over
   Modbus RTU (RS-485 adapter) or Modbus TCP: set the speed, run forward / reverse / stop, and read the actual speed
   and the fault code. Small built-in Modbus engine (no extra libraries) with timeouts, retries after timeouts or

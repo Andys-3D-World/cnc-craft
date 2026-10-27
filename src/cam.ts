@@ -640,7 +640,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   const alreadyChained = new Set<string>();
   /** Vorschub-Anpassung nur bei Fräsern mit Schneide am Umfang – nicht Bohren, V-Carve, Fase, adaptive Tasche */
   const adaptsFeed = (shape: any): boolean => {
-    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill")) return false;
+    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "threadmill")) return false;
     if (shape.restOf) return true;
     const mode = shape.millingMode || "outside";
     if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer") return false;
@@ -698,7 +698,7 @@ const generateGcodeInner = (shapes: any): string | null => {
       return;
     }
     // V-Stichel, Bohrer und Senker taugen nicht für Konturen mit Fräser-Versatz/Taschen
-    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "countersink")) {
+    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "countersink" || curTool.type === "threadmill")) {
       const w = t("gcw.toolType", { name: curTool.name, type: t("tl.type." + curTool.type) });
       if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w);
     }

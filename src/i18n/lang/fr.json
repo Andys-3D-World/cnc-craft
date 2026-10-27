@@ -3362,5 +3362,10 @@
   "cyc.err.noF": "Aucune avance (F) définie.",
   "cyc.err.dwellMs": "Temporisation P supérieure à 60 s – probablement en millisecondes. Réglez le post-processeur en secondes.",
   "cyc.err.unknownZ": "Hauteur de départ inconnue (p. ex. après G28) – allez à une hauteur Z avant le cycle ou utilisez G99.",
-  "cyc.err.unsupported": "Le cycle G{code} n'est pas pris en charge."
+  "cyc.err.unsupported": "Le cycle G{code} n'est pas pris en charge.",
+  "tl.type.threadmill": "Fraise à fileter",
+  "tl.typeTip.threadmill": "Fraise des filetages intérieurs et extérieurs sur une trajectoire hélicoïdale. Angle = angle de flanc (métrique 60°), plus le pas. Pas pour les contours normaux.",
+  "tl.g.pitch": "Pas",
+  "tl.pitchTip": "Pas du filetage en mm, p. ex. 1 pour M6, 1,25 pour M8, 1,5 pour M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }

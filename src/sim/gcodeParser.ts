@@ -7,6 +7,8 @@
  * Verstanden wird: G0/G1/G2/G3 (I/J- und R-Schreibweise, auch Helix mit Z), G17, G20/G21, G90/G91,
  * F (Vorschub), M3/M4/M5 (Spindel/Laser/Plasma an/aus, S0 = aus), G4 (Warten, zählt zur Zeit),
  * G38.x (Antasten – wird nicht nachgebildet), Kommentare ( ) und ;
+ * Bohrzyklen G73/G74/G81–G85/G89 (G98/G99, R/Z/Q/P bleiben gültig bis G80) – so, wie cycles.rs sie
+ * vor dem Senden in G0/G1 umwandelt
  *
  * Bewegungsarten:  0 = Eilgang (G0), 1 = Schnitt (G1-G3 mit Werkzeug an), 2 = Leerfahrt (G1 mit Werkzeug aus)
  * Enthält die Datei gar keine M3/M4/M5-Befehle, gilt jede G1-G3-Bewegung als Schnitt.
@@ -15,6 +17,9 @@
 export const MOVE_RAPID = 0;
 export const MOVE_CUT = 1;
 export const MOVE_TRAVEL = 2;
+
+/** Bohrzyklen, die nachgebildet werden (wie cycles.rs) */
+const CYCLES = [73, 74, 81, 82, 83, 84, 85, 89];
 
 export interface SimProgram {
   lines: string[];
@@ -58,6 +63,9 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   let power = 1;          // letzter S-Wert (S0 = Laser/Plasma aus)
   let cutLength = 0, rapidLength = 0;
   let dwell = 0; // Wartezeit (G4), wird der nächsten Bewegung zugeschlagen
+  // Bohrzyklus: aktive Nummer (0 = keiner), Rückzug auf Starthöhe (G98) oder R (G99), gemerkte Werte
+  let cycle = 0, retractInitial = true;
+  let cR: number | undefined, cZ: number | undefined, cQ: number | undefined, cP: number | undefined;
 
   const add = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, kind: number, li: number, f: number) => {
     const len = Math.hypot(bx - ax, by - ay, bz - az);
@@ -87,7 +95,13 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     }
 
     for (const g of gs) {
-      if (g === 0 || g === 1 || g === 2 || g === 3) motion = g;
+      if (g === 0 || g === 1 || g === 2 || g === 3 || g === 80 || (g >= 38 && g < 39)) {
+        if (g <= 3) motion = g;
+        cycle = 0; cR = cZ = cQ = cP = undefined;
+      }
+      else if (CYCLES.includes(g)) cycle = g;
+      else if (g === 98) retractInitial = true;
+      else if (g === 99) retractInitial = false;
       else if (g === 90) absolute = true;
       else if (g === 91) absolute = false;
       else if (g === 20) inch = true;
@@ -108,10 +122,49 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     // Antasten (G38.2 usw.): Ergebnis ist unbekannt -> nicht nachbilden
     if (gs.some(g => g >= 38 && g < 39)) continue;
 
+    // Zyklus-Werte auch von Zeilen ohne Loch merken (z. B. "G99 G83 R1 Q2")
+    if (cycle) {
+      if (words.R !== undefined) cR = words.R * f;
+      if (words.Q !== undefined) cQ = Math.abs(words.Q * f);
+      if (words.P !== undefined) cP = words.P;
+    }
     const hasXYZ = words.X !== undefined || words.Y !== undefined || words.Z !== undefined;
     if (!hasXYZ) continue;
     // G53/G28 usw. nicht nachbilden
     if (gs.some(g => g === 28 || g === 30 || g === 53 || g === 92)) continue;
+
+    // Bohrzyklus: ein Loch an X/Y (Z = Bohrtiefe, nicht Position)
+    if (cycle && absolute) {
+      if (words.Z !== undefined) cZ = words.Z * f;
+      const hx = words.X === undefined ? x : words.X * f;
+      const hy = words.Y === undefined ? y : words.Y * f;
+      if (cR === undefined || cZ === undefined || cZ > cR) { x = hx; y = hy; continue; }
+      const r = cR, zb = cZ, ret = retractInitial ? Math.max(z, r) : r;
+      const kind = spindleOn ? MOVE_CUT : MOVE_TRAVEL;
+      const clear = inch ? 0.254 : 0.25;
+      const to = (nz: number, k: number) => { add(x, y, z, x, y, nz, k, li, feed); z = nz; };
+      if (z < r) to(r, MOVE_RAPID);
+      add(x, y, z, hx, hy, z, MOVE_RAPID, li, feed); x = hx; y = hy;
+      to(r, MOVE_RAPID);
+      if ((cycle === 83 || cycle === 73) && cQ && cQ > 0) {
+        let depth = r;
+        for (let k = 0; k < 10000; k++) {
+          const next = Math.max(depth - cQ, zb);
+          if (depth < r) to(depth + clear, MOVE_RAPID);
+          to(next, kind);
+          depth = next;
+          if (depth <= zb + 1e-9) break;
+          to(cycle === 83 ? r : depth + clear, MOVE_RAPID);
+        }
+      } else {
+        to(zb, kind);
+      }
+      if (cP && cP > 0 && cycle !== 81 && cycle !== 83 && cycle !== 73 && cycle !== 85) dwell += Math.min(cP, 60);
+      // Ausbohren / Gewindebohren: mit Vorschub wieder heraus
+      if (cycle === 84 || cycle === 74 || cycle === 85 || cycle === 89) to(r, kind);
+      to(ret, MOVE_RAPID);
+      continue;
+    }
 
     const nx = words.X === undefined ? x : (absolute ? words.X * f : x + words.X * f);
     const ny = words.Y === undefined ? y : (absolute ? words.Y * f : y + words.Y * f);

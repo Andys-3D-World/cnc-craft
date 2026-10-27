@@ -3362,5 +3362,10 @@
   "cyc.err.noF": "No hay avance (F) definido.",
   "cyc.err.dwellMs": "Espera P de más de 60 s – probablemente en milisegundos. Ajusta el postprocesador a segundos.",
   "cyc.err.unknownZ": "Altura inicial desconocida (p. ej. tras G28) – mueve a una altura Z antes del ciclo o usa G99.",
-  "cyc.err.unsupported": "El ciclo G{code} no es compatible."
+  "cyc.err.unsupported": "El ciclo G{code} no es compatible.",
+  "tl.type.threadmill": "Fresa de roscar",
+  "tl.typeTip.threadmill": "Fresa roscas interiores y exteriores en una trayectoria helicoidal. Ángulo = ángulo de flanco (métrico 60°), más el paso. No para contornos normales.",
+  "tl.g.pitch": "Paso",
+  "tl.pitchTip": "Paso de rosca en mm, p. ej. 1 para M6, 1,25 para M8, 1,5 para M10.",
+  "tl.autoNamePitch": "{type} P{p} Ø{d}"
 }
