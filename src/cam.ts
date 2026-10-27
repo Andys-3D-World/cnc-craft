@@ -18,7 +18,7 @@ import { generateLaserGcode } from "./laserCam";
 import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./rotary";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 import { adaptFeed, feedAdapt } from "./feedAdapt";
-import { threadPath } from "./threadMill";
+import { threadPath, ThreadInfo } from "./threadMill";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -28,6 +28,8 @@ const encoder = new TextEncoder();
 
 /** Hinweise aus der letzten G-Code-Erzeugung (werden in der Konsole angezeigt) */
 export let lastGcodeWarnings: string[] = [];
+/** Gewinde des letzten G-Codes (für die 3D-Ansicht: Gewindegänge einzeichnen) */
+export let lastThreads: ThreadInfo[] = [];
 
 /** Formen, die mit demselben Werkzeug gefräst werden */
 export interface ToolGroup { tool: MillingTool | null; shapes: any[] }
@@ -132,6 +134,7 @@ function usedAreaShapes(shapes: any[]): Set<any> {
 
 const generateGcodeInner = (shapes: any): string | null => {
   lastGcodeWarnings = [];
+  lastThreads = [];
   if (shapes.length === 0) return null;
 
   // LASER: eigener G-Code (Ebenen, Leistung %, Füllen) – siehe laserCam.ts
@@ -638,12 +641,17 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
     const r = threadPath({
       cx: c0.x, cy: c0.y, holeD, internal: side < 0,
-      D: Number(shape.threadD) || 0, pitch: tool.pitch || 1, toolD: tool.diameter,
+      D: Number(shape.threadD) || 0, pitch: Number(shape.threadPitch) || 0,
+      toolPitch: tool.threadSingle ? 0 : tool.pitch || 1, toolD: tool.diameter,
       length: Math.abs(typeof shape.millingDepth === "number" ? shape.millingDepth : 0),
-      left: !!shape.threadLeft, feed: feedXY, plunge: PLUNGE_FEED, safeZ: SAFE_Z,
+      left: !!shape.threadLeft, passes: Number(shape.threadPasses) || 1, springPass: !!shape.threadSpring,
+      feed: feedXY, plunge: PLUNGE_FEED, safeZ: SAFE_Z,
     });
     if (!r.ok) { warn("gcw.thread." + r.why, { d: tool.diameter }); return; }
-    gcode += `\n${c("gc.thread", { n: formCounter, d: r.D, p: tool.pitch || 1, l: Math.abs(shape.millingDepth), side: t(side < 0 ? "gc.threadIn" : "gc.threadOut"), hand: t(shape.threadLeft ? "gc.threadLeft" : "gc.threadRight") })}\n`;
+    // Einzahn: Hals muss tief genug reichen
+    if (tool.threadSingle && tool.fluteLen > 0 && r.info.length > tool.fluteLen + 1e-6) warn("gcw.threadReach", { l: r.info.length, r: tool.fluteLen });
+    lastThreads.push(r.info);
+    gcode += `\n${c("gc.thread", { n: formCounter, d: r.D, p: r.P, l: r.info.length, side: t(side < 0 ? "gc.threadIn" : "gc.threadOut"), hand: t(shape.threadLeft ? "gc.threadLeft" : "gc.threadRight") })}\n`;
     gcode += r.lines.join("\n") + "\n";
   };
 

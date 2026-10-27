@@ -26,6 +26,8 @@ export interface ToolGeom {
   tipDia: number;     // Spitzen-Ø (V-Stichel/Fase)
   cornerR: number;    // Eckenradius (Torusfräser)
   pitch?: number;     // Steigung (Gewindefräser), z. B. 1 für M6
+  threadSingle?: boolean; // Einzahn-Gewindefräser: ein Zahn unten, schneidet jede Steigung
+  neckDia?: number;   // Hals-Ø hinter dem Zahn (Einzahn), fluteLen = Schulterlänge (Ausladung)
 }
 
 type P = [number, number];
@@ -77,6 +79,14 @@ function cutterProfile(g: ToolGeom): { pts: P[]; top: number } {
       break;
     }
     case "threadmill": {
+      if (g.threadSingle) {
+        // Einzahn: ein 60°-Zahn unten, darüber der dünnere Hals bis zur Schulterlänge (siehe fullProfile)
+        const Rn = Math.min(R * 0.95, Math.max(R * 0.3, (g.neckDia || R * 1.4) / 2));
+        const h = (R - Rn) * Math.tan(Math.max(10, Math.min(170, g.angle || 60)) / 2 * Math.PI / 180) * 2;
+        pts.push([0, 0], [Rn, 0], [R, h / 2], [Rn, h]);
+        top = h;
+        break;
+      }
       // Zähne wie ein Gewinde: Flankenwinkel = angle (meist 60°), Zahnhöhe aus der Steigung
       const P = Math.max(0.2, g.pitch || 1);
       const half = Math.max(10, Math.min(170, g.angle || 60)) / 2 * Math.PI / 180;
@@ -100,10 +110,13 @@ function fullProfile(g: ToolGeom): { cut: P[]; all: P[]; top: number; total: num
   const R = g.diameter / 2, Rs = Math.max(0.1, g.shankDia / 2);
   const conical = g.type === "vbit" || g.type === "chamfer" || g.type === "countersink";
   const neck = Math.abs(R - Rs) < 1e-6 ? 0 : (conical && R > Rs ? 0.6 : Math.min(Math.abs(R - Rs) * 0.8, 4));
-  const total = Math.max(g.length, top + neck + Math.max(4, Rs * 2));
+  const total = Math.max(g.length, Math.max(top, g.type === "threadmill" && g.threadSingle ? g.fluteLen : 0) + neck + Math.max(4, Rs * 2));
   const all = pts.slice();
+  // Einzahn-Gewindefräser: Hals mit kleinerem Ø bis zur Schulterlänge
+  let top2 = top;
+  if (g.type === "threadmill" && g.threadSingle && g.fluteLen > top) { all.push([all[all.length - 1][0], g.fluteLen]); top2 = g.fluteLen; }
   const lastX = all[all.length - 1][0];
-  if (Math.abs(lastX - Rs) > 1e-6) all.push([Rs, top + neck]);
+  if (Math.abs(lastX - Rs) > 1e-6) all.push([Rs, top2 + neck]);
   all.push([Rs, total]);
   return { cut: pts, all, top, total };
 }
@@ -191,7 +204,8 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
     }
     if (g.type === "threadmill") {
       // neben die Schneiden (oberhalb der Schneidenlänge), damit die Zähne sichtbar bleiben
-      dims += `<text x="${n(X(R) + 6)}" y="${n(Y(top) - 8)}" class="tg-angle">P${fmt(g.pitch || 1)} · ${fmt(g.angle)}°</text>`;
+      const lbl = g.threadSingle ? `${fmt(g.angle)}°${g.neckDia ? ` · Ø${fmt(g.neckDia)}` : ""}` : `P${fmt(g.pitch || 1)} · ${fmt(g.angle)}°`;
+      dims += `<text x="${n(X(R) + 6)}" y="${n(Y(top) - 8)}" class="tg-angle">${lbl}</text>`;
     }
     if (g.type === "bullnose" && g.cornerR > 0) {
       dims += `<text x="${n(X(R) + 4)}" y="${n(Y(0) - 2)}" class="tg-angle">R${fmt(g.cornerR)}</text>`;

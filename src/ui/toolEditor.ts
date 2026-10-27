@@ -29,10 +29,12 @@ function esc(s: string): string {
 const FLUTE_CHOICES = [1, 2, 3, 4, 6];
 
 /** Vorschlag für den Namen, z. B. "3 mm Schaftfräser 2-schneidig" oder "V-Stichel 60° Ø6" */
-export function autoToolName(x: { type: ToolType; diameter: number; flutes: number; angle: number; pitch?: number }): string {
+export function autoToolName(x: { type: ToolType; diameter: number; flutes: number; angle: number; pitch?: number; threadSingle?: boolean }): string {
   const typ = toolTypeName(x);
   if (x.type === "vbit" || x.type === "chamfer" || x.type === "countersink") return t("tl.autoNameAngle", { type: typ, a: fmt(x.angle), d: fmt(x.diameter) });
-  if (x.type === "threadmill") return t("tl.autoNamePitch", { type: typ, p: fmt(x.pitch || 1), d: fmt(x.diameter) });
+  if (x.type === "threadmill") return x.threadSingle
+    ? t("tl.autoNameSingle", { type: typ, d: fmt(x.diameter) })
+    : t("tl.autoNamePitch", { type: typ, p: fmt(x.pitch || 1), d: fmt(x.diameter) });
   return t("tl.autoName", { d: fmt(x.diameter), type: typ, z: x.flutes });
 }
 
@@ -76,6 +78,9 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
             ${num("tl.g.fluteLen", "flutelen", src.fluteLen, "0.5", "mm", "", "tl.fluteLenTip")}
             ${num("tl.g.length", "len", src.length, "1", "mm", "", "tl.lengthTip")}
             ${num("tl.g.angle", "angle", src.angle, "1", "°", "te-cone")}
+            <label class="te-row te-single" data-tip="${esc(t("tl.singleTip"))}"><span>${esc(t("tl.single"))}</span>
+              <input id="${p}single" type="checkbox" style="width:auto;"${src.threadSingle ?? TYPE_DEFAULTS.threadmill.threadSingle ? " checked" : ""}></label>
+            ${num("tl.g.neck", "neck", src.neckDia ?? TYPE_DEFAULTS.threadmill.neckDia ?? 0, "0.05", "mm", "te-neck", "tl.neckTip")}
             ${num("tl.g.pitch", "pitch", src.pitch ?? TYPE_DEFAULTS.threadmill.pitch ?? 1, "0.05", "mm", "te-pitch", "tl.pitchTip")}
             ${num("tl.g.tip", "tip", src.tipDia, "0.05", "mm", "te-tip", "tl.tipTip")}
             ${num("tl.g.corner", "corner", src.cornerR, "0.1", "mm", "te-corner")}
@@ -133,6 +138,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     id: src.id || "x", name: q("name").value.trim() || "?", type,
     diameter: val("dia"), shankDia: val("shank"), fluteLen: val("flutelen"), length: val("len"),
     angle: val("angle"), tipDia: val("tip"), cornerR: val("corner"), flutes: val("flutes"), pitch: val("pitch"),
+    threadSingle: q("single").checked, neckDia: val("neck"),
     helix: q<HTMLSelectElement>("helix").value, toolMat: q<HTMLSelectElement>("tmat").value,
     rpm: val("rpm"), feedrate: val("feed"), plungeFeed: val("plunge"), rampAngle: val("ramp"), stepZ: val("stepz"),
     notes: q<HTMLTextAreaElement>("notes").value
@@ -143,7 +149,10 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     root.querySelectorAll<HTMLElement>(".te-type").forEach(b => b.classList.toggle("active", b.dataset.type === type));
     const cone = CONE_TYPES.includes(type);
     root.querySelectorAll<HTMLElement>(".te-cone").forEach(e => { e.style.display = cone || type === "threadmill" ? "" : "none"; });
-    root.querySelectorAll<HTMLElement>(".te-pitch").forEach(e => { e.style.display = type === "threadmill" ? "" : "none"; });
+    const single = type === "threadmill" && q("single").checked;
+    root.querySelectorAll<HTMLElement>(".te-single").forEach(e => { e.style.display = type === "threadmill" ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-neck").forEach(e => { e.style.display = single ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-pitch").forEach(e => { e.style.display = type === "threadmill" && !single ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-tip").forEach(e => { e.style.display = type === "vbit" || type === "chamfer" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-corner").forEach(e => { e.style.display = type === "bullnose" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-helix-row").forEach(e => { e.style.display = cone && type !== "drill" ? "none" : ""; });
@@ -170,6 +179,8 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     const set = (id: string, v: number | string) => { q(id).value = String(v); };
     set("angle", d.angle); set("tip", d.tipDia); set("corner", d.cornerR); set("flutes", d.flutes);
     if (d.pitch) set("pitch", d.pitch);
+    if (d.neckDia) set("neck", d.neckDia);
+    if (d.threadSingle !== undefined) q("single").checked = d.threadSingle;
     q<HTMLSelectElement>("helix").value = d.helix;
     if (isNew) { set("dia", d.diameter); set("shank", d.shankDia); set("len", d.length); prevDia = d.shankDia === d.diameter ? d.diameter : NaN; }
     set("flutelen", d.fluteLen);

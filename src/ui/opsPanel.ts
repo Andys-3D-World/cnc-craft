@@ -73,14 +73,19 @@ export function initOpsPanel(redraw: () => void, log: (s: string) => void) {
     const depth = parseFloat(q("ops-depth")?.value || "");
     const cw = parseFloat(q("ops-cw")?.value || "");
     const td = parseFloat(q("ops-td")?.value || "");
-    const left = q("ops-left");
+    const tp = parseFloat(q("ops-tp")?.value || "");
+    const tn = parseFloat(q("ops-tn")?.value || "");
+    const left = q("ops-left"), spring = q("ops-spring");
     return {
       kind, toolId: tool || undefined,
       depth: Number.isFinite(depth) ? Math.min(0, depth) : prev?.depth ?? -1,
       chamferW: Number.isFinite(cw) && cw > 0 ? cw : prev?.chamferW ?? 1,
       ...(kind === "thread" ? {
         threadD: Number.isFinite(td) && td >= 0 ? td : prev?.threadD ?? 0,
-        threadLeft: left ? left.checked : prev?.threadLeft ?? false
+        threadLeft: left ? left.checked : prev?.threadLeft ?? false,
+        threadPitch: Number.isFinite(tp) && tp >= 0 ? tp : prev?.threadPitch ?? 0,
+        threadPasses: Number.isFinite(tn) && tn >= 1 ? Math.min(10, Math.round(tn)) : prev?.threadPasses ?? 1,
+        threadSpring: spring ? spring.checked : prev?.threadSpring ?? false
       } : {})
     };
   });
@@ -153,6 +158,9 @@ export function refreshOps(force = false) {
         : o.kind === "thread"
         ? `<div class="prop-row" ${tip("ops.threadLenTip")}>${T("ops.threadLen")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>
            <div class="prop-row" ${tip("ops.threadDTip")}>${T("ops.threadD")}<input type="number" class="prop-input ops-td" min="0" step="0.5" value="${o.threadD || 0}"></div>
+           <div class="prop-row" ${tip("ops.threadPitchTip")}>${T("ops.threadPitch")}<input type="number" class="prop-input ops-tp" min="0" step="0.05" value="${o.threadPitch || 0}"></div>
+           <div class="prop-row" ${tip("ops.threadPassesTip")}>${T("ops.threadPasses")}<input type="number" class="prop-input ops-tn" min="1" max="10" step="1" value="${o.threadPasses || 1}"></div>
+           <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadSpringTip")}>${T("ops.threadSpring")}<input type="checkbox" class="ops-spring" style="width:auto;"${o.threadSpring ? " checked" : ""}></label>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadLeftTip")}>${T("ops.threadLeft")}<input type="checkbox" class="ops-left" style="width:auto;"${o.threadLeft ? " checked" : ""}></label>`
         : `<div class="prop-row">${T("rp.depth")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
     </div>`).join("");

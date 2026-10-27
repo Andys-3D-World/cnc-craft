@@ -3372,7 +3372,7 @@
   "ops.threadLen": "Longueur du filetage",
   "ops.threadLenTip": "Profondeur du filetage (négative, depuis le dessus). L'avant-trou doit être au moins aussi profond.",
   "ops.threadD": "Ø du filetage",
-  "ops.threadDTip": "Ø nominal, p. ex. 8 pour M8. 0 = automatique : pour les trous avant-trou + pas (6,8 mm → M8), pour les tenons le Ø du cercle.",
+  "ops.threadDTip": "Ø nominal, p. ex. 8 pour M8. 0 = automatique depuis le cercle : pour les trous via l'avant-trou (6,8 mm → M8), pour les tenons le Ø du cercle.",
   "ops.threadLeft": "Filetage à gauche",
   "ops.threadLeftTip": "Fraiser un filetage à gauche au lieu d'un filetage à droite.",
   "gc.thread": "Forme {n} : {side} M{d} x {p}, {l} mm de profondeur, {hand}",
@@ -3388,5 +3388,17 @@
   "gcw.thread.toolTooBig": "Forme {n} : la fraise à fileter Ø{d} est trop grande pour ce filetage – ignorée.",
   "gcw.thread.toolNoFit": "Forme {n} : la fraise à fileter Ø{d} n'entre pas dans l'avant-trou – ignorée.",
   "gcw.thread.small": "Forme {n} : le Ø du filetage est trop petit pour le pas – ignorée.",
-  "gcw.threadCore": "Forme {n} : le trou (Ø{h}) n'est fraisé qu'en contour « Intérieur » – avec la fraise Ø{d}, un noyau reste au centre et la fraise à fileter le heurterait. Choisissez « Poche » comme première opération."
+  "gcw.threadCore": "Forme {n} : le trou (Ø{h}) n'est fraisé qu'en contour « Intérieur » – avec la fraise Ø{d}, un noyau reste au centre et la fraise à fileter le heurterait. Choisissez « Poche » comme première opération.",
+  "tl.single": "Monodent",
+  "tl.singleTip": "Une seule dent en bas, taille n'importe quel pas (p. ex. fraise à fileter monoprofil carbure). Le pas vient alors de l'opération ou du filetage ISO à pas gros. « Longueur de coupe » = longueur d'épaulement L1 (profondeur atteinte par le col).",
+  "tl.g.neck": "Ø du col",
+  "tl.neckTip": "Ø du col derrière la dent (D3 dans les catalogues).",
+  "tl.autoNameSingle": "{type} monodent Ø{d}",
+  "ops.threadPitch": "Pas",
+  "ops.threadPitchTip": "Pas en mm. 0 = automatique : filetage ISO à pas gros pour les fraises monodent (M8 → 1,25), sinon le pas de l'outil. À saisir pour les pas fins.",
+  "ops.threadPasses": "Passes",
+  "ops.threadPassesTip": "Nombre de tours autour du filetage, un peu plus profond à chaque fois – ménage les petits outils (alu : 2–3).",
+  "ops.threadSpring": "Passe à vide",
+  "ops.threadSpringTip": "Refaire la dernière trajectoire à la fin – lisse les flancs.",
+  "gcw.threadReach": "Forme {n} : le filetage fait {l} mm, mais le col de la fraise monodent n'atteint que {r} mm – la queue toucherait."
 }

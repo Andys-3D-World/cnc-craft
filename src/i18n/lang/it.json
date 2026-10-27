@@ -3372,7 +3372,7 @@
   "ops.threadLen": "Lunghezza filetto",
   "ops.threadLenTip": "Profondità del filetto (negativa, dall'alto). Il preforo deve essere almeno così profondo.",
   "ops.threadD": "Ø filetto",
-  "ops.threadDTip": "Ø nominale, ad es. 8 per M8. 0 = automatico: per i fori preforo + passo (6,8 mm → M8), per i perni il Ø del cerchio.",
+  "ops.threadDTip": "Ø nominale, ad es. 8 per M8. 0 = automatico dal cerchio: per i fori dal preforo (6,8 mm → M8), per i perni il Ø del cerchio.",
   "ops.threadLeft": "Filetto sinistro",
   "ops.threadLeftTip": "Fresare un filetto sinistro invece di uno destro.",
   "gc.thread": "Forma {n}: {side} M{d} x {p}, profondita {l} mm, {hand}",
@@ -3388,5 +3388,17 @@
   "gcw.thread.toolTooBig": "Forma {n}: la fresa per filettare Ø{d} è troppo grande per questo filetto – saltata.",
   "gcw.thread.toolNoFit": "Forma {n}: la fresa per filettare Ø{d} non entra nel preforo – saltata.",
   "gcw.thread.small": "Forma {n}: il Ø del filetto è troppo piccolo per il passo – saltata.",
-  "gcw.threadCore": "Forma {n}: il foro (Ø{h}) è fresato solo come contorno «Interno» – con la fresa Ø{d} resta un nucleo al centro e la fresa per filettare lo urterebbe. Scegli «Tasca» come prima lavorazione."
+  "gcw.threadCore": "Forma {n}: il foro (Ø{h}) è fresato solo come contorno «Interno» – con la fresa Ø{d} resta un nucleo al centro e la fresa per filettare lo urterebbe. Scegli «Tasca» come prima lavorazione.",
+  "tl.single": "Monodente",
+  "tl.singleTip": "Un solo dente in basso, taglia qualsiasi passo (es. fresa per filettare monoprofilo in metallo duro). Il passo viene dalla lavorazione o dal filetto ISO a passo grosso. «Lunghezza taglienti» = lunghezza spalla L1 (fin dove arriva il collo).",
+  "tl.g.neck": "Ø collo",
+  "tl.neckTip": "Ø del collo dietro il dente (D3 nei cataloghi).",
+  "tl.autoNameSingle": "{type} monodente Ø{d}",
+  "ops.threadPitch": "Passo",
+  "ops.threadPitchTip": "Passo in mm. 0 = automatico: filetto ISO a passo grosso per le frese monodente (M8 → 1,25), altrimenti il passo dell'utensile. Inseriscilo per i passi fini.",
+  "ops.threadPasses": "Passate",
+  "ops.threadPassesTip": "Quante volte l'utensile gira attorno al filetto, ogni volta un po' più a fondo – protegge gli utensili piccoli (alluminio: 2–3).",
+  "ops.threadSpring": "Passata a vuoto",
+  "ops.threadSpringTip": "Ripetere l'ultimo percorso alla fine – leviga i fianchi.",
+  "gcw.threadReach": "Forma {n}: il filetto è lungo {l} mm ma il collo della fresa monodente arriva solo a {r} mm – il gambo urterebbe."
 }

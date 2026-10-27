@@ -3372,7 +3372,7 @@
   "ops.threadLen": "Długość gwintu",
   "ops.threadLenTip": "Jak głęboko sięga gwint (ujemnie, od góry). Otwór pod gwint musi być co najmniej tak głęboki.",
   "ops.threadD": "Ø gwintu",
-  "ops.threadDTip": "Ø nominalna, np. 8 dla M8. 0 = automatycznie: dla otworów otwór + skok (6,8 mm → M8), dla czopów Ø okręgu.",
+  "ops.threadDTip": "Ø nominalna, np. 8 dla M8. 0 = automatycznie z okręgu: dla otworów przez otwór pod gwint (6,8 mm → M8), dla czopów Ø okręgu.",
   "ops.threadLeft": "Gwint lewy",
   "ops.threadLeftTip": "Frezuj gwint lewy zamiast prawego.",
   "gc.thread": "Ksztalt {n}: {side} M{d} x {p}, {l} mm glebokosci, {hand}",
@@ -3388,5 +3388,17 @@
   "gcw.thread.toolTooBig": "Kształt {n}: frez do gwintów Ø{d} jest za duży dla tego gwintu – pominięto.",
   "gcw.thread.toolNoFit": "Kształt {n}: frez do gwintów Ø{d} nie mieści się w otworze – pominięto.",
   "gcw.thread.small": "Kształt {n}: Ø gwintu jest za mała dla skoku – pominięto.",
-  "gcw.threadCore": "Kształt {n}: otwór (Ø{h}) jest frezowany tylko jako kontur „Wewnątrz” – frezem Ø{d} w środku zostaje rdzeń, w który uderzy frez do gwintów. Wybierz „Kieszeń” jako pierwszą obróbkę."
+  "gcw.threadCore": "Kształt {n}: otwór (Ø{h}) jest frezowany tylko jako kontur „Wewnątrz” – frezem Ø{d} w środku zostaje rdzeń, w który uderzy frez do gwintów. Wybierz „Kieszeń” jako pierwszą obróbkę.",
+  "tl.single": "Jednozębny",
+  "tl.singleTip": "Jeden ząb na dole, tnie dowolny skok (np. węglikowy frez do gwintów jednoprofilowy). Skok pochodzi wtedy z obróbki lub z gwintu ISO zwykłego. „Długość ostrzy” = długość szyjki L1 (jak głęboko sięga szyjka).",
+  "tl.g.neck": "Ø szyjki",
+  "tl.neckTip": "Ø szyjki za zębem (D3 w katalogach).",
+  "tl.autoNameSingle": "{type} jednozębny Ø{d}",
+  "ops.threadPitch": "Skok",
+  "ops.threadPitchTip": "Skok w mm. 0 = automatycznie: gwint ISO zwykły dla frezów jednozębnych (M8 → 1,25), w innym razie skok narzędzia. Dla gwintów drobnozwojnych wpisz sam.",
+  "ops.threadPasses": "Przejścia",
+  "ops.threadPassesTip": "Ile razy frez okrąża gwint, za każdym razem trochę głębiej – oszczędza małe frezy (aluminium: 2–3).",
+  "ops.threadSpring": "Przejście jałowe",
+  "ops.threadSpringTip": "Na koniec jeszcze raz ostatni tor – wygładza boki.",
+  "gcw.threadReach": "Kształt {n}: gwint ma {l} mm, a szyjka frezu jednozębnego sięga tylko {r} mm – trzonek by uderzył."
 }

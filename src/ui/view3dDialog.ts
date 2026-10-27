@@ -8,7 +8,8 @@ import { t } from "../i18n/i18n";
 import { Viewer3D } from "../view3d/viewer3d";
 import { partsScene, cylinderScene, carveScene } from "../view3d/scenes";
 import { carve, CarveResult } from "../view3d/carveSim";
-import { generateGcode, noGcodeMessage, orderToolGroups } from "../cam";
+import { generateGcode, noGcodeMessage, orderToolGroups, lastThreads } from "../cam";
+import { threadMeshes } from "../view3d/threadMesh";
 import { MATERIALS, materialView } from "../materialView";
 import { rotary } from "../rotary";
 import { isLaser, isPlasma } from "../machineMode";
@@ -108,7 +109,9 @@ export function openView3D(want: "auto" | Mode = "auto") {
       }
       if (!res) { viewer.setMeshes([], keepView); info.textContent = t("v3d.carveEmpty"); return; }
       const T = carveT();
-      viewer.setMeshes(carveScene(res, m, T), keepView);
+      // Gewindegänge zeigt das Höhenraster nicht – als eigenes Netz dazu (threadMesh.ts)
+      const threads = [...lastThreads];
+      viewer.setMeshes([...carveScene(res, m, T), ...threadMeshes(threads, T, [m.base[0] / 255 * 0.8, m.base[1] / 255 * 0.8, m.base[2] / 255 * 0.8])], keepView);
       info.textContent = t("v3d.carveInfo", { d: (-res.minZ).toFixed(2), c: res.cell.toFixed(2) })
         + (-res.minZ > T + 1e-3 ? " · " + t("v3d.carveThrough", { t: T }) : "");
     } else {

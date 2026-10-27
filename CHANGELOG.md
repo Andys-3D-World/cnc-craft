@@ -15,6 +15,13 @@
 - **Thread mill as a tool type:** new type *Thread mill* in the tool library with pitch and flank angle (metric 60°),
   drawn with its teeth, named e.g. *Thread mill P1.25 Ø6*. The cutting data calculator uses half the feed and one
   pitch as step-down. CNC Craft warns when a thread mill is used for normal contours.
+- **Thread milling like in Fusion 360:** single-tooth thread mills (one tooth, any pitch – e.g. solid carbide
+  single-profile thread mills) with neck Ø and shoulder length; the pitch then comes from the ISO coarse thread
+  table (M8 → 1.25) unless you enter one (fine threads). The tool path now enters and leaves on a tangent arc that
+  already follows the thread (half circle from the hole centre inside, quarter circle from outside for studs), can
+  run several radial passes from the first contact to full depth and an optional spring pass. CNC Craft warns when
+  the thread is longer than the neck reaches. The 3D view (*Milling result*) now shows the thread flanks in the
+  hole or on the stud.
 - **Thread milling (internal and external threads):** new operation *Thread milling* in *Operations* for circles,
   e.g. drill or mill the core hole first, then add *Thread milling* with the thread mill. Holes get an internal
   thread, studs (outside) an external thread. Settings: thread length, thread Ø (0 = automatic: core hole + pitch,

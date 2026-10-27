@@ -3547,7 +3547,7 @@
   "ops.threadLen": "Thread length",
   "ops.threadLenTip": "How deep the thread goes (negative, from the top). The core hole must be at least this deep.",
   "ops.threadD": "Thread Ø",
-  "ops.threadDTip": "Nominal Ø, e.g. 8 for M8. 0 = automatic: for holes core hole + pitch (6.8 mm → M8), for studs the circle Ø.",
+  "ops.threadDTip": "Nominal Ø, e.g. 8 for M8. 0 = automatic from the circle: for holes via the core hole (6.8 mm → M8), for studs the circle Ø.",
   "ops.threadLeft": "Left-hand thread",
   "ops.threadLeftTip": "Mill a left-hand instead of a right-hand thread.",
   "gc.thread": "Shape {n}: {side} M{d} x {p}, {l} mm deep, {hand}",
@@ -3563,5 +3563,17 @@
   "gcw.thread.toolTooBig": "Shape {n}: thread mill Ø{d} is too big for this thread – skipped.",
   "gcw.thread.toolNoFit": "Shape {n}: thread mill Ø{d} does not fit into the core hole – skipped.",
   "gcw.thread.small": "Shape {n}: thread Ø is too small for the pitch – skipped.",
-  "gcw.threadCore": "Shape {n}: the hole (Ø{h}) is only milled as an “Inside” contour – with the Ø{d} cutter a core stays in the middle and the thread mill would hit it. Choose “Pocket” as first operation."
+  "gcw.threadCore": "Shape {n}: the hole (Ø{h}) is only milled as an “Inside” contour – with the Ø{d} cutter a core stays in the middle and the thread mill would hit it. Choose “Pocket” as first operation.",
+  "tl.single": "Single tooth",
+  "tl.singleTip": "One tooth at the bottom, cuts any pitch (e.g. single-profile solid carbide thread mill). The pitch then comes from the operation or the ISO coarse thread. “Flute length” = shoulder length L1 (how deep the neck reaches).",
+  "tl.g.neck": "Neck Ø",
+  "tl.neckTip": "Ø of the neck behind the tooth (D3 in catalogues).",
+  "tl.autoNameSingle": "Single-tooth {type} Ø{d}",
+  "ops.threadPitch": "Pitch",
+  "ops.threadPitchTip": "Pitch in mm. 0 = automatic: ISO coarse thread for single-tooth mills (M8 → 1.25), otherwise the pitch of the tool. Enter it yourself for fine threads.",
+  "ops.threadPasses": "Passes",
+  "ops.threadPassesTip": "How often the tool goes round the thread, a bit deeper each time – protects small tools (aluminium: 2–3).",
+  "ops.threadSpring": "Spring pass",
+  "ops.threadSpringTip": "Run the last path once more at the end – smooths the flanks.",
+  "gcw.threadReach": "Shape {n}: the thread is {l} mm long but the neck of the single-tooth mill only reaches {r} mm – the shank would hit."
 }

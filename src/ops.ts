@@ -23,6 +23,9 @@ export interface ShapeOp {
   finishAllow?: number; // Schlicht-Aufmaß in mm
   threadD?: number;     // Gewinde: Nenn-Ø in mm (0 = aus dem Kreis)
   threadLeft?: boolean; // Gewinde: Linksgewinde
+  threadPitch?: number; // Gewinde: Steigung (0 = Werkzeug bzw. ISO-Regelgewinde)
+  threadPasses?: number; // Gewinde: radiale Durchgänge
+  threadSpring?: boolean; // Gewinde: Leerdurchgang
 }
 
 const num = (v: any, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d);
@@ -36,7 +39,11 @@ export function extraOps(s: any): ShapeOp[] {
     depth: Math.min(0, num(o.depth, -1)),
     chamferW: Math.max(0.05, num(o.chamferW, 1)),
     finishAllow: Math.max(0, num(o.finishAllow, 0)),
-    ...(o.kind === "thread" ? { threadD: Math.max(0, Math.min(500, num(o.threadD, 0))), threadLeft: o.threadLeft === true } : {})
+    ...(o.kind === "thread" ? {
+      threadD: Math.max(0, Math.min(500, num(o.threadD, 0))), threadLeft: o.threadLeft === true,
+      threadPitch: Math.max(0, Math.min(10, num(o.threadPitch, 0))),
+      threadPasses: Math.max(1, Math.min(10, Math.round(num(o.threadPasses, 1)))), threadSpring: o.threadSpring === true
+    } : {})
   }));
 }
 
@@ -65,6 +72,9 @@ export function expandOps(shapes: any[]): any[] {
         chamferSide: chamferSide(s),
         threadD: o.threadD,
         threadLeft: o.threadLeft,
+        threadPitch: o.threadPitch,
+        threadPasses: o.threadPasses,
+        threadSpring: o.threadSpring,
         restToolId: undefined,
         parentChainId: undefined,
         ops: undefined

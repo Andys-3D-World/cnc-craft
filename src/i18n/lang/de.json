@@ -3547,7 +3547,7 @@
   "ops.threadLen": "Gewindelänge",
   "ops.threadLenTip": "Wie tief das Gewinde reicht (negativ, ab Oberkante). Das Kernloch muss mindestens so tief sein.",
   "ops.threadD": "Gewinde-Ø",
-  "ops.threadDTip": "Nenn-Ø, z. B. 8 für M8. 0 = automatisch: bei Löchern Kernloch + Steigung (6,8 mm → M8), bei Bolzen der Kreis-Ø.",
+  "ops.threadDTip": "Nenn-Ø, z. B. 8 für M8. 0 = automatisch aus dem Kreis: bei Löchern über das Kernloch (6,8 mm → M8), bei Bolzen der Kreis-Ø.",
   "ops.threadLeft": "Linksgewinde",
   "ops.threadLeftTip": "Linksgewinde statt Rechtsgewinde fräsen.",
   "gc.thread": "Form {n}: {side} M{d} x {p}, {l} mm tief, {hand}",
@@ -3563,5 +3563,17 @@
   "gcw.thread.toolTooBig": "Form {n}: Gewindefräser Ø{d} ist zu groß für dieses Gewinde – übersprungen.",
   "gcw.thread.toolNoFit": "Form {n}: Gewindefräser Ø{d} passt nicht ins Kernloch – übersprungen.",
   "gcw.thread.small": "Form {n}: Gewinde-Ø ist zu klein für die Steigung – übersprungen.",
-  "gcw.threadCore": "Form {n}: Das Loch (Ø{h}) ist nur als Kontur „Innen“ gefräst – mit dem Ø{d}-Fräser bleibt in der Mitte ein Kern stehen, an den der Gewindefräser stößt. Als erste Bearbeitung „Tasche“ wählen."
+  "gcw.threadCore": "Form {n}: Das Loch (Ø{h}) ist nur als Kontur „Innen“ gefräst – mit dem Ø{d}-Fräser bleibt in der Mitte ein Kern stehen, an den der Gewindefräser stößt. Als erste Bearbeitung „Tasche“ wählen.",
+  "tl.single": "Einzahn",
+  "tl.singleTip": "Ein Zahn unten, schneidet jede Steigung (z. B. HC VHM-Gewindefräser Einzahn). Die Steigung kommt dann aus der Bearbeitung bzw. dem ISO-Regelgewinde. „Schneidenlänge“ = Schulterlänge L1 (wie tief der Hals reicht).",
+  "tl.g.neck": "Hals-Ø",
+  "tl.neckTip": "Ø des Halses hinter dem Zahn (D3 im Katalog).",
+  "tl.autoNameSingle": "Einzahn-{type} Ø{d}",
+  "ops.threadPitch": "Steigung",
+  "ops.threadPitchTip": "Steigung in mm. 0 = automatisch: beim Einzahn-Fräser das ISO-Regelgewinde (M8 → 1,25), sonst die Steigung des Fräsers. Für Feingewinde selbst eintragen.",
+  "ops.threadPasses": "Durchgänge",
+  "ops.threadPassesTip": "Wie oft der Fräser das Gewinde umrundet, jedes Mal etwas tiefer – schont kleine Fräser (Alu: 2–3).",
+  "ops.threadSpring": "Leerdurchgang",
+  "ops.threadSpringTip": "Am Ende die letzte Bahn noch einmal fahren – glättet die Flanken.",
+  "gcw.threadReach": "Form {n}: Das Gewinde ist {l} mm lang, der Hals des Einzahn-Fräsers reicht nur {r} mm – der Schaft würde anstoßen."
 }
