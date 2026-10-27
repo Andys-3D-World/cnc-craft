@@ -60,7 +60,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
   const labels = (m: string) => t(`mode.${m}`);
   document.getElementById("cam-inlay")?.addEventListener("click", () => openInlayDialog(state, redraw, appendToConsole));
 
-  ["part", "hole", "engrave", "pocket", "vcarve", "drill"].forEach(mode => {
+  ["part", "hole", "engrave", "pocket", "vcarve", "drill", "face"].forEach(mode => {
     const btn = document.getElementById(`cam-mode-${mode}`);
     btn?.addEventListener("click", () => {
       const ids = new Set(state.selectedShapeIds);
@@ -72,7 +72,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
 
       // Außen/Innen/Tasche brauchen geschlossene Konturen: zusammenhängende Linien/Bögen verbinden
       const open = sel.filter((s: any) => !isClosedShape(s));
-      if (mode !== "engrave" && mode !== "drill" && open.length) {
+      if (mode !== "engrave" && mode !== "drill" && mode !== "face" && open.length) {
         const { closed: joined, left } = joinOpenShapes(open);
         if (joined.length) {
           const gone = new Set(joined.flatMap(c => c.from.map((s: any) => s.id)));
@@ -99,6 +99,8 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
       const depth = nestingDepths(closed);
 
       sel.forEach((s: any) => {
+        // Planfräsen nimmt das umgebende Rechteck – geht mit jeder Form
+        if (mode === "face") { s.millingMode = "face"; return; }
         if (!isClosedShape(s)) {
           if (mode === "drill") return; // Bohren nur bei geschlossenen Formen (Mitte)
           s.millingMode = s.type === "arc" && mode === "part" ? "outside" : s.type === "arc" && mode === "hole" ? "inside" : "on-line";

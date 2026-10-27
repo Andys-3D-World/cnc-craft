@@ -17,6 +17,9 @@
   The wizard makes a facing job (zigzag rows over the area, several depths, plunging next to the stock): mill side 1,
   flip the plate, zero Z again, mill the same job for side 2. The material thickness in 3D milling is reduced
   automatically, with a warning if the stock would become thinner than the model.
+- **Facing as a milling operation:** new button *Facing* under *Path correction* (and as an extra operation per
+  shape). The bounding rectangle of the shape is milled flat in rows down to the milling depth – e.g. to face stock
+  or a spoilboard. Rows run past the edge, plunging happens next to the area; facing runs first within its tool.
 
 **Improved**
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),

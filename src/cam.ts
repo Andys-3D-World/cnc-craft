@@ -19,6 +19,7 @@ import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 import { adaptFeed, feedAdapt } from "./feedAdapt";
 import { threadPath, ThreadInfo } from "./threadMill";
+import { facingPath } from "./facing";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -195,6 +196,8 @@ const generateGcodeInner = (shapes: any): string | null => {
   const pocketStrategy: PocketStrategy = pocketSel?.value === "spiral" || pocketSel?.value === "adaptive" ? pocketSel.value : "linear";
   /** seitliche Zustellung in der Tasche: 40 % des Fräserdurchmessers */
   const STEPOVER = 0.4;
+  /** Planfräsen: 60 % des Fräserdurchmessers (die Zeilen überlappen nur wenig, die Fläche wird nur abgezogen) */
+  const FACE_STEPOVER = 0.6;
 
   // Weltkoordinate -> Maschinen-mm.
   // FIX: Y zeigt im Speicher schon nach oben (wie an der Maschine). Vorher wurde hier
@@ -206,7 +209,7 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 3. SORTIERUNG: INNEN VOR AUSSEN (innerhalb eines Werkzeugs) ----
   const priority = (mode: string) =>
-    mode === "drill" ? -1 : mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : mode === "chamfer" ? 2.5 : 3;
+    mode === "face" ? -2 : mode === "drill" ? -1 : mode === "inside" ? 0 : mode === "pocket" ? 1 : mode === "vcarve" || mode === "vplug" ? 1.5 : mode === "on-line" ? 2 : mode === "chamfer" ? 2.5 : 3;
   const groups = orderToolGroups(shapes);
   const restIgnored = shapes.filter((s: any) => getTool(s.restToolId) && !restToolFor(s)).length;
   if (restIgnored) lastGcodeWarnings.push(t("gcw.restIgnored", { n: restIgnored }));
@@ -660,6 +663,23 @@ const generateGcodeInner = (shapes: any): string | null => {
    * neben der Kante (außen bei Außenkonturen, innen bei Löchern/Taschen) – dann trifft der Kegel die Wand genau an
    * der Kante und die Oberseite in Fasenbreite daneben.
    */
+  /**
+   * PLANFRÄSEN: das umgebende Rechteck der Form in Zickzack-Zeilen auf Tiefe planen (facing.ts).
+   * Die Zeilen laufen über den Rand hinaus, eingetaucht wird neben der Fläche.
+   */
+  const millFace = (shape: any) => {
+    const pts = shapeToPaths(shape).flatMap(p => p.pts).map(p => toMachine(p.x, p.y));
+    if (!pts.length) return;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const x0 = Math.min(...xs), y0 = Math.min(...ys);
+    const res = facingPath({
+      x0, y0, w: Math.max(...xs) - x0, h: Math.max(...ys) - y0, depth: Math.abs(computeDepth(shape)), stepZ,
+      toolD: toolDiameter, stepOver: FACE_STEPOVER, feed: feedXY, plunge: PLUNGE_FEED, safeZ: SAFE_Z, dir: "x",
+    });
+    if (!res.lines.length) { lastGcodeWarnings.push(t("gcw.faceEmpty", { n: formCounter })); return; }
+    gcode += res.lines.join("\n") + "\n";
+  };
+
   const millChamfer = (shape: any) => {
     const tool = curTool;
     if (!tool || !CONE_TYPES.includes(tool.type) || !(tool.angle > 0) || tool.angle >= 180) {
@@ -703,7 +723,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "threadmill")) return false;
     if (shape.restOf) return true;
     const mode = shape.millingMode || "outside";
-    if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer") return false;
+    if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer" || mode === "face") return false;
     return !(mode === "pocket" && pocketStrategy === "adaptive");
   };
 
@@ -745,6 +765,11 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
     if (mode === "thread") {
       millThread(shape);
+      return;
+    }
+    if (mode === "face") {
+      gcode += `\n${c("gc.face", { n: formCounter })}\n`;
+      millFace(shape);
       return;
     }
     if (mode === "drill") {

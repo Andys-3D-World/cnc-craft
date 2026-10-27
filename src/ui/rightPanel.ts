@@ -69,6 +69,7 @@ export function renderRightPanel(container: HTMLElement) {
             <button id="cam-mode-pocket" class="btn-secondary" ${tip("rp.modePocketTip")}>🔲 ${T("rp.modePocket")}</button>
             <button id="cam-mode-vcarve" class="btn-secondary only-mill" ${tip("rp.modeVcarveTip")}>🔻 ${T("rp.modeVcarve")}</button>
             <button id="cam-mode-drill" class="btn-secondary only-mill" ${tip("rp.modeDrillTip")}>🔩 ${T("rp.modeDrill")}</button>
+            <button id="cam-mode-face" class="btn-secondary only-mill" ${tip("rp.modeFaceTip")}>🪵 ${T("rp.modeFace")}</button>
             <button id="cam-inlay" class="btn-secondary only-mill" ${tip("rp.inlayTip")}>🧩 ${T("rp.inlay")}</button>
           </div>
         </div>
@@ -340,10 +341,10 @@ export function renderRightPanel(container: HTMLElement) {
   });
 
   // Aktiv-Markierung für die Bahn-Korrektur-Knöpfe
-  ["part", "hole", "engrave", "pocket", "vcarve", "drill"].forEach(mode => {
+  ["part", "hole", "engrave", "pocket", "vcarve", "drill", "face"].forEach(mode => {
     const btn = container.querySelector(`#cam-mode-${mode}`);
     btn?.addEventListener("click", () => {
-      container.querySelectorAll("#cam-mode-part, #cam-mode-hole, #cam-mode-engrave, #cam-mode-pocket, #cam-mode-vcarve, #cam-mode-drill")
+      container.querySelectorAll("#cam-mode-part, #cam-mode-hole, #cam-mode-engrave, #cam-mode-pocket, #cam-mode-vcarve, #cam-mode-drill, #cam-mode-face")
         .forEach(b => b.classList.remove("cam-mode-active"));
       btn.classList.add("cam-mode-active");
     });

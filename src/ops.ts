@@ -10,10 +10,11 @@
  * außen bei Außenkonturen, innen bei Löchern/Taschen, auf der Linie sonst (siehe cam.ts → millChamfer).
  * Art „thread“ (Gewinde fräsen): nur an Kreisen mit dem Gewindefräser – innen bei Löchern, außen bei Bolzen
  * (gleiche Seite wie die Fase); Tiefe = Gewindelänge (siehe threadMill.ts).
+ * Art „face“ (Planfräsen): das umgebende Rechteck der Form auf Tiefe planen (siehe facing.ts).
  */
 
-export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread";
-export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread"];
+export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread" | "face";
+export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread", "face"];
 
 export interface ShapeOp {
   kind: OpKind;
