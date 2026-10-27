@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Spindle inverter (VFD) over Modbus – backend:** CNC Craft can now talk to a spindle inverter directly over
+  Modbus RTU (RS-485 adapter) or Modbus TCP: set the speed, run forward / reverse / stop, and read the actual speed
+  and the fault code. Small built-in Modbus engine (no extra libraries) with timeouts, retries after timeouts or
+  line noise (CRC errors) and CRC16 checking. The registers come from profiles (data, not code): *Delta-style*
+  (Delta VFD-E/M, MS300, GS20 …) and *Huanyang GT / P2A, Inovance-style*; custom profiles can be passed as JSON.
+  The register maps are assumptions from common manuals – always check your own inverter manual first (the old
+  Huanyang HY protocol is not supported). The spindle is stopped on disconnect and when the program closes.
+  No user interface yet – only the commands for it.
 - **Laser and plasma: optimized cut order (shortest rapids):** new switch *Optimize cut order* in the laser and
   plasma settings (on by default). Until now the contours of a layer / cut were cut open lines first, then from small
   to large, so the head often jumped back and forth across the sheet. CNC Craft now picks the order with the shortest

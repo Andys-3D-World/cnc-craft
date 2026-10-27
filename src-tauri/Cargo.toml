@@ -31,3 +31,5 @@ serialport = "4"
 rusb = { version = "0.9", features = ["vendored"] }
 # 3D-Fräsen (cam3d.rs): Drop-Cutter und Höhenraster auf allen Kernen rechnen
 rayon = "1"
+# Modbus (modbus.rs, vfd.rs): Netzwerk + Zeitlimits. Tauri bringt tokio ohnehin mit – nur diese Teile einschalten
+tokio = { version = "1", features = ["net", "time", "io-util", "rt", "sync"] }

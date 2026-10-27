@@ -12,6 +12,9 @@
 //!   flash.rs   – Firmware flashen: ESP32/ESP32-S3 (MKS DLC32 …) und Arduino (GRBL) – ohne Zusatzprogramm
 //!   fonts.rs   – Systemschriften für das Text-Werkzeug auflisten und laden
 //!   workshop.rs – Werkstatt-Geräte (Absaugung, Kompressor …) per HTTP/MQTT mit dem Job schalten
+//!   controller.rs – gemeinsame Schnittstelle aller Steuerungen (MachineController)
+//!   modbus.rs  – Modbus TCP/RTU (async, Zeitlimit + Wiederholen) – Rahmen/CRC mit Tests
+//!   vfd.rs     – Frequenzumrichter (Spindel) per Modbus: Drehzahl, Richtung, Störung – Profile
 //!
 //! Die Oberfläche ruft die Befehle unten per invoke(...) auf und bekommt Ereignisse:
 //!   machine-welcome, machine-status, machine-line, machine-alarm, machine-disconnected,
@@ -20,6 +23,7 @@
 //! GRBL und Ruida melden dieselben Ereignisse – die Oberfläche muss kaum unterscheiden.
 
 mod cam3d;
+mod controller;
 mod elfimg;
 mod flash;
 mod fonts;
@@ -29,6 +33,7 @@ mod k40;
 mod libsync;
 mod machine;
 mod marlin;
+mod modbus;
 mod netscan;
 mod camfetch;
 mod ruida;
@@ -36,8 +41,10 @@ mod serial;
 mod store;
 mod update;
 mod usb_k40;
+mod vfd;
 mod workshop;
 
+use controller::MachineController;
 use machine::{Emit, Machine};
 use k40::{K40Options, K40};
 use marlin::Marlin;
@@ -64,20 +71,19 @@ macro_rules! each {
 }
 
 impl Conn {
-    fn is_alive(&self) -> bool { each!(self, c => c.is_alive()) }
-    fn shutdown(&self) { each!(self, c => c.shutdown()) }
-    fn send_line(&self, l: &str) -> Result<u64, String> { each!(self, c => c.send_line(l)) }
-    fn realtime(&self, b: u8) -> Result<(), String> { each!(self, c => c.realtime(b)) }
-    fn start_job(&self, lines: Vec<String>) -> Result<usize, String> { each!(self, c => c.start_job(lines)) }
-    fn pause_job(&self) -> Result<(), String> { each!(self, c => c.pause_job()) }
-    fn resume_job(&self) -> Result<(), String> { each!(self, c => c.resume_job()) }
-    fn stop_job(&self) -> Result<(), String> { each!(self, c => c.stop_job()) }
+    /// Gemeinsame Schnittstelle der Steuerung (controller.rs)
+    fn ctl(&self) -> &dyn MachineController { each!(self, c => c) }
+    fn is_alive(&self) -> bool { self.ctl().is_alive() }
+    fn shutdown(&self) { self.ctl().shutdown() }
+    fn send_line(&self, l: &str) -> Result<u64, String> { self.ctl().send_line(l) }
+    fn realtime(&self, b: u8) -> Result<(), String> { self.ctl().realtime(b) }
+    fn start_job(&self, lines: Vec<String>) -> Result<usize, String> { self.ctl().start_job(lines) }
+    fn pause_job(&self) -> Result<(), String> { self.ctl().pause_job() }
+    fn resume_job(&self) -> Result<(), String> { self.ctl().resume_job() }
+    fn stop_job(&self) -> Result<(), String> { self.ctl().stop_job() }
     /// Live-Bearbeitung nur bei GRBL (Zeilen werden einzeln gesendet; Ruida/K40 bekommen die Datei als Ganzes)
     fn patch_job(&self, from: usize, delete: usize, insert: Vec<String>, expect_total: usize) -> Result<usize, String> {
-        match self {
-            Conn::Grbl(m) => m.patch_job(from, delete, insert, expect_total),
-            _ => Err("unsupported".into()),
-        }
+        self.ctl().patch_job(from, delete, insert, expect_total)
     }
 
     /// Vor dem Trennen/Beenden: laufenden Job sicher anhalten, damit die Maschine nicht mit
@@ -831,6 +837,12 @@ pub fn run() {
             cam3d_cancel,
             workshop_set_devices,
             workshop_test,
+            vfd::vfd_profiles,
+            vfd::vfd_connect,
+            vfd::vfd_disconnect,
+            vfd::vfd_set_speed,
+            vfd::vfd_set_direction,
+            vfd::vfd_status,
             update::update_install,
             update::update_restart
         ])
@@ -838,6 +850,7 @@ pub fn run() {
         .on_window_event(|_window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 close_all();
+                vfd::stop_blocking(); // Spindel am Umrichter (Modbus) ebenfalls anhalten
             }
         })
         .run(tauri::generate_context!())
