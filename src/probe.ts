@@ -45,10 +45,14 @@ export interface ProbeSettings {
   tcX: number; tcY: number; // Wechselposition (Maschinenkoordinaten)
   tcFeed: number;     // Fahrt zwischen Positionen (mm/min)
   tcM6: number;       // G-Code: 1 = Werkzeugwechsel als „M6 T<n>“ statt „M0“
+  // ---- Nachmessen bei langen Jobs (Wärmegang, toolChange.ts runDrift) ----
+  drOn: number;       // 1 = Mess-Punkte in den G-Code (Standard 0 = aus)
+  drMin: number;      // alle so viele Minuten (geschätzte Laufzeit)
 }
 const DEF: ProbeSettings = { plate: 20, sx: 0, sy: 0, sensorH: 30, material: 10, travel: 50, fast: 200, slow: 25, lift: 10, sensorSet: 0,
   mx: 100, my: 100, mnx: 5, mny: 5, hop: 3, mzero: 1,
-  tcMode: 0, tcSafe: -2, tcLift: 0, tcWorkZ: 40, tcSz: -2, tcTravel: 80, tcPos: 0, tcX: 0, tcY: 0, tcFeed: 1500, tcM6: 0 };
+  tcMode: 0, tcSafe: -2, tcLift: 0, tcWorkZ: 40, tcSz: -2, tcTravel: 80, tcPos: 0, tcX: 0, tcY: 0, tcFeed: 1500, tcM6: 0,
+  drOn: 0, drMin: 60 };
 
 function load(): ProbeSettings {
   try {

@@ -22,6 +22,13 @@
  * → Fahrt sofort abbrechen, Job NICHT fortsetzen (bei Alarm/Stopp wird er beendet). Weiter geht es nur nach Klick.
  * Alle Fahrten als Jog ($J=…): die ändern den Zustand des G-Code-Programms nicht (sonst wäre danach z. B. G0 aktiv).
  * Zoll (G20) und relative Maße (G91) des Programms werden vorher gelesen ($G) und danach wiederhergestellt.
+ *
+ * NACHMESSEN bei langen Jobs (Wärmegang, Einstellung „Werkzeug nachmessen“, Standard aus): cam.ts setzt
+ * „M0 (gc.remeasure)“ an sichere Stellen (driftPoints.ts). Dort: Spindel aus → Z hoch → messen → Z-Nullpunkt um die
+ * Abweichung zur ersten Messung verschieben → zurück → Spindel an → weiter. Die erste Messung im Job ist die Referenz.
+ *   Fester Sensor: läuft allein durch (nur bei großer Abweichung fragt es nach).
+ *   Handtaster:    an der Wechselposition – Platte dort hinlegen (auf eine Stelle, die nicht gefräst wird),
+ *                  antasten, Platte weg, bestätigen. Gemessen wird relativ (gleiche Platte, gleiche Stelle).
  */
 import { t, allBuiltinTexts, ascii } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, sendAndWait, jobResume, jobStop, setSwitchGuard } from "./machine";
@@ -61,8 +68,14 @@ export const tc = {
   zSet: null as number | null,    // gesetzter Z-Wert (Platte)
   spindle: "",             // wird beim Weitermachen wieder eingeschaltet (z. B. "M3 S12000"), "" = nichts
   ref: null as number | null,     // Referenz: Maschinen-Z beim Sensor-Kontakt des aktuellen Werkzeugs
-  refBusy: false
+  refBusy: false,
+  kind: "change" as "change" | "drift",   // Werkzeugwechsel oder Nachmessen (Wärmegang)
+  driftRef: null as number | null,       // Nachmessen mit Handtaster: Maschinen-Z beim ersten Kontakt
+  driftAt: 0                             // Zeitpunkt der letzten Messung (ms)
 };
+
+/** Größere Abweichung beim Nachmessen wird nicht ohne Nachfrage übernommen (mm) */
+const DRIFT_MAX = 0.3;
 
 type Answer = "go" | "skip" | "cancel";
 let pending: ((a: Answer) => void) | null = null;
@@ -211,10 +224,17 @@ function parserState(): Promise<string> {
 // Ablauf
 // ---------------------------------------------------------------------
 
+/** Ist das der Mess-Punkt „Werkzeug nachmessen“ aus cam.ts (in irgendeiner Sprache)? */
+export function isDriftNote(note: string): boolean {
+  return allBuiltinTexts("gc.remeasure").some(tpl => ascii(tpl) === note);
+}
+
 /** Neuer Werkzeugwechsel vom Job (nur die ausgewählte Maschine) */
 function onJobToolChange(p: { note?: string; tool?: number | null; m6?: boolean }) {
   const note = String(p?.note || "");
   const m6 = !!p?.m6;
+  if (!m6 && isDriftNote(note)) { onDriftPoint(); return; }
+  tc.kind = "change";
   // M0 ohne Werkzeugwechsel-Kommentar = gewöhnliche Pause wie bisher (Fortsetzen-Knopf)
   if (!m6 && !parseToolNote(note)) return;
   if (toolChangeBusy()) return;
@@ -345,7 +365,7 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
       let a = await waitUser(TcState.WaitSwap);
       for (;;) {
         if (a === "cancel") throw new Cancel();
-        if (a === "skip") { tc.ref = null; break; } // Nutzer hat selbst genullt – alte Referenz passt nicht mehr
+        if (a === "skip") { tc.ref = null; tc.driftRef = null; break; } // Nutzer hat selbst genullt – alte Referenz passt nicht mehr
         set(TcState.Probing);
         const z = await measureAtSensor();
         if (cancelled || guard.tripped) throw new Cancel();
@@ -354,7 +374,7 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
           await freshStatus(); await freshStatus();
           const v = machine.status.wpos[2] - delta;
           must(await step("G21") && await step(`G10 L20 P0 Z${f3(v)}`), "G10");
-          tc.ref = z; tc.delta = delta;
+          tc.ref = z; tc.delta = delta; tc.driftRef = null;
           log(t("tc.log.delta", { d: delta.toFixed(3) }));
           break;
         }
@@ -365,7 +385,7 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
       let a = await waitUser(TcState.WaitPlate);
       for (;;) {
         if (a === "cancel") throw new Cancel();
-        if (a === "skip") { tc.ref = null; break; } // Nutzer hat selbst genullt – alte Referenz passt nicht mehr
+        if (a === "skip") { tc.ref = null; tc.driftRef = null; break; } // Nutzer hat selbst genullt – alte Referenz passt nicht mehr
         if ((machine.status.pins || "").includes("P")) { a = await waitUser(TcState.WaitPlate, t("pr.alreadyTriggered")); continue; }
         set(TcState.Probing);
         const z = await touchAt(Math.max(1, s.tcTravel));
@@ -374,6 +394,7 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
           must(await step("G21") && await step(`G10 L20 P0 Z${f3(s.plate)}`), "G10");
           tc.zSet = s.plate;
           tc.ref = null; // Sensor-Referenz gehört zum alten Werkzeug
+          tc.driftRef = null;
           log(t("pr.plateDone", { d: s.plate }));
           must(await liftUp(true), "lift");
           if ((await waitUser(TcState.WaitRemovePlate)) === "cancel") throw new Cancel();
@@ -402,6 +423,96 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
     } else if (guard.tripped && tc.state !== TcState.Aborted) {
       tcAbort(t("tc.why.guard"), true);
     }
+  } finally {
+    stopGuard();
+    pending = null;
+  }
+}
+
+/** Mess-Punkt erreicht: messen (wenn fällig) oder gleich weiter */
+function onDriftPoint() {
+  if (toolChangeBusy()) return;
+  const resume = () => jobResume().catch(e => log(`${t("log.error")} ${e}`));
+  if (machine.protocol !== "grbl") { log(t("dr.log.grblOnly")); resume(); return; }
+  const sensor = s.tcMode === 1;
+  if (!sensor && !s.tcPos) { log(t("dr.log.noSpot")); resume(); return; }
+  if (sensor && !s.sensorSet) { log(t("pr.sensorNotSet")); resume(); return; }
+  // Laufzeit-Schätzung im G-Code war zu kurz (z. B. Overrides) – noch nicht fällig, wenn eine Referenz da ist
+  const ref = sensor ? tc.ref : tc.driftRef;
+  if (ref !== null && Date.now() - tc.driftAt < s.drMin * 30_000) { resume(); return; }
+  tc.kind = "drift";
+  tc.tool = { num: null, name: "", d: null };
+  tc.note = ""; tc.delta = null; tc.zSet = null; tc.spindle = "";
+  noTopLogged = false;
+  runDrift(sensor);
+}
+
+/** Nachmessen: Referenz beim ersten Mal, danach Z-Nullpunkt um die Abweichung verschieben */
+async function runDrift(sensor: boolean) {
+  cancelled = false;
+  set(TcState.Parking);
+  startGuard();
+  try {
+    const start = await readStart();
+    const sp = start.gc.match(/\b(M[34])\b/), sv = start.gc.match(/\bS([\d.]+)/);
+    tc.spindle = sp ? `${sp[1]} S${sv ? sv[1] : "0"}` : "";
+    must(await step("M5"), "M5");
+    if (tc.spindle) await sleep(3000); // auslaufen lassen
+    must(await goSafe(), "safe");
+    const ref = sensor ? tc.ref : tc.driftRef;
+    let a: Answer = "go";
+    if (!sensor) {
+      set(TcState.Travel);
+      must(await moveXY(s.tcX, s.tcY), "travel");
+      a = await waitUser(TcState.WaitPlate);
+    }
+    for (;;) {
+      if (a === "cancel") throw new Cancel();
+      if (a === "skip") { log(t("dr.log.skipped")); break; } // Z bleibt, wie es ist
+      if (!sensor && (machine.status.pins || "").includes("P")) { a = await waitUser(TcState.WaitPlate, t("pr.alreadyTriggered")); continue; }
+      set(TcState.Probing);
+      let z: number | null;
+      if (sensor) z = await measureAtSensor();
+      else {
+        z = await touchAt(Math.max(1, s.tcTravel));
+        if (z !== null) must(await liftUp(true), "lift");
+      }
+      if (cancelled || guard.tripped) throw new Cancel();
+      if (z === null) { a = await waitUser(TcState.Failed, t("tc.err.measure")); continue; }
+      tc.driftAt = Date.now();
+      if (ref === null) {
+        if (sensor) tc.ref = z; else tc.driftRef = z;
+        log(t("dr.log.ref", { z: z.toFixed(3) }));
+        break;
+      }
+      const delta = z - ref;
+      tc.delta = delta;
+      // ungewöhnlich viel: nicht einfach übernehmen (falsche Stelle, Span auf dem Sensor …)
+      if (Math.abs(delta) > DRIFT_MAX) {
+        a = await waitUser(TcState.Failed, t("dr.tooBig", { d: delta.toFixed(3), max: DRIFT_MAX }));
+        continue;
+      }
+      await freshStatus(); await freshStatus();
+      const v = machine.status.wpos[2] - delta;
+      must(await step("G21") && await step(`G10 L20 P0 Z${f3(v)}`), "G10");
+      if (sensor) tc.ref = z; else tc.driftRef = z;
+      log(t("dr.log.delta", { d: delta.toFixed(3) }));
+      break;
+    }
+    if (!sensor && (await waitUser(TcState.WaitRemovePlate)) === "cancel") throw new Cancel();
+
+    set(TcState.Returning);
+    await returnTo(start);
+    stopGuard();
+    // Handtaster: man steht ohnehin an der Maschine – erst nach Bestätigung weiter; Sensor: läuft allein weiter
+    if (!sensor && (await waitUser(TcState.WaitResume)) !== "go") throw new Cancel();
+    if (tc.spindle) must(await step(tc.spindle) && await step("G4 P3"), "spindle");
+    set(TcState.Idle);
+    await jobResume();
+    log(t("dr.log.resumed"));
+  } catch (e) {
+    if (!(e instanceof Cancel) && !cancelled) tcAbort(t("tc.err.step", { e: (e as Error).message || String(e) }), true);
+    else if (guard.tripped && tc.state !== TcState.Aborted) tcAbort(t("tc.why.guard"), true);
   } finally {
     stopGuard();
     pending = null;
@@ -461,12 +572,12 @@ export function initToolChange(logFn: (s: string) => void) {
   window.addEventListener(MACHINE_EVENT, (e: Event) => {
     const { type, data } = (e as CustomEvent).detail || {};
     if (type === "job-toolchange") onJobToolChange(data);
-    else if (type === "alarm") { tc.ref = null; tcAbort(t("tc.why.alarm", { code: data?.code ?? "" }), true); }
-    else if (type === "disconnected") { tc.ref = null; tcAbort(t("tc.why.lost"), false, false); }
-    else if (type === "welcome") { tc.ref = null; tcAbort(t("tc.why.reset"), false, false); }
+    else if (type === "alarm") { tc.ref = null; tc.driftRef = null; tcAbort(t("tc.why.alarm", { code: data?.code ?? "" }), true); }
+    else if (type === "disconnected") { tc.ref = null; tc.driftRef = null; tcAbort(t("tc.why.lost"), false, false); }
+    else if (type === "welcome") { tc.ref = null; tc.driftRef = null; tcAbort(t("tc.why.reset"), false, false); }
     else if (type === "switched") tcAbort(t("tc.why.switched"), false, false);
     else if (type === "job-done") {
-      tc.ref = null;
+      tc.ref = null; tc.driftRef = null;
       if (tc.state === TcState.Manual) set(TcState.Idle);
       else tcAbort(t("tc.why.stopped"), false);
     } else if (type === "job-progress" && tc.state === TcState.Manual && !machine.job.toolChange) set(TcState.Idle);

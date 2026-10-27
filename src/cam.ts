@@ -20,6 +20,9 @@ import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./sto
 import { adaptFeed, feedAdapt } from "./feedAdapt";
 import { threadPath, ThreadInfo } from "./threadMill";
 import { facingPath } from "./facing";
+import { DRIFT_SLOT, placeDriftPoints } from "./driftPoints";
+import { probeSettings } from "./probe";
+import { parseGcodeProgram } from "./sim/gcodeParser";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -198,6 +201,8 @@ const generateGcodeInner = (shapes: any): string | null => {
   const STEPOVER = 0.4;
   /** Planfräsen: 60 % des Fräserdurchmessers (die Zeilen überlappen nur wenig, die Fläche wird nur abgezogen) */
   const FACE_STEPOVER = 0.6;
+  /** Werkzeug während langer Jobs nachmessen (Einstellung im Abschnitt Werkzeugwechsel, Standard aus) */
+  const driftOn = probeSettings.drOn === 1;
 
   // Weltkoordinate -> Maschinen-mm.
   // FIX: Y zeigt im Speicher schon nach oben (wie an der Maschine). Vorher wurde hier
@@ -933,6 +938,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
   };
   group.shapes.forEach((shape: any) => {
+    // sichere Stelle (Fräser oben) – hier darf später zum Nachmessen angehalten werden (driftPoints.ts)
+    if (driftOn) gcode += DRIFT_SLOT + "\n";
     const from = gcode.length;
     millShape(shape);
     // Vorschub in engen Kurven und Innenecken senken (feedAdapt.ts)
@@ -942,6 +949,21 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 7. FOOTER ----
   gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
+
+  // ---- 8. NACHMESSEN (Wärmegang, Einstellung „Werkzeug nachmessen“): Mess-Punkte nach geschätzter Laufzeit ----
+  if (driftOn) {
+    const lines = gcode.split("\n");
+    const prog = parseGcodeProgram(lines);
+    const timeAt: number[] = new Array(lines.length);
+    let k = 0, tNow = 0;
+    for (let i = 0; i < lines.length; i++) {
+      while (k < prog.n && prog.line[k] < i) { tNow = prog.t0[k] + prog.dur[k]; k++; }
+      timeAt[i] = tNow;
+    }
+    const res = placeDriftPoints(lines, timeAt, probeSettings.drMin, `M0 ${c("gc.remeasure")}`);
+    gcode = res.lines.join("\n");
+    if (probeSettings.tcMode !== 1 && !probeSettings.tcPos) lastGcodeWarnings.push(t("gcw.driftNoSpot"));
+  }
 
   imageNote();
   return gcode;

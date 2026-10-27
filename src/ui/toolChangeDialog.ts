@@ -44,14 +44,20 @@ export function toolChangeSettingsHtml(): string {
             <button id="tc-ref-go" class="btn-secondary btn-compact" ${tip("tc.refGoTip")}>📏 ${T("tc.refGo")}</button>
           </div>
         </div>
-        <label class="prop-row" style="cursor:pointer;" ${tip("tc.m6Tip")}>${T("tc.m6")}<input type="checkbox" id="tc-m6" style="width:auto;"></label>`;
+        <label class="prop-row" style="cursor:pointer;" ${tip("tc.m6Tip")}>${T("tc.m6")}<input type="checkbox" id="tc-m6" style="width:auto;"></label>
+        <label class="prop-row" style="cursor:pointer;" ${tip("dr.onTip")}>${T("dr.on")}<input type="checkbox" id="dr-on" style="width:auto;"></label>
+        <div id="dr-box">
+          ${num("dr-min", "dr.min", "5", "5")}
+          <div class="tool-scope" id="dr-how"></div>
+        </div>`;
 }
 
 export function initToolChangeSettings(log: (s: string) => void) {
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => document.getElementById(id) as E | null;
   initToolChange(log);
   const fields: [string, keyof ProbeSettings][] = [
-    ["tc-safe", "tcSafe"], ["tc-workz", "tcWorkZ"], ["tc-travel", "tcTravel"], ["tc-sz", "tcSz"], ["tc-x", "tcX"], ["tc-y", "tcY"], ["tc-feed", "tcFeed"]
+    ["tc-safe", "tcSafe"], ["tc-workz", "tcWorkZ"], ["tc-travel", "tcTravel"], ["tc-sz", "tcSz"], ["tc-x", "tcX"], ["tc-y", "tcY"], ["tc-feed", "tcFeed"],
+    ["dr-min", "drMin"]
   ];
   const show = () => {
     fields.forEach(([id, k]) => { const el = $(id); if (el) el.value = String(s[k]); });
@@ -61,14 +67,22 @@ export function initToolChangeSettings(log: (s: string) => void) {
     const lift = $<HTMLSelectElement>("tc-lift");
     if (lift) lift.value = String(s.tcLift);
     if (m6) m6.checked = !!s.tcM6;
+    const dr = $("dr-on");
+    if (dr) dr.checked = s.drOn === 1;
     const vis = (id: string, on: boolean) => { const el = $(id); if (el) el.style.display = on ? "" : "none"; };
-    vis("tc-auto", s.tcMode !== 0);
+    // Nachmessen mit Handtaster braucht Wechselposition und Antast-Weg auch beim Wechsel „von Hand“
+    vis("tc-auto", s.tcMode !== 0 || s.drOn === 1);
     // „ganz nach oben“ braucht die Höhe nur als Ersatz (ohne Referenzfahrt); „nicht anheben“ gilt nur von Hand
     vis("tc-safe-row", s.tcLift === 0 || (s.tcLift === 2 && s.tcMode !== 0));
     vis("tc-workz-row", s.tcLift === 1 || s.tcLift === 3);
     vis("tc-sensor-only", s.tcMode === 1);
     vis("tc-ref-box", s.tcMode === 1);
     vis("tc-pos-box", s.tcPos === 1);
+    vis("dr-box", s.drOn === 1);
+    // Nachmessen: fester Sensor allein, sonst Handtaster an der Wechselposition
+    const how = $("dr-how");
+    if (how) how.textContent = s.tcMode === 1 ? t("dr.howSensor", { x: s.sx, y: s.sy })
+      : s.tcPos ? t("dr.howPlate", { x: s.tcX, y: s.tcY }) : t("dr.howNoSpot");
     const reuse = $("tc-reuse");
     if (reuse) reuse.textContent = s.tcMode === 1
       ? t("tc.reuseSensor", { x: s.sx, y: s.sy, f: s.fast, sl: s.slow })
@@ -81,7 +95,7 @@ export function initToolChangeSettings(log: (s: string) => void) {
   fields.forEach(([id, k]) => $(id)?.addEventListener("change", () => {
     const v = parseFloat(($(id) as HTMLInputElement).value);
     if (Number.isFinite(v)) {
-      s[k] = k === "tcWorkZ" ? Math.min(500, Math.max(0, v)) : k === "tcTravel" ? Math.min(300, Math.max(1, v)) : k === "tcFeed" ? Math.min(10000, Math.max(100, v)) : v;
+      s[k] = k === "drMin" ? Math.min(600, Math.max(5, Math.round(v))) : k === "tcWorkZ" ? Math.min(500, Math.max(0, v)) : k === "tcTravel" ? Math.min(300, Math.max(1, v)) : k === "tcFeed" ? Math.min(10000, Math.max(100, v)) : v;
       saveProbe();
     }
     show();
@@ -90,6 +104,7 @@ export function initToolChangeSettings(log: (s: string) => void) {
   $<HTMLSelectElement>("tc-lift")?.addEventListener("change", e => { s.tcLift = +(e.target as HTMLSelectElement).value; saveProbe(); show(); });
   $<HTMLSelectElement>("tc-pos")?.addEventListener("change", e => { s.tcPos = +(e.target as HTMLSelectElement).value; saveProbe(); show(); });
   $("tc-m6")?.addEventListener("change", e => { s.tcM6 = (e.target as HTMLInputElement).checked ? 1 : 0; saveProbe(); });
+  $("dr-on")?.addEventListener("change", e => { s.drOn = (e.target as HTMLInputElement).checked ? 1 : 0; saveProbe(); show(); });
   $("tc-here")?.addEventListener("click", () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
     s.tcX = +machine.status.mpos[0].toFixed(3); s.tcY = +machine.status.mpos[1].toFixed(3);
@@ -130,35 +145,38 @@ function render() {
     travel: s.tcTravel, plate: s.plate, x: s.tcPos ? s.tcX : "-", y: s.tcPos ? s.tcY : "-",
     d: tc.delta !== null ? tc.delta.toFixed(3) : "-", z: tc.zSet !== null ? tc.zSet.toFixed(2) : "-", s: tc.spindle
   };
+  // Nachmessen (Wärmegang) nutzt denselben Ablauf mit eigenen Texten
+  const drift = tc.kind === "drift";
+  const k = (key: string) => (drift ? key.replace(/^tc\./, "dr.") : key);
   const btn = (id: string, label: string, cls = "btn-secondary") => `<button id="${id}" class="${cls}">${label}</button>`;
   const stop = btn("tc-b-stop", "⏹ " + t("tc.b.stop"), "btn-secondary dlg-danger");
   let buttons = "";
   switch (st) {
     case TcState.Manual:
       buttons = (machine.protocol === "grbl" ? btn("tc-b-plate", "⊥ " + t("tc.b.plateNow")) : "") + btn("tc-b-mresume", "▶ " + t("tc.b.resume"), "btn-primary") + stop; break;
-    case TcState.WaitSwap: buttons = btn("tc-b-go", "📏 " + t("tc.b.measure"), "btn-primary") + btn("tc-b-skip", t("tc.b.skip")) + stop; break;
-    case TcState.WaitPlate: buttons = btn("tc-b-go", "⊥ " + t("tc.b.probe"), "btn-primary") + btn("tc-b-skip", t("tc.b.skip")) + stop; break;
-    case TcState.Failed: buttons = btn("tc-b-go", "↻ " + t("tc.b.retry"), "btn-primary") + btn("tc-b-skip", t("tc.b.skip")) + stop; break;
+    case TcState.WaitSwap: buttons = btn("tc-b-go", "📏 " + t("tc.b.measure"), "btn-primary") + btn("tc-b-skip", t(k("tc.b.skip"))) + stop; break;
+    case TcState.WaitPlate: buttons = btn("tc-b-go", "⊥ " + t("tc.b.probe"), "btn-primary") + btn("tc-b-skip", t(k("tc.b.skip"))) + stop; break;
+    case TcState.Failed: buttons = btn("tc-b-go", "↻ " + t("tc.b.retry"), "btn-primary") + btn("tc-b-skip", t(k("tc.b.skip"))) + stop; break;
     case TcState.WaitRemovePlate: buttons = btn("tc-b-go", "✓ " + t("tc.b.removed"), "btn-primary") + stop; break;
     case TcState.WaitResume: buttons = btn("tc-b-go", "▶ " + t("tc.b.resume"), "btn-primary") + stop; break;
     case TcState.Aborted: buttons = btn("tc-b-close", t("tc.b.close")); break;
     default: buttons = stop;
   }
   const extra = st === TcState.WaitResume
-    ? (tc.delta !== null ? `<div class="tc-result">${esc(t("tc.resDelta", params))}</div>` : tc.zSet !== null ? `<div class="tc-result">${esc(t("tc.resPlate", params))}</div>` : "")
+    ? (tc.delta !== null ? `<div class="tc-result">${esc(t(k("tc.resDelta"), params))}</div>` : tc.zSet !== null ? `<div class="tc-result">${esc(t("tc.resPlate", params))}</div>` : "")
       + (tc.spindle ? `<div class="dlg-hint">${esc(t("tc.resSpindle", params))}</div>` : "")
     : "";
   box.innerHTML = `
-    <h3>🔧 ${esc(t("tc.dlgTitle"))}</h3>
-    <div class="tc-tool">${esc(toolLabel())}</div>
-    <div class="tc-step${BUSY.includes(st) ? " tc-busy" : ""}">${esc(t("tc.st." + st, params))}</div>
+    <h3>${drift ? "🌡" : "🔧"} ${esc(t(k("tc.dlgTitle")))}</h3>
+    <div class="tc-tool">${esc(drift ? t("dr.sub", { m: s.drMin }) : toolLabel())}</div>
+    <div class="tc-step${BUSY.includes(st) ? " tc-busy" : ""}">${esc(t(k("tc.st." + st), params))}</div>
     ${tc.msg ? `<div class="tc-msg">⚠ ${esc(tc.msg)}</div>` : ""}
     ${extra}
     ${st === TcState.WaitPlate || st === TcState.WaitSwap || st === TcState.Failed ? `<div class="pr-live" id="tc-live"></div>` : ""}
     <div class="dlg-buttons tc-buttons">${buttons}</div>`;
   const on = (id: string, fn: () => void) => document.getElementById(id)?.addEventListener("click", fn);
   on("tc-b-go", () => { if (tcWaiting()) tcAnswer("go"); });
-  on("tc-b-skip", () => { if (tcWaiting() && window.confirm(t("tc.skipConfirm"))) tcAnswer("skip"); });
+  on("tc-b-skip", () => { if (tcWaiting() && window.confirm(t(k("tc.skipConfirm")))) tcAnswer("skip"); });
   on("tc-b-stop", () => { if (window.confirm(t("tc.stopConfirm"))) tcAbort(t("tc.why.user"), true); });
   on("tc-b-close", () => tcClose());
   on("tc-b-plate", () => tcManualPlate());

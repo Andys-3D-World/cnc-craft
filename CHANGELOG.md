@@ -20,6 +20,13 @@
 - **Facing as a milling operation:** new button *Facing* under *Path correction* (and as an extra operation per
   shape). The bounding rectangle of the shape is milled flat in rows down to the milling depth – e.g. to face stock
   or a spoilboard. Rows run past the edge, plunging happens next to the area; facing runs first within its tool.
+- **Re-measure tool during long jobs (thermal drift):** new option in the tool change section, **off by default**.
+  When on, newly generated G-code gets measuring points at safe places (between shapes, cutter up) – the first one
+  at the start of the job is the reference, then one every set number of minutes (estimated run time). There the job
+  stops the spindle, measures the tool and shifts Z zero by the difference to the reference. With a fixed sensor
+  it runs by itself; with a normal hand probe plate it measures at the tool change position (plate on a surface that
+  is not milled) and asks to remove the plate before continuing. Differences above 0.3 mm are not applied without
+  asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),
