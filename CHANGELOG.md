@@ -17,6 +17,10 @@
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),
   then *Resume from here* starts the resume dialog at exactly that line.
 
+**Fixed**
+- **Inch jobs (G20):** jogging and *Frame job* now always send `G21`. Before, an inch job could leave the machine in
+  inch mode, and the next jog or frame (calculated in mm) would have travelled 25.4 times as far.
+
 ## 0.3.3 Beta
 
 **New**

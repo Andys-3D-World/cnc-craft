@@ -66,7 +66,8 @@ export function handleJogClick(
     return `${axis}${(dir * distance).toFixed(2)}`;
   });
 
-  const jogCommand = `$J=G91 F${feed} ${axisCommands.join(" ")}`;
+  // G21: Schritte sind mm – auch wenn ein Zoll-Job (G20) die Maschine in Zoll gelassen hat
+  const jogCommand = `$J=G91 G21 F${feed} ${axisCommands.join(" ")}`;
   appendToConsole(`> ${jogCommand}`);
   
   // Digitale Zahlenleiste oben rechts aktualisieren

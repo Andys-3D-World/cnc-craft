@@ -86,7 +86,8 @@ export async function runFrame(log: (s: string) => void) {
   // Drehachse an eigener A-Achse: Y gehört nicht zum Teil → nur entlang X fahren
   const aAxis = rotary.on && rotary.axis === "a" && isLaser();
   for (const [px, py] of aAxis ? [[b.x0, 0], [b.x1, 0], [b.x0, 0]] : corners) {
-    const a = await sendAndWait(aAxis ? `G90 G0 X${r2(px)}` : `G90 G0 X${r2(px)} Y${r2(py)}`, machine.protocol === "ruida" || machine.protocol === "k40" ? 40000 : 8000, true);
+    // G21: Rahmen ist in mm gerechnet – ein Zoll-Job (G20) davor lässt die Maschine sonst in Zoll
+    const a = await sendAndWait(aAxis ? `G21 G90 G0 X${r2(px)}` : `G21 G90 G0 X${r2(px)} Y${r2(py)}`, machine.protocol === "ruida" || machine.protocol === "k40" ? 40000 : 8000, true);
     if (!a.ok) { log(t("frame.failed")); return; }
   }
   log(t("frame.done"));
