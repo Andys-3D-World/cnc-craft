@@ -194,15 +194,18 @@ export function initConnection(appendToConsole: (text: string) => void) {
     const net = netCapable();
     const last = get(ruida ? KEY_LAST_RUIDA : KEY_LAST);
     const cur = portSelect.value === NET ? "" : portSelect.value;
-    const keep = ruida ? (last || NET) : (last === NET && net ? NET : (cur || last));
+    // Ruida: USB-Kabel = serieller Port mit FTDI-Chip – den zuerst anbieten, wenn noch nichts gewählt war
+    const ftdi = ports.find(p => p.chip === "FTDI")?.name;
+    const keep = ruida ? (last || ftdi || NET) : (last === NET && net ? NET : (cur || last));
     const list = ports.map(p => {
       const extra = [p.chip, p.product].filter(Boolean).join(" · ");
-      const hint = chipHint(p);
+      const hint = ruida ? "" : chipHint(p);
       // Namen kommen vom USB-Gerät selbst – nie ungeprüft als HTML einsetzen
-      return `<option value="${escHtml(p.name)}" title="${escHtml(hint)}">${escHtml(p.name)}${extra ? " – " + escHtml(extra) : ""}${hint ? " (" + escHtml(hint) + ")" : ""}</option>`;
+      return `<option value="${escHtml(p.name)}" title="${escHtml(hint)}">${ruida ? "🔌 USB: " : ""}${escHtml(p.name)}${extra ? " – " + escHtml(extra) : ""}${hint ? " (" + escHtml(hint) + ")" : ""}</option>`;
     }).join("");
-    portSelect.innerHTML = (net ? `<option value="${NET}">🌐 ${t("m.ruidaNet")}</option>` : "")
-      + (list || (ruida ? "" : `<option value="">${t("m.noPorts")}</option>`));
+    // Ruida ohne USB-Port: trotzdem zeigen, dass USB geht (Kabel einstecken, Laser einschalten, 🔄)
+    const none = ruida ? `<option value="" disabled>🔌 USB: ${escHtml(t("m.ruidaUsbNone"))}</option>` : `<option value="">${t("m.noPorts")}</option>`;
+    portSelect.innerHTML = (net ? `<option value="${NET}">🌐 ${t("m.ruidaNet")}</option>` : "") + (list || none);
     if (keep && (ports.some(p => p.name === keep) || (net && keep === NET))) portSelect.value = keep;
     else if (!ruida && net && list) portSelect.value = ports[0].name;
     else if (ruida) portSelect.value = NET;

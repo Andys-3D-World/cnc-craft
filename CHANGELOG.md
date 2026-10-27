@@ -3,14 +3,18 @@
 ## Next version (unreleased)
 
 **New**
-- **Spindle inverter (VFD) over Modbus – backend:** CNC Craft can now talk to a spindle inverter directly over
+- **Spindle inverter (VFD) over Modbus:** CNC Craft can now talk to a spindle inverter directly over
   Modbus RTU (RS-485 adapter) or Modbus TCP: set the speed, run forward / reverse / stop, and read the actual speed
   and the fault code. Small built-in Modbus engine (no extra libraries) with timeouts, retries after timeouts or
   line noise (CRC errors) and CRC16 checking. The registers come from profiles (data, not code): *Delta-style*
   (Delta VFD-E/M, MS300, GS20 …) and *Huanyang GT / P2A, Inovance-style*; custom profiles can be passed as JSON.
   The register maps are assumptions from common manuals – always check your own inverter manual first (the old
   Huanyang HY protocol is not supported). The spindle is stopped on disconnect and when the program closes.
-  No user interface yet – only the commands for it.
+  New section *Spindle inverter (Modbus)* in the *Machine* tab (milling): connection (RS-485 USB adapter with port,
+  baud rate and parity, or IP address), device address, profile, max. speed and frequency, the register map of the
+  profile to compare with the manual (*Custom profile* lets you enter every register yourself, *Use as custom
+  profile* copies a built-in one), then speed, forward / reverse / stop and a live display of actual speed and
+  fault code.
 - **Laser and plasma: optimized cut order (shortest rapids):** new switch *Optimize cut order* in the laser and
   plasma settings (on by default). Until now the contours of a layer / cut were cut open lines first, then from small
   to large, so the head often jumped back and forth across the sheet. CNC Craft now picks the order with the shortest
@@ -74,6 +78,9 @@
   the new `npm test` (`node --test`).
 
 **Improved**
+- **Ruida over USB is easier to find:** in the port list of a Ruida laser the USB ports are now marked
+  *🔌 USB* (an FTDI port is picked automatically), and when no cable is plugged in the list still shows a USB entry
+  with a hint (plug in the cable, switch the laser on, then 🔄) instead of only *Network*.
 - **Tool change: choose how far Z lifts – also in “Manual” mode:** new setting *Lift Z at the change* (section
   *Probing* → *Tool change*): *height above work zero* (e.g. 40 mm – works on every machine), *all the way up* (to just
   below the limit switch: the homing position, `-$27` – needs homing upwards via `$22`, otherwise the height above work

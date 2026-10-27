@@ -21,6 +21,7 @@ import { spindlePanelHtml } from "./spindlePanel";
 import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
 import { workshopPanelHtml } from "./workshopPanel";
+import { vfdPanelHtml } from "./vfdPanel";
 import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
 import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt";
@@ -268,6 +269,8 @@ export function renderRightPanel(container: HTMLElement) {
         </div>
 
         ${spindlePanelHtml()}
+
+        ${vfdPanelHtml()}
 
         ${probePanelHtml()}
 

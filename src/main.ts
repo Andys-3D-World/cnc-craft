@@ -30,6 +30,7 @@ import { initJobTools } from "./ui/jobTools";
 import { initSpindlePanel } from "./ui/spindlePanel";
 import { initProbePanel } from "./ui/probePanel";
 import { initWorkshopPanel } from "./ui/workshopPanel";
+import { initVfdPanel } from "./ui/vfdPanel";
 import { initPinLeds } from "./ui/pinLeds";
 import { initWiringPage } from "./ui/wiringPage";
 import { initAboutDialog } from "./ui/aboutDialog";
@@ -191,6 +192,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initSpindlePanel(appendToConsole); // Spindel an/aus, Laser-Testschuss, THC, Override-Regler
     initProbePanel(appendToConsole);   // Antasten: Tasterplatte, Werkzeuglängensensor
     initWorkshopPanel(appendToConsole); // Werkstatt: Absaugung/Kompressor mit dem Job schalten
+    initVfdPanel(appendToConsole); // Frequenzumrichter der Spindel per Modbus
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates
