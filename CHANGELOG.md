@@ -1,5 +1,14 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Tool wear compensation (router):** each tool has a new field *Wear compensation* (mm). Toolpaths are calculated
+  with the nominal Ø minus this value, so a worn cutter can be corrected without changing its real Ø – part too big
+  or hole too small: increase the value; negative if the cutter cuts bigger (e.g. runout). Used for contours,
+  pockets, rest machining, thread milling and 3D milling; not for V-bits, chamfer mills, countersinks and drills.
+  The tool list shows the corrected Ø (“cuts Ø2.95”).
+
 ## 0.3.3 Beta
 
 **New**

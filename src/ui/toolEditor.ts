@@ -15,7 +15,7 @@
  */
 import { t } from "../i18n/i18n";
 import {
-  MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, TYPE_DEFAULTS, typeGeom, MATERIALS,
+  MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, cutDiameter, TYPE_DEFAULTS, typeGeom, MATERIALS,
   calcCutData, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
   duplicateTool, swapTools, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
   sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
@@ -75,6 +75,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
         <div class="te-fields">
           <fieldset><legend>${esc(t("tl.geometry"))}</legend>
             ${num("tool.dia", "dia", src.diameter, "0.1", "mm", "", "tl.diaTip")}
+            ${num("tl.g.wear", "wear", src.wearOffset ?? 0, "0.01", "mm", "te-wear", "tl.wearTip")}
             ${num("tl.g.shank", "shank", src.shankDia, "0.1", "mm")}
             ${num("tl.g.fluteLen", "flutelen", src.fluteLen, "0.5", "mm", "", "tl.fluteLenTip")}
             ${num("tl.g.length", "len", src.length, "1", "mm", "", "tl.lengthTip")}
@@ -131,6 +132,8 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
   if (isNew) src.name = ""; // sanitize setzt "?" – neues Werkzeug bekommt einen Namensvorschlag
   root.innerHTML = editorHtml(p, src, isNew, h);
   const q = <T extends HTMLElement = HTMLInputElement>(id: string) => root.querySelector("#" + p + id) as T;
+  // Verschleiß darf auch negativ sein (Fräser schneidet größer, z. B. durch Rundlauffehler)
+  q("wear").min = "-1"; q("wear").max = "1";
   let type: ToolType = src.type;
   // Name automatisch vorschlagen, solange man ihn nicht selbst geändert hat
   let lastAuto = isNew ? "" : (src.name === autoToolName(src) ? src.name : null);
@@ -140,7 +143,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     id: src.id || "x", name: q("name").value.trim() || "?", type,
     diameter: val("dia"), shankDia: val("shank"), fluteLen: val("flutelen"), length: val("len"),
     angle: val("angle"), tipDia: val("tip"), cornerR: val("corner"), flutes: val("flutes"), pitch: val("pitch"),
-    threadSingle: q("single").checked, neckDia: val("neck"),
+    threadSingle: q("single").checked, neckDia: val("neck"), wearOffset: val("wear"),
     helix: q<HTMLSelectElement>("helix").value, toolMat: q<HTMLSelectElement>("tmat").value,
     rpm: val("rpm"), feedrate: val("feed"), plungeFeed: val("plunge"), rampAngle: val("ramp"), stepZ: val("stepz"),
     notes: q<HTMLTextAreaElement>("notes").value
@@ -157,6 +160,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     root.querySelectorAll<HTMLElement>(".te-pitch").forEach(e => { e.style.display = type === "threadmill" && !single ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-tip").forEach(e => { e.style.display = type === "vbit" || type === "chamfer" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-corner").forEach(e => { e.style.display = type === "bullnose" ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-wear").forEach(e => { e.style.display = cone ? "none" : ""; });
     root.querySelectorAll<HTMLElement>(".te-helix-row").forEach(e => { e.style.display = cone && type !== "drill" ? "none" : ""; });
     // Schneidenlänge 0 = automatisch (Kegelhöhe)
     const fl = q("flutelen");
@@ -386,7 +390,7 @@ export function renderToolPage(withEditor = true) {
         <div class="tlp-ico">${toolIconSvg(tl, 22, 44, toolColor(tl))}</div>
         <div class="tlp-txt">
           <div class="tlp-name"><b style="color:${toolColor(tl)}">T${toolNumber(tl)}</b> ${esc(tl.name)}</div>
-          <div class="tlp-info">${esc(toolTypeName(tl))} · Ø${fmt(tl.diameter)} · ${esc(t("tl.flutesN", { n: tl.flutes }))} · S${tl.rpm} · F${tl.feedrate}</div>
+          <div class="tlp-info">${esc(toolTypeName(tl))} · Ø${fmt(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))} · S${tl.rpm} · F${tl.feedrate}</div>
         </div>
         <button class="tlp-star${def ? " on" : ""}" data-act="default" data-tip="${esc(t(def ? "tl.isDefault" : "tl.makeDefault"))}">${def ? "★" : "☆"}</button>
       </div>`;

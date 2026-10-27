@@ -31,6 +31,7 @@ export interface MillingTool extends ToolGeom {
   rpm: number;         // Drehzahl
   plungeFeed?: number; // Eintauch-Vorschub in mm/min (Standard 300)
   rampAngle?: number;  // Eintauchwinkel in ° (Rampe/Schraube), 0 = senkrecht eintauchen
+  wearOffset?: number; // Verschleiß-Ausgleich in mm: so viel kleiner schneidet der Fräser als sein Ø (negativ = größer)
   toolMat: ToolMat;    // Schneidstoff: Hartmetall oder HSS
   notes: string;       // Notiz (Bezugsquelle, Material, …)
   updated?: number;    // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
@@ -212,6 +213,8 @@ export function sanitize(x: any): MillingTool {
     rpm: Number.isFinite(+x.rpm) && +x.rpm >= 0 ? +x.rpm : 12000,
     plungeFeed: num(x.plungeFeed, DEFAULT_PLUNGE),
     rampAngle: Math.min(45, num0(x.rampAngle, 0)),
+    // höchstens ±1 mm und nie mehr als der halbe Ø
+    wearOffset: Number.isFinite(+x.wearOffset) ? Math.max(-1, Math.min(1, diameter / 2, +x.wearOffset)) : 0,
     toolMat: x.toolMat === "hss" ? "hss" : "carbide",
     notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
     ...syncFields(x)
@@ -233,6 +236,15 @@ function changed() {
 // ---------------------------------------------------------------------
 // Öffentliche Funktionen (für CAM-Bereich, G-Code, Projekte)
 // ---------------------------------------------------------------------
+
+/**
+ * Durchmesser, mit dem die Fräsbahnen gerechnet werden: Nenn-Ø minus Verschleiß-Ausgleich.
+ * Kegel-Werkzeuge und Bohrer schneiden über ihre Form – dort zählt der Ausgleich nicht.
+ */
+export function cutDiameter(tool: Pick<MillingTool, "type" | "diameter" | "wearOffset">): number {
+  if (CONE_TYPES.includes(tool.type)) return tool.diameter;
+  return Math.max(0.01, tool.diameter - (tool.wearOffset || 0));
+}
 
 export function getTools(): MillingTool[] {
   return tools;

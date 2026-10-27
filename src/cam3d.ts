@@ -10,7 +10,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { t, ascii } from "./i18n/i18n";
 import { spindleCode } from "./spindleDir";
-import { DEFAULT_PLUNGE, MillingTool, toolNumber } from "./toolLibrary";
+import { DEFAULT_PLUNGE, MillingTool, toolNumber, cutDiameter } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
 
 const SAFE_Z = 5.0;     // wie cam.ts
@@ -58,7 +58,7 @@ export async function loadModel3d(pos: Float32Array): Promise<number> {
 /** Bahnen rechnen. onProgress(0…1, "rough" | "finish") */
 export async function computePaths3d(job: Job3D, onProgress: (f: number, stage: string) => void): Promise<Path3D[]> {
   const op = (o: Op3D | null) => o && {
-    ball: o.tool.type === "ball", diameter: o.tool.diameter, stepDown: o.stepDown, stepOver: o.stepOver,
+    ball: o.tool.type === "ball", diameter: cutDiameter(o.tool), stepDown: o.stepDown, stepOver: o.stepOver,
     allowance: o.allowance, dir: o.dir, tolerance: o.tolerance
   };
   const un = await listen<{ p: number; stage: string }>("cam3d-progress", e => onProgress(e.payload.p, e.payload.stage));

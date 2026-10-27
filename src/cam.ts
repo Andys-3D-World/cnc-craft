@@ -1,6 +1,6 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber } from "./toolLibrary";
+import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
 import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
@@ -177,7 +177,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   let rampTan = 0;
   const useTool = (tool: MillingTool | null) => {
     curTool = tool;
-    toolDiameter = tool ? tool.diameter : 3.0;
+    toolDiameter = tool ? cutDiameter(tool) : 3.0;
     toolRadius = toolDiameter / 2;
     stepZ = tool ? Math.max(0.05, Math.abs(tool.stepZ)) : 1.5;
     feedXY = tool ? tool.feedrate : 800;
@@ -525,13 +525,13 @@ const generateGcodeInner = (shapes: any): string | null => {
   const millRest = (shape: any) => {
     const big = toolForShape(shape);
     if (!big) return;
-    const R = big.diameter / 2, r = toolRadius, mode = shape.millingMode;
+    const R = cutDiameter(big) / 2, r = toolRadius, mode = shape.millingMode;
     let bigPaths: { pts: P[]; closed: boolean }[] = [], small: { pts: P[]; closed: boolean }[] = [];
     if (mode === "pocket") {
       const outer = closedMm(shape);
       if (!outer) return;
       const isl = islandsOf(shape, outer);
-      bigPaths = pocketPaths(outer, isl, R, Math.max(0.05, big.diameter * STEPOVER), pocketStrategy).paths;
+      bigPaths = pocketPaths(outer, isl, R, Math.max(0.05, 2 * R * STEPOVER), pocketStrategy).paths;
       small = pocketPaths(outer, isl, r, Math.max(0.05, toolDiameter * STEPOVER), "spiral").paths;
     } else if (shape.type === "polyline" && shape.closed) {
       const pts: P[] = shape.points.map((p: any) => toMachine(p.x, p.y));
@@ -636,13 +636,13 @@ const generateGcodeInner = (shapes: any): string | null => {
     const c0 = toMachine(round.x, round.y), holeD = 2 * round.r / MM_TO_PIXEL;
     // Loch nur als Kontur „Innen“ gefräst: ab Loch-Ø > 2 × Fräser-Ø bleibt in der Mitte ein Kern stehen
     const first = shape.opOf, firstTool = first ? toolForShape(first) : null;
-    if (side < 0 && first?.millingMode === "inside" && firstTool && holeD > 2 * firstTool.diameter - 0.01) {
+    if (side < 0 && first?.millingMode === "inside" && firstTool && holeD > 2 * cutDiameter(firstTool) - 0.01) {
       warn("gcw.threadCore", { h: holeD.toFixed(2), d: firstTool.diameter });
     }
     const r = threadPath({
       cx: c0.x, cy: c0.y, holeD, internal: side < 0,
       D: Number(shape.threadD) || 0, pitch: Number(shape.threadPitch) || 0,
-      toolPitch: tool.threadSingle ? 0 : tool.pitch || 1, toolD: tool.diameter,
+      toolPitch: tool.threadSingle ? 0 : tool.pitch || 1, toolD: cutDiameter(tool),
       length: Math.abs(typeof shape.millingDepth === "number" ? shape.millingDepth : 0),
       left: !!shape.threadLeft, passes: Number(shape.threadPasses) || 1, springPass: !!shape.threadSpring,
       feed: feedXY, plunge: PLUNGE_FEED, safeZ: SAFE_Z,
