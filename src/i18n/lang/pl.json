@@ -3256,5 +3256,8 @@
   "ws.err.mqtt-bad-answer": "pod tym adresem nie ma brokera MQTT",
   "cam.avoidCut": "Omijaj wycięte detale",
   "cam.avoidCutTip": "Ruchy szybkie (G0) omijają już wycięte detale i otwory (ramka + odstęp) zamiast jechać nad nimi – uniesiony detal mógłby uderzyć w głowicę. Gdy nic nie przeszkadza, ruch pozostaje prosty",
-  "gc.avoid": "objazd wycietego detalu"
+  "gc.avoid": "objazd wycietego detalu",
+  "cam.optOrder": "Optymalizuj kolejność cięcia",
+  "cam.optOrderTip": "Tnie kontury każdej warstwy w kolejności z najkrótszymi ruchami szybkimi (najbliższy sąsiad + 2-opt). Otwory i wszystko wewnątrz detalu nadal idą przed detalem; kolejność warstw i punkty przebicia zostają. W laserze punkt startu zamkniętych konturów bez wejścia może się przesunąć",
+  "gc.orderOpt": "kolejnosc ciecia zoptymalizowana: ruchy szybkie {a} mm -> {b} mm"
 }

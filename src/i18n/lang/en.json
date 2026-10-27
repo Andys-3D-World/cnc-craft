@@ -3431,5 +3431,8 @@
   "ws.err.mqtt-bad-answer": "no MQTT broker at this address",
   "cam.avoidCut": "Avoid cut-out parts",
   "cam.avoidCutTip": "Rapid moves (G0) go around parts and holes that are already cut (bounding box + margin) instead of straight over them – tipped-up pieces could otherwise hit the head. If nothing is in the way, the move stays straight",
-  "gc.avoid": "detour around cut part"
+  "gc.avoid": "detour around cut part",
+  "cam.optOrder": "Optimize cut order",
+  "cam.optOrderTip": "Cuts the contours of each layer in the order with the shortest rapid moves (nearest neighbour + 2-opt). Holes and everything inside a part still come before the part; layer order and pierce points stay. On the laser, the start point of closed contours without lead-in may move",
+  "gc.orderOpt": "cut order optimized: rapids {a} mm -> {b} mm"
 }

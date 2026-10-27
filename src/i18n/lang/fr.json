@@ -3256,5 +3256,8 @@
   "ws.err.mqtt-bad-answer": "aucun broker MQTT à cette adresse",
   "cam.avoidCut": "Contourner les pièces découpées",
   "cam.avoidCutTip": "Les déplacements rapides (G0) contournent les pièces et trous déjà découpés (cadre + marge) au lieu de passer dessus – une pièce basculée pourrait sinon heurter la tête. Si rien ne gêne, le trajet reste droit",
-  "gc.avoid": "detour autour d'une piece decoupee"
+  "gc.avoid": "detour autour d'une piece decoupee",
+  "cam.optOrder": "Optimiser l'ordre de découpe",
+  "cam.optOrderTip": "Découpe les contours de chaque calque dans l'ordre avec les déplacements rapides les plus courts (plus proche voisin + 2-opt). Les trous et tout ce qui est dans une pièce passent toujours avant la pièce ; l'ordre des calques et les points de perçage restent. Au laser, le point de départ des contours fermés sans amorce peut se déplacer",
+  "gc.orderOpt": "ordre de decoupe optimise : rapides {a} mm -> {b} mm"
 }

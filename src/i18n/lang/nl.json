@@ -3256,5 +3256,8 @@
   "ws.err.mqtt-bad-answer": "geen MQTT-broker op dit adres",
   "cam.avoidCut": "Uitgesneden delen ontwijken",
   "cam.avoidCutTip": "IJlgangen (G0) gaan om al gesneden delen en gaten heen (kader + marge) in plaats van er recht overheen – omhooggekomen delen kunnen anders de kop raken. Ligt er niets in de weg, dan blijft de beweging recht",
-  "gc.avoid": "omweg rond gesneden deel"
+  "gc.avoid": "omweg rond gesneden deel",
+  "cam.optOrder": "Snijvolgorde optimaliseren",
+  "cam.optOrderTip": "Snijdt de contouren van elke laag in de volgorde met de kortste ijlgangen (dichtstbijzijnde buur + 2-opt). Gaten en alles binnen een deel komen nog steeds vóór het deel; laagvolgorde en insteekpunten blijven. Bij de laser mag het startpunt van gesloten contouren zonder inloop verschuiven",
+  "gc.orderOpt": "snijvolgorde geoptimaliseerd: ijlgangen {a} mm -> {b} mm"
 }

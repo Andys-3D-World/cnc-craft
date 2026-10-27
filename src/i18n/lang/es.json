@@ -3256,5 +3256,8 @@
   "ws.err.mqtt-bad-answer": "no hay ningún broker MQTT en esta dirección",
   "cam.avoidCut": "Esquivar piezas cortadas",
   "cam.avoidCutTip": "Los movimientos rápidos (G0) rodean las piezas y agujeros ya cortados (marco + margen) en vez de pasar por encima – una pieza levantada podría golpear el cabezal. Si nada estorba, el movimiento sigue recto",
-  "gc.avoid": "rodeo alrededor de pieza cortada"
+  "gc.avoid": "rodeo alrededor de pieza cortada",
+  "cam.optOrder": "Optimizar orden de corte",
+  "cam.optOrderTip": "Corta los contornos de cada capa en el orden con los movimientos rápidos más cortos (vecino más cercano + 2-opt). Los agujeros y todo lo que está dentro de una pieza siguen antes de la pieza; el orden de capas y los puntos de perforación se mantienen. En el láser, el punto de inicio de contornos cerrados sin entrada puede moverse",
+  "gc.orderOpt": "orden de corte optimizado: rapidos {a} mm -> {b} mm"
 }

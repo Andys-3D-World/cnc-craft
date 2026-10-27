@@ -22,6 +22,8 @@
  *
  * Reihenfolge: Schnitte in Listen-Reihenfolge; darin offene Linien, dann geschlossene
  * Konturen von klein nach groß (Löcher vor dem Teil – sonst fällt das Teil vorher heraus).
+ * Mit "Reihenfolge optimieren": innerhalb eines Schnitts die Reihenfolge mit den kürzesten
+ * Leerfahrten, Löcher weiter vor ihrem Teil, Einstichpunkte unverändert (siehe cutOrder.ts).
  */
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { offsetPolygon, polygonArea, pointInPoly } from "./polyOffset";
@@ -29,6 +31,7 @@ import { getCuts, cutForShape, plasmaSettings, PlasmaCut } from "./plasmaCuts";
 import { t, ascii } from "./i18n/i18n";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
+import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
@@ -108,6 +111,8 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
   }
   return res;
 }
+
+const lastOf = (pts: Pt[]) => pts[pts.length - 1];
 
 /** größte Ausdehnung (Breite oder Höhe) */
 function extent(pts: Pt[]): number {
@@ -296,6 +301,20 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
     });
     // offene Linien zuerst, dann geschlossene von klein nach groß
     plans.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || a.area - b.area);
+    // kürzeste Leerfahrten: Einstichpunkte bleiben, Löcher weiter vor ihrem Teil (siehe cutOrder.ts)
+    if (S.optimizeOrder && plans.length > 1) {
+      const items: CutItem[] = plans.map(p => ({
+        entry: p.runs ? (p.lead || p.runs[0][0]) : (p.lead || p.pts[0]),
+        exit: p.runs ? lastOf(p.runs[p.runs.length - 1]) : p.over.length ? lastOf(p.over) : p.closed ? p.pts[0] : lastOf(p.pts),
+        pts: p.pts, closed: p.closed
+      }));
+      const from = pos || { x: 0, y: 0 };
+      const steps = optimizeCutOrder(items, from);
+      const before = travelLength(items, items.map((_, i) => ({ index: i, reversed: false, start: 0 })), from);
+      const after = travelLength(items, steps, from);
+      g += `${c("gc.orderOpt", { a: Math.round(before), b: Math.round(after) })}\n`;
+      plans.splice(0, plans.length, ...steps.map(st => plans[st.index]));
+    }
 
     for (const p of plans) {
       const small = isSmallHole(p);

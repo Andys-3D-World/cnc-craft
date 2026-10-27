@@ -3431,5 +3431,8 @@
   "ws.err.mqtt-bad-answer": "unter dieser Adresse antwortet kein MQTT-Broker",
   "cam.avoidCut": "Ausgeschnittene Teile umfahren",
   "cam.avoidCutTip": "Leerfahrten (G0) fahren um schon ausgeschnittene Teile und Löcher herum (Rahmen + Abstand), statt gerade darüber – gekippte oder hochstehende Teile können sonst den Kopf treffen. Ist nichts im Weg, bleibt die Fahrt gerade",
-  "gc.avoid": "Umweg um ausgeschnittenes Teil"
+  "gc.avoid": "Umweg um ausgeschnittenes Teil",
+  "cam.optOrder": "Reihenfolge optimieren",
+  "cam.optOrderTip": "Schneidet die Konturen jeder Ebene in der Reihenfolge mit den kürzesten Leerfahrten (nächster Nachbar + 2-opt). Löcher und alles, was in einem Teil liegt, kommen weiter vor dem Teil; Ebenen-Reihenfolge und Einstichpunkte bleiben. Beim Laser darf der Startpunkt geschlossener Konturen ohne Freischnitt wandern",
+  "gc.orderOpt": "Reihenfolge optimiert: Leerfahrten {a} mm -> {b} mm"
 }

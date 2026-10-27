@@ -3256,5 +3256,8 @@
   "ws.err.mqtt-bad-answer": "nessun broker MQTT a questo indirizzo",
   "cam.avoidCut": "Evitare i pezzi tagliati",
   "cam.avoidCutTip": "I movimenti rapidi (G0) girano attorno a pezzi e fori già tagliati (riquadro + margine) invece di passarci sopra – un pezzo sollevato potrebbe colpire la testa. Se non c'è nulla in mezzo, il movimento resta dritto",
-  "gc.avoid": "deviazione attorno a pezzo tagliato"
+  "gc.avoid": "deviazione attorno a pezzo tagliato",
+  "cam.optOrder": "Ottimizza ordine di taglio",
+  "cam.optOrderTip": "Taglia i contorni di ogni livello nell'ordine con i movimenti rapidi più brevi (vicino più prossimo + 2-opt). I fori e tutto ciò che sta dentro un pezzo vengono sempre prima del pezzo; ordine dei livelli e punti di sfondamento restano. Sul laser il punto di partenza dei contorni chiusi senza attacco può spostarsi",
+  "gc.orderOpt": "ordine di taglio ottimizzato: rapidi {a} mm -> {b} mm"
 }

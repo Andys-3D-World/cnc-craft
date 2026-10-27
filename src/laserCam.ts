@@ -6,7 +6,8 @@
  *   abwechselnd hin und zurück. Alle geschlossenen Formen einer Ebene werden zusammen
  *   gefüllt (gerade/ungerade-Regel) -> Löcher in Buchstaben bleiben frei.
  * - "Linie": jede Kontur wird abgefahren, kleine/innere Konturen zuerst (Teile fallen
- *   sonst heraus, bevor ihre Löcher geschnitten sind).
+ *   sonst heraus, bevor ihre Löcher geschnitten sind). Mit "Reihenfolge optimieren" in der
+ *   Reihenfolge mit den kürzesten Leerfahrten (Innenleben weiter zuerst, siehe cutOrder.ts).
  * - Bilder (Bildgravur): Zeile für Zeile, abwechselnd hin und zurück, vor allen Konturen der Ebene
  *   (siehe raster/imageShape.ts). Gerastert = Laser an/aus, Graustufen = Leistung folgt der Helligkeit.
  * - Leistung: S = Leistung% × S-Max ($30). M4 = dynamische Leistung (empfohlen),
@@ -17,6 +18,7 @@ import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
+import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
 import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
@@ -134,6 +136,21 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
           return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)) };
         }).sort((a, b) => a.area - b.area)
       ];
+      // kürzeste Leerfahrten (Löcher bleiben vor ihrem Teil, siehe cutOrder.ts)
+      if (laserSettings.optimizeOrder && paths.length > 1) {
+        const items: CutItem[] = paths.map(p => {
+          if (p.runs) return { entry: p.lead || p.runs[0][0], exit: lastOf(p.runs[p.runs.length - 1]), pts: p.pts, closed: true };
+          if (!p.closed) return { entry: p.pts[0], exit: lastOf(p.pts), pts: p.pts, closed: false, reversible: true };
+          if (p.lead) return { entry: p.lead, exit: p.pts[0], pts: p.pts, closed: true };
+          return { entry: p.pts[0], exit: p.pts[0], pts: p.pts, closed: true, freeStart: true };
+        });
+        const from = pos || { x: 0, y: 0 };
+        const steps = optimizeCutOrder(items, from);
+        const before = travelLength(items, items.map((_, i) => ({ index: i, reversed: false, start: 0 })), from);
+        const after = travelLength(items, steps, from);
+        g += `${c("gc.orderOpt", { a: Math.round(before), b: Math.round(after) })}\n`;
+        paths.splice(0, paths.length, ...steps.map(st => ({ ...paths[st.index], pts: orientPts(items[st.index], st) })));
+      }
       if (both) g += `F${n(layer.speed)}\n`; // nach dem Füllen wieder die Linien-Geschwindigkeit
       for (let pass = 0; pass < layer.passes; pass++) {
         if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
@@ -178,6 +195,8 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   g += `M30 ${c("gc.end")}\n`;
   return { gcode: g, warnings };
 }
+
+const lastOf = (pts: Pt[]) => pts[pts.length - 1];
 
 /**
  * Freischnitt (Lead-in) für eine geschlossene Kontur: Start an der schärfsten Ecke, Einstich

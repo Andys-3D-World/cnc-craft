@@ -52,6 +52,7 @@ export interface PlasmaSettings {
   smallHole: number;    // Löcher bis zu diesem Durchmesser: ohne THC und langsamer (0 = aus)
   holeSpeed: number;    // Geschwindigkeit für kleine Löcher in % der Schnittgeschwindigkeit
   avoidCut: boolean;    // Leerfahrten um schon ausgeschnittene Teile herum (gekippte Teile, siehe rapidAvoid.ts)
+  optimizeOrder: boolean; // Reihenfolge mit kürzesten Leerfahrten (siehe cutOrder.ts)
 }
 
 export type ThcMode = "none" | "external" | "grblhal";
@@ -65,7 +66,7 @@ export let activeCut: PlasmaCut | null = null;
 let cuts: PlasmaCut[] = [];
 export const plasmaSettings: PlasmaSettings = {
   safeZ: 10, useZ: true, probe: false, probeOffset: 0, overcut: 1,
-  thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true
+  thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true, optimizeOrder: true
 };
 
 export function initPlasmaCuts() {
@@ -233,6 +234,7 @@ export function setPlasmaSettings(s: Partial<PlasmaSettings>, notify = true) {
   if (s.smallHole !== undefined) plasmaSettings.smallHole = num(s.smallHole, plasmaSettings.smallHole, 0, 500);
   if (s.holeSpeed !== undefined) plasmaSettings.holeSpeed = num(s.holeSpeed, plasmaSettings.holeSpeed, 10, 100);
   if (s.avoidCut !== undefined) plasmaSettings.avoidCut = !!s.avoidCut;
+  if (s.optimizeOrder !== undefined) plasmaSettings.optimizeOrder = !!s.optimizeOrder;
   if (notify) changed();
 }
 

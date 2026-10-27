@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Laser and plasma: optimized cut order (shortest rapids):** new switch *Optimize cut order* in the laser and
+  plasma settings (on by default). Until now the contours of a layer / cut were cut open lines first, then from small
+  to large, so the head often jumped back and forth across the sheet. CNC Craft now picks the order with the shortest
+  rapid moves: nearest neighbour first, then improved with 2-opt (with a time limit, so jobs with thousands of parts
+  stay fast). Holes – and everything else that lies inside a closed contour, also a part inside the hole of a frame –
+  are still always cut before that contour, the layer and cut order you set stays, and plasma pierce points and
+  lead-ins are not moved. On the laser, open lines may be driven in the cheaper direction and closed contours without
+  lead-in or tabs start at the point that is closest to the previous and the next contour. The G-code shows the rapid
+  length before and after as a comment. Rapid detours around cut parts still work on top of the new order.
 - **Milling: slow down in curves and inside corners (adaptive feed rate):** new switch *Slow down in curves* with a
   *Minimum feed (%)* in *Milling parameters* (on by default, minimum 50 %). In tight curves and inside corners the
   cutter wraps around more material, which made it chatter or break at the full feed. CNC Craft now measures how

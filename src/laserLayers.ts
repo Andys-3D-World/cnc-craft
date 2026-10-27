@@ -41,6 +41,7 @@ export interface LaserSettings {
   sMax: number;       // S-Wert für 100 % (GRBL: $30, meist 1000)
   dynamic: boolean;   // M4 = Leistung passt sich der Geschwindigkeit an (empfohlen)
   avoidCut: boolean;  // Leerfahrten um schon ausgeschnittene Teile herum (siehe rapidAvoid.ts)
+  optimizeOrder: boolean; // Linien-Reihenfolge mit kürzesten Leerfahrten (siehe cutOrder.ts)
 }
 
 export const LAYERS_CHANGED = "cnc-laser-layers-changed";
@@ -56,7 +57,7 @@ export const LAYER_COLORS = [
 
 export let activeLayer: LaserLayer | null = null;
 let layers: LaserLayer[] = [];
-export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false };
+export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false, optimizeOrder: true };
 
 // ---------------------------------------------------------------------
 // Laden / Speichern
@@ -87,6 +88,7 @@ export function initLaserLayers() {
       if (Number.isFinite(+s.sMax) && +s.sMax > 0) laserSettings.sMax = +s.sMax;
       if (typeof s.dynamic === "boolean") laserSettings.dynamic = s.dynamic;
       if (typeof s.avoidCut === "boolean") laserSettings.avoidCut = s.avoidCut;
+      if (typeof s.optimizeOrder === "boolean") laserSettings.optimizeOrder = s.optimizeOrder;
     }
   } catch { /* Standardwerte */ }
 }
@@ -251,7 +253,7 @@ export function importLaserLibrary(data: any, replace: boolean): number {
   noteRemoved("laser", before.filter(id => !seen.has(id)));
   noteOrder("laser");
   activeLayer = layers.find(l => l.id === data?.active) || layers[0];
-  if (data?.settings && typeof data.settings === "object") setLaserSettings({ sMax: data.settings.sMax, dynamic: data.settings.dynamic, avoidCut: data.settings.avoidCut });
+  if (data?.settings && typeof data.settings === "object") setLaserSettings({ sMax: data.settings.sMax, dynamic: data.settings.dynamic, avoidCut: data.settings.avoidCut, optimizeOrder: data.settings.optimizeOrder });
   changed();
   return layers.length;
 }
@@ -260,6 +262,7 @@ export function setLaserSettings(s: Partial<LaserSettings>) {
   if (s.sMax !== undefined && Number.isFinite(+s.sMax) && +s.sMax > 0) laserSettings.sMax = Math.round(+s.sMax);
   if (s.dynamic !== undefined) laserSettings.dynamic = !!s.dynamic;
   if (s.avoidCut !== undefined) laserSettings.avoidCut = !!s.avoidCut;
+  if (s.optimizeOrder !== undefined) laserSettings.optimizeOrder = !!s.optimizeOrder;
   save();
   window.dispatchEvent(new CustomEvent(LAYERS_CHANGED));
 }
