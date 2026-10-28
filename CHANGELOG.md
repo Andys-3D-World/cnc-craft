@@ -73,6 +73,9 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **Surface the spoilboard drove past the bed:** the passes ran a cutter radius + 1 mm beyond the bed on both
+  sides (with a 30 mm cutter 16 mm past the limit switches). Now the cutter centre stays on the bed – the radius
+  still reaches the edge.
 - **Plasma height probing stopped too early (only down to Z −60):** probing now moves relative to the current
   height with the new setting *Probe distance* (default 100 mm, counted from the safe height), so it also finds
   the sheet when work Z0 is far above it.

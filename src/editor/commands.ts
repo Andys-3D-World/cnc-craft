@@ -163,7 +163,7 @@ export const commands: Record<string, () => void> = {
   // Opferplatte planen: ganzes Bett, eine Seite (Nullpunkt links unten, Z auf der Opferplatte)
   surface: () => {
     if (getMachineMode() !== "mill") { log(t("face.spoil.millOnly")); return; }
-    const b = bedSizeMm(); openFacingDialog({ x0: 0, y0: 0, w: b.w, h: b.h, thick: 0, height: 0, spoil: true }, log); },
+    const b = bedSizeMm(); openFacingDialog({ x0: 0, y0: 0, w: b.w, h: b.h, thick: 0, height: 0, spoil: true, bed: b }, log); },
   shapeLib: () => openShapeLibrary(log),
   nameGen: () => openNameGenerator(log, () => { done(); checkpoint(); }),
   materialTest: () => openMaterialTestDialog(log, () => { done(); checkpoint(); }),

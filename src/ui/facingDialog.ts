@@ -23,6 +23,7 @@ export interface FacingStart {
   thick: number;      // Materialdicke vorher (mm), 0 = unbekannt
   height: number;     // Höhe des Modells (mm), 0 = unbekannt
   spoil?: boolean;    // Opferplatte planen (eine Seite, ganzes Bett) statt Rohteil beidseitig
+  bed?: { w: number; h: number }; // Bettgröße: Fräsermitte bleibt darin (Nullpunkt links unten)
 }
 
 /** Werkzeug-Vorschlag: Planfräser, sonst der größte Schaft-/Torusfräser */
@@ -114,6 +115,7 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
     return {
       x0: o.x0, y0: o.y0, w: o.w, h: o.h, depth: o.depth, stepZ: o.stepZ || o.depth, toolD: cutDiameter(tl),
       stepOver: o.over / 100, feed: tl.feedrate || 800, plunge: tl.plungeFeed ?? DEFAULT_PLUNGE, safeZ: SAFE_Z, dir: o.dir,
+      bounds: start.bed ? { x0: 0, y0: 0, x1: start.bed.w, y1: start.bed.h } : undefined,
     };
   };
   const refresh = () => {

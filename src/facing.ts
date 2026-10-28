@@ -9,6 +9,8 @@
  * Bahn: Zickzack-Zeilen über die ganze Fläche, in mehreren Tiefen. Jede Tiefe beginnt NEBEN dem Rohteil
  * (Fräsermitte einen Radius + 1 mm außerhalb) – dort taucht der Fräser ins Leere ein, ohne Rampe.
  * Die Zeilen laufen über den Rand hinaus, damit auch die Kanten ganz geplant sind.
+ * Mit `bounds` (Opferplatte: das Bett) bleibt die Fräsermitte innerhalb dieser Grenzen – sonst führe sie über
+ * die Endschalter hinaus. Der Radius ragt dann trotzdem bis an den Rand (bei Ø 30 mm also 15 mm weiter).
  * Keine Abhängigkeiten (läuft auch in den Tests mit `npm test`).
  */
 
@@ -22,6 +24,7 @@ export interface FacingParams {
   feed: number; plunge: number;
   safeZ: number;
   dir: "x" | "y";           // Zeilen entlang X oder Y
+  bounds?: { x0: number; y0: number; x1: number; y1: number }; // Fräsermitte bleibt hier drin (Bett)
 }
 
 export interface FacingResult { lines: string[]; passes: number; rows: number; length: number }
@@ -36,11 +39,15 @@ export function facingPath(p: FacingParams): FacingResult {
   const step = p.toolD * Math.min(0.9, Math.max(0.1, p.stepOver));
   // entlang "dir" laufen die Zeilen, quer dazu wird zugestellt
   const along = p.dir === "x" ? p.w : p.h, across = p.dir === "x" ? p.h : p.w;
-  const a0 = (p.dir === "x" ? p.x0 : p.y0) - r - 1, a1 = (p.dir === "x" ? p.x0 : p.y0) + along + r + 1;
-  const c0 = p.dir === "x" ? p.y0 : p.x0;
+  const B = p.bounds, bx = p.dir === "x";
+  const aLo = B ? (bx ? B.x0 : B.y0) : -Infinity, aHi = B ? (bx ? B.x1 : B.y1) : Infinity;
+  const cLo = B ? (bx ? B.y0 : B.x0) : -Infinity, cHi = B ? (bx ? B.y1 : B.x1) : Infinity;
+  const a0 = Math.max(aLo, (bx ? p.x0 : p.y0) - r - 1), a1 = Math.min(aHi, (bx ? p.x0 : p.y0) + along + r + 1);
+  const c0 = Math.max(cLo, bx ? p.y0 : p.x0), c1 = Math.min(cHi, (bx ? p.y0 : p.x0) + across);
+  if (!(a1 > a0 && c1 >= c0)) return empty;
   // Zeilen gleichmäßig von Kante zu Kante (Fräsermitte genau auf beiden Kanten)
-  const rows = Math.max(1, Math.ceil(across / step)) + 1;
-  const dc = across / (rows - 1);
+  const rows = c1 - c0 < 1e-9 ? 1 : Math.max(1, Math.ceil((c1 - c0) / step)) + 1;
+  const dc = rows > 1 ? (c1 - c0) / (rows - 1) : 0;
   const passes = Math.max(1, Math.ceil(p.depth / p.stepZ - 1e-9));
   const pt = (a: number, c: number) => (p.dir === "x" ? `X${f3(a)} Y${f3(c)}` : `X${f3(c)} Y${f3(a)}`);
   const L: string[] = [];

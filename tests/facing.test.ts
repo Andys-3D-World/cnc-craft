@@ -47,3 +47,18 @@ test("Zeilen entlang Y und unsinnige Werte", () => {
   assert.equal(facingPath({ ...base, w: 0 }).lines.length, 0);
   assert.equal(r.lines[r.lines.length - 1], "G0 Z5");
 });
+
+test("Opferplatte: Fräsermitte bleibt im Bett (nicht über die Endschalter)", () => {
+  const bed = { ...base, w: 400, h: 300, toolD: 30, bounds: { x0: 0, y0: 0, x1: 400, y1: 300 } };
+  for (const dir of ["x", "y"] as const) {
+    const r = facingPath({ ...bed, dir });
+    const xs = r.lines.filter(l => l.includes("X")).map(l => num(l, "X")!);
+    const ys = r.lines.filter(l => l.includes("Y")).map(l => num(l, "Y")!);
+    assert.equal(Math.min(...xs), 0); assert.equal(Math.max(...xs), 400);
+    assert.equal(Math.min(...ys), 0); assert.equal(Math.max(...ys), 300);
+  }
+  // kleinere Fläche mitten im Bett: darf wie bisher über den Rand der Fläche hinaus
+  const r = facingPath({ ...bed, x0: 100, w: 100 });
+  const xs = r.lines.filter(l => l.includes("X")).map(l => num(l, "X")!);
+  assert.equal(Math.min(...xs), 84); assert.equal(Math.max(...xs), 216);
+});
