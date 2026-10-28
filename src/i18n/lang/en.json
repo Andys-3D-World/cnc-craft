@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Before each pierce the torch moves down to the plate (G38.2, needs a probe/ohmic sensing) and resets Z there",
   "plasma.probeOffset": "Switch offset (mm)",
   "plasma.probeOffsetTip": "How many mm above the plate the switch triggers (0 for ohmic sensing)",
+  "plasma.probeDist": "Probe distance (mm)",
+  "plasma.probeDistTip": "Maximum distance Z moves down while probing – counted from the safe height. If the probe finds no sheet within it, the machine stops with alarm 5.",
   "plasma.overcut": "Overcut (mm)",
   "plasma.overcutTip": "Keep cutting a bit past the start of closed contours so the part is fully released",
   "plasma.hint": "Torch on = M3, off = M5. Delay G4 P in seconds (GRBL). Test values on scrap first.",

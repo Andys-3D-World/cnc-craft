@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Przed każdym przebiciem palnik zjeżdża do blachy (G38.2, potrzebna sonda) i tam ustawia Z",
   "plasma.probeOffset": "Przesunięcie czujnika (mm)",
   "plasma.probeOffsetTip": "Ile mm nad blachą zadziała czujnik (0 przy omowym)",
+  "plasma.probeDist": "Droga pomiaru (mm)",
+  "plasma.probeDistTip": "Maksymalna droga Z w dół podczas pomiaru – liczona od wysokości bezpiecznej. Jeśli sonda nie znajdzie blachy, maszyna zatrzyma się z alarmem 5.",
   "plasma.overcut": "Nadcięcie (mm)",
   "plasma.overcutTip": "Ciąć trochę dalej za początkiem konturu, by detal na pewno odpadł",
   "plasma.hint": "Palnik wł. = M3, wył. = M5. Pauza G4 P w sekundach (GRBL). Najpierw testuj na odpadzie.",

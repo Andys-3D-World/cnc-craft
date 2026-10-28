@@ -338,7 +338,9 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
         rapid(start);
         if (S.useZ) {
           if (S.probe) {
-            g += `G38.2 Z${n(-(S.safeZ + 50))} F${PROBE_FEED} ${c("pgc.probe")}\n`;
+            // relativ ab der aktuellen Höhe – ein fester Zielwert reicht nicht, wenn Z0 weit über dem Blech liegt
+            g += `G91 G38.2 Z${n(-S.probeDist)} F${PROBE_FEED} ${c("pgc.probe")}\n`;
+            g += `G90\n`;
             g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
           }
           g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;

@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Vor jedem Einstich fährt der Brenner bis zum Blech (G38.2, Taster/Ohmsche Abtastung nötig) und setzt dort Z neu",
   "plasma.probeOffset": "Schalter-Versatz (mm)",
   "plasma.probeOffsetTip": "So viele mm über dem Blech löst der Taster aus (bei ohmscher Abtastung 0)",
+  "plasma.probeDist": "Antast-Weg (mm)",
+  "plasma.probeDistTip": "So weit fährt Z beim Abtasten höchstens nach unten – gezählt ab der Sicherheitshöhe. Findet der Taster bis dahin kein Blech, stoppt die Maschine mit Alarm 5.",
   "plasma.overcut": "Überlauf (mm)",
   "plasma.overcutTip": "Am Ende geschlossener Konturen ein Stück weiterschneiden, damit das Teil sicher ganz frei ist",
   "plasma.hint": "Brenner an = M3, aus = M5. Wartezeit G4 P in Sekunden (GRBL). Werte zuerst an einem Reststück testen.",

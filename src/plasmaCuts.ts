@@ -39,6 +39,7 @@ export interface PlasmaSettings {
   useZ: boolean;        // Z-Achse fahren (aus = fester Brenner oder Höhenregelung übernimmt)
   probe: boolean;       // vor jedem Einstich Blechhöhe abtasten (G38.2)
   probeOffset: number;  // Schalter-Versatz: so viel mm über dem Blech löst der Taster aus
+  probeDist: number;    // so weit (mm) darf Z beim Abtasten höchstens nach unten fahren – ab der Sicherheitshöhe
   overcut: number;      // Überlauf am Ende geschlossener Konturen in mm
   /**
    * Höhenregelung (THC):
@@ -65,7 +66,7 @@ const KEY_SETTINGS = "cnc_craft_plasma_settings";
 export let activeCut: PlasmaCut | null = null;
 let cuts: PlasmaCut[] = [];
 export const plasmaSettings: PlasmaSettings = {
-  safeZ: 10, useZ: true, probe: false, probeOffset: 0, overcut: 1,
+  safeZ: 10, useZ: true, probe: false, probeOffset: 0, probeDist: 100, overcut: 1,
   thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true, optimizeOrder: true
 };
 
@@ -227,6 +228,7 @@ export function setPlasmaSettings(s: Partial<PlasmaSettings>, notify = true) {
   if (s.useZ !== undefined) plasmaSettings.useZ = !!s.useZ;
   if (s.probe !== undefined) plasmaSettings.probe = !!s.probe;
   if (s.probeOffset !== undefined) plasmaSettings.probeOffset = num(s.probeOffset, plasmaSettings.probeOffset, -20, 20);
+  if (s.probeDist !== undefined) plasmaSettings.probeDist = num(s.probeDist, plasmaSettings.probeDist, 5, 500);
   if (s.overcut !== undefined) plasmaSettings.overcut = num(s.overcut, plasmaSettings.overcut, 0, 20);
   if (s.thc !== undefined) plasmaSettings.thc = (["none", "external", "grblhal"] as const).includes(s.thc as ThcMode) ? s.thc as ThcMode : plasmaSettings.thc;
   if (s.thcOut !== undefined) plasmaSettings.thcOut = s.thcOut === "M7" ? "M7" : "M8";

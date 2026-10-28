@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Vóór elke doorsteek zakt de toorts tot op de plaat (G38.2, taster nodig) en zet daar Z opnieuw",
   "plasma.probeOffset": "Schakelaarverschil (mm)",
   "plasma.probeOffsetTip": "Op hoeveel mm boven de plaat de schakelaar schakelt (0 bij ohmisch)",
+  "plasma.probeDist": "Tastweg (mm)",
+  "plasma.probeDistTip": "Zo ver gaat Z bij het tasten maximaal omlaag – gerekend vanaf de veilige hoogte. Vindt de taster geen plaat, dan stopt de machine met alarm 5.",
   "plasma.overcut": "Overloop (mm)",
   "plasma.overcutTip": "Iets voorbij het begin doorsnijden zodat het deel echt los is",
   "plasma.hint": "Toorts aan = M3, uit = M5. Wachttijd G4 P in seconden (GRBL). Test eerst op een restje.",

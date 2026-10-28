@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Antes de cada perforación la antorcha baja hasta la chapa (G38.2, requiere palpador) y fija Z allí",
   "plasma.probeOffset": "Desfase del interruptor (mm)",
   "plasma.probeOffsetTip": "A cuántos mm sobre la chapa se activa el interruptor (0 si es óhmico)",
+  "plasma.probeDist": "Recorrido de palpado (mm)",
+  "plasma.probeDistTip": "Distancia máxima que baja Z al palpar – contada desde la altura de seguridad. Si la sonda no encuentra la chapa, la máquina se detiene con la alarma 5.",
   "plasma.overcut": "Sobrecorte (mm)",
   "plasma.overcutTip": "Seguir cortando un poco tras cerrar el contorno para liberar bien la pieza",
   "plasma.hint": "Antorcha encendida = M3, apagada = M5. Pausa G4 P en segundos (GRBL). Prueba primero en un retal.",

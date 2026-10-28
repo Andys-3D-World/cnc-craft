@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Avant chaque perçage la torche descend jusqu'à la tôle (G38.2, palpeur requis) et y remet Z à jour",
   "plasma.probeOffset": "Décalage du contact (mm)",
   "plasma.probeOffsetTip": "À combien de mm au-dessus de la tôle le contact se déclenche (0 en ohmique)",
+  "plasma.probeDist": "Course de palpage (mm)",
+  "plasma.probeDistTip": "Distance maximale de descente de Z pendant le palpage – comptée depuis la hauteur de sécurité. Sans contact avec la tôle, la machine s'arrête avec l'alarme 5.",
   "plasma.overcut": "Surcoupe (mm)",
   "plasma.overcutTip": "Continuer un peu après le départ des contours fermés pour bien libérer la pièce",
   "plasma.hint": "Torche allumée = M3, éteinte = M5. Pause G4 P en secondes (GRBL). Testez d'abord sur une chute.",

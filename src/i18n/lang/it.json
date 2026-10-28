@@ -1064,6 +1064,8 @@
   "plasma.probeTip": "Prima di ogni sfondamento la torcia scende fino alla lamiera (G38.2, serve un tastatore) e reimposta Z",
   "plasma.probeOffset": "Offset interruttore (mm)",
   "plasma.probeOffsetTip": "A quanti mm sopra la lamiera scatta l'interruttore (0 se ohmico)",
+  "plasma.probeDist": "Corsa di tastatura (mm)",
+  "plasma.probeDistTip": "Distanza massima che Z scende durante la tastatura – contata dall'altezza di sicurezza. Se la sonda non trova la lamiera, la macchina si ferma con l'allarme 5.",
   "plasma.overcut": "Sovrataglio (mm)",
   "plasma.overcutTip": "Continuare un po' oltre la chiusura del contorno per liberare bene il pezzo",
   "plasma.hint": "Torcia accesa = M3, spenta = M5. Pausa G4 P in secondi (GRBL). Prova prima su uno scarto.",

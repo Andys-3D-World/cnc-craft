@@ -48,6 +48,7 @@ export function plasmaSettingsHtml(): string {
         <div class="prop-row">${T("plasma.safeZ")}<input type="number" id="plasma-safez" min="0" step="1" class="prop-input"></div>
         <label class="prop-row" style="cursor:pointer;" ${tip("plasma.probeTip")}><span>${T("plasma.probe")}</span><input type="checkbox" id="plasma-probe" style="width:auto;"></label>
         <div class="prop-row" ${tip("plasma.probeOffsetTip")}>${T("plasma.probeOffset")}<input type="number" id="plasma-probe-offset" step="0.1" class="prop-input"></div>
+        <div class="prop-row" ${tip("plasma.probeDistTip")}>${T("plasma.probeDist")}<input type="number" id="plasma-probe-dist" min="5" max="500" step="5" class="prop-input"></div>
         <div class="prop-row" ${tip("plasma.overcutTip")}>${T("plasma.overcut")}<input type="number" id="plasma-overcut" min="0" step="0.5" class="prop-input"></div>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.avoidCutTip")}><span>${T("cam.avoidCut")}</span><input type="checkbox" id="plasma-avoid" style="width:auto;"></label>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.optOrderTip")}><span>${T("cam.optOrder")}</span><input type="checkbox" id="plasma-order" style="width:auto;"></label>
@@ -127,7 +128,7 @@ export function initPlasmaPanel(redraw: () => void) {
   });
 
   // ---- Einstellungen ----
-  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "overcut" | "antiDive" | "smallHole" | "holeSpeed") => {
+  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "probeDist" | "overcut" | "antiDive" | "smallHole" | "holeSpeed") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.value = String(plasmaSettings[key]);
@@ -141,13 +142,14 @@ export function initPlasmaPanel(redraw: () => void) {
   };
   const syncEnabled = () => {
     const z = plasmaSettings.useZ;
-    ["plasma-safez", "plasma-probe", "plasma-probe-offset"].forEach(id => {
+    ["plasma-safez", "plasma-probe", "plasma-probe-offset", "plasma-probe-dist"].forEach(id => {
       const el = document.getElementById(id) as HTMLInputElement | null;
-      if (el) el.disabled = !z || (id === "plasma-probe-offset" && !plasmaSettings.probe);
+      if (el) el.disabled = !z || ((id === "plasma-probe-offset" || id === "plasma-probe-dist") && !plasmaSettings.probe);
     });
   };
   bindNum("plasma-safez", "safeZ");
   bindNum("plasma-probe-offset", "probeOffset");
+  bindNum("plasma-probe-dist", "probeDist");
   bindNum("plasma-overcut", "overcut");
   bindCheck("plasma-usez", "useZ");
   bindCheck("plasma-probe", "probe");
@@ -170,7 +172,7 @@ export function initPlasmaPanel(redraw: () => void) {
 
   // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
   const syncFields = () => {
-    const nums: [string, keyof typeof plasmaSettings][] = [["plasma-safez", "safeZ"], ["plasma-probe-offset", "probeOffset"], ["plasma-overcut", "overcut"],
+    const nums: [string, keyof typeof plasmaSettings][] = [["plasma-safez", "safeZ"], ["plasma-probe-offset", "probeOffset"], ["plasma-probe-dist", "probeDist"], ["plasma-overcut", "overcut"],
       ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
     for (const [id, key] of nums) {
       const el = document.getElementById(id) as HTMLInputElement | null;

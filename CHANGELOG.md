@@ -73,6 +73,11 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **Plasma height probing stopped too early (only down to Z −60):** probing now moves relative to the current
+  height with the new setting *Probe distance* (default 100 mm, counted from the safe height), so it also finds
+  the sheet when work Z0 is far above it.
+- **Dozens of “Error 9” lines after an alarm:** the board rejects every job line still in its receive buffer;
+  these identical messages are now collapsed into one line (“… ×38”).
 - **grblHAL alarms 11–18 were shown as “unknown alarm”:** they now have their own texts in all languages – e.g.
   alarm 15 (dual-axis homing with auto-squaring could not find the second limit switch). Only used with grblHAL,
   since FluidNC numbers these alarms differently.

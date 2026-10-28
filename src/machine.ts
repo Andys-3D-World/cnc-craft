@@ -354,6 +354,27 @@ function resolveAck(id: number | null | undefined, a: Ack) {
   else { early.set(id, a); if (early.size > 200) early.delete(early.keys().next().value as number); }
 }
 
+/**
+ * Fehler ins Protokoll. Antworten ohne gesendete Zeile (id null) kommen nach einem Alarm oft dutzendfach: das Board
+ * hatte schon viele Job-Zeilen im Empfangspuffer und lehnt jede mit „Fehler 9“ ab. Gleiche solche Fehler kurz
+ * hintereinander werden zu einer Zeile „… ×N“ zusammengefasst.
+ */
+let strayErr: { code: number; count: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
+const errLine = (code: number, n: number) => t("m.error", { code, text: errorText(code) }) + (n > 1 ? ` ×${n}` : "");
+function flushStray() {
+  if (!strayErr) return;
+  if (strayErr.timer) clearTimeout(strayErr.timer);
+  log(errLine(strayErr.code, strayErr.count));
+  strayErr = null;
+}
+function logError(code: number, stray: boolean) {
+  if (!stray) { log(errLine(code, 1)); return; }
+  if (strayErr && strayErr.code === code) strayErr.count++;
+  else { flushStray(); strayErr = { code, count: 1, timer: null }; }
+  if (strayErr.timer) clearTimeout(strayErr.timer);
+  strayErr.timer = setTimeout(flushStray, 400);
+}
+
 /** Text zu einem GRBL-Fehlercode */
 export function errorText(code: number): string {
   const k = `grbl.err.${code}`;
@@ -455,7 +476,7 @@ export async function initMachine(logFn: (s: string) => void) {
         break;
       case "error":
         resolveAck(p.id, { ok: false, code: p.code });
-        log(t("m.error", { code: p.code, text: errorText(p.code) }));
+        logError(p.code, p.id == null);
         break;
       case "timeout":
         // Antwort verloren gegangen – der Befehl kam evtl. trotzdem an
