@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Sicherheit] Bitte zuerst eine Referenzfahrt (HOME) ausführen!",
   "jog.blockedAxis": "[CRASH-SCHUTZ] Blockiert! {axis}-Ziel ({v} mm) liegt außerhalb des Arbeitsraums!",
   "jog.blockedZ": "[CRASH-SCHUTZ] Blockiert! Z-Sicherheitsbereich überschritten!",
+  "jog.toEdge": "[Schutz] {axis} nur bis zum Bettrand gefahren (Bett {b} mm, Nullpunkt links unten). Bettgröße stimmt nicht? Oben ändern.",
+  "jog.atEdge": "[Schutz] {axis} steht am Bettrand (Bett {b} mm) – weiter geht es nicht. Bettgröße stimmt nicht? Oben ändern.",
   "stream.dlgTitle": "G-Code laden",
   "stream.dlgFilter": "G-Code-Dateien",
   "stream.reading": "[System] Lese G-Code-Datei ein...",

@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Sécurité] Veuillez d'abord faire la prise d'origine (HOME) !",
   "jog.blockedAxis": "[ANTI-COLLISION] Bloqué ! La cible {axis} ({v} mm) est hors de la zone de travail !",
   "jog.blockedZ": "[ANTI-COLLISION] Bloqué ! Zone de sécurité Z dépassée !",
+  "jog.toEdge": "[Sécurité] {axis} déplacé seulement jusqu'au bord du plateau (plateau {b} mm, origine en bas à gauche). Mauvaise taille ? Modifiez-la en haut.",
+  "jog.atEdge": "[Sécurité] {axis} est au bord du plateau ({b} mm) – impossible d'aller plus loin. Mauvaise taille ? Modifiez-la en haut.",
   "stream.dlgTitle": "Charger un G-code",
   "stream.dlgFilter": "Fichiers G-code",
   "stream.reading": "[Système] Lecture du fichier G-code...",

@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Safety] Please run homing (HOME) first!",
   "jog.blockedAxis": "[CRASH PROTECTION] Blocked! {axis} target ({v} mm) is outside the work area!",
   "jog.blockedZ": "[CRASH PROTECTION] Blocked! Z safety range exceeded!",
+  "jog.toEdge": "[Safety] {axis} only moved up to the bed edge (bed {b} mm, origin bottom left). Wrong bed size? Change it at the top.",
+  "jog.atEdge": "[Safety] {axis} is at the bed edge (bed {b} mm) – it cannot go further. Wrong bed size? Change it at the top.",
   "stream.dlgTitle": "Load G-code",
   "stream.dlgFilter": "G-code files",
   "stream.reading": "[System] Reading G-code file...",

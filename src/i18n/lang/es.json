@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Seguridad] ¡Primero haz la búsqueda de origen (HOME)!",
   "jog.blockedAxis": "[ANTICOLISIÓN] ¡Bloqueado! El destino {axis} ({v} mm) está fuera del área de trabajo.",
   "jog.blockedZ": "[ANTICOLISIÓN] ¡Bloqueado! Se ha superado el rango de seguridad de Z.",
+  "jog.toEdge": "[Seguridad] {axis} solo se movió hasta el borde de la mesa (mesa {b} mm, origen abajo a la izquierda). ¿Tamaño incorrecto? Cámbialo arriba.",
+  "jog.atEdge": "[Seguridad] {axis} está en el borde de la mesa ({b} mm) – no puede ir más allá. ¿Tamaño incorrecto? Cámbialo arriba.",
   "stream.dlgTitle": "Cargar G-code",
   "stream.dlgFilter": "Archivos G-code",
   "stream.reading": "[Sistema] Leyendo archivo G-code...",

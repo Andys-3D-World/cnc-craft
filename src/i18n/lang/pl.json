@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Bezpieczeństwo] Najpierw wykonaj bazowanie (HOME)!",
   "jog.blockedAxis": "[OCHRONA PRZED KOLIZJĄ] Zablokowano! Cel {axis} ({v} mm) leży poza obszarem roboczym!",
   "jog.blockedZ": "[OCHRONA PRZED KOLIZJĄ] Zablokowano! Przekroczono bezpieczny zakres Z!",
+  "jog.toEdge": "[Ochrona] {axis} przesunięto tylko do krawędzi stołu (stół {b} mm, zero w lewym dolnym rogu). Zły rozmiar stołu? Zmień go u góry.",
+  "jog.atEdge": "[Ochrona] {axis} jest na krawędzi stołu ({b} mm) – dalej nie można. Zły rozmiar stołu? Zmień go u góry.",
   "stream.dlgTitle": "Wczytaj G-code",
   "stream.dlgFilter": "Pliki G-code",
   "stream.reading": "[System] Wczytywanie pliku G-code...",

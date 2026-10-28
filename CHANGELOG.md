@@ -73,6 +73,9 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **Manual jogging could drive past the bed:** a 100 mm step at X 150 on a 205 mm bed went to 300 mm – into the
+  limit switch or the frame. Jog steps in X/Y are now shortened to the bed edge (bed size from the top bar, origin
+  bottom left); an axis already outside the bed may only move back towards it.
 - **Surface the spoilboard drove past the bed:** the passes ran a cutter radius + 1 mm beyond the bed on both
   sides (with a 30 mm cutter 16 mm past the limit switches). Now the cutter centre stays on the bed – the radius
   still reaches the edge.

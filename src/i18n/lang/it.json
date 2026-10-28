@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Sicurezza] Esegui prima l'azzeramento (HOME)!",
   "jog.blockedAxis": "[ANTICOLLISIONE] Bloccato! La destinazione {axis} ({v} mm) è fuori dall'area di lavoro!",
   "jog.blockedZ": "[ANTICOLLISIONE] Bloccato! Superata la zona di sicurezza Z!",
+  "jog.toEdge": "[Sicurezza] {axis} spostato solo fino al bordo del piano (piano {b} mm, origine in basso a sinistra). Dimensione errata? Cambiala in alto.",
+  "jog.atEdge": "[Sicurezza] {axis} è al bordo del piano ({b} mm) – non può andare oltre. Dimensione errata? Cambiala in alto.",
   "stream.dlgTitle": "Carica G-code",
   "stream.dlgFilter": "File G-code",
   "stream.reading": "[Sistema] Lettura del file G-code...",

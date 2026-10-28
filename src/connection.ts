@@ -15,6 +15,8 @@
 import { state } from "./main";
 import { liveMachinePos } from "./render";
 import { handleJogClick } from "./jogSimulator";
+import { clampJog } from "./jogLimit";
+import { bedSizeMm } from "./editor/editorState";
 import { t } from "./i18n/i18n";
 import {
   machine, MACHINE_EVENT, RT, listPorts, connect, connectMarlin, connectRuida, connectK40, k40Count, disconnect, send, sendAndWait, realtime,
@@ -605,6 +607,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
     return v > 0 ? v : activeStep;
   };
   const feed = () => (feedSlider ? parseInt(feedSlider.value, 10) : 1000);
+  let jogEnd: number[] | null = null; // Ziel des zuletzt geschickten Schritts
 
   document.querySelectorAll<HTMLElement>(".btn-jog[data-cmd]").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -618,8 +621,17 @@ export function initConnection(appendToConsole: (text: string) => void) {
       if (st === "Alarm") { appendToConsole(t("m.unlockFirst")); return; }
       if (st !== "Idle" && st !== "Jog") { appendToConsole(t("m.jogNotIdle", { s: st })); return; }
       const d = distance();
-      const axes = (btn.dataset.cmd || "").split(" ").map(p => `${p[0]}${(parseInt(p.slice(1), 10) * d).toFixed(3)}`);
-      try { await send(`$J=G21 G91 ${axes.join(" ")} F${feed()}`); } catch (e) { appendToConsole(`${t("log.error")} ${e}`); }
+      const want = [0, 0, 0];
+      for (const p of (btn.dataset.cmd || "").split(" ")) { const i = "XYZ".indexOf(p[0]); if (i >= 0) want[i] = parseInt(p.slice(1), 10) * d; }
+      // nicht über das Bett hinaus (jogLimit.ts); läuft noch ein Schritt, zählt dessen Ziel statt der gemeldeten Position
+      const from = st === "Jog" && jogEnd ? jogEnd : machine.status.wpos.slice(0, 3);
+      const bed = bedSizeMm();
+      const { delta, clamped } = clampJog(from, want, bed);
+      for (const i of clamped) appendToConsole(t(delta[i] ? "jog.toEdge" : "jog.atEdge", { axis: "XYZ"[i], b: i ? bed.h : bed.w }));
+      const axes = delta.map((v, i) => (v ? `${"XYZ"[i]}${v.toFixed(3)}` : "")).filter(Boolean);
+      if (!axes.length) return;
+      jogEnd = from.map((v, i) => v + delta[i]);
+      try { await send(`$J=G21 G91 ${axes.join(" ")} F${feed()}`); } catch (e) { jogEnd = null; appendToConsole(`${t("log.error")} ${e}`); }
     });
   });
   // Mitte: Joggen sofort abbrechen

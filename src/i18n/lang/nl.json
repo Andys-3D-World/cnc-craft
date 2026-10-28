@@ -44,6 +44,8 @@
   "jog.homeFirst": "[Veiligheid] Voer eerst een referentierit (HOME) uit!",
   "jog.blockedAxis": "[BOTSINGBEVEILIGING] Geblokkeerd! Doel {axis} ({v} mm) ligt buiten het werkgebied!",
   "jog.blockedZ": "[BOTSINGBEVEILIGING] Geblokkeerd! Z-veiligheidsbereik overschreden!",
+  "jog.toEdge": "[Veiligheid] {axis} alleen tot de rand van het bed verplaatst (bed {b} mm, nulpunt linksonder). Verkeerde bedmaat? Pas die bovenaan aan.",
+  "jog.atEdge": "[Veiligheid] {axis} staat aan de rand van het bed ({b} mm) – verder gaat niet. Verkeerde bedmaat? Pas die bovenaan aan.",
   "stream.dlgTitle": "G-code laden",
   "stream.dlgFilter": "G-code-bestanden",
   "stream.reading": "[Systeem] G-code-bestand inlezen...",
