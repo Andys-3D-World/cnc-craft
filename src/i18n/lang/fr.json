@@ -1133,6 +1133,7 @@
   "stock.skipped": "{n} forme(s) sur la zone utilisée (en rouge) ont été ignorées et ne seront pas découpées.",
   "stock.allSkipped": "[Système] Toutes les formes sont sur la zone utilisée (en rouge) – rien à découper. Déplacez-les avec « Vers un endroit libre » ou choisissez « Nouvelle plaque ».",
   "m.welcome": "[Machine] {fw} {v} détecté.",
+  "m.awakeFail": "[Remarque] Impossible d'empêcher la mise en veille de l'ordinateur – désactivez-la dans les réglages d'énergie, sinon le travail peut s'arrêter en cours.",
   "m.notGrbl": "[Machine] {fw} détecté – choisissez une machine adaptée dans l'assistant machine (ex. Creality, Anycubic ou « Machine Marlin personnalisée ») et reconnectez-vous.",
   "m.error": "[Erreur {code}] {text}",
   "m.board": "Carte",

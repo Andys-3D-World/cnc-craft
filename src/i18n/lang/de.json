@@ -1231,6 +1231,7 @@
   "set.32.n": "Laser-Modus",
   "set.32.d": "EIN für Laser: Der Laser schaltet bei Leerfahrten (G0) aus und die Maschine fährt ohne Anhalten durch. AUS für Fräse und Plasma!",
   "m.welcome": "[Maschine] {fw} {v} erkannt.",
+  "m.awakeFail": "[Hinweis] Der Ruhezustand des Rechners ließ sich nicht abschalten – bitte in den Energie-Einstellungen ausschalten, sonst kann der Job mittendrin abbrechen.",
   "m.notGrbl": "[Maschine] {fw} erkannt – bitte im Maschinen-Assistenten eine passende Maschine wählen (z. B. Creality, Anycubic oder „Eigene Marlin-Maschine“) und neu verbinden.",
   "m.error": "[Fehler {code}] {text}",
   "m.board": "Board",

@@ -222,6 +222,18 @@ let log: (s: string) => void = () => {};
 
 function fire(type: string, data?: any) {
   window.dispatchEvent(new CustomEvent(MACHINE_EVENT, { detail: { type, data } }));
+  syncAwake();
+}
+
+// Rechner nicht in den Ruhezustand, solange auf irgendeiner Maschine ein Job läuft (Rust awake.rs)
+let awake = false;
+function syncAwake() {
+  const busy = (machine.connected && machine.job.active) || [...others.values()].some(o => o.state.connected && o.state.job.active);
+  if (busy === awake) return;
+  awake = busy;
+  invoke<boolean>("keep_awake", { on: busy })
+    .then(ok => { if (busy && !ok) log(t("m.awakeFail")); })
+    .catch(() => { /* im Browser-Test ohne Tauri */ });
 }
 
 // ---------------------------------------------------------------------

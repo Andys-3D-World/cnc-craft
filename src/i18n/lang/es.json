@@ -1133,6 +1133,7 @@
   "stock.skipped": "{n} forma(s) sobre la zona usada (en rojo) se han omitido y no se cortarán.",
   "stock.allSkipped": "[Sistema] Todas las formas están sobre la zona usada (en rojo): nada que cortar. Muévelas con «A un sitio libre» o elige «Plancha nueva».",
   "m.welcome": "[Máquina] {fw} {v} detectado.",
+  "m.awakeFail": "[Aviso] No se pudo evitar que el ordenador entre en reposo – desactívalo en los ajustes de energía, si no el trabajo puede pararse a mitad.",
   "m.notGrbl": "[Máquina] {fw} detectado: elige una máquina adecuada en el asistente (p. ej. Creality, Anycubic o «Máquina Marlin propia») y vuelve a conectar.",
   "m.error": "[Error {code}] {text}",
   "m.board": "Placa",

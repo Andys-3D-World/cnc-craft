@@ -1133,6 +1133,7 @@
   "stock.skipped": "{n} forma/e sull'area usata (in rosso) sono state escluse e non verranno tagliate.",
   "stock.allSkipped": "[Sistema] Tutte le forme sono sull'area usata (in rosso): niente da tagliare. Spostale con «In un punto libero» o scegli «Nuova lastra».",
   "m.welcome": "[Macchina] {fw} {v} rilevato.",
+  "m.awakeFail": "[Nota] Impossibile impedire la sospensione del computer – disattivala nelle impostazioni di risparmio energetico, altrimenti il lavoro può fermarsi a metà.",
   "m.notGrbl": "[Macchina] {fw} rilevato: scegli una macchina adatta nell'assistente (es. Creality, Anycubic o «Macchina Marlin personalizzata») e ricollegati.",
   "m.error": "[Errore {code}] {text}",
   "m.board": "Scheda",

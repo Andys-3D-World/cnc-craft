@@ -23,6 +23,7 @@
 //!   flash-progress, workshop-action
 //! GRBL und Ruida melden dieselben Ereignisse – die Oberfläche muss kaum unterscheiden.
 
+mod awake;
 mod cam3d;
 mod controller;
 mod cycles;
@@ -231,6 +232,12 @@ struct PortJson {
     chip: String,
     product: String,
     manufacturer: String,
+}
+
+/// Ruhezustand verhindern, solange ein Job läuft (awake.rs)
+#[tauri::command]
+fn keep_awake(on: bool) -> bool {
+    awake::set(on)
 }
 
 #[tauri::command]
@@ -799,6 +806,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             list_ports,
+            keep_awake,
             machine_connect,
             marlin_connect,
             k40_count,

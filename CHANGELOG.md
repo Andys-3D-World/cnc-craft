@@ -3,6 +3,9 @@
 ## Next version (unreleased)
 
 **New**
+- **Computer stays awake during a job:** while a job runs on any connected machine, CNC Craft keeps the computer
+  from going to sleep (macOS `caffeinate`, Windows power request, Linux `systemd-inhibit`) – like a video player.
+  The screen may still turn off. Sleep is allowed again as soon as the job ends or stops.
 - **On connect: read bed size and home:** two new ticks under *Connect*. *Read bed size on connect* (on by default)
   takes the X/Y travel from the board ($130/$131) as bed size, so the bed limit for jogging and spoilboard
   surfacing matches the machine. *Home on connect* (off by default) runs homing ($H) right after connecting –

@@ -1133,6 +1133,7 @@
   "stock.skipped": "Pominięto {n} kształt(ów) na zużytym obszarze (czerwone) – nie zostaną wycięte.",
   "stock.allSkipped": "[System] Wszystkie kształty leżą na zużytym obszarze (czerwone) – nie ma czego wycinać. Przesuń je przez „W wolne miejsce” lub wybierz „Nowy arkusz”.",
   "m.welcome": "[Maszyna] Wykryto {fw} {v}.",
+  "m.awakeFail": "[Uwaga] Nie udało się zablokować uśpienia komputera – wyłącz je w ustawieniach zasilania, inaczej zadanie może przerwać się w połowie.",
   "m.notGrbl": "[Maszyna] Wykryto {fw} – wybierz w kreatorze pasującą maszynę (np. Creality, Anycubic lub „Własna maszyna Marlin”) i połącz ponownie.",
   "m.error": "[Błąd {code}] {text}",
   "m.board": "Płyta",

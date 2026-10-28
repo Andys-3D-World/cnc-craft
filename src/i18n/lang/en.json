@@ -1231,6 +1231,7 @@
   "set.32.n": "Laser mode",
   "set.32.d": "ON for lasers: the laser turns off during rapids (G0) and the machine moves without stopping. OFF for routers and plasma!",
   "m.welcome": "[Machine] {fw} {v} detected.",
+  "m.awakeFail": "[Note] Could not stop the computer from going to sleep – please turn sleep off in the power settings, otherwise the job may stop halfway.",
   "m.notGrbl": "[Machine] {fw} detected – please choose a matching machine in the machine wizard (e.g. Creality, Anycubic or “Custom Marlin machine”) and reconnect.",
   "m.error": "[Error {code}] {text}",
   "m.board": "Board",
