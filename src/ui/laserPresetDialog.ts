@@ -8,7 +8,7 @@
  */
 import { t } from "../i18n/i18n";
 import { addLayer, getLayers, moveLayer } from "../laserLayers";
-import { PRESETS, LaserKind, LaserPreset, presetValues, REF_WATT } from "../laserPresets";
+import { PRESETS, LaserKind, LaserPreset, presetValues, REF_WATT, LASER_KINDS, LINE_INTERVAL } from "../laserPresets";
 import { mountOwnPresets } from "./ownPresetSection";
 
 const KEY = "cnc_craft_laser_presets";
@@ -21,7 +21,7 @@ const f2 = (v: number) => String(Math.round(v * 100) / 100);
 function load(): { kind: LaserKind; watt: number } {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "{}");
-    const kind: LaserKind = s.kind === "co2" ? "co2" : "diode";
+    const kind: LaserKind = LASER_KINDS.includes(s.kind) ? s.kind : "diode";
     const watt = Number(s.watt) > 0 ? Number(s.watt) : REF_WATT[kind];
     return { kind, watt };
   } catch { return { kind: "diode", watt: REF_WATT.diode }; }
@@ -47,12 +47,12 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin:6px 0;">
         <label class="dlg-row" style="flex:1;min-width:200px;"><span>${esc(t("llib.pre.kind"))}</span>
           <select id="lpre-kind" class="prop-input" style="width:auto;">
-            <option value="diode"${init.kind === "diode" ? " selected" : ""}>${esc(t("llib.pre.kind.diode"))}</option>
-            <option value="co2"${init.kind === "co2" ? " selected" : ""}>${esc(t("llib.pre.kind.co2"))}</option>
+            ${LASER_KINDS.map(k => `<option value="${k}"${init.kind === k ? " selected" : ""}>${esc(t("llib.pre.kind." + k))}</option>`).join("")}
           </select></label>
         <label class="dlg-row" style="flex:1;min-width:200px;" data-tip="${esc(t("llib.pre.wattTip"))}"><span>${esc(t("llib.pre.watt"))}</span>
           <span class="dlg-num"><input id="lpre-watt" type="number" min="1" step="1" value="${init.watt}"><em>W</em></span></label>
       </div>
+      <div id="lpre-kindnote" class="dlg-hint" style="color:var(--color-warning);"></div>
       <div id="lpre-list" style="max-height:340px;overflow:auto;border:1px solid rgba(255,255,255,0.08);border-radius:8px;"></div>
       <div class="dlg-hint">⚠️ ${esc(t("llib.pre.hint"))}</div>
       <div class="dlg-buttons">
@@ -66,14 +66,18 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
   const added = new Set<string>();
 
   const read = () => {
-    const kind: LaserKind = kindSel.value === "co2" ? "co2" : "diode";
+    const kind: LaserKind = LASER_KINDS.includes(kindSel.value as LaserKind) ? kindSel.value as LaserKind : "diode";
     const w = parseFloat(wattIn.value);
     return { kind, watt: Number.isFinite(w) && w > 0 ? w : REF_WATT[kind] };
   };
 
   const render = () => {
     const { kind, watt } = read();
-    list.innerHTML = PRESETS.map(p => {
+    // Faserlaser: nur Geräte, die CNC Craft über GRBL ansteuert – Hinweis zeigen
+    (ov.querySelector("#lpre-kindnote") as HTMLElement).textContent = kind === "fiber" ? t("llib.pre.fiberNote") : "";
+    // Vorlagen, die zu dieser Laserart passen, zuerst
+    const sorted = [...PRESETS].sort((a, b) => Number(!a[kind]) - Number(!b[kind]));
+    list.innerHTML = sorted.map(p => {
       const v = presetValues(p, kind, watt);
       const vals = v
         ? `${v.power} % · ${v.speed} mm/min${v.passes > 1 ? ` · ${v.passes}×` : ""}`
@@ -106,7 +110,7 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
     const l = addLayer({
       name: presetName(p), mode: engrave ? "fill" : "line",
       power: v.power, speed: v.speed, fillPower: v.power, fillSpeed: v.speed, passes: v.passes,
-      interval: kind === "diode" ? 0.08 : 0.1, angle: 0, air: !engrave, leadIn: 0,
+      interval: LINE_INTERVAL[kind], angle: 0, air: !engrave, leadIn: 0,
       material: t("llib.mat." + p.mat), thickness: p.thick,
       notes: t("llib.pre.layerNote", { kind: t("llib.pre.kind." + kind), w: f2(watt) })
     });
@@ -124,7 +128,7 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
   });
   kindSel.addEventListener("change", () => {
     // beim Wechsel der Laserart die übliche Leistung vorschlagen
-    wattIn.value = String(REF_WATT[kindSel.value === "co2" ? "co2" : "diode"]);
+    wattIn.value = String(REF_WATT[read().kind]);
     render();
   });
   wattIn.addEventListener("input", render);

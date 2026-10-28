@@ -13,6 +13,11 @@
   cut height, lead-in). One click creates a cut.
 - **My presets (laser and plasma):** in the material presets, a tested laser layer or plasma cut can be saved as an
   own preset and later added again with one click – even after the layer has been changed or deleted.
+- **Fibre laser presets:** the laser material presets now also offer *Fibre laser* (reference 30 W) with presets
+  for metal: stainless steel (dark marking and deep engraving), steel, bare and anodised aluminium, brass, copper,
+  titanium, slate and ABS – converted to your source power, with frequency hints and a 0.03 mm line interval. Only
+  for fibre lasers that CNC Craft controls via GRBL (e.g. xTool F1 Ultra, gantry machines); galvo machines with an
+  EZCAD controller are not supported, which the dialog says.
 - **Mandala generator:** new command next to the box generator. A round disc with patterns in rings (petal, drop,
   circle, diamond, arch, spike), the same all around – diameter, symmetry, number of rings, bridge width, edge
   (round, wavy, petals) and centre can be chosen, every click on *New pattern* gives a different mandala. All

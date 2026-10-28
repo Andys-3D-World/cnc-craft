@@ -2,7 +2,8 @@
  * MATERIAL-VORLAGEN FÜR DEN LASER (Laser-Bibliothek → „Vorlagen“)
  *
  * Startwerte je Material, Dicke und Arbeit (schneiden / gravieren) für einen Bezugs-Laser:
- * Diode 10 W (optische Leistung) und CO2 50 W. Für den eigenen Laser wird umgerechnet:
+ * Diode 10 W (optische Leistung), CO2 50 W und Faserlaser 30 W (gütegeschaltet, Galvo – Metall markieren/gravieren).
+ * Für den eigenen Laser wird umgerechnet:
  *  - schneiden: gleiche Leistung %, Geschwindigkeit im Verhältnis der Watt (gleiche Energie pro mm);
  *    wird es langsamer als sinnvoll, gibt es stattdessen mehr Durchgänge
  *  - gravieren: gleiche Geschwindigkeit, Leistung % im umgekehrten Verhältnis der Watt;
@@ -10,7 +11,8 @@
  * Bewusst vorsichtige Richtwerte aus üblichen Tabellen – immer erst mit dem Material-Testraster prüfen.
  */
 
-export type LaserKind = "diode" | "co2";
+export type LaserKind = "diode" | "co2" | "fiber";
+export const LASER_KINDS: LaserKind[] = ["diode", "co2", "fiber"];
 export type PresetOp = "cut" | "engrave";
 
 /** [Leistung %, Geschwindigkeit mm/min, Durchgänge] am Bezugs-Laser; fehlt = für diese Laserart nicht geeignet */
@@ -23,14 +25,19 @@ export interface LaserPreset {
   op: PresetOp;
   diode?: Val;
   co2?: Val;
+  fiber?: Val;
   note?: string;      // i18n-Schlüssel für einen Hinweis (z. B. nur dunkles Acryl)
 }
 
-export const REF_WATT: Record<LaserKind, number> = { diode: 10, co2: 50 };
+export const REF_WATT: Record<LaserKind, number> = { diode: 10, co2: 50, fiber: 30 };
 const LIMITS: Record<LaserKind, { minP: number; maxV: number; minCutV: number }> = {
   diode: { minP: 1, maxV: 6000, minCutV: 100 },
-  co2: { minP: 10, maxV: 24000, minCutV: 300 }
+  co2: { minP: 10, maxV: 24000, minCutV: 300 },
+  // Galvo: sehr schnell (mm/min – 1000 mm/s = 60 000 mm/min)
+  fiber: { minP: 10, maxV: 600000, minCutV: 3000 }
 };
+/** Üblicher Linienabstand beim Gravieren (mm) */
+export const LINE_INTERVAL: Record<LaserKind, number> = { diode: 0.08, co2: 0.1, fiber: 0.03 };
 /** mehr Durchgänge als so viele: zu schwach für diese Arbeit */
 export const MAX_PASSES = 6;
 
@@ -51,9 +58,18 @@ export const PRESETS: LaserPreset[] = [
   { id: "leae", mat: "leather", thick: 0, op: "engrave", diode: [30, 3000, 1], co2: [20, 12000, 1], note: "llib.pre.noteLeather" },
   { id: "cork3c", mat: "cork", thick: 3, op: "cut", diode: [100, 600, 1], co2: [30, 1500, 1] },
   { id: "felt3c", mat: "felt", thick: 3, op: "cut", diode: [100, 600, 1], co2: [30, 1800, 1] },
-  { id: "slatee", mat: "slate", thick: 0, op: "engrave", diode: [80, 2000, 1], co2: [30, 12000, 1] },
+  { id: "slatee", mat: "slate", thick: 0, op: "engrave", diode: [80, 2000, 1], co2: [30, 12000, 1], fiber: [40, 60000, 1] },
   { id: "glasse", mat: "glass", thick: 0, op: "engrave", co2: [30, 6000, 1], note: "llib.pre.noteGlass" },
-  { id: "anoe", mat: "anodized", thick: 0, op: "engrave", diode: [60, 3000, 1], co2: [40, 12000, 1] }
+  { id: "anoe", mat: "anodized", thick: 0, op: "engrave", diode: [60, 3000, 1], co2: [40, 12000, 1], fiber: [25, 120000, 1] },
+  // Faserlaser (Metall): Werte für 30 W, Frequenz siehe Hinweis
+  { id: "sse", mat: "stainless", thick: 0, op: "engrave", fiber: [60, 60000, 1], note: "llib.pre.noteFiber" },
+  { id: "ssd", mat: "stainlessDeep", thick: 0, op: "engrave", fiber: [100, 30000, 5], note: "llib.pre.noteFiberDeep" },
+  { id: "ste", mat: "mildsteel", thick: 0, op: "engrave", fiber: [70, 60000, 1], note: "llib.pre.noteFiber" },
+  { id: "ale", mat: "aluminium", thick: 0, op: "engrave", fiber: [80, 60000, 1], note: "llib.pre.noteFiber" },
+  { id: "bre", mat: "brass", thick: 0, op: "engrave", fiber: [80, 48000, 1], note: "llib.pre.noteFiber" },
+  { id: "cue", mat: "copper", thick: 0, op: "engrave", fiber: [100, 30000, 2], note: "llib.pre.noteFiber" },
+  { id: "tie", mat: "titanium", thick: 0, op: "engrave", fiber: [40, 60000, 1], note: "llib.pre.noteFiber" },
+  { id: "abse", mat: "abs", thick: 0, op: "engrave", fiber: [30, 90000, 1], note: "llib.pre.noteFiberPlastic" }
 ];
 
 export interface PresetValues { power: number; speed: number; passes: number; weak: boolean }
