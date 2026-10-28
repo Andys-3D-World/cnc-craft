@@ -28,6 +28,7 @@ const P: Record<string, string> = {
   dogbone: `<path d="M3 4v16h18V4"/><path d="M7 4v8a1 1 0 001 1h8a1 1 0 001-1V4"/><circle cx="7.6" cy="12.4" r="1.8" stroke-width="1.5"/><circle cx="16.4" cy="12.4" r="1.8" stroke-width="1.5"/>`,
   cost: `<circle cx="12" cy="12" r="9"/><path d="M15.5 8.6a4.2 4.2 0 100 6.8M7 10.6h6M7 13.4h6"/>`,
   stlExport: `<path d="M4 15l8 4 8-4M4 15V9l8-4 8 4v6M12 19v-6M4 9l8 4 8-4"/><path d="M12 2v3" stroke-width="1.5"/><path d="M3 21h18" stroke-width="1.5"/>`,
+  surface: `<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 11h14M5 8h14" stroke-dasharray="2 2"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/>`,
   mandala: `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8c-1.2-1.6-1.2-3.4 0-5 1.2 1.6 1.2 3.4 0 5zM12 14.2c1.2 1.6 1.2 3.4 0 5-1.2-1.6-1.2-3.4 0-5zM9.8 12c-1.6 1.2-3.4 1.2-5 0 1.6-1.2 3.4-1.2 5 0zM14.2 12c1.6-1.2 3.4-1.2 5 0-1.6 1.2-3.4 1.2-5 0z" stroke-width="1.4"/>`,
   nameGen: `<path d="M3 15c2-6 4-9 5-9s-1 9 1 9 3-6 4-6-1 6 1 6 2-4 3-4"/><path d="M3 18h16" stroke-width="2.2"/><circle cx="21" cy="12" r="1.6"/>`,
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,

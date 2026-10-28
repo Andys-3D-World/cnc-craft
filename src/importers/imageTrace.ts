@@ -4,15 +4,21 @@
  * Ein Foto, Logo oder Scan (PNG, JPG, BMP, GIF, WEBP) wird in Schwarz/Weiß
  * umgewandelt und die Umrisse werden als Konturen eingefügt.
  * Im Dialog: Schwelle, Umkehren, Weichzeichnen, Glätten, kleine Flecken ignorieren, Breite in mm.
+ * „Mittellinie“: statt der Umrisse eine einzige Linie in der Mitte jedes Strichs (Handschrift, Skizzen – centerline.ts).
  */
 import { ImportResult, emptyResult, Pt } from "./common";
 import { marchingSquares, simplifyClosed } from "../traceUtil";
 import { pathArea } from "../shapeTransform";
 import { t } from "../i18n/i18n";
+import { centerlines } from "../centerline";
 
 const MAX_SIDE = 2000;
 
-interface TraceOpts { threshold: number; invert: boolean; blur: number; smooth: number; minArea: number; widthMm: number; }
+interface TraceOpts { threshold: number; invert: boolean; blur: number; smooth: number; minArea: number; widthMm: number; center: boolean; }
+/** Ein Ergebnis: Umriss (geschlossen) oder Mittellinie (meist offen) */
+interface TracePath { pts: Pt[]; closed: boolean }
+/** Mittellinie wird auf höchstens so viele Pixel verkleinert gerechnet (Ausdünnen ist bei großen Bildern langsam) */
+const CENTER_SIDE = 900;
 
 export async function openImageTraceDialog(fileName: string, bytes: Uint8Array): Promise<ImportResult | null> {
   const img = await loadImage(fileName, bytes);
@@ -40,6 +46,7 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
         </div>
         <div class="trc-row">
           <label class="trc-check"><input id="trc-inv" type="checkbox"> ${t("trace.invert")}</label>
+          <label class="trc-check" title="${escapeHtml(t("trace.centerTip"))}"><input id="trc-center" type="checkbox"> ${t("trace.center")}</label>
           <span style="flex:1"></span>
           <label>${t("trace.width")} <input id="trc-width" type="number" min="1" step="1" value="${defWidth}" style="width:80px"> mm</label>
         </div>
@@ -76,10 +83,11 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
       blur: parseInt($<HTMLInputElement>("trc-blur").value, 10),
       smooth: parseFloat($<HTMLInputElement>("trc-smooth").value),
       minArea: parseFloat($<HTMLInputElement>("trc-min").value),
-      widthMm: Math.max(1, parseFloat($<HTMLInputElement>("trc-width").value) || defWidth)
+      widthMm: Math.max(1, parseFloat($<HTMLInputElement>("trc-width").value) || defWidth),
+      center: $<HTMLInputElement>("trc-center").checked
     });
 
-    let loops: Pt[][] = [];
+    let loops: TracePath[] = [];
     let timer = 0;
     const update = () => {
       const o = read();
@@ -87,9 +95,9 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
       $("trc-blur-val").textContent = String(o.blur);
       $("trc-smooth-val").textContent = o.smooth.toFixed(1);
       $("trc-min-val").textContent = String(o.minArea);
-      loops = trace(gray, W, H, o);
-      drawPreview($<HTMLCanvasElement>("trc-preview"), img, W, H, loops);
-      const pts = loops.reduce((n, l) => n + l.length, 0);
+      loops = o.center ? traceCenter(gray, W, H, o) : trace(gray, W, H, o).map(l => ({ pts: l, closed: true }));
+      drawPreview($<HTMLCanvasElement>("trc-preview"), img, W, H, loops, !o.center);
+      const pts = loops.reduce((n, l) => n + l.pts.length, 0);
       const hMm = (o.widthMm * H) / W;
       $("trc-info").textContent = t("trace.stats", { n: loops.length, pts, w: o.widthMm.toFixed(1), h: hMm.toFixed(1) });
     };
@@ -104,7 +112,7 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
       const o = read();
       const s = o.widthMm / W;
       const res = emptyResult();
-      res.paths = loops.map(l => ({ pts: l.map(q => ({ x: q.x * s, y: (H - q.y) * s })), closed: true }));
+      res.paths = loops.map(l => ({ pts: l.pts.map(q => ({ x: q.x * s, y: (H - q.y) * s })), closed: l.closed }));
       res.info = t("trace.info", { n: loops.length, w: o.widthMm.toFixed(1) });
       finish(res);
     });
@@ -200,7 +208,23 @@ function trace(gray: Float32Array, W: number, H: number, o: TraceOpts): Pt[][] {
     .filter(l => l.length >= 3 && Math.abs(pathArea(l)) >= Math.max(1, o.minArea));
 }
 
-function drawPreview(canvas: HTMLCanvasElement, img: CanvasImageSource, W: number, H: number, loops: Pt[][]) {
+/** Mittellinien: Maske wie beim Umriss (dunkel = Strich), dann ausdünnen und nachfahren */
+function traceCenter(gray: Float32Array, W: number, H: number, o: TraceOpts): TracePath[] {
+  const g = boxBlur(gray, W, H, o.blur);
+  const k = Math.min(1, CENTER_SIDE / Math.max(W, H));
+  const w = Math.max(1, Math.round(W * k)), h = Math.max(1, Math.round(H * k));
+  const mask = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const v = g[Math.min(H - 1, Math.floor(y / k)) * W + Math.min(W - 1, Math.floor(x / k))];
+    mask[y * w + x] = (o.invert ? v >= o.threshold : v < o.threshold) ? 1 : 0;
+  }
+  // Mindestlänge aus „Flecken ignorieren“ (Fläche → Seitenlänge), Vereinfachung aus „Glätten“
+  const minLen = Math.max(3, Math.sqrt(o.minArea) * k);
+  return centerlines(mask, w, h, minLen, Math.max(0.3, o.smooth * 0.6))
+    .map(p => ({ pts: p.pts.map(q => ({ x: q.x / k, y: q.y / k })), closed: p.closed }));
+}
+
+function drawPreview(canvas: HTMLCanvasElement, img: CanvasImageSource, W: number, H: number, loops: TracePath[], fill: boolean) {
   const ctx = canvas.getContext("2d")!;
   const cw = canvas.width, ch = canvas.height;
   ctx.fillStyle = "#ffffff";
@@ -212,11 +236,14 @@ function drawPreview(canvas: HTMLCanvasElement, img: CanvasImageSource, W: numbe
   ctx.globalAlpha = 1;
   ctx.beginPath();
   for (const l of loops) {
-    l.forEach((p, i) => (i ? ctx.lineTo(ox + p.x * s, oy + p.y * s) : ctx.moveTo(ox + p.x * s, oy + p.y * s)));
-    ctx.closePath();
+    l.pts.forEach((p, i) => (i ? ctx.lineTo(ox + p.x * s, oy + p.y * s) : ctx.moveTo(ox + p.x * s, oy + p.y * s)));
+    if (l.closed) ctx.closePath();
   }
-  ctx.fillStyle = "rgba(109, 74, 255, 0.25)";
-  ctx.fill("evenodd");
+  // Umrisse gefüllt zeigen, Mittellinien nur als Linie
+  if (fill) {
+    ctx.fillStyle = "rgba(109, 74, 255, 0.25)";
+    ctx.fill("evenodd");
+  }
   ctx.strokeStyle = "#5a2cff";
   ctx.lineWidth = 1.2;
   ctx.stroke();

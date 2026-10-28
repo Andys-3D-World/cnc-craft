@@ -42,6 +42,9 @@ export interface LaserSettings {
   dynamic: boolean;   // M4 = Leistung passt sich der Geschwindigkeit an (empfohlen)
   avoidCut: boolean;  // Leerfahrten um schon ausgeschnittene Teile herum (siehe rapidAvoid.ts)
   optimizeOrder: boolean; // Linien-Reihenfolge mit kürzesten Leerfahrten (siehe cutOrder.ts)
+  cornerPower: boolean;   // ohne M4: Leistung in Ecken nach der Bremsfahrt senken (siehe cornerPower.ts)
+  cornerAccel: number;    // Beschleunigung der Maschine (mm/s²) für die Ecken-Leistung
+  cornerMin: number;      // Ecken-Leistung: höchstens bis auf so viel % senken
 }
 
 export const LAYERS_CHANGED = "cnc-laser-layers-changed";
@@ -57,7 +60,7 @@ export const LAYER_COLORS = [
 
 export let activeLayer: LaserLayer | null = null;
 let layers: LaserLayer[] = [];
-export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false, optimizeOrder: true };
+export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false, optimizeOrder: true, cornerPower: false, cornerAccel: 1000, cornerMin: 20 };
 
 // ---------------------------------------------------------------------
 // Laden / Speichern
@@ -89,6 +92,7 @@ export function initLaserLayers() {
       if (typeof s.dynamic === "boolean") laserSettings.dynamic = s.dynamic;
       if (typeof s.avoidCut === "boolean") laserSettings.avoidCut = s.avoidCut;
       if (typeof s.optimizeOrder === "boolean") laserSettings.optimizeOrder = s.optimizeOrder;
+      setCorner(s);
     }
   } catch { /* Standardwerte */ }
 }
@@ -263,8 +267,16 @@ export function setLaserSettings(s: Partial<LaserSettings>) {
   if (s.dynamic !== undefined) laserSettings.dynamic = !!s.dynamic;
   if (s.avoidCut !== undefined) laserSettings.avoidCut = !!s.avoidCut;
   if (s.optimizeOrder !== undefined) laserSettings.optimizeOrder = !!s.optimizeOrder;
+  setCorner(s);
   save();
   window.dispatchEvent(new CustomEvent(LAYERS_CHANGED));
+}
+
+/** Ecken-Leistung übernehmen (geprüft – kommt auch aus Dateien) */
+function setCorner(s: any) {
+  if (typeof s.cornerPower === "boolean") laserSettings.cornerPower = s.cornerPower;
+  if (Number.isFinite(+s.cornerAccel) && +s.cornerAccel > 0) laserSettings.cornerAccel = Math.min(50000, Math.max(50, +s.cornerAccel));
+  if (Number.isFinite(+s.cornerMin) && +s.cornerMin >= 0) laserSettings.cornerMin = Math.min(100, +s.cornerMin);
 }
 
 /** Projekt öffnen: fehlende Ebenen übernehmen (wie bei den Fräswerkzeugen) */

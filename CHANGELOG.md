@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Centerline trace:** *Trace image* has a new option *Centerline* – instead of outlines, one single line in the
+  middle of each stroke (handwriting, sketches, line drawings), ideal for engraving as a line or with a V-bit.
+  The image is thinned to 1 pixel, followed along strokes and crossings, short stubs are dropped.
+- **Lower power in corners (lasers without M4, e.g. Marlin):** new option in the laser settings. CNC Craft works
+  out where the machine brakes before corners and accelerates when starting (acceleration in mm/s², junction model
+  like GRBL) and lowers the S value there in the G-code, never below a set minimum – against burnt corners and dark
+  start points. Only shown when M4 is off.
+- **Surface the spoilboard:** new command in the extras menu (router). Mills the whole bed (or any area) flat in one
+  pass set – the same facing path as *Face both sides*, without the flip steps.
 - **Material database (router):** 📚 next to the material in the tool settings opens a table of all materials of the
   cutting data calculator – cutting speed, feed per tooth (factor × Ø and maximum) and step down, with an example
   for a 6 mm cutter. Built-in materials can be adjusted to your machine and reset, own materials can be added,
@@ -49,6 +58,7 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Thread mills in the tool list** now show *single-tooth* or the pitch next to the number of flutes.
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),
   then *Resume from here* starts the resume dialog at exactly that line.
 

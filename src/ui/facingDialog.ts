@@ -22,6 +22,7 @@ export interface FacingStart {
   x0: number; y0: number; w: number; h: number;
   thick: number;      // Materialdicke vorher (mm), 0 = unbekannt
   height: number;     // Höhe des Modells (mm), 0 = unbekannt
+  spoil?: boolean;    // Opferplatte planen (eine Seite, ganzes Bett) statt Rohteil beidseitig
 }
 
 /** Werkzeug-Vorschlag: Planfräser, sonst der größte Schaft-/Torusfräser */
@@ -69,6 +70,8 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
   const tool = () => tools.find(x => x.id === o.toolId) || tools[0];
   o.stepZ = Math.min(o.depth, +(tool().stepZ || 1).toFixed(2));
 
+  // Opferplatte: eigene Texte (face.spoil.*), sonst wie „beidseitig planen“
+  const k = (key: string) => (start.spoil ? key.replace(/^face\./, "face.spoil.") : key);
   const num = (id: string, label: string, unit = "mm", step = "0.1", tip = "") =>
     `<div class="dlg-row"${tip ? ` data-tip="${esc(t(tip))}"` : ""}><span>${esc(t(label))}</span><span class="dlg-num"><input id="${id}" type="number" min="0" step="${step}" class="prop-input"><em>${unit}</em></span></div>`;
   const ov = document.createElement("div");
@@ -76,8 +79,8 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
   ov.className = "dlg-overlay";
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(520px, calc(100vw - 32px));">
-      <h3>🪵 ${esc(t("face.title"))}</h3>
-      <div class="dlg-hint">${esc(t("face.intro"))}</div>
+      <h3>🪵 ${esc(t(k("face.title")))}</h3>
+      <div class="dlg-hint">${esc(t(k("face.intro")))}</div>
       ${num("face-x0", "c3d.posX")}${num("face-y0", "c3d.posY")}
       ${num("face-w", "c3d.sizeX")}${num("face-h", "c3d.sizeY")}
       ${num("face-depth", "face.depth", "mm", "0.1", "face.depthTip")}
@@ -91,7 +94,7 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
       <div class="dlg-hint" id="face-info"></div>
       <div class="dlg-hint" id="face-warn" style="color:#ffb454;"></div>
       <ol class="dlg-hint" style="margin:6px 0 0 18px;padding:0;">
-        <li>${esc(t("face.step1"))}</li><li>${esc(t("face.step2"))}</li><li>${esc(t("face.step3"))}</li><li>${esc(t("face.step4"))}</li>
+        ${(start.spoil ? [1, 2, 3] : [1, 2, 3, 4]).map(i => `<li>${esc(t(k("face.step" + i)))}</li>`).join("")}
       </ol>
       <div class="dlg-buttons">
         <button id="face-load" class="btn-primary">${esc(t("c3d.load"))}</button>
@@ -117,7 +120,7 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
     const p = params(), res = facingPath(p);
     const min = res.length / Math.max(1, p.feed);
     $<HTMLElement>("face-info").textContent = res.lines.length
-      ? t("face.info", { n: res.passes, r: res.rows, m: Math.max(1, Math.round(min)) })
+      ? t(k("face.info"), { n: res.passes, r: res.rows, m: Math.max(1, Math.round(min)) })
         + (o.thick > 0 ? " " + t("face.after", { a: +(o.thick - 2 * o.depth).toFixed(2), b: o.thick }) : "")
       : t("face.invalid");
     $<HTMLElement>("face-warn").textContent = o.thick > 0 && o.height > 0 && o.thick - 2 * o.depth < o.height - 1e-6
@@ -146,8 +149,8 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
     const g = facingGcode(params(), tl, tl.rpm || 12000);
     if (!g) return;
     try { localStorage.setItem(KEY, JSON.stringify({ depth: o.depth, over: o.over, dir: o.dir, toolId: o.toolId })); } catch { /* egal */ }
-    if (loadGcodeFromText(g, t("face.jobName", { d: o.depth }), log)) {
-      log(t("face.loaded", { d: o.depth }));
+    if (loadGcodeFromText(g, t(k("face.jobName"), { d: o.depth }), log)) {
+      log(t(k("face.loaded"), { d: o.depth }));
       onDone?.(o.depth);
       ov.remove();
     }

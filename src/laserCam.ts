@@ -16,6 +16,7 @@
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { polygonArea, pointInPoly } from "./polyOffset";
 import { cornerIndex, leadPoint } from "./plasmaCam";
+import { cornerPowerPath } from "./cornerPower";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
 import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
@@ -35,6 +36,9 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
   const n = (v: number) => String(+v.toFixed(3));
   const sOf = (power: number) => Math.round((power / 100) * laserSettings.sMax);
+  // Ecken-Leistung nur ohne M4 (mit M4 regelt das Board selbst)
+  const corner = laserSettings.cornerPower && !laserSettings.dynamic
+    ? { accel: laserSettings.cornerAccel, deviation: 0.02, minPct: laserSettings.cornerMin } : null;
 
   // ---- Formen nach Ebene sortieren (Reihenfolge wie in der Ebenen-Liste) ----
   // Formen mit eigenen Werten (Material-Testraster) bilden eigene Blöcke direkt hinter ihrer Ebene
@@ -158,29 +162,44 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
           if (p.runs) {
             // mit Haltestegen: jedes Stück schneiden, über den Steg mit Laser aus springen
             p.runs.forEach((run, ri) => {
-              if (ri === 0 && p.lead) {
-                rapid(p.lead, " " + c("lgc.leadIn"));
-                g += `G1 X${n(run[0].x)} Y${n(run[0].y)} S${S}\n`;
+              const lead = ri === 0 && p.lead ? p.lead : null;
+              if (lead) rapid(lead, " " + c("lgc.leadIn"));
+              else rapid(run[0], ri > 0 ? " " + c("gc.tab") : "");
+              if (corner) {
+                // jedes Stück beginnt und endet im Stand (Laser aus über dem Steg)
+                let last = -1;
+                for (const m of cornerPowerPath(lead ? [lead, ...run] : run, false, layer.speed, S, corner)) {
+                  g += `G1 X${n(m.x)} Y${n(m.y)}${m.s !== last ? ` S${m.s}` : ""}\n`;
+                  last = m.s;
+                }
               } else {
-                rapid(run[0], ri > 0 ? " " + c("gc.tab") : "");
+                if (lead) g += `G1 X${n(run[0].x)} Y${n(run[0].y)} S${S}\n`;
+                g += `G1 X${n(run[1].x)} Y${n(run[1].y)} S${S}\n`;
+                for (let i = 2; i < run.length; i++) g += `G1 X${n(run[i].x)} Y${n(run[i].y)}\n`;
               }
-              g += `G1 X${n(run[1].x)} Y${n(run[1].y)} S${S}\n`;
-              for (let i = 2; i < run.length; i++) g += `G1 X${n(run[i].x)} Y${n(run[i].y)}\n`;
               pos = run[run.length - 1];
             });
             continue;
           }
           const pts = p.pts;
           // Freischnitt: im Abfall einstechen und zur Kontur fahren
-          if (p.lead) {
-            rapid(p.lead, " " + c("lgc.leadIn"));
-            g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)} S${S}\n`;
+          if (p.lead) rapid(p.lead, " " + c("lgc.leadIn"));
+          else rapid(pts[0]);
+          if (corner) {
+            // ohne M4: in Ecken weniger Leistung, wo die Maschine bremst – auch beim Anfahren aus dem Stand
+            // (nach der Leerfahrt) und am Ende; darum immer als offener Weg vom Einstich bis zurück zum Start
+            const way = [...(p.lead ? [p.lead] : []), ...pts, ...(p.closed ? [pts[0]] : [])];
+            let last = -1;
+            for (const m of cornerPowerPath(way, false, layer.speed, S, corner)) {
+              g += `G1 X${n(m.x)} Y${n(m.y)}${m.s !== last ? ` S${m.s}` : ""}\n`;
+              last = m.s;
+            }
           } else {
-            rapid(pts[0]);
+            if (p.lead) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)} S${S}\n`;
+            g += `G1 X${n(pts[1].x)} Y${n(pts[1].y)} S${S}\n`;
+            for (let i = 2; i < pts.length; i++) g += `G1 X${n(pts[i].x)} Y${n(pts[i].y)}\n`;
+            if (p.closed) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)}\n`;
           }
-          g += `G1 X${n(pts[1].x)} Y${n(pts[1].y)} S${S}\n`;
-          for (let i = 2; i < pts.length; i++) g += `G1 X${n(pts[i].x)} Y${n(pts[i].y)}\n`;
-          if (p.closed) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)}\n`;
           pos = p.closed ? pts[0] : pts[pts.length - 1];
           // ganz ausgeschnitten (ohne Haltestege) -> kann kippen, ab jetzt umfahren (einmal reicht)
           if (avoid && p.closed && pass === 0) avoid.addCut(pts);

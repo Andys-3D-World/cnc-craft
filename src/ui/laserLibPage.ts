@@ -106,6 +106,13 @@ export function renderLaserLibPage(withEditor = true) {
             <h4>⚙️ ${esc(t("laser.settings"))}</h4>
             <label class="te-row" data-tip="${esc(t("laser.sMaxTip"))}"><span>${esc(t("laser.sMax"))}</span><span class="dlg-num"><input id="lps-smax" type="number" min="1" step="1"><em>S</em></span></label>
             <label class="te-row" data-tip="${esc(t("laser.dynamicTip"))}"><span>${esc(t("laser.dynamic"))}</span><input id="lps-dyn" type="checkbox" style="width:auto;"></label>
+            <div id="lps-corner-box">
+              <label class="te-row" data-tip="${esc(t("laser.cornerTip"))}"><span>${esc(t("laser.corner"))}</span><input id="lps-corner" type="checkbox" style="width:auto;"></label>
+              <div id="lps-corner-vals">
+                <label class="te-row" data-tip="${esc(t("laser.cornerAccelTip"))}"><span>${esc(t("laser.cornerAccel"))}</span><span class="dlg-num"><input id="lps-cacc" type="number" min="50" step="100"><em>mm/s²</em></span></label>
+                <label class="te-row" data-tip="${esc(t("laser.cornerMinTip"))}"><span>${esc(t("laser.cornerMin"))}</span><span class="dlg-num"><input id="lps-cmin" type="number" min="0" max="100" step="5"><em>%</em></span></label>
+              </div>
+            </div>
             <div class="tool-scope">${esc(t("llib.orderHint"))}</div>
           </div>
         </div>
@@ -135,6 +142,11 @@ export function renderLaserLibPage(withEditor = true) {
   const setv = (id: string, v: string) => { const e = page.querySelector("#" + id) as HTMLInputElement; if (e && document.activeElement !== e) e.value = v; };
   setv("lps-smax", String(laserSettings.sMax));
   (page.querySelector("#lps-dyn") as HTMLInputElement).checked = laserSettings.dynamic;
+  // Ecken-Leistung nur ohne M4 (mit M4 regelt das Board selbst)
+  (page.querySelector("#lps-corner-box") as HTMLElement).style.display = laserSettings.dynamic ? "none" : "";
+  (page.querySelector("#lps-corner") as HTMLInputElement).checked = laserSettings.cornerPower;
+  (page.querySelector("#lps-corner-vals") as HTMLElement).style.display = laserSettings.cornerPower ? "" : "none";
+  setv("lps-cacc", String(laserSettings.cornerAccel)); setv("lps-cmin", String(laserSettings.cornerMin));
   (page.querySelector("#lp-dup") as HTMLButtonElement).disabled = isNew || !sel;
   (page.querySelector("#lp-up") as HTMLButtonElement).disabled = isNew || layers[0]?.id === sel;
   (page.querySelector("#lp-down") as HTMLButtonElement).disabled = isNew || layers[layers.length - 1]?.id === sel;
@@ -170,6 +182,11 @@ function bindPage(page: HTMLElement) {
   smax.addEventListener("change", () => { setLaserSettings({ sMax: parseFloat(smax.value) }); smax.value = String(laserSettings.sMax); });
   const dyn = page.querySelector("#lps-dyn") as HTMLInputElement;
   dyn.addEventListener("change", () => setLaserSettings({ dynamic: dyn.checked }));
+  const corner = page.querySelector("#lps-corner") as HTMLInputElement;
+  corner.addEventListener("change", () => setLaserSettings({ cornerPower: corner.checked }));
+  const cacc = page.querySelector("#lps-cacc") as HTMLInputElement, cmin = page.querySelector("#lps-cmin") as HTMLInputElement;
+  cacc.addEventListener("change", () => setLaserSettings({ cornerAccel: parseFloat(cacc.value) }));
+  cmin.addEventListener("change", () => setLaserSettings({ cornerMin: parseFloat(cmin.value) }));
 }
 
 // ---------------------------------------------------------------------
