@@ -361,8 +361,12 @@ export function errorText(code: number): string {
   return s === k ? t("grbl.errUnknown") : s;
 }
 
-/** Text zu einem GRBL-Alarm */
-export function alarmText(code: number): string {
+/**
+ * Text zu einem GRBL-Alarm. Ab 11 sind die Nummern je Firmware verschieden (FluidNC: 14 = nicht referenziert …) –
+ * die Texte 11–18 gelten nur für grblHAL.
+ */
+export function alarmText(code: number, firmware = machine.firmware): string {
+  if (code > 10 && !/grblhal/i.test(firmware)) return t("grbl.alarmUnknown");
   const k = `grbl.alarm.${code}`;
   const s = t(k);
   return s === k ? t("grbl.alarmUnknown") : s;
@@ -474,7 +478,7 @@ export async function initMachine(logFn: (s: string) => void) {
     const r = route(p); if (!r) return;
     const { m, own, tag } = r;
     m.lastAlarm = p.code;
-    log(tag + t("m.alarm", { code: p.code, text: alarmText(p.code) }));
+    log(tag + t("m.alarm", { code: p.code, text: alarmText(p.code, m.firmware) }));
     fire("slots");
     if (own) fire("alarm", p);
   });

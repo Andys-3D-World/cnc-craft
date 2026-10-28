@@ -73,6 +73,9 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **grblHAL alarms 11–18 were shown as “unknown alarm”:** they now have their own texts in all languages – e.g.
+  alarm 15 (dual-axis homing with auto-squaring could not find the second limit switch). Only used with grblHAL,
+  since FluidNC numbers these alarms differently.
 - **Inch jobs (G20):** jogging and *Frame job* now always send `G21`. Before, an inch job could leave the machine in
   inch mode, and the next jog or frame (calculated in mm) would have travelled 25.4 times as far.
 
