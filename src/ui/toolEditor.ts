@@ -15,12 +15,13 @@
  */
 import { t } from "../i18n/i18n";
 import {
-  MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, cutDiameter, TYPE_DEFAULTS, typeGeom, MATERIALS,
+  MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, cutDiameter, materialName, TYPE_DEFAULTS, typeGeom, MATERIALS,
   calcCutData, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
   duplicateTool, swapTools, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
   sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
 } from "../toolLibrary";
 import { COATINGS, COATING_LABEL } from "../toolCoating";
+import { openMaterialDb } from "./materialDbDialog";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
 
 function esc(s: string): string {
@@ -59,7 +60,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
     <button type="button" class="te-type${ty === src.type ? " active" : ""}" data-type="${ty}" data-tip="${esc(t("tl.typeTip." + ty))}">
       ${toolIconSvg(typeGeom(ty), 30, 46)}<span>${esc(t("tl.type." + ty))}</span></button>`).join("");
   const fluteBtns = FLUTE_CHOICES.map(z => `<button type="button" class="te-flute${z === src.flutes ? " active" : ""}" data-z="${z}">${z}</button>`).join("");
-  const matOpts = MATERIALS.map(m => `<option value="${m.id}"${m.id === toolSettings.material ? " selected" : ""}>${esc(t("tl.mat." + m.id))}</option>`).join("");
+  const matOpts = MATERIALS.map(m => `<option value="${m.id}"${m.id === toolSettings.material ? " selected" : ""}>${esc(materialName(m.id))}</option>`).join("");
   return `
     <div class="te${h.compact ? " te-compact" : ""}">
       <label class="te-row te-name"><span>${esc(t("tool.name"))}</span>
@@ -231,7 +232,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     const r = calcCutData(read(), mat);
     q("rpm").value = String(r.rpm); q("feed").value = String(r.feedrate);
     q("plunge").value = String(r.plungeFeed); q("stepz").value = String(r.stepZ);
-    q<HTMLElement>("calcres").textContent = t("tl.calcRes", { fz: r.fz, z: read().flutes, mat: t("tl.mat." + mat) })
+    q<HTMLElement>("calcres").textContent = t("tl.calcRes", { fz: r.fz, z: read().flutes, mat: materialName(mat) })
       + (r.limited ? " " + t("tl.calcLimited") : "");
     if (toolSettings.material !== mat) setToolSettings({ material: mat });
     refresh();
@@ -376,7 +377,8 @@ export function renderToolPage(withEditor = true) {
             <label class="te-row" data-tip="${esc(t("tl.set.maxRpmTip"))}"><span>${esc(t("tl.set.maxRpm"))}</span><span class="dlg-num"><input id="tps-maxrpm" type="number" min="100" step="1000"><em>${esc(t("unit.rpm"))}</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.minRpmTip"))}"><span>${esc(t("tl.set.minRpm"))}</span><span class="dlg-num"><input id="tps-minrpm" type="number" min="0" step="1000"><em>${esc(t("unit.rpm"))}</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.maxFeedTip"))}"><span>${esc(t("tl.set.maxFeed"))}</span><span class="dlg-num"><input id="tps-maxfeed" type="number" min="10" step="100"><em>mm/min</em></span></label>
-            <label class="te-row"><span>${esc(t("tl.set.material"))}</span><select id="tps-mat">${MATERIALS.map(m => `<option value="${m.id}">${esc(t("tl.mat." + m.id))}</option>`).join("")}</select></label>
+            <label class="te-row"><span>${esc(t("tl.set.material"))}</span><span class="tps-matrow"><select id="tps-mat"></select>
+              <button id="tps-matdb" class="btn-secondary btn-icon" type="button" data-tip="${esc(t("matdb.btnTip"))}">📚</button></span></label>
             <button id="tps-all" class="btn-secondary" data-tip="${esc(t("tl.set.allTip"))}">🧮 ${esc(t("tl.set.all"))}</button>
             <div class="tool-scope">${esc(t("tl.set.hint"))}</div>
           </div>
@@ -429,6 +431,11 @@ export function renderToolPage(withEditor = true) {
   // Einstellungen
   const setv = (id: string, v: string) => { const e = page.querySelector("#" + id) as HTMLInputElement; if (e && document.activeElement !== e) e.value = v; };
   setv("tps-maxrpm", String(toolSettings.maxRpm)); setv("tps-minrpm", String(toolSettings.minRpm));
+  // Material-Liste neu (die Datenbank kann sich geändert haben)
+  const matSel = page.querySelector("#tps-mat") as HTMLSelectElement | null;
+  if (matSel && document.activeElement !== matSel) {
+    matSel.innerHTML = MATERIALS.map(m => `<option value="${esc(m.id)}">${esc(materialName(m.id))}</option>`).join("");
+  }
   setv("tps-maxfeed", String(toolSettings.maxFeed)); setv("tps-mat", toolSettings.material);
   (page.querySelector("#tp-dup") as HTMLButtonElement).disabled = pageNew || !pageSel;
   (page.querySelector("#tp-up") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, -1);
@@ -511,11 +518,12 @@ function bindPage(page: HTMLElement) {
     const el = page.querySelector("#" + id) as HTMLInputElement;
     el.addEventListener("change", () => setToolSettings({ [key]: key === "material" ? el.value : parseFloat(el.value) } as any));
   };
+  page.querySelector("#tps-matdb")?.addEventListener("click", () => openMaterialDb());
   bind("tps-maxrpm", "maxRpm"); bind("tps-minrpm", "minRpm"); bind("tps-maxfeed", "maxFeed"); bind("tps-mat", "material");
   // Alle Werkzeuge für das gewählte Material neu berechnen
   page.querySelector("#tps-all")!.addEventListener("click", () => {
     const mat = toolSettings.material;
-    if (!window.confirm(t("tl.set.allConfirm", { mat: t("tl.mat." + mat), n: getTools().length }))) return;
+    if (!window.confirm(t("tl.set.allConfirm", { mat: materialName(mat), n: getTools().length }))) return;
     for (const tl of getTools().slice()) {
       const r = calcCutData(tl, mat);
       updateTool(tl.id, { rpm: r.rpm, feedrate: r.feedrate, plungeFeed: r.plungeFeed, stepZ: r.stepZ });

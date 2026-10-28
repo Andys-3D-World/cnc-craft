@@ -77,24 +77,103 @@ const KEY_SETTINGS = "cnc_craft_tool_settings";
 export const toolSettings: ToolSettings = { minRpm: 0, maxRpm: 24000, maxFeed: 3000, material: "softwood" };
 
 /**
- * Material-Tabelle für den Rechner (Hartmetall-Fräser, Hobby-/Portalfräsen):
+ * MATERIAL-DATENBANK für den Rechner (Hartmetall-Fräser, Hobby-/Portalfräsen):
  *   vc   Schnittgeschwindigkeit m/min
  *   fzK  Zahnvorschub = fzK × Ø (mm/Zahn), begrenzt auf fzMax
  *   ap   Zustellung = ap × Ø
  * Bewusst vorsichtig – lieber erst langsam und an einem Reststück testen.
+ * Eingebaute Materialien lassen sich ändern (und zurücksetzen), eigene dazu anlegen (ui/materialDbDialog.ts).
+ * Gespeichert unter KEY_MATERIALS: { edits: { id: Werte }, custom: [eigene Materialien] }.
  */
-export const MATERIALS: { id: string; vc: number; fzK: number; fzMax: number; ap: number }[] = [
+export interface Material { id: string; vc: number; fzK: number; fzMax: number; ap: number; name?: string; custom?: boolean }
+export type MaterialValues = Pick<Material, "vc" | "fzK" | "fzMax" | "ap">;
+
+const BUILTIN_MATERIALS: Material[] = [
   { id: "softwood", vc: 600, fzK: 0.025, fzMax: 0.25, ap: 1.0 },
   { id: "hardwood", vc: 500, fzK: 0.018, fzMax: 0.2, ap: 0.5 },
   { id: "mdf", vc: 600, fzK: 0.022, fzMax: 0.22, ap: 0.75 },
   { id: "plywood", vc: 500, fzK: 0.02, fzMax: 0.2, ap: 0.6 },
   { id: "acrylic", vc: 300, fzK: 0.015, fzMax: 0.15, ap: 0.5 },
   { id: "softplastic", vc: 400, fzK: 0.02, fzMax: 0.2, ap: 0.75 },
+  { id: "pom", vc: 300, fzK: 0.02, fzMax: 0.2, ap: 0.75 },
+  { id: "hdpe", vc: 400, fzK: 0.025, fzMax: 0.25, ap: 1.0 },
+  { id: "foam", vc: 800, fzK: 0.03, fzMax: 0.3, ap: 2.0 },
   { id: "pcb", vc: 200, fzK: 0.008, fzMax: 0.05, ap: 0.3 },
   { id: "alu", vc: 250, fzK: 0.006, fzMax: 0.06, ap: 0.2 },
   { id: "brass", vc: 150, fzK: 0.005, fzMax: 0.05, ap: 0.15 },
   { id: "steel", vc: 80, fzK: 0.003, fzMax: 0.04, ap: 0.1 }
 ];
+const KEY_MATERIALS = "cnc_craft_materials";
+
+/** Werte in sinnvolle Grenzen bringen (auch für Daten aus Dateien) */
+function cleanValues(x: any, d: MaterialValues): MaterialValues {
+  const n = (v: any, def: number, min: number, max: number) => (Number.isFinite(+v) && +v > 0 ? Math.min(max, Math.max(min, +v)) : def);
+  return { vc: n(x?.vc, d.vc, 5, 3000), fzK: n(x?.fzK, d.fzK, 0.0005, 0.2), fzMax: n(x?.fzMax, d.fzMax, 0.002, 1), ap: n(x?.ap, d.ap, 0.02, 3) };
+}
+
+function loadMaterials(): Material[] {
+  let data: any = {};
+  try { data = JSON.parse(localStorage.getItem(KEY_MATERIALS) || "{}") || {}; } catch { /* egal */ }
+  const edits = data.edits && typeof data.edits === "object" ? data.edits : {};
+  const list: Material[] = BUILTIN_MATERIALS.map(m => ({ ...m, ...(edits[m.id] ? cleanValues(edits[m.id], m) : {}) }));
+  if (Array.isArray(data.custom)) {
+    for (const c of data.custom.slice(0, 100)) {
+      const id = String(c?.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40);
+      if (!id.startsWith("c_") || list.some(m => m.id === id)) continue;
+      list.push({ id, name: String(c.name || "?").slice(0, 60), custom: true, ...cleanValues(c, BUILTIN_MATERIALS[0]) });
+    }
+  }
+  return list;
+}
+
+/** Alle Materialien (eingebaut + eigene) – wird an Ort und Stelle geändert, Importe bleiben gültig */
+export const MATERIALS: Material[] = loadMaterials();
+
+function saveMaterials() {
+  const edits: Record<string, MaterialValues> = {};
+  for (const b of BUILTIN_MATERIALS) {
+    const m = MATERIALS.find(x => x.id === b.id);
+    if (m && materialEdited(m.id)) edits[m.id] = { vc: m.vc, fzK: m.fzK, fzMax: m.fzMax, ap: m.ap };
+  }
+  const custom = MATERIALS.filter(m => m.custom).map(m => ({ id: m.id, name: m.name, vc: m.vc, fzK: m.fzK, fzMax: m.fzMax, ap: m.ap }));
+  try { localStorage.setItem(KEY_MATERIALS, JSON.stringify({ edits, custom })); } catch { /* egal */ }
+  if (!MATERIALS.some(m => m.id === toolSettings.material)) toolSettings.material = MATERIALS[0].id;
+  window.dispatchEvent(new CustomEvent(TOOLS_CHANGED));
+}
+
+/** Anzeigename: eingebaute übersetzt, eigene wie eingegeben (für HTML immer esc()) */
+export function materialName(id: string): string {
+  const m = MATERIALS.find(x => x.id === id);
+  return m?.custom ? (m.name || "?") : t("tl.mat." + id);
+}
+/** Eingebautes Material mit geänderten Werten? */
+export function materialEdited(id: string): boolean {
+  const b = BUILTIN_MATERIALS.find(x => x.id === id), m = MATERIALS.find(x => x.id === id);
+  return !!b && !!m && (b.vc !== m.vc || b.fzK !== m.fzK || b.fzMax !== m.fzMax || b.ap !== m.ap);
+}
+export function setMaterial(id: string, v: Partial<MaterialValues> & { name?: string }) {
+  const m = MATERIALS.find(x => x.id === id);
+  if (!m) return;
+  Object.assign(m, cleanValues({ ...m, ...v }, m));
+  if (m.custom && typeof v.name === "string") m.name = v.name.trim().slice(0, 60) || m.name;
+  saveMaterials();
+}
+export function resetMaterial(id: string) {
+  const b = BUILTIN_MATERIALS.find(x => x.id === id), m = MATERIALS.find(x => x.id === id);
+  if (b && m) { Object.assign(m, { vc: b.vc, fzK: b.fzK, fzMax: b.fzMax, ap: b.ap }); saveMaterials(); }
+}
+/** Neues eigenes Material (Werte von `from` übernommen) – Rückgabe: Kennung */
+export function addMaterial(name: string, from: string): string {
+  const src = MATERIALS.find(x => x.id === from) || MATERIALS[0];
+  const id = "c_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  MATERIALS.push({ id, name: name.trim().slice(0, 60) || "?", custom: true, vc: src.vc, fzK: src.fzK, fzMax: src.fzMax, ap: src.ap });
+  saveMaterials();
+  return id;
+}
+export function removeMaterial(id: string) {
+  const i = MATERIALS.findIndex(x => x.id === id && x.custom);
+  if (i >= 0) { MATERIALS.splice(i, 1); saveMaterials(); }
+}
 
 export interface CutData { rpm: number; feedrate: number; plungeFeed: number; stepZ: number; fz: number; limited: boolean }
 

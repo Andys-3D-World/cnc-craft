@@ -3,11 +3,13 @@
  *
  * Laserart + Watt einstellen, dann pro Material/Dicke/Arbeit mit ＋ eine Ebene mit Startwerten anlegen.
  * Gravur-Ebenen kommen vor die Schneide-Ebenen (Reihenfolge in der Liste = Laser-Reihenfolge).
+ * Oben „Meine Vorlagen“: getestete Ebenen merken und wieder einsetzen (ownPresets.ts).
  * Werte und Umrechnung: laserPresets.ts
  */
 import { t } from "../i18n/i18n";
 import { addLayer, getLayers, moveLayer } from "../laserLayers";
 import { PRESETS, LaserKind, LaserPreset, presetValues, REF_WATT } from "../laserPresets";
+import { mountOwnPresets } from "./ownPresetSection";
 
 const KEY = "cnc_craft_laser_presets";
 
@@ -41,6 +43,7 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
     <div class="dlg-box" role="dialog" style="width:640px;">
       <h3>📋 ${esc(t("llib.pre.title"))}</h3>
       <div class="dlg-hint">${esc(t("llib.pre.desc"))}</div>
+      <div class="own-box" id="lpre-own"></div>
       <div style="display:flex;gap:12px;flex-wrap:wrap;margin:6px 0;">
         <label class="dlg-row" style="flex:1;min-width:200px;"><span>${esc(t("llib.pre.kind"))}</span>
           <select id="lpre-kind" class="prop-input" style="width:auto;">
@@ -125,6 +128,10 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
     render();
   });
   wattIn.addEventListener("input", render);
+  mountOwnPresets(ov.querySelector("#lpre-own") as HTMLElement, "laser",
+    () => getLayers().map(l => ({ id: l.id, name: l.name, values: l })),
+    d => t("own.laserInfo", { p: Number(d.power) || 0, v: Number(d.speed) || 0, n: Number(d.passes) || 1 }),
+    (label, data) => { const l = addLayer({ ...data, name: label }); onAdded(l.id); });
   const close = () => ov.remove();
   ov.querySelector("#lpre-close")!.addEventListener("click", close);
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });

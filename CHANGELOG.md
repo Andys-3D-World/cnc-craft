@@ -3,6 +3,16 @@
 ## Next version (unreleased)
 
 **New**
+- **Material database (router):** 📚 next to the material in the tool settings opens a table of all materials of the
+  cutting data calculator – cutting speed, feed per tooth (factor × Ø and maximum) and step down, with an example
+  for a 6 mm cutter. Built-in materials can be adjusted to your machine and reset, own materials can be added,
+  renamed and deleted. New built-in materials: POM (Delrin), HDPE and rigid foam. The Fusion 360 import also
+  recognises them in cutting data presets.
+- **Material presets for plasma:** 📋 *Material presets* in the plasma library – starting values for mild steel,
+  stainless steel and aluminium from 1 to 12 mm for 40 A and 60 A air plasma (speed, kerf, pierce height and delay,
+  cut height, lead-in). One click creates a cut.
+- **My presets (laser and plasma):** in the material presets, a tested laser layer or plasma cut can be saved as an
+  own preset and later added again with one click – even after the layer has been changed or deleted.
 - **Mandala generator:** new command next to the box generator. A round disc with patterns in rings (petal, drop,
   circle, diamond, arch, spike), the same all around – diameter, symmetry, number of rings, bridge width, edge
   (round, wavy, petals) and centre can be chosen, every click on *New pattern* gives a different mandala. All

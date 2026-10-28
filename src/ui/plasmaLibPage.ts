@@ -14,6 +14,7 @@ import {
   activeCut, setActiveCut, cutInfo, plasmaSettings, setPlasmaSettings
 } from "../plasmaCuts";
 import { LAYER_COLORS } from "../laserLayers";
+import { openPlasmaPresetDialog } from "./plasmaPresetDialog";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -114,6 +115,7 @@ export function renderPlasmaLibPage(withEditor = true) {
             <button id="pp-up" class="btn-secondary" data-tip="${esc(t("plib.upTip"))}">▲</button>
             <button id="pp-down" class="btn-secondary" data-tip="${esc(t("plib.downTip"))}">▼</button>
           </div>
+          <button id="pp-presets" class="btn-secondary" style="width:100%;margin:4px 0;" data-tip="${esc(t("ppre.tip"))}">📋 ${esc(t("llib.pre.button"))}</button>
           <div id="pp-list" class="tlp-list"></div>
           <div class="tlp-settings">
             <h4>⚙️ ${esc(t("plasma.settings"))}</h4>
@@ -175,6 +177,7 @@ function bindPage(page: HTMLElement) {
     renderPlasmaLibPage();
   });
   page.querySelector("#pp-new")!.addEventListener("click", () => { isNew = true; renderPlasmaLibPage(); });
+  page.querySelector("#pp-presets")!.addEventListener("click", () => openPlasmaPresetDialog(id => { sel = id; isNew = false; renderPlasmaLibPage(); }));
   page.querySelector("#pp-dup")!.addEventListener("click", () => {
     if (!sel) return;
     const c = duplicateCut(sel);

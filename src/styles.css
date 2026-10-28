@@ -1680,3 +1680,23 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .tc-msg { font-size: 0.8rem; color: var(--color-danger); line-height: 1.4; }
 .tc-result { font-size: 0.84rem; font-weight: 600; color: var(--color-success); }
 .tc-buttons { flex-wrap: wrap; }
+
+/* Material-Datenbank (ui/materialDbDialog.ts) */
+.tps-matrow { display: flex; gap: 4px; align-items: center; }
+.matdb-wrap { max-height: 55vh; overflow: auto; margin: 8px 0; }
+.matdb { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+.matdb th { position: sticky; top: 0; background: var(--bg-panel, #1e1e26); text-align: left; font-weight: 600; padding: 4px 6px; color: var(--text-muted); }
+.matdb th small { font-weight: 400; }
+.matdb td { padding: 3px 6px; border-top: 1px solid rgba(255, 255, 255, 0.06); vertical-align: middle; }
+.matdb input.prop-input { width: 72px; }
+.matdb input.matdb-name { width: 150px; }
+.matdb tr.matdb-cur td:first-child { font-weight: 700; }
+.matdb .matdb-ex { color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* Material-Vorlagen: „Meine Vorlagen“ (ui/ownPresetSection.ts) */
+.own-box { border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; padding: 6px 10px; margin: 6px 0; max-height: 180px; overflow: auto; }
+.own-head { font-weight: 700; font-size: 0.85rem; margin-bottom: 4px; }
+.own-save { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.own-save select { flex: 1; min-width: 0; }
+.own-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.own-empty { padding: 2px 0; }
