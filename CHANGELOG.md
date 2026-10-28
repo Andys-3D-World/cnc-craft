@@ -3,6 +3,11 @@
 ## Next version (unreleased)
 
 **New**
+- **Mandala generator:** new command next to the box generator. A round disc with patterns in rings (petal, drop,
+  circle, diamond, arch, spike), the same all around – diameter, symmetry, number of rings, bridge width, edge
+  (round, wavy, petals) and centre can be chosen, every click on *New pattern* gives a different mandala. All
+  holes keep the bridge width to each other and to the edge, so the part stays in one piece. Created as a group:
+  outer contour *outside*, patterns as holes – or only engraved.
 - **Tool wear compensation (router):** each tool has a new field *Wear compensation* (mm). Toolpaths are calculated
   with the nominal Ø minus this value, so a worn cutter can be corrected without changing its real Ø – part too big
   or hole too small: increase the value; negative if the cutter cuts bigger (e.g. runout). Used for contours,
