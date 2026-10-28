@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **On connect: read bed size and home:** two new ticks under *Connect*. *Read bed size on connect* (on by default)
+  takes the X/Y travel from the board ($130/$131) as bed size, so the bed limit for jogging and spoilboard
+  surfacing matches the machine. *Home on connect* (off by default) runs homing ($H) right after connecting –
+  only once per connection, not again after a board reset.
 - **PiBot Controller V5.88 Ultra board:** new in *Wiring* (ESP32-S3) – drawn after PiBot's pin map and test YAML:
   10 opto-isolated inputs in two rows (limits ±, probe, tool setter), white EN STP DIR GND terminals for external
   drivers and green motor terminals for all six axes, PWM 5 V outputs (spindle IO45, laser IO46), 0–10 V with

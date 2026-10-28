@@ -200,6 +200,8 @@ export function renderRightPanel(container: HTMLElement) {
               </select>
               <button id="connect-btn" class="btn-primary" style="flex: 1; padding: 4px; font-size: 0.8rem;">🔌 ${T("rp.connect")}</button>
             </div>
+            <label class="prop-row not-k40" style="cursor:pointer;" ${tip("conn.autoBedTip")}><span>📐 ${T("conn.autoBed")}</span><input type="checkbox" id="conn-auto-bed" checked style="width:auto;"></label>
+            <label class="prop-row not-ruida not-k40" style="cursor:pointer;" ${tip("conn.autoHomeTip")}><span>⌂ ${T("conn.autoHome")}</span><input type="checkbox" id="conn-auto-home" style="width:auto;"></label>
             <div id="net-find-list" class="net-find" style="display: none;"></div>
             <button id="wifi-setup-btn" class="btn-secondary btn-compact" style="display: none;" ${tip("wifi.btnTip")}>📶 ${T("wifi.title")}</button>
             <div id="machine-info" class="tool-scope"></div>

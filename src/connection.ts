@@ -534,7 +534,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
   });
 
   // ---------------- Bettgröße aus $130/$131 ----------------
-  $("btn-sync-bed")?.addEventListener("click", guard(async () => {
+  const syncBed = async () => {
     if (machine.protocol === "ruida") {
       const b = machine.ruidaBed;
       const w = $("bed-w") as HTMLInputElement, h = $("bed-h") as HTMLInputElement;
@@ -552,7 +552,43 @@ export function initConnection(appendToConsole: (text: string) => void) {
     if (x > 0 && w) { w.value = x.toFixed(0); appendToConsole(t("conn.syncedX", { v: w.value })); w.dispatchEvent(new Event("input")); }
     if (y > 0 && h) { h.value = y.toFixed(0); appendToConsole(t("conn.syncedY", { v: h.value })); h.dispatchEvent(new Event("input")); }
     redraw();
-  }));
+  };
+  $("btn-sync-bed")?.addEventListener("click", guard(syncBed));
+
+  // ---------------- Beim Verbinden: Bett auslesen, Referenzfahrt ----------------
+  // Nur einmal je Verbindung („connected“) – nicht nach jedem Reset des Boards (der schickt auch eine Startmeldung)
+  const autoBed = $("conn-auto-bed") as HTMLInputElement | null, autoHome = $("conn-auto-home") as HTMLInputElement | null;
+  const AUTO_KEY = "cnc_craft_connect_auto";
+  try {
+    const a = JSON.parse(get(AUTO_KEY) || "{}");
+    if (autoBed && typeof a.bed === "boolean") autoBed.checked = a.bed;
+    if (autoHome && typeof a.home === "boolean") autoHome.checked = a.home;
+  } catch { /* egal */ }
+  const saveAuto = () => { try { localStorage.setItem(AUTO_KEY, JSON.stringify({ bed: !!autoBed?.checked, home: !!autoHome?.checked })); } catch { /* egal */ } };
+  autoBed?.addEventListener("change", saveAuto);
+  autoHome?.addEventListener("change", saveAuto);
+  const onConnectSetup = async () => {
+    const grbl = machine.protocol === "grbl" && machine.firmware !== "Marlin";
+    if (autoBed?.checked && (grbl || machine.protocol === "ruida")) await syncBed().catch(() => {});
+    if (!autoHome?.checked || !grbl || !machine.connected) return;
+    if (machine.settings.get("$22") === "0") { appendToConsole(t("conn.autoHomeOff")); return; }
+    const st = machine.status.state;
+    if (st && st !== "Idle" && st !== "Alarm") { appendToConsole(t("m.jogNotIdle", { s: st })); return; }
+    appendToConsole(t("conn.autoHoming"));
+    try { await send("$H"); } catch (e) { appendToConsole(`${t("log.error")} ${e}`); }
+  };
+  window.addEventListener(MACHINE_EVENT, (e: Event) => {
+    if ((e as CustomEvent).detail?.type !== "connected") return;
+    // warten, bis sich das Board gemeldet hat (Firmware und erster Status), höchstens 5 s
+    const port = machine.port;
+    let tries = 0;
+    const wait = () => {
+      if (!machine.connected || machine.port !== port) return;
+      if ((machine.firmware && machine.status.state) || ++tries > 25) { setTimeout(() => { void onConnectSetup(); }, 500); return; }
+      setTimeout(wait, 200);
+    };
+    wait();
+  });
 
   // ---------------- WLAN einrichten ----------------
   // Knopf nur bei Boards mit WLAN (FluidNC, grblHAL, Grbl_ESP32, MKS DLC32 …)
