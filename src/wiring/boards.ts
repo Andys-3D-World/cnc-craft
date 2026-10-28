@@ -11,6 +11,7 @@
  *     Laser/Spindel=IO32, Kühlung=IO4 (I2C-SCL).
  *   - MKS DLC32 MAX V1.0: Makerbase-Pinplan „MKS DLC32 MAX V1.0_002 PIN“.
  *   - PiBot FluidNC V4.96 Pro: PiBot-Wiki „Pin Definition Overview“ (wiki.pibot.com) + Test-YAML des Herstellers.
+ *   - PiBot Controller V5.88 Ultra: PiBot-Wiki „Pinout Reference“ (Bild „V588 diagram V1“) + Test-YAML des Herstellers.
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
  *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
@@ -417,6 +418,94 @@ const pibot: Board = {
   hookups: {}
 };
 
+// ---------------------------------------------------------------------
+// PiBot Controller V5.88 Ultra (ESP32-S3, FluidNC vorinstalliert) – Lage nach dem PiBot-Pinplan
+// „V588 diagram V1“ (wiki.pibot.com, Pinout Reference), Pins nach der Test-YAML des Herstellers.
+// 10 Eingänge in zwei Reihen oben, je Achse eine weiße Klemme EN STP DIR GND (externe Treiber, ohne Brücken)
+// über dem Sockel und eine grüne Motorklemme unten. Kein Relais; zwei MOSFET-Ausgänge (500 mA).
+// ---------------------------------------------------------------------
+const PU_BLUE = "#bfe3ee";
+const puIn = (id: string, label: string, x: number, y: number, gpio: string, fn: string, body: string): BConn => ({
+  ...pbIn(id, label, x, gpio, fn), y, body, pinRot: true
+});
+const puMot = (axis: string, x: number): BConn => ({
+  id: "m" + axis.toLowerCase(), label: axis, x, y: 395, dir: "h", labelPos: "above", pitch: 14, style: "screw", body: PB_GREEN,
+  pins: [{ k: "2B", label: "2B" }, { k: "2A", label: "2A" }, { k: "1A", label: "1A" }, { k: "1B", label: "1B" }]
+});
+const puExt = (axis: string, x: number, en: string, stp: string, dir: string): BConn => ({
+  id: "e" + axis.toLowerCase(), label: "", x, y: 266, dir: "h", labelPos: "below", pitch: 14, style: "screw", body: PU_BLUE, pinRot: true,
+  pins: [{ k: "EN", label: "EN", mcu: en, fn: "Enable" }, { k: "STP", label: "STP", mcu: stp, fn: "Step" }, { k: "DIR", label: "DIR", mcu: dir, fn: "Dir" }, { k: "G", label: "GND" }]
+});
+const puRight = (id: string, label: string, y: number, pins: BPin[]): BConn => ({
+  id, label, x: 604, y, dir: "v", labelPos: "left", rot: true, pitch: 17, style: "screw", body: PB_CREAM, pinSide: "right", pins
+});
+const pibotUltra: Board = {
+  id: "pibot-v588-ultra",
+  maker: "PiBot",
+  name: "PiBot Controller V5.88 Ultra",
+  mcu: "ESP32-S3",
+  fw: "wr.fw.pibot588",
+  source: "wr.src.pibot588",
+  volt: "12–24 V",
+  w: 640, h: 410,
+  pcb: { fill: "#111215", edge: "#2d3137" },
+  holes: [{ x: 14, y: 14, r: 12 }, { x: 626, y: 14, r: 12 }, { x: 14, y: 396, r: 12 }, { x: 626, y: 396, r: 12 }],
+  conns: [
+    // Eingänge: obere Reihe (grün) und zweite Reihe (hellblau), je GPIO / GND / SW-VCC
+    puIn("lx", "X−", 114, 17, "GPIO42", "X-Limit −", PB_GREEN), puIn("lxp", "X+", 164, 17, "GPIO41", "X-Limit +", PB_GREEN),
+    puIn("ly", "Y−", 215, 17, "GPIO40", "Y-Limit −", PB_GREEN), puIn("lyp", "Y+", 265, 17, "GPIO39", "Y-Limit +", PB_GREEN),
+    puIn("lz", "Z−", 315, 17, "GPIO38", "Z-Limit −", PB_GREEN),
+    puIn("la", "A−", 114, 86, "GPIO37", "A-Limit", PU_BLUE), puIn("lb", "B−", 164, 86, "GPIO36", "B-Limit", PU_BLUE),
+    puIn("lc", "C−", 215, 86, "GPIO48", "C-Limit", PU_BLUE), puIn("lp", "Probe", 265, 86, "GPIO47", "Taster", PU_BLUE),
+    puIn("lts", "Tool", 315, 86, "GPIO3", "Längensensor (Brücke ⑩)", PU_BLUE),
+    // Ausgänge oben
+    { id: "pwm", label: "PWM 5V", x: 365, y: 17, dir: "h", labelPos: "below", pitch: 14, style: "screw", body: PB_GREEN, pinRot: true,
+      pins: [{ k: "4", label: "IO4", mcu: "GPIO4", fn: "Nebel M7 / MOSFET" }, { k: "5", label: "IO5", mcu: "GPIO5", fn: "Kühlung M8 / MOSFET" },
+        { k: "45", label: "IO45", mcu: "GPIO45", fn: "Spindel PWM" }, { k: "46", label: "IO46", mcu: "GPIO46", fn: "Laser PWM" }, { k: "G", label: "GND" }] },
+    { id: "rs485", label: "RS485", x: 435, y: 17, dir: "h", labelPos: "below", pitch: 14, style: "screw", body: PB_GREEN, pinRot: true,
+      pins: [{ k: "3V3", label: "3V3" }, { k: "5V", label: "5V" }, { k: "A", label: "A", mcu: "GPIO12/11", fn: "Modbus (VFD)" }, { k: "B", label: "B" }, { k: "G", label: "GND" }] },
+    { id: "v10", label: "0-10V", x: 506, y: 17, dir: "h", labelPos: "below", pitch: 14, style: "screw", body: PB_GREEN, pinRot: true,
+      pins: [{ k: "R", label: "O2", mcu: "GPIO8", fn: "Optokoppler (Rückwärts)" }, { k: "F", label: "O1", mcu: "GPIO7", fn: "Optokoppler (Vorwärts)" },
+        { k: "C", label: "COM", fn: "OUT-Common" }, { k: "V", label: "10V", mcu: "GPIO6", fn: "0–10 V" }, { k: "G", label: "GND" }] },
+    // rechts: zwei MOSFET-Ausgänge und zwei Stromeingänge
+    puRight("m4", "MOS4", 132, [{ k: "4", label: "io4−", mcu: "GPIO4", fn: "MOSFET 500 mA" }, { k: "V", label: "Vmot" }]),
+    puRight("m5", "MOS5", 172, [{ k: "5", label: "io5−", mcu: "GPIO5", fn: "MOSFET 500 mA" }, { k: "V", label: "Vmot" }]),
+    puRight("pwr", "VIN", 210, [{ k: "-", label: "GND" }, { k: "+", label: "+ VIN" }]),
+    puRight("vdrv", "DRV", 251, [{ k: "-", label: "GND" }, { k: "+", label: "+ Vmot-Driver" }]),
+    // externe Treiber (weiß, über den Sockeln) und Motoren (grün, unten)
+    puExt("X", 182, "I2SO.0", "I2SO.2", "I2SO.1"), puExt("Y", 250, "I2SO.7", "I2SO.5", "I2SO.4"), puExt("Z", 322, "I2SO.8", "I2SO.10", "I2SO.9"),
+    puExt("A", 390, "I2SO.15", "I2SO.13", "I2SO.12"), puExt("B", 461, "I2SO.16", "I2SO.18", "I2SO.17"), puExt("C", 529, "I2SO.23", "I2SO.21", "I2SO.20"),
+    puMot("X", 180), puMot("Y", 248), puMot("Z", 320), puMot("A", 390), puMot("B", 461), puMot("C", 529),
+    { id: "extra", label: "EXTRA IO", x: 106, y: 266, dir: "h", labelPos: "below", pitch: 14, style: "screw", body: PU_BLUE, pinRot: true,
+      pins: [{ k: "3", label: "IO3", mcu: "GPIO3" }, { k: "10", label: "IO10", mcu: "GPIO10", fn: "M64/M65 P0" }, { k: "15", label: "IO15", mcu: "GPIO15", fn: "M64/M65 P1" }, { k: "G", label: "GND" }] },
+    { id: "spi", label: "SPI", x: 113, y: 392, dir: "h", labelPos: "above", pitch: 14, pinLbl: false, style: "screw", body: PB_GREEN,
+      pins: [{ k: "MOSI", label: "MOSI", mcu: "GPIO1" }, { k: "SCK", label: "SCK", mcu: "GPIO21" }, { k: "MISO", label: "MISO", mcu: "GPIO2" }, { k: "CS", label: "CS", mcu: "I2SO.3" }] },
+    { id: "oled", label: "OLED", x: 393, y: 95, dir: "h", labelPos: "above", style: "header", body: XH_BLACK, pinRot: true,
+      pins: [{ k: "G", label: "GND" }, { k: "3V3", label: "3V3" }, { k: "13", label: "13", mcu: "GPIO13", fn: "I2C SCL" }, { k: "14", label: "14", mcu: "GPIO14", fn: "I2C SDA" }] }
+  ],
+  deco: [
+    { x: 175, y: 290, w: 56, h: 82, label: "X", kind: "driver" }, { x: 245, y: 290, w: 56, h: 82, label: "Y", kind: "driver" },
+    { x: 315, y: 290, w: 56, h: 82, label: "Z", kind: "driver" }, { x: 385, y: 290, w: 56, h: 82, label: "A", kind: "driver" },
+    { x: 455, y: 290, w: 56, h: 82, label: "B", kind: "driver" }, { x: 525, y: 290, w: 56, h: 82, label: "C", kind: "driver" },
+    { x: 7, y: 205, w: 82, h: 84, label: "ESP32-S3", kind: "esp" },
+    { x: 7, y: 96, w: 62, h: 70, label: "TF", kind: "sd" },
+    { x: 54, y: 2, w: 40, h: 32, label: "USB 2", kind: "usb" }, { x: 54, y: 380, w: 40, h: 30, label: "USB", kind: "usb" },
+    { x: 572, y: 56, w: 57, h: 54, label: "RJ12", kind: "rj" },
+    { x: 576, y: 10, w: 12, h: 12, label: "", kind: "button" },
+    { x: 120, y: 168, w: 14, h: 14, label: "", kind: "button" }, { x: 120, y: 198, w: 14, h: 14, label: "", kind: "button" },
+    { x: 90, y: 170, w: 28, h: 12, label: "RST", kind: "text", size: 8, align: "end" }, { x: 90, y: 200, w: 28, h: 12, label: "BOOT", kind: "text", size: 8, align: "end" },
+    { x: 498, y: 152, w: 0, h: 0, label: "", kind: "pins", cols: 3, rows: 1, gap: 11 },
+    { x: 498, y: 174, w: 0, h: 0, label: "", kind: "pins", cols: 3, rows: 1, gap: 11 },
+    { x: 432, y: 146, w: 58, h: 12, label: "SW-VCC", kind: "text", size: 8, align: "end" },
+    { x: 432, y: 168, w: 58, h: 12, label: "VDD 5V/3V3", kind: "text", size: 8, align: "end" },
+    { x: 592, y: 296, w: 0, h: 0, label: "", kind: "pins", cols: 2, rows: 6, gap: 12 },
+    { x: 560, y: 280, w: 64, h: 10, label: "IO3 · MS · RST · SLP", kind: "text", size: 7 },
+    { x: 150, y: 150, w: 110, h: 24, label: "PiBot", kind: "text", size: 20 },
+    { x: 150, y: 176, w: 110, h: 14, label: "ULTRA · Controller V5.88", kind: "text", size: 9 }
+  ],
+  hookups: {}
+};
+
 // =====================================================================
 // Ruida RDC6445G / RDC6445S (CO2-Laser-Steuerung, eigene Firmware)
 // Lage wie auf dem Bild der Hauptplatine im Ruida-Handbuch: oben CN6/CN5 (Laser 2/1) und AXIS_U…X,
@@ -692,8 +781,131 @@ function pibotHookups(): Partial<Record<CompId, Hookup>> {
   return h;
 }
 
+/** PiBot V5.88 Ultra mit FluidNC – Belegung wie in der Test-YAML von PiBot (Einstellungen = YAML-Einträge) */
+function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"],
+      wires: [{ from: "+", to: "pwr.+", color: RED }, { from: "-", to: "pwr.-", color: BLACK }, { from: "+", to: "vdrv.+", color: RED }, { from: "-", to: "vdrv.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.pu.psu" }, { k: "wr.s.psu.3", p: { volt: "24 V (12–24 V)" } }],
+    notes: [{ k: "wr.n.pu.psu" }],
+    pro: [{ k: "wr.p.vref" }],
+    settings: []
+  };
+  const motors = ["X", "Y", "Z", "A", "B", "C"].map(a => motorPart(a, "m" + a.toLowerCase(), "bottom"));
+  h.motors = {
+    comp: "motors",
+    parts: motors,
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: "X, Y, Z, A, B, C" } }, { k: "wr.s.pu.mot" }, { k: "wr.s.mot.3" }, { k: "wr.s.pb.mot.4" }],
+    notes: [{ k: "wr.n.pu.mot" }],
+    pro: [{ k: "wr.p.pu.micro" }],
+    settings: ["axes/x/steps_per_mm", "axes/x/motor0/standard_stepper:", "step_pin: I2SO.2", "direction_pin: I2SO.1", "disable_pin: I2SO.0"]
+  };
+  h.extdrv = {
+    comp: "extdrv",
+    parts: [
+      { id: "drv", kind: "extdrv", name: "X", side: "left", pins: ["PUL+", "PUL−", "DIR+", "DIR−", "ENA+", "ENA−"],
+        wires: [{ from: "PUL+", to: "ex.STP", color: YEL }, { from: "PUL−", to: "ex.G", color: BLACK }, { from: "DIR+", to: "ex.DIR", color: GRN },
+          { from: "DIR−", to: "ex.G", color: BLACK }, { from: "ENA+", to: "ex.EN", color: VIO }, { from: "ENA−", to: "ex.G", color: BLACK }] },
+      { id: "mX", kind: "motor", name: "X", side: "left", outer: true, pins: ["1A", "1B", "2A", "2B"],
+        wires: [{ from: "1A", to: "@drv.A+", color: BLACK }, { from: "1B", to: "@drv.A−", color: GRN }, { from: "2A", to: "@drv.B+", color: RED }, { from: "2B", to: "@drv.B−", color: BLU }] },
+      { id: "psu", kind: "psu", name: "", side: "left", outer: true, pins: ["+", "-"],
+        wires: [{ from: "+", to: "@drv.VCC", color: RED }, { from: "-", to: "@drv.GND", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.ext.1" }, { k: "wr.s.pu.ext.2" }, { k: "wr.s.ext.3" }, { k: "wr.s.ext.4" }, { k: "wr.s.pu.ext.5" }, { k: "wr.s.pu.ext.6" }],
+    notes: [{ k: "wr.n.pb.ext" }],
+    pro: [{ k: "wr.p.pu.ext" }],
+    settings: ["axes/x/motor0/standard_stepper:", "step_pin: I2SO.2", "direction_pin: I2SO.1", "disable_pin: I2SO.0", "stepping/pulse_us: 5"]
+  };
+  h.limits = {
+    comp: "limits",
+    parts: [switchPart("X", "lx"), switchPart("Y", "ly"), switchPart("Z", "lz")],
+    steps: [{ k: "wr.s.lim.1", p: { sig: "IO42 / IO40 / IO38", gnd: "GND" } }, { k: "wr.s.lim.2" }, { k: "wr.s.pu.lim.3" }],
+    notes: [{ k: "wr.n.pu.lim" }],
+    pro: [{ k: "wr.p.pb.nc" }],
+    settings: ["x/motor0/limit_neg_pin: gpio.42:low", "x/motor0/limit_pos_pin: gpio.41:low", "y/motor0/limit_neg_pin: gpio.40:low",
+      "y/motor0/limit_pos_pin: gpio.39:low", "z/motor0/limit_neg_pin: gpio.38:low", "hard_limits: true"]
+  };
+  h.probe = {
+    comp: "probe",
+    parts: [
+      { id: "probe", kind: "probe", name: "", side: "left", pins: ["S", "G"],
+        wires: [{ from: "S", to: "lp.S", color: YEL }, { from: "G", to: "lp.G", color: BLACK }] },
+      { id: "wls", kind: "wls", name: "", side: "top", pins: ["S", "G"],
+        wires: [{ from: "S", to: "lts.S", color: ORG }, { from: "G", to: "lts.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.probe.1", p: { sig: "Probe IO47", gnd: "GND" } }, { k: "wr.s.pu.probe.2" }, { k: "wr.s.probe.3" }],
+    notes: [{ k: "wr.n.pu.probe" }],
+    pro: [{ k: "wr.p.pb.probe" }],
+    settings: ["probe/pin: gpio.47:low", "probe/toolsetter_pin: gpio.3:low"]
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "laser", kind: "laser", name: "", side: "top", pins: ["PWM", "GND", "VCC"],
+        wires: [{ from: "PWM", to: "pwm.46", color: YEL }, { from: "GND", to: "pwm.G", color: BLACK }, { from: "VCC", to: "@psu.+", color: RED }] },
+      { id: "psu", kind: "psu", name: "", side: "top", pins: ["+", "-"], wires: [{ from: "-", to: "pwm.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.laser.1", p: { sig: "PWM 5V IO46", gnd: "GND", vcc: "12/24 V" } }, { k: "wr.s.laser.2" }, { k: "wr.s.pu.laser.3" }],
+    notes: [{ k: "wr.n.pu.laser" }],
+    pro: [{ k: "wr.p.pb.laser" }],
+    settings: ["Laser:", "output_pin: gpio.46", "speed_map: 0=0% 1000=100%", "tool_num: 1"]
+  };
+  h.spindle = {
+    comp: "spindle",
+    parts: [{ id: "vfd", kind: "inv", name: "", side: "top", pins: ["REV", "FOR", "DCM", "AVI", "ACM"],
+      wires: [{ from: "REV", to: "v10.R", color: ORG }, { from: "FOR", to: "v10.F", color: GRN }, { from: "DCM", to: "v10.C", color: BLACK },
+        { from: "AVI", to: "v10.V", color: VIO }, { from: "ACM", to: "v10.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.pu.sp.1" }, { k: "wr.s.pu.sp.2" }, { k: "wr.s.pu.sp.3" }, { k: "wr.s.sp.2" }, { k: "wr.s.pu.sp.4" }],
+    notes: [{ k: "wr.n.pu.sp" }],
+    pro: [{ k: "wr.p.pu.vfd" }],
+    settings: ["10V:", "output_pin: gpio.6", "forward_pin: gpio.7", "reverse_pin: gpio.8", "speed_map: 0=0% 24000=100%"]
+  };
+  h.plasma = {
+    comp: "plasma",
+    parts: [
+      { id: "relay", kind: "relay", name: "24 V", side: "right", pins: ["+", "-"],
+        wires: [{ from: "+", to: "m4.V", color: RED }, { from: "-", to: "m4.4", color: BLACK }] },
+      { id: "plasma", kind: "plasma", name: "", side: "right", outer: true, pins: ["T1", "T2"],
+        wires: [{ from: "T1", to: "@relay.NO", color: WHT }, { from: "T2", to: "@relay.COM", color: WHT }] }
+    ],
+    steps: [{ k: "wr.s.pu.pl.1" }, { k: "wr.s.pl.2" }, { k: "wr.s.pl.4" }],
+    notes: [{ k: "wr.n.plasma.hf" }, { k: "wr.n.pu.pl" }],
+    pro: [{ k: "wr.p.arcok" }],
+    settings: ["relay:", "output_pin: gpio.4", "coolant/mist_pin: NO_PIN"]
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "pump", kind: "pump", name: "", side: "right", pins: ["+", "-"],
+      wires: [{ from: "+", to: "m5.V", color: RED }, { from: "-", to: "m5.5", color: BLACK }] }],
+    steps: [{ k: "wr.s.pu.air" }, { k: "wr.s.air.2" }],
+    notes: [{ k: "wr.n.pu.air" }], pro: [], settings: ["coolant/flood_pin: gpio.5"]
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"], wires: [{ from: "-", to: "pwr.-", color: BLACK }, { from: "-", to: "vdrv.-", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "right", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "pwr.+", color: RED }, { from: "2", to: "vdrv.+", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.estop.2" }],
+    notes: [{ k: "wr.n.pb.estop" }],
+    pro: [{ k: "wr.p.estop" }],
+    settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "left", pins: ["NO", "C"], wires: [{ from: "NO", to: "lc.S", color: YEL }, { from: "C", to: "lc.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.door.1", p: { sig: "C− IO48", gnd: "GND" } }, { k: "wr.s.pu.door" }],
+    notes: [], pro: [], settings: ["control/safety_door_pin: gpio.48:low"]
+  };
+  return h;
+}
+
 function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   if (b.maker === "Ruida") return ruidaHookups();
+  if (b.id === "pibot-v588-ultra") return pibotUltraHookups();
   if (b.maker === "PiBot") return pibotHookups();
   const isShield = b.id === "cnc-shield-v3";
   const isMax = b.id === "mks-dlc32-max";
@@ -892,7 +1104,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, ruida6445];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {

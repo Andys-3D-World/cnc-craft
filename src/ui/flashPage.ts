@@ -70,6 +70,7 @@ const BOARDS: Board[] = [
     fwExpect: "MKS DLC32 MAX", halGuide: "max", origGuide: "max" },
   { id: "mks-dlc32", name: "MKS DLC32 (V2.0 / V2.1)", kind: "esp", chipId: 0, chip: "ESP32", max: false, links: ["fl.link.mks", "fl.link.fluidnc", "fl.link.grblhal"],
     fwExpect: "MKS DLC32 2." },
+  { id: "pibot-v588-ultra", name: "PiBot Controller V5.88 Ultra", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, links: ["fl.link.pibot588", "fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "pibot-v496-pro", name: "PiBot FluidNC V4.96 Pro", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.pibot", "fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "esp32", nameKey: "fl.board.esp32", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "esp32s3", nameKey: "fl.board.esp32s3", kind: "esp", chipId: 9, chip: "ESP32-S3", links: ["fl.link.grblhal"] },
@@ -87,6 +88,7 @@ const LINKS: Record<string, string> = {
   "fl.link.grblhal": "https://webbuilder.grblhal.org/",
   // PiBot: YAML-Vorlagen und Anleitungen des Herstellers
   "fl.link.pibot": "https://wiki.pibot.com/doku.php?id=pibot_cnc_laser_series:v496_pro:docs:start",
+  "fl.link.pibot588": "https://wiki.pibot.com/doku.php?id=pibot_cnc_laser_series:v588_ultra:docs:start",
   // Weboberfläche für grblHAL (ESP3D-WebUI v3) – muss nach jedem Flashen neu aufs Board
   "fl.link.webuiFile": "https://github.com/luc-github/ESP3D-WEBUI/tree/3.0/dist/CNC/GRBLHal"
 };

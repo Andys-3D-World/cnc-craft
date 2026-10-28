@@ -59,6 +59,7 @@ function guessBoard(): string {
     const fl = localStorage.getItem("cnc_craft_flash_board") || "";
     if (fl === "mks-dlc32-max") return "mks-dlc32-max";
     if (fl === "mks-dlc32") return "mks-dlc32-v21";
+    if (/V5\.?88/i.test(name) || fl === "pibot-v588-ultra") return "pibot-v588-ultra";
     if (/PiBot|V49PB/i.test(name) || fl === "pibot-v496-pro") return "pibot-v496-pro";
   } catch { /* egal */ }
   return "cnc-shield-v3";

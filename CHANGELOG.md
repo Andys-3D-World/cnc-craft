@@ -3,6 +3,11 @@
 ## Next version (unreleased)
 
 **New**
+- **PiBot Controller V5.88 Ultra board:** new in *Wiring* (ESP32-S3) – drawn after PiBot's pin map and test YAML:
+  10 opto-isolated inputs in two rows (limits ±, probe, tool setter), white EN STP DIR GND terminals for external
+  drivers and green motor terminals for all six axes, PWM 5 V outputs (spindle IO45, laser IO46), 0–10 V with
+  forward/reverse, isolated RS485, two MOSFET outputs (500 mA) and both power inputs, with FluidNC *config.yaml*
+  hints for every part. Also listed in *Flash board* with a link to PiBot's YAML templates.
 - **PiBot FluidNC V4.96 Pro board:** new in *Wiring* – drawn like the real board (PiBot pin map and test YAML):
   six axes with one terminal each for motors or external drivers (EN STP DIR GND with jumpers), limit inputs,
   probe and tool setter, laser PWM, 0–10 V with forward/reverse, RS485, relay, MOSFET outputs and both power
