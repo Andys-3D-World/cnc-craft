@@ -59,6 +59,7 @@ function guessBoard(): string {
     const fl = localStorage.getItem("cnc_craft_flash_board") || "";
     if (fl === "mks-dlc32-max") return "mks-dlc32-max";
     if (fl === "mks-dlc32") return "mks-dlc32-v21";
+    if (/PiBot|V49PB/i.test(name) || fl === "pibot-v496-pro") return "pibot-v496-pro";
   } catch { /* egal */ }
   return "cnc-shield-v3";
 }
@@ -176,7 +177,7 @@ function partGlyph(pl: Placed): string {
     case "estop": return `<circle cx="${n(cx)}" cy="${n(cy)}" r="14" fill="#f5c518"/><circle cx="${n(cx)}" cy="${n(cy)}" r="10" fill="#e5484d" stroke="#8b1d20"/>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
-      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡"
+      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡"
     }[p.kind as string] || "■"}</text>`;
   }
 }

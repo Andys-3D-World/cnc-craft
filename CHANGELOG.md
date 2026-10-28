@@ -3,6 +3,11 @@
 ## Next version (unreleased)
 
 **New**
+- **PiBot FluidNC V4.96 Pro board:** new in *Wiring* – drawn like the real board (PiBot pin map and test YAML):
+  six axes with one terminal each for motors or external drivers (EN STP DIR GND with jumpers), limit inputs,
+  probe and tool setter, laser PWM, 0–10 V with forward/reverse, RS485, relay, MOSFET outputs and both power
+  inputs. Every part has step-by-step help with the matching FluidNC *config.yaml* entries and jumper hints
+  (SW-VCC, VDD, GPIO26 relay/input). The board is also listed in *Flash board* with a link to PiBot's YAML templates.
 - **Centerline trace:** *Trace image* has a new option *Centerline* – instead of outlines, one single line in the
   middle of each stroke (handwriting, sketches, line drawings), ideal for engraving as a line or with a V-bit.
   The image is thinned to 1 pixel, followed along strokes and crossings, short stubs are dropped.
