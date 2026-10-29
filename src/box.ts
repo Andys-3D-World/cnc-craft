@@ -67,7 +67,27 @@ export type PanelName = "bottom" | "top" | "front" | "back" | "left" | "right" |
   | "slideLid" | "linerSide" | "linerBack" | "railSide" | "railBack" | "shelfBack" | "shelfEnd" | "shelf" | "flexWall" | "flexRing"
   | "plugOuter" | "plugInner" | "hexWall" | "ramp" | "drBottom" | "drEnd" | "drSide" | "drPlate";
 /** holes: Ausschnitte in der Platte (Schlitze, Grifflöcher); lines: offene Schnitte (Biegescharnier) */
-export interface Panel { name: PanelName; w: number; h: number; pts: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; lines?: { x: number; y: number }[][] }
+export interface Panel {
+  name: PanelName; w: number; h: number; pts: { x: number; y: number }[]; holes?: { x: number; y: number }[][]; lines?: { x: number; y: number }[][];
+  at?: Place;                                         // Lage in der fertigen Kiste (für die 3D-Ansicht)
+  wrap?: { loop: { x: number; y: number }[]; z0: number; z1: number }; // gebogene Wand: Mittellinie (Draufsicht), Höhe
+}
+
+/**
+ * Lage einer Platte in der fertigen Kiste: Punkt (x, y) der Platte in Tiefe s (0 … Materialstärke) liegt bei
+ * o + u·x + v·y + n·s. Kiste: X = Breite, Y = Tiefe (0 = vorne), Z = Höhe (0 = unten).
+ */
+export type V3 = [number, number, number];
+export interface Place { o: V3; u: V3; v: V3; n: V3 }
+const EX: V3 = [1, 0, 0], EY: V3 = [0, 1, 0], EZ: V3 = [0, 0, 1];
+const flat = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EY, n: EZ });       // liegend
+const across = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EZ, n: EY });     // stehend, parallel zur Front
+const along = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EY, v: EZ, n: EX });      // stehend, parallel zur Seite
+/** Lage mit einer Abbildung (Drehung/Spiegelung M, danach verschieben um T) umrechnen */
+function movePlace(pl: Place, M: (v: V3) => V3, T: V3): Place {
+  const o = M(pl.o);
+  return { o: [o[0] + T[0], o[1] + T[1], o[2] + T[2]], u: M(pl.u), v: M(pl.v), n: M(pl.n) };
+}
 
 /** Außenmaße (W × D × H) aus den eingegebenen Maßen – je nach Art kommen die Wände anders dazu */
 export function outerSize(o: BoxOptions): { W: number; D: number; H: number } {
@@ -182,8 +202,10 @@ function rawPanels(o: BoxOptions): Panel[] {
     // Quer-Trennwände → Regalbretter (die offene Seite zeigt nach vorne)
     const { W, D, H } = outerSize(o);
     const rename: Partial<Record<PanelName, PanelName>> = { bottom: "shelfBack", front: "shelfEnd", back: "shelfEnd", divX: "shelf" };
+    // Lage: Boden des Sortierkastens (z = 0) wird zur Rückwand (y = D), seine Tiefe zur Höhe
+    const M = (v: V3): V3 => [v[0], -v[2], v[1]];
     return rawPanels({ ...o, inner: false, w: W, d: H, h: D, type: "tray", nx: o.shelves ?? 2, ny: 0 })
-      .map(p => ({ ...p, name: rename[p.name] || p.name }));
+      .map(p => ({ ...p, name: rename[p.name] || p.name, at: p.at && movePlace(p.at, M, [0, D, 0]) }));
   }
   const lid = LIDDED.includes(type);
   const t = Math.max(0.1, o.t);
@@ -209,6 +231,10 @@ function rawPanels(o: BoxOptions): Panel[] {
   const topEdge = slide ? merge([{ a: 0, b: t, out: true }, ...P(D, false, true, false).slice(1)]) : P(D, false, true, lid);
   const lr = (name: "left" | "right") => panels.push({ name, w: D, h: H, pts: outline(D, H, t, P(D, false, true), P(H, false, false), topEdge, frontEdge) });
   lr("left"); lr("right");
+  get("bottom").at = flat(0, 0, 0);
+  if (lid) get("top").at = flat(0, 0, H - t);
+  get("front").at = across(0, 0, 0); get("back").at = across(0, D - t, 0);
+  get("left").at = along(0, 0, 0); get("right").at = along(W - t, 0, 0);
 
   const Wi = W - 2 * t, Di = D - 2 * t, Hi = H - t; // Innenmaße (offene Box)
   if (type === "tray" || type === "traylid") {
@@ -233,8 +259,8 @@ function rawPanels(o: BoxOptions): Panel[] {
       pts.push({ x: t, y: Hd }, { x: t, y: te }, { x: 0, y: te }, { x: 0, y: tb }, { x: t, y: tb });
       return { name, w: L + 2 * t, h: Hd, pts };
     };
-    for (let i = 0; i < nx; i++) panels.push(divider(Wi, xs, true, "divX"));
-    for (let i = 0; i < ny; i++) panels.push(divider(Di, ys, false, "divY"));
+    for (let i = 0; i < nx; i++) panels.push({ ...divider(Wi, xs, true, "divX"), at: across(0, t + ys[i] - t / 2, t) });
+    for (let i = 0; i < ny; i++) panels.push({ ...divider(Di, ys, false, "divY"), at: along(t + xs[i] - t / 2, 0, t) });
   }
   if (type === "handle") {
     // Grifflöcher in links/rechts, oben mittig
@@ -245,21 +271,21 @@ function rawPanels(o: BoxOptions): Panel[] {
     // Blende: rundum `overhang` größer als die Front (unten bündig, oben + overhang), mit Griffloch
     const ov = Math.max(0, o.overhang ?? 5), bw = W + 2 * ov, bh = H + ov;
     const hl = Math.min(bw * 0.35, 90), hh = Math.min(25, bh * 0.25);
-    panels.push({ name: "blende", w: bw, h: bh, pts: rect(0, 0, bw, bh), holes: hl > hh * 1.5 ? [slot(bw / 2, bh * 0.6, hl, hh)] : [] });
+    panels.push({ name: "blende", w: bw, h: bh, pts: rect(0, 0, bw, bh), holes: hl > hh * 1.5 ? [slot(bw / 2, bh * 0.6, hl, hh)] : [], at: across(-ov, -t, 0) });
   }
   if (slide) {
     // Innen: unten Futter-Leisten bis Hf (darauf liegt der Deckel), oben Halte-Leisten (2 t hoch) mit Luft c darunter
     const lh = Hf - t, bw = Wi - 2 * t;
     if (lh > 0.5) {
-      panels.push({ name: "linerSide", w: Di, h: lh, pts: rect(0, 0, Di, lh) }, { name: "linerSide", w: Di, h: lh, pts: rect(0, 0, Di, lh) });
-      panels.push({ name: "linerBack", w: bw, h: lh, pts: rect(0, 0, bw, lh) });
+      panels.push({ name: "linerSide", w: Di, h: lh, pts: rect(0, 0, Di, lh), at: along(t, t, t) }, { name: "linerSide", w: Di, h: lh, pts: rect(0, 0, Di, lh), at: along(W - 2 * t, t, t) });
+      panels.push({ name: "linerBack", w: bw, h: lh, pts: rect(0, 0, bw, lh), at: across(2 * t, D - 2 * t, t) });
     }
-    panels.push({ name: "railSide", w: Di, h: 2 * t, pts: rect(0, 0, Di, 2 * t) }, { name: "railSide", w: Di, h: 2 * t, pts: rect(0, 0, Di, 2 * t) });
-    panels.push({ name: "railBack", w: bw, h: 2 * t, pts: rect(0, 0, bw, 2 * t) });
+    panels.push({ name: "railSide", w: Di, h: 2 * t, pts: rect(0, 0, Di, 2 * t), at: along(t, t, H - 2 * t) }, { name: "railSide", w: Di, h: 2 * t, pts: rect(0, 0, Di, 2 * t), at: along(W - 2 * t, t, H - 2 * t) });
+    panels.push({ name: "railBack", w: bw, h: 2 * t, pts: rect(0, 0, bw, 2 * t), at: across(2 * t, D - 2 * t, H - 2 * t) });
     // Deckel: so breit wie innen (minus Luft), von der Vorderkante bis an die Rückwand; Griffmulde vorne
     const lw = Wi - 2 * c, ld = D - t - c;
     const gl = Math.min(lw * 0.4, 50), gh = Math.min(10, ld * 0.15);
-    panels.push({ name: "slideLid", w: lw, h: ld, pts: rect(0, 0, lw, ld), holes: gl > gh * 1.5 ? [slot(lw / 2, 6 + gh / 2, gl, gh)] : [] });
+    panels.push({ name: "slideLid", w: lw, h: ld, pts: rect(0, 0, lw, ld), holes: gl > gh * 1.5 ? [slot(lw / 2, 6 + gh / 2, gl, gh)] : [], at: flat(t + c, 0, Hf) });
   }
   if (type === "lantern") {
     // Fenster mit Rundbogen in allen vier Wänden (Rand frei für die Zinken), Abzugsloch im Deckel
@@ -279,8 +305,8 @@ function rawPanels(o: BoxOptions): Panel[] {
     const hr = Math.min(25, (Math.min(bot.w, bot.h) - 4 * t) / 2 - 2);
     if (hr > 6) {
       bot.holes = [circle(bot.w / 2, bot.h / 2, hr)];
-      panels.push({ name: "plugOuter", w: 2 * hr + 10, h: 2 * hr + 10, pts: circle(hr + 5, hr + 5, hr + 5) });
-      panels.push({ name: "plugInner", w: 2 * hr, h: 2 * hr, pts: circle(hr, hr, hr - 0.2) });
+      panels.push({ name: "plugOuter", w: 2 * hr + 10, h: 2 * hr + 10, pts: circle(hr + 5, hr + 5, hr + 5), at: flat(W / 2 - hr - 5, D / 2 - hr - 5, -t) });
+      panels.push({ name: "plugInner", w: 2 * hr, h: 2 * hr, pts: circle(hr, hr, hr - 0.2), at: flat(W / 2 - hr, D / 2 - hr, 0) });
     }
   }
   if (type === "tissue") {
@@ -320,8 +346,8 @@ function rawPanels(o: BoxOptions): Panel[] {
   if (type === "lidbox" || type === "traylid") {
     // Stülpdeckel: außen W × D, innen passend in die Öffnung (0,2 mm Luft je Seite) – beide aufeinander kleben
     const c = 0.2;
-    panels.push({ name: "lidOuter", w: W, h: D, pts: rect(0, 0, W, D) });
-    panels.push({ name: "lidInner", w: Wi - 2 * c, h: Di - 2 * c, pts: rect(0, 0, Wi - 2 * c, Di - 2 * c) });
+    panels.push({ name: "lidOuter", w: W, h: D, pts: rect(0, 0, W, D), at: flat(0, 0, H) });
+    panels.push({ name: "lidInner", w: Wi - 2 * c, h: Di - 2 * c, pts: rect(0, 0, Wi - 2 * c, Di - 2 * c), at: flat(t + c, t + c, H - t) });
   }
   return panels;
 }
@@ -381,9 +407,9 @@ function flexPanels(o: BoxOptions): Panel[] {
   const panels: Panel[] = [];
   // Boden + Ring: liegen innerhalb der Wand, Zapfen gehen durch die Wand bis außen
   const plate = () => roundRect(t, t, W - t, D - t, r - t, { t, finger: f, d: t });
-  panels.push({ name: "bottom", w: W, h: D, pts: plate() });
+  panels.push({ name: "bottom", w: W, h: D, pts: plate(), at: flat(0, 0, 0) });
   const hole = roundRect(t + rw, t + rw, W - t - rw, D - t - rw, Math.max(0.5, r - t - rw));
-  panels.push({ name: "flexRing", w: W, h: D, pts: plate(), holes: [hole] });
+  panels.push({ name: "flexRing", w: W, h: D, pts: plate(), holes: [hole], at: flat(0, 0, H - t) });
 
   // Stoß mitten auf der längeren geraden Seite (hinten bzw. links); Reihenfolge wie roundRect: vorne, rechts, hinten, links
   const straight = [Lw, Ld, Lw, Ld];
@@ -447,13 +473,13 @@ function flexPanels(o: BoxOptions): Panel[] {
   pts.push({ x: 0, y: H });
   for (const yc of [...knobs].reverse()) pts.push({ x: 0, y: yc + nw / 2 }, { x: kd, y: yc + hw / 2 }, { x: kd, y: yc - hw / 2 }, { x: 0, y: yc - nw / 2 });
   const clean = pts.filter((q, i) => { const nq = pts[(i + 1) % pts.length]; return Math.hypot(q.x - nq.x, q.y - nq.y) > 1e-6; });
-  panels.push({ name: "flexWall", w: len + kd, h: H, pts: clean, lines });
+  panels.push({ name: "flexWall", w: len + kd, h: H, pts: clean, lines, wrap: { loop: roundRect(t / 2, t / 2, W - t / 2, D - t / 2, r - t / 2), z0: 0, z1: H } });
 
   if (o.type !== "flexcup") {
     // Stülpdeckel: außen wie die Kiste, innen passend in die Öffnung des Rings
-    panels.push({ name: "lidOuter", w: W, h: D, pts: roundRect(0, 0, W, D, r) });
+    panels.push({ name: "lidOuter", w: W, h: D, pts: roundRect(0, 0, W, D, r), at: flat(0, 0, H) });
     const iw = W - 2 * (t + rw) - 2 * c, id = D - 2 * (t + rw) - 2 * c;
-    panels.push({ name: "lidInner", w: iw, h: id, pts: roundRect(0, 0, iw, id, Math.max(0.5, r - t - rw - c)) });
+    panels.push({ name: "lidInner", w: iw, h: id, pts: roundRect(0, 0, iw, id, Math.max(0.5, r - t - rw - c)), at: flat(t + rw + c, t + rw + c, H - t) });
   }
   return panels;
 }
@@ -481,16 +507,20 @@ function diceRamps(front: Panel, left: Panel, right: Panel, t: number, f: number
   for (const [P, Q] of lines) {
     if (Math.max(P.y, Q.y) + t / 2 > H - 2) continue;
     const L = Math.hypot(Q.x - P.x, Q.y - P.y), ux = (Q.x - P.x) / L, uy = (Q.y - P.y) / L;
-    const Lr = L - 0.5, tabs = tabsOn(Lr, t, f);
+    // die Rampe ist schräg: an beiden Enden so viel kürzer, dass ihre Ecken nicht in die Wand ragen
+    const d0 = (t / 2) * Math.abs(uy / ux) + 0.25;
+    const Lr = L - 2 * d0, tabs = tabsOn(Lr, t, f);
     // Schlitz: Rechteck um die Mittellinie, so lang wie der Zapfen, so breit wie das Material
-    for (const [a, b] of tabs) slots.push([[a, -1], [b, -1], [b, 1], [a, 1]].map(([s, n]) => ({ x: P.x + ux * s - uy * n * t / 2, y: P.y + uy * s + ux * n * t / 2 })));
+    for (const [a, b] of tabs) slots.push([[a, -1], [b, -1], [b, 1], [a, 1]].map(([s, n]) => ({ x: P.x + ux * (d0 + s) - uy * n * t / 2, y: P.y + uy * (d0 + s) + ux * n * t / 2 })));
     // Rampe: Länge Lr × Innenbreite, Zapfen (t) an beiden langen Seiten
     const pts: Pt2[] = [{ x: 0, y: t }];
     for (const [a, b] of tabs) pts.push({ x: a, y: t }, { x: a, y: 0 }, { x: b, y: 0 }, { x: b, y: t });
     pts.push({ x: Lr, y: t }, { x: Lr, y: t + Wi });
     for (const [a, b] of [...tabs].reverse()) pts.push({ x: b, y: t + Wi }, { x: b, y: Wi + 2 * t }, { x: a, y: Wi + 2 * t }, { x: a, y: t + Wi });
     pts.push({ x: 0, y: t + Wi });
-    ramps.push({ name: "ramp", w: Lr, h: Wi + 2 * t, pts });
+    // Lage: Wand-x = Tiefe Y, Wand-y = Höhe Z; Rampe quer über die Breite, Dicke um die Mittellinie
+    const sx = P.x + ux * d0 + uy * t / 2, sz = P.y + uy * d0 - ux * t / 2;
+    ramps.push({ name: "ramp", w: Lr, h: Wi + 2 * t, pts, at: { o: [0, sx, sz], u: [0, ux, uy], v: EX, n: [0, -uy, ux] } });
   }
   left.holes = slots.map(sl => sl.map(q => ({ ...q })));
   right.holes = slots.map(sl => sl.map(q => ({ ...q })));
@@ -537,11 +567,17 @@ function hexPanels(o: BoxOptions): Panel[] {
   const wall: Pt2[] = [{ x: 0, y: t }];
   for (const [s0, s1] of tabs) wall.push({ x: s0, y: t }, { x: s0, y: 0 }, { x: s1, y: 0 }, { x: s1, y: t });
   wall.push({ x: side, y: t }, { x: side, y: t + Hw }, { x: 0, y: t + Hw });
-  for (let i = 0; i < n; i++) panels.push({ name: "hexWall", w: side, h: Hw + t, pts: wall.map(q => ({ ...q })) });
-  panels.push({ name: "lidOuter", w: W, h: D, pts: polyVerts(cx, cy, A, n) });
+  for (let i = 0; i < n; i++) {
+    // Wand i: Innenseite im Abstand ai, Dicke nach außen, Platten-x entlang der Seite
+    const th = (2 * Math.PI * i) / n, nx = Math.cos(th), ny = Math.sin(th);
+    panels.push({ name: "hexWall", w: side, h: Hw + t, pts: wall.map(q => ({ ...q })),
+      at: { o: [cx + nx * ai + ny * side / 2, cy + ny * ai - nx * side / 2, 0], u: [-ny, nx, 0], v: EZ, n: [nx, ny, 0] } });
+  }
+  panels[0].at = flat(0, 0, 0);
+  panels.push({ name: "lidOuter", w: W, h: D, pts: polyVerts(cx, cy, A, n), at: flat(0, 0, Hw + t) });
   const li = polyVerts(0, 0, ai - c, n), lx = Math.min(...li.map(q => q.x)), ly = Math.min(...li.map(q => q.y));
   const lw = Math.max(...li.map(q => q.x)) - lx, lh = Math.max(...li.map(q => q.y)) - ly;
-  panels.push({ name: "lidInner", w: lw, h: lh, pts: li.map(q => ({ x: q.x - lx, y: q.y - ly })) });
+  panels.push({ name: "lidInner", w: lw, h: lh, pts: li.map(q => ({ x: q.x - lx, y: q.y - ly })), at: flat(cx + lx, cy + ly, Hw) });
   return panels;
 }
 
@@ -562,7 +598,12 @@ function cabinetPanels(o: BoxOptions): Panel[] {
   const panels = rawPanels({ ...o, type: "shelf" });
   const dr = cabinetDrawer(o);
   const rename: Partial<Record<PanelName, PanelName>> = { bottom: "drBottom", front: "drEnd", back: "drEnd", left: "drSide", right: "drSide", blende: "drPlate" };
-  if (Math.min(dr.w, dr.d, dr.h) > 3 * Math.max(0.1, o.t)) for (let i = 0; i < dr.n; i++)
-    panels.push(...rawPanels({ ...o, inner: false, type: "drawer", w: dr.w, d: dr.d, h: dr.h, overhang: 0 }).map(p => ({ ...p, name: rename[p.name] || p.name })));
+  const t = Math.max(0.1, o.t), { H } = outerSize({ ...o, type: "cabinet" }), I = (v: V3): V3 => v;
+  // Schublade k steht auf dem Boden ihres Fachs (Fach 0: auf der unteren Platte, sonst auf dem Regalbrett darunter);
+  // die Blende vorne bündig, 1 mm Luft links
+  const floor = (k: number) => (k === 0 ? t : t + ((H - 2 * t) * k) / (dr.n) + t / 2);
+  if (Math.min(dr.w, dr.d, dr.h) > 3 * t) for (let i = 0; i < dr.n; i++)
+    panels.push(...rawPanels({ ...o, inner: false, type: "drawer", w: dr.w, d: dr.d, h: dr.h, overhang: 0 })
+      .map(p => ({ ...p, name: rename[p.name] || p.name, at: p.at && movePlace(p.at, I, [t + 1, t, floor(i)]) })));
   return panels;
 }

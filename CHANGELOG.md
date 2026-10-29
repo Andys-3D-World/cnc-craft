@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **3D view in the *Box generator*:** shows the finished box built from the panels – drag to rotate, mouse wheel to
+  zoom, double-click to reset. *Pull apart* moves the panels away from each other so you can see how the finger
+  joints, dividers, ramps and drawers fit. Works for every box type (the round box shows its bent wall as a plain
+  surface). Tests check that every panel has its place and no panel sits inside another.
 - **Three more box types in the *Box generator*:** *Polygon box* (5–12 sides, hexagon by default – walls with tabs in
   slots of the bottom plate, lift-off lid), *Dice tower* (open at the top, three sloped ramps with tabs in slanted
   slots of the side walls, exit at the bottom front) and *Drawer cabinet* (shelf open at the front with one fitting

@@ -5,11 +5,13 @@ import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
 import { boxPanels, outerSize, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
+import { Box3DView } from "./box3d";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
 const hexWallTooSmall = (b: BoxOptions) => !boxPanels(b).some(p => p.name === "hexWall" && p.w >= 3 * b.t && p.h > 3 * b.t);
 
 const KEY = "cnc_craft_box";
+const VIEW_KEY = "cnc_craft_box_view"; // Vorschau: "2d" (Platten) oder "3d" (fertige Kiste)
 const DEF: BoxOptions = { w: 100, d: 80, h: 50, inner: false, t: 3, finger: 9, lid: true, kerf: 0.1, type: "closed", nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6 };
 
 function loadBox(): BoxOptions {
@@ -65,7 +67,17 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
           <div class="box-x" data-for="hex">${num("box-sides", "box.sides", o.sides ?? 6, "1", "5")}</div>
           ${num("box-kerf", "box.kerf", o.kerf, "0.01", "0")}
         </div>
-        <div class="box-prev"><svg id="box-svg" viewBox="0 0 100 100"></svg><div id="box-info" class="dlg-hint"></div></div>
+        <div class="box-prev">
+          <div class="box-view">
+            <button type="button" class="btn-secondary" data-view="2d">${t("box.view.flat")}</button>
+            <button type="button" class="btn-secondary" data-view="3d">🧊 ${t("box.view.3d")}</button>
+          </div>
+          <svg id="box-svg" viewBox="0 0 100 100"></svg>
+          <canvas id="box-3d" class="box-3d" title="${t("box.view.hint")}"></canvas>
+          <label class="prop-row box-3d-only">${t("box.view.explode")}<input id="box-explode" type="range" min="0" max="1" step="0.05" value="0" style="width:110px;"></label>
+          <div class="dlg-hint box-3d-only">${t("box.view.hint")}</div>
+          <div id="box-info" class="dlg-hint"></div>
+        </div>
       </div>
       <div class="dlg-hint">${t("box.hint")}</div>
       <div class="dlg-buttons">
@@ -75,6 +87,9 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     </div>`;
   document.body.appendChild(ov);
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => ov.querySelector("#" + id) as E;
+  const view3d = new Box3DView($<HTMLCanvasElement>("box-3d"));
+  let mode: "2d" | "3d" = "2d";
+  try { if (localStorage.getItem(VIEW_KEY) === "3d") mode = "3d"; } catch { /* egal */ }
   const read = (): BoxOptions => {
     const n = (id: string, d: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? v : d; };
     const type = $<HTMLSelectElement>("box-type").value as BoxType;
@@ -104,9 +119,14 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     $<HTMLElement>("box-tdesc").textContent = t("box.tdesc." + b.type);
     const svg = $<HTMLElement>("box-svg") as unknown as SVGSVGElement;
     const info = $<HTMLElement>("box-info");
-    if (!valid(b)) { svg.innerHTML = ""; info.textContent = t("box.tooSmall"); $<HTMLButtonElement>("box-ok").disabled = true; return; }
+    ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.classList.toggle("active", el.dataset.view === mode));
+    svg.style.display = mode === "2d" ? "" : "none";
+    ov.querySelectorAll<HTMLElement>(".box-3d, .box-3d-only").forEach(el => { el.style.display = mode === "3d" ? "" : "none"; });
+    if (!valid(b)) { svg.innerHTML = ""; view3d.setPanels([], b.t, 0); info.textContent = t("box.tooSmall"); $<HTMLButtonElement>("box-ok").disabled = true; return; }
     $<HTMLButtonElement>("box-ok").disabled = false;
     const ps = boxPanels(b);
+    // 2D: Platten nebeneinander; 3D: fertige Kiste (ohne Schnittspalt, der ist zu klein zum Sehen)
+    if (mode === "3d") view3d.setPanels(boxPanels({ ...b, kerf: 0 }), b.t, parseFloat($("box-explode").value) || 0);
     const pos = layout(ps, 4, Math.max(b.w, b.d) * 2.4);
     let W = 0, H = 0;
     ps.forEach((p, i) => { W = Math.max(W, pos[i].x + p.w); H = Math.max(H, pos[i].y + p.h); });
@@ -122,6 +142,11 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
   };
   $<HTMLSelectElement>("box-type").value = o.type || "closed";
   ov.querySelectorAll("input, select").forEach(i => i.addEventListener("input", preview));
+  ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.addEventListener("click", () => {
+    mode = el.dataset.view === "3d" ? "3d" : "2d";
+    try { localStorage.setItem(VIEW_KEY, mode); } catch { /* egal */ }
+    preview();
+  }));
   preview();
   const close = () => ov.remove();
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); if (e.key === "Enter") $<HTMLElement>("box-ok").click(); });

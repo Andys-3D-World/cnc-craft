@@ -117,3 +117,39 @@ test("Schubladenschrank: je Fach eine Schublade, die mit Luft hineinpasst", () =
     assert.ok(Math.abs(plate.w - dr.w) < 1e-9 && Math.abs(plate.h - dr.h) < 1e-9);
   }
 });
+
+// 3D-Lage: jede Platte hat einen Platz, und in der fertigen Kiste steckt keine Platte in einer anderen
+// (Prüfung: Punkte im Inneren jeder Platte – in halber Dicke, Raster 1,5 mm – liegen in keiner anderen Platte)
+type V = [number, number, number];
+const dot = (a: V, b: V) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+function solidAt(p: Panel, q: V, t: number, eps = 0.05): boolean {
+  const at = p.at!, d: V = [q[0] - at.o[0], q[1] - at.o[1], q[2] - at.o[2]];
+  const s = dot(d, at.n);
+  if (s < eps || s > t - eps) return false;
+  const pt = { x: dot(d, at.u), y: dot(d, at.v) };
+  if (!inside(pt, p.pts) || (p.holes || []).some(h => inside(pt, h))) return false;
+  // nicht direkt an einer Kante (dort berühren sich Platten nur)
+  const near = (ring: Pt[]) => ring.some((a, i) => {
+    const b = ring[(i + 1) % ring.length], dx = b.x - a.x, dy = b.y - a.y, L = dx * dx + dy * dy;
+    const u = L ? Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / L)) : 0;
+    return Math.hypot(pt.x - a.x - u * dx, pt.y - a.y - u * dy) < eps;
+  });
+  return !near(p.pts) && !(p.holes || []).some(near);
+}
+for (const type of BOX_TYPES) {
+  test(`3D: alle Platten an ihrem Platz, keine steckt in einer anderen (${type})`, () => {
+    const o = opts(type, type === "cabinet" ? { w: 160, d: 120, h: 160 } : {}), t = o.t, ps = boxPanels(o);
+    for (const p of ps) assert.ok(p.at || p.wrap, `${p.name}: keine Lage`);
+    const solid = ps.filter(p => p.at);
+    for (const p of solid) {
+      const at = p.at!, xs = p.pts.map(q => q.x), ys = p.pts.map(q => q.y);
+      for (let x = Math.min(...xs) + 0.37; x < Math.max(...xs); x += 1.5) for (let y = Math.min(...ys) + 0.41; y < Math.max(...ys); y += 1.5) {
+        const pt = { x, y };
+        if (!inside(pt, p.pts) || (p.holes || []).some(h => inside(pt, h))) continue;
+        const q: V = [0, 1, 2].map(k => at.o[k] + at.u[k] * x + at.v[k] * y + at.n[k] * t / 2) as V;
+        for (const other of solid) if (other !== p && solidAt(other, q, t))
+          assert.fail(`${p.name} steckt in ${other.name} bei ${q.map(v => v.toFixed(1)).join(", ")}`);
+      }
+    }
+  });
+}
