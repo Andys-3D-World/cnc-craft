@@ -2,7 +2,8 @@
  * MANDALA-GENERATOR – nur die Geometrie (Fenster: editor/mandalaGen.ts)
  *
  * Eine runde Scheibe mit Mustern in Ringen, n-fach drehsymmetrisch. Jeder Ring bekommt eine Musterform
- * (Blatt, Tropfen, Kreis, Raute, Bogen, Spitze), die n- oder 2n-mal im Kreis wiederholt wird.
+ * (Blatt, Tropfen, Kreis, Raute, Bogen, Spitze, Zwiebel, Sanduhr, Langloch, Fächer), die n- oder 2n-mal im Kreis
+ * wiederholt wird – zufällig je Ring („mixed“) oder überall dieselbe Form.
  * Alle Muster bleiben um die Stegbreite voneinander und vom Rand entfernt – beim Ausschneiden hält das Teil zusammen.
  * Die Form eines Musters entsteht aus einer Breiten-Kurve entlang des Radius: an jedem Radius höchstens so breit,
  * wie das Kreisstück (Sektor) minus Steg erlaubt.
@@ -11,10 +12,12 @@
  */
 
 export type Pt = { x: number; y: number };
-export type MandalaEdge = "round" | "wavy" | "petals";
-export type MandalaCenter = "hole" | "flower" | "none";
-export type Motif = "petal" | "drop" | "circle" | "diamond" | "arch" | "spike";
-export const MOTIFS: Motif[] = ["petal", "drop", "circle", "diamond", "arch", "spike"];
+export type MandalaEdge = "round" | "wavy" | "petals" | "zigzag" | "lace";
+export type MandalaCenter = "hole" | "flower" | "none" | "star" | "dots";
+export type Motif = "petal" | "drop" | "circle" | "diamond" | "arch" | "spike" | "onion" | "hourglass" | "capsule" | "fan";
+export const MOTIFS: Motif[] = ["petal", "drop", "circle", "diamond", "arch", "spike", "onion", "hourglass", "capsule", "fan"];
+export const MANDALA_EDGES: MandalaEdge[] = ["round", "wavy", "petals", "zigzag", "lace"];
+export const MANDALA_CENTERS: MandalaCenter[] = ["hole", "flower", "none", "star", "dots"];
 
 export interface MandalaOptions {
   d: number;            // Durchmesser (mm)
@@ -24,6 +27,7 @@ export interface MandalaOptions {
   edge: MandalaEdge;
   center: MandalaCenter;
   seed: number;
+  motif?: Motif | "mixed"; // Musterform für alle Ringe (Standard: zufällig je Ring)
 }
 
 export interface Mandala { outer: Pt[]; holes: Pt[][]; motifs: Motif[] }
@@ -52,6 +56,14 @@ function profile(m: Motif, s: number): number {
     case "diamond": return 1 - Math.abs(2 * s - 1);
     case "arch": return Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, 2 * s - 1), 2))) * Math.min(1, s * 12);
     case "spike": return Math.pow(1 - s, 1.3) * Math.min(1, s * 10);
+    // Zwiebelturm: schmaler Hals innen, bauchig, außen spitz
+    case "onion": return Math.pow(Math.sin(Math.PI * Math.pow(s, 0.8)), 1.5) * (0.35 + 0.65 * Math.min(1, s * 2.5)) * (1 - Math.pow(s, 6));
+    // Sanduhr: rund an beiden Enden, in der Mitte eingeschnürt (nie schmaler als 35 %)
+    case "hourglass": return Math.sqrt(Math.max(0, 1 - Math.pow(2 * s - 1, 8))) * (0.35 + 0.65 * Math.pow(2 * s - 1, 2));
+    // Langloch: gerade Seiten, halbrunde Enden
+    case "capsule": { const e = Math.min(s, 1 - s) / 0.2; return e >= 1 ? 1 : Math.sqrt(Math.max(0, 1 - (1 - e) * (1 - e))); }
+    // Fächer: wird nach außen breiter, außen rund
+    case "fan": return Math.min(1, 0.2 + 0.8 * s) * Math.sqrt(Math.max(0, 1 - Math.pow(Math.max(0, (s - 0.8) / 0.2), 2))) * Math.min(1, s * 12);
     default: return Math.sqrt(Math.max(0, 1 - Math.pow(2 * s - 1, 2))); // circle (Ellipse, unten angepasst)
   }
 }
@@ -101,8 +113,14 @@ function edgeRadius(o: MandalaOptions, a: number): number {
   const R = o.d / 2;
   if (o.edge === "wavy") return R - R * 0.04 * (1 - Math.cos(o.n * a)) / 2;
   if (o.edge === "petals") return R - R * 0.08 * (1 - Math.abs(Math.cos((o.n * a) / 2)));
+  // Zacken: Dreieckswelle, Spitzen außen
+  if (o.edge === "zigzag") { const u = ((o.n * a) / (2 * Math.PI)) % 1; return R - R * 0.08 * Math.abs(2 * u - 1); }
+  // Spitze (Häkelrand): doppelt so viele kleine Bögen
+  if (o.edge === "lace") return R - R * 0.04 * (1 - Math.abs(Math.cos(o.n * a)));
   return R;
 }
+/** innerster Radius des Außenrands (dort endet das letzte Band) */
+const EDGE_DEPTH: Record<MandalaEdge, number> = { round: 0, wavy: 0.04, petals: 0.08, zigzag: 0.08, lace: 0.04 };
 
 export function mandala(o: MandalaOptions): Mandala {
   const n = Math.max(3, Math.min(36, Math.round(o.n)));
@@ -118,7 +136,7 @@ export function mandala(o: MandalaOptions): Mandala {
     outer.push({ x: r * Math.cos(a), y: r * Math.sin(a) });
   }
   // innerster Rand des Außenrands (Wellen/Blätter) – dort endet das letzte Band
-  const rEdge = (o.edge === "round" ? R : o.edge === "wavy" ? R * 0.96 : R * 0.92) - web;
+  const rEdge = R * (1 - (EDGE_DEPTH[o.edge] ?? 0)) - web;
   const rCenter = o.center === "none" ? web : Math.max(web * 2, R * 0.12);
 
   // Bänder: zufällige Breiten (mit Untergrenze), zusammen genau bis zum Rand
@@ -130,7 +148,8 @@ export function mandala(o: MandalaOptions): Mandala {
     const band = ((rEdge - rCenter) * parts[k]) / sum;
     const r0 = r + web / 2, r1 = r + band - web / 2;
     r += band;
-    const m = MOTIFS[Math.floor(rand() * MOTIFS.length)];
+    const pick = MOTIFS[Math.floor(rand() * MOTIFS.length)];   // immer ziehen – so bleibt der Zufall gleich
+    const m = o.motif && o.motif !== "mixed" && MOTIFS.includes(o.motif) ? o.motif : pick;
     motifs.push(m);
     const count = rand() < 0.35 && n <= 18 ? n * 2 : n;      // manchmal doppelt so viele
     const offset = rand() < 0.5 ? Math.PI / count : 0;      // versetzt zum Ring davor
@@ -151,6 +170,30 @@ export function mandala(o: MandalaOptions): Mandala {
     const cnt = Math.min(n, 12);
     const shape = motifShape("petal", web, rCenter - web / 2, Math.PI / cnt, web);
     if (shape) for (let i = 0; i < cnt; i++) holes.push(shape.map(p => rot(p, (i * 2 * Math.PI) / cnt)));
+  } else if (o.center === "star") {
+    // Stern mit n Zacken (höchstens 12), innen halb so weit wie außen
+    const cnt = Math.max(5, Math.min(n, 12)), ro = rCenter - web, ri = ro * 0.5;
+    if (ri >= MIN_FEATURE / 2) {
+      const st: Pt[] = [];
+      for (let i = 0; i < 2 * cnt; i++) { const a = (i * Math.PI) / cnt, r = i % 2 ? ri : ro; st.push({ x: r * Math.cos(a), y: r * Math.sin(a) }); }
+      holes.push(st);
+    }
+  } else if (o.center === "dots") {
+    // kleines Loch in der Mitte, drumherum ein Kranz kleiner Punkte (Abstand überall mindestens ein Steg)
+    // Anzahl Punkte: ein Teiler von n (bleibt symmetrisch), so viele, wie bei gut 1 mm Punkt-Radius Platz haben
+    const rc = rCenter - web;
+    const size = (c: number) => Math.min(rc / 4, ((rc * Math.sin(Math.PI / c) - web / 2) / (1 + Math.sin(Math.PI / c))) * 0.95);
+    const divs = Array.from({ length: 10 }, (_, i) => 12 - i).filter(c => n % c === 0);
+    const cnt = divs.find(c => size(c) >= Math.min(rc / 4, 1.1)) ?? divs[divs.length - 1] ?? 3;
+    const rd = size(cnt);                                                                  // Punkt-Radius
+    const ring = rc - rd;                                                                  // Kranz-Radius
+    const r0 = ring - rd - web;                                                            // Mittelloch
+    const disc = (cx: number, cy: number, r: number, k = 24): Pt[] =>
+      Array.from({ length: k }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / k), y: cy + r * Math.sin((2 * Math.PI * i) / k) }));
+    if (rd >= MIN_FEATURE / 2 && ring * Math.sin(Math.PI / cnt) - rd >= web / 2) {
+      for (let i = 0; i < cnt; i++) { const a = (i * 2 * Math.PI) / cnt; holes.push(disc(ring * Math.cos(a), ring * Math.sin(a), rd)); }
+      if (r0 >= MIN_FEATURE / 2) holes.push(disc(0, 0, r0, 32));
+    }
   }
   return { outer, holes, motifs };
 }

@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Three more box types in the *Box generator*:** *Polygon box* (5–12 sides, hexagon by default – walls with tabs in
+  slots of the bottom plate, lift-off lid), *Dice tower* (open at the top, three sloped ramps with tabs in slanted
+  slots of the side walls, exit at the bottom front) and *Drawer cabinet* (shelf open at the front with one fitting
+  drawer and front plate per compartment).
+- **More patterns in the *Mandala generator*:** four new shapes (onion domes, hourglasses, long holes, fans), a
+  *Pattern shape* choice (mixed at random, or one shape for all rings), two new edges (zigzag, lace) and two new
+  centres (star, ring of dots). Bridges between the holes stay at least the chosen bridge width.
 - ***Flash board* knows the new wiring boards:** 6 Pack CNC Controller and Jackpot (ESP32, FluidNC) can be flashed
   directly, with links to their wikis. Arduino Mega + RAMPS and BTT SKR Pro are listed with a guide instead, since
   CNC Craft cannot flash them (Mega: Arduino IDE with grbl-Mega-5X; SKR Pro: firmware.bin on the SD card, grblHAL

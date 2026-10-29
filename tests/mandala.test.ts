@@ -1,7 +1,7 @@
 // Tests für den Mandala-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mandala, type MandalaOptions, type Pt } from "../src/mandala.ts";
+import { mandala, MOTIFS, MANDALA_EDGES, MANDALA_CENTERS, type MandalaOptions, type Pt } from "../src/mandala.ts";
 
 const base: MandalaOptions = { d: 150, n: 12, rings: 4, web: 2, edge: "round", center: "hole", seed: 7 };
 
@@ -18,6 +18,37 @@ function gap(a: Pt[], b: Pt[]): number {
   return m;
 }
 const bbox = (p: Pt[]) => ({ x0: Math.min(...p.map(q => q.x)), x1: Math.max(...p.map(q => q.x)), y0: Math.min(...p.map(q => q.y)), y1: Math.max(...p.map(q => q.y)) });
+
+/** alle Löcher mindestens ~einen Steg voneinander und vom Rand entfernt */
+function checkWebs(o: MandalaOptions, minHoles: number) {
+  const m = mandala(o);
+  assert.ok(m.holes.length >= minHoles, "es gibt Muster");
+  const boxes = m.holes.map(bbox);
+  for (let i = 0; i < m.holes.length; i++) {
+    for (let j = i + 1; j < m.holes.length; j++) {
+      const A = boxes[i], B = boxes[j];
+      if (A.x1 + o.web < B.x0 || B.x1 + o.web < A.x0 || A.y1 + o.web < B.y0 || B.y1 + o.web < A.y0) continue;
+      assert.ok(gap(m.holes[i], m.holes[j]) >= o.web * 0.85, `Loch ${i} und ${j} zu nah`);
+    }
+    assert.ok(gap(m.holes[i], m.outer) >= o.web * 0.85, `Loch ${i} zu nah am Rand`);
+  }
+}
+
+for (const motif of MOTIFS) for (const n of [6, 12, 24]) {
+  test(`Musterform ${motif} (n = ${n}): Stege bleiben stehen`, () => checkWebs({ ...base, n, motif, seed: 3 }, n));
+}
+for (const edge of MANDALA_EDGES) for (const center of MANDALA_CENTERS) {
+  test(`Rand ${edge}, Mitte ${center}: Stege bleiben stehen`, () => checkWebs({ ...base, edge, center, seed: 11 }, base.n));
+}
+test("Musterform für alle Ringe: jeder Ring hat dieselbe Form", () => {
+  for (const motif of MOTIFS) assert.ok(mandala({ ...base, motif }).motifs.every(m => m === motif));
+  assert.ok(new Set(mandala({ ...base, rings: 8, motif: "mixed" }).motifs).size > 1, "gemischt = verschiedene Formen");
+});
+test("Mitte Stern und Punkte erzeugen Löcher in der Mitte", () => {
+  const ring = (o: MandalaOptions) => mandala(o).holes.filter(h => Math.max(...h.map(q => Math.hypot(q.x, q.y))) <= o.d * 0.06).length; // Mitte: Radius 12 % von R
+  assert.equal(ring({ ...base, center: "star" }), 1);
+  assert.ok(ring({ ...base, center: "dots" }) >= 4);
+});
 
 for (const seed of [1, 7, 42, 99]) for (const edge of ["round", "wavy", "petals"] as const) {
   test(`Stege bleiben stehen (Seed ${seed}, Rand ${edge})`, () => {
