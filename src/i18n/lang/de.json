@@ -59,6 +59,7 @@
   "stream.loadError": "[Fehler] Konnte G-Code nicht laden: {e}",
   "stream.alreadyRunning": "[Job] Läuft bereits!",
   "stream.noGcode": "[Job] Kein G-Code geladen! Erst eine Datei öffnen.",
+  "stream.laserModeMill": "[Job] ⚠️ Job nicht gestartet: Am Board ist der Laser-Modus an ($32=1). Dann schaltet GRBL die Spindel bei jeder Eilfahrt ab und beim Fräsen ohne Hochlaufzeit wieder an. Für die Fräse $32 auf 0 stellen (Reiter „Einstellungen ($$)“ oder in der Konsole $32=0 senden) und den Job neu starten.",
   "stream.simulated": "[Job] WARNUNG: Keine echte Maschine verbunden – es wird simuliert!",
   "stream.started": "[JOB] === Job gestartet ===",
   "stream.aborted": "[JOB] === ABGEBROCHEN – Feed Hold! Spindel stoppen! ===",

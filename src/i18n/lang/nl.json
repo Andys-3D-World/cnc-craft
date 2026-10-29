@@ -59,6 +59,7 @@
   "stream.loadError": "[Fout] Kon G-code niet laden: {e}",
   "stream.alreadyRunning": "[Job] Loopt al!",
   "stream.noGcode": "[Job] Geen G-code geladen! Open eerst een bestand.",
+  "stream.laserModeMill": "[Job] ⚠️ Taak niet gestart: lasermodus staat aan op het board ($32=1). GRBL zet de spindel dan bij elke ijlgang uit en bij het frezen zonder aanlooptijd weer aan. Zet voor frezen $32 op 0 (tabblad “Instellingen ($$)” of stuur $32=0 in de console) en start de taak opnieuw.",
   "stream.simulated": "[Job] WAARSCHUWING: geen echte machine verbonden – er wordt gesimuleerd!",
   "stream.started": "[JOB] === Job gestart ===",
   "stream.aborted": "[JOB] === AFGEBROKEN – feed hold! Spil stoppen! ===",

@@ -75,6 +75,10 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Shorter travel moves when milling:** within each kind of operation (drilling, inside, pocket, outside …) the
+  shapes are now ordered for the shortest rapid moves, like laser and plasma already were. Inside still comes
+  before outside, and anything inside a closed shape is milled before that shape. Example job with 48 holes:
+  4.3 m → 1.3 m of travel.
 - **Adaptive feed in curves is now off by default:** milling jobs with many curves ran too slowly. Turn it on
   under *Milling parameters* → *Adapt feed in curves* and set the minimum feed (%) when needed.
 - **Thread mills in the tool list** now show *single-tooth* or the pitch next to the number of flutes.
@@ -82,6 +86,9 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **Spindle stopping on every rapid move:** a milling job no longer starts while the board is in laser mode
+  ($32=1) – GRBL would switch the spindle off on each G0 and back on for cutting without spin-up time. The console
+  explains how to set $32=0.
 - **Slots and round contours no longer mill in tiny back-and-forth steps:** the inside/outside offset of finely
   divided arcs (slots, imported circles, rounded corners) left tiny loops at every arc point, so the cutter jerked
   forward and back and the path had up to four times as many points. Those loops are now removed.

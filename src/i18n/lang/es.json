@@ -59,6 +59,7 @@
   "stream.loadError": "[Error] No se pudo cargar el G-code: {e}",
   "stream.alreadyRunning": "[Trabajo] ¡Ya está en marcha!",
   "stream.noGcode": "[Trabajo] ¡No hay G-code cargado! Abre primero un archivo.",
+  "stream.laserModeMill": "[Job] ⚠️ Trabajo no iniciado: el modo láser está activado en la placa ($32=1). GRBL apaga entonces el husillo en cada movimiento rápido y lo vuelve a encender al fresar sin tiempo de arranque. Para fresar pon $32 a 0 (pestaña «Ajustes ($$)» o envía $32=0 en la consola) y vuelve a iniciar el trabajo.",
   "stream.simulated": "[Trabajo] AVISO: no hay ninguna máquina real conectada – ¡se simula!",
   "stream.started": "[TRABAJO] === Trabajo iniciado ===",
   "stream.aborted": "[TRABAJO] === CANCELADO – ¡parada de avance! ¡Detén el husillo! ===",

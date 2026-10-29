@@ -59,6 +59,7 @@
   "stream.loadError": "[Erreur] Impossible de charger le G-code : {e}",
   "stream.alreadyRunning": "[Job] Déjà en cours !",
   "stream.noGcode": "[Job] Aucun G-code chargé ! Ouvrez d'abord un fichier.",
+  "stream.laserModeMill": "[Job] ⚠️ Tâche non lancée : le mode laser est activé sur la carte ($32=1). GRBL coupe alors la broche à chaque déplacement rapide et la rallume pour l’usinage sans temps de montée. Pour le fraisage, réglez $32 sur 0 (onglet « Réglages ($$) » ou envoyez $32=0 dans la console) puis relancez la tâche.",
   "stream.simulated": "[Job] ATTENTION : aucune machine réelle connectée – simulation en cours !",
   "stream.started": "[JOB] === Job démarré ===",
   "stream.aborted": "[JOB] === INTERROMPU – arrêt d'avance ! Arrêtez la broche ! ===",

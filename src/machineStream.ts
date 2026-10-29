@@ -289,6 +289,10 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
 
   if (machine.connected) {
     if (machine.status.state === "Alarm") { appendToConsole(t("m.unlockFirst")); return; }
+    // Laser-Modus an der Fräse: GRBL schaltet die Spindel bei jeder Eilfahrt (G0) ab und bei G1 ohne Hochlaufzeit
+    // wieder an – der Fräser fährt dann stehend oder halb drehend ins Material
+    if (getMachineMode() === "mill" && machine.protocol === "grbl" && machine.settings.get("$32") === "1"
+      && streamState.loadedLines.some(l => /\bM0?[34]\b/i.test(l))) { appendToConsole(t("stream.laserModeMill")); return; }
     const refused = aAxisRefused(streamState.loadedLines);
     if (refused) { appendToConsole(refused); return; }
     // Höhenkarte: Z an die gemessene Oberfläche anpassen (nur Fräse mit GRBL)

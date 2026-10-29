@@ -59,6 +59,7 @@
   "stream.loadError": "[Error] Could not load G-code: {e}",
   "stream.alreadyRunning": "[Job] Already running!",
   "stream.noGcode": "[Job] No G-code loaded! Open a file first.",
+  "stream.laserModeMill": "[Job] ⚠️ Job not started: laser mode is on at the board ($32=1). GRBL then switches the spindle off on every rapid move and back on for cutting without spin-up time. For milling set $32 to 0 (“Settings ($$)” tab or send $32=0 in the console) and start the job again.",
   "stream.simulated": "[Job] WARNING: No real machine connected – running in simulation!",
   "stream.started": "[JOB] === Job started ===",
   "stream.aborted": "[JOB] === ABORTED – feed hold! Stop the spindle! ===",

@@ -59,6 +59,7 @@
   "stream.loadError": "[Errore] Impossibile caricare il G-code: {e}",
   "stream.alreadyRunning": "[Lavoro] Già in corso!",
   "stream.noGcode": "[Lavoro] Nessun G-code caricato! Apri prima un file.",
+  "stream.laserModeMill": "[Job] ⚠️ Lavoro non avviato: sulla scheda è attiva la modalità laser ($32=1). GRBL spegne il mandrino a ogni movimento rapido e lo riaccende in lavorazione senza tempo di avvio. Per la fresatura imposta $32 a 0 (scheda «Impostazioni ($$)» o invia $32=0 nella console) e riavvia il lavoro.",
   "stream.simulated": "[Lavoro] ATTENZIONE: nessuna macchina reale collegata – simulazione in corso!",
   "stream.started": "[LAVORO] === Lavoro avviato ===",
   "stream.aborted": "[LAVORO] === INTERROTTO – arresto avanzamento! Fermare il mandrino! ===",

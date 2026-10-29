@@ -59,6 +59,7 @@
   "stream.loadError": "[Błąd] Nie udało się wczytać G-code: {e}",
   "stream.alreadyRunning": "[Zadanie] Już trwa!",
   "stream.noGcode": "[Zadanie] Brak wczytanego G-code! Najpierw otwórz plik.",
+  "stream.laserModeMill": "[Job] ⚠️ Zadanie nie uruchomione: na płytce włączony jest tryb lasera ($32=1). GRBL wyłącza wtedy wrzeciono przy każdym ruchu szybkim i włącza je przy frezowaniu bez czasu rozpędu. Do frezowania ustaw $32 na 0 (karta „Ustawienia ($$)” lub wyślij $32=0 w konsoli) i uruchom zadanie ponownie.",
   "stream.simulated": "[Zadanie] UWAGA: brak podłączonej prawdziwej maszyny – trwa symulacja!",
   "stream.started": "[ZADANIE] === Zadanie rozpoczęte ===",
   "stream.aborted": "[ZADANIE] === PRZERWANO – zatrzymanie posuwu! Zatrzymaj wrzeciono! ===",

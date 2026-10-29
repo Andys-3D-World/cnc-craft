@@ -23,6 +23,7 @@ import { facingPath } from "./facing";
 import { DRIFT_SLOT, placeDriftPoints } from "./driftPoints";
 import { probeSettings } from "./probe";
 import { parseGcodeProgram } from "./sim/gcodeParser";
+import { optimizeCutOrder, CutItem } from "./cutOrder";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -219,21 +220,32 @@ const generateGcodeInner = (shapes: any): string | null => {
   const restIgnored = shapes.filter((s: any) => getTool(s.restToolId) && !restToolFor(s)).length;
   if (restIgnored) lastGcodeWarnings.push(t("gcw.restIgnored", { n: restIgnored }));
   groups.forEach(g => g.shapes.sort((a: any, b: any) => priority(a.millingMode) - priority(b.millingMode)));
-  // Bohrungen: immer zur nächsten Bohrung fahren (kurze Wege)
+  // Kurze Leerfahrten: innerhalb jeder Bearbeitungsart (Bohren, Innen, Tasche …) die Formen so ordnen, dass der Weg
+  // zur nächsten Form möglichst kurz ist (wie beim Laser, cutOrder.ts). „Innen vor Außen“ bleibt: es wird nur innerhalb
+  // einer Art sortiert, und was in einer geschlossenen Form liegt, kommt vor ihr.
+  let orderFrom: P = { x: 0, y: 0 };
   groups.forEach(g => {
-    const drills = g.shapes.filter((s: any) => s.millingMode === "drill");
-    if (drills.length < 2) return;
-    const at = (s: any) => { const b = s.type === "circle" ? null : shapeBounds(s); return b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : { x: s.x, y: s.y }; };
-    const order: any[] = [];
-    let cur = { x: 0, y: 0 };
-    const left = [...drills];
-    while (left.length) {
-      let bi = 0, bd = Infinity;
-      left.forEach((s, i) => { const p = at(s), d = Math.hypot(p.x - cur.x, p.y - cur.y); if (d < bd) { bd = d; bi = i; } });
-      const [s] = left.splice(bi, 1);
-      order.push(s); cur = at(s);
+    const out: any[] = [];
+    for (let i = 0; i < g.shapes.length;) {
+      let j = i;
+      while (j < g.shapes.length && priority(g.shapes[j].millingMode) === priority(g.shapes[i].millingMode)) j++;
+      const run = g.shapes.slice(i, j);
+      const items: CutItem[] = run.map((o: any) => {
+        const sh = o.restOf ?? o; // Restbearbeitung: Lage der Original-Form
+        let b: { minX: number; maxX: number; minY: number; maxY: number } | null = null;
+        try { b = sh.type === "circle" ? { minX: sh.x - Math.abs(sh.w), maxX: sh.x + Math.abs(sh.w), minY: sh.y - Math.abs(sh.w), maxY: sh.y + Math.abs(sh.w) } : shapeBounds(sh); } catch { /* ohne Maße */ }
+        const ring = sh.type === "circle" ? makeEllipsePoints(sh.x, sh.y, Math.abs(sh.w), Math.abs(sh.w))
+          : sh.type === "polyline" && sh.closed && sh.points?.length >= 3 ? sh.points : null;
+        const mid = b ? toMachine((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2) : toMachine(sh.x ?? 0, sh.y ?? 0);
+        const pts = ring ? ring.map((q: any) => toMachine(q.x, q.y)) : [mid];
+        return { entry: mid, exit: mid, pts, closed: !!ring };
+      });
+      if (run.length > 1) for (const st of optimizeCutOrder(items, orderFrom)) out.push(run[st.index]);
+      else out.push(...run);
+      orderFrom = items[run.indexOf(out[out.length - 1])].exit;
+      i = j;
     }
-    g.shapes = [...order, ...g.shapes.filter((s: any) => s.millingMode !== "drill")];
+    g.shapes = out;
   });
 
   // ---- 4. ZUSTELLUNGEN BERECHNEN (pro Form, weil jede Form ihre eigene Tiefe hat) ----
