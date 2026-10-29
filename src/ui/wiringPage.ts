@@ -11,7 +11,7 @@
  * Daten: src/wiring/boards.ts
  */
 import { t } from "../i18n/i18n";
-import { BOARDS, COMPS, CompId, Board, BConn, Deco, Part, Hookup, getBoard, sensorHookup, SensorType, SensorVolt } from "../wiring/boards";
+import { BOARDS, COMPS, OPTIONAL_COMPS, CompId, Board, BConn, Deco, Part, Hookup, getBoard, sensorHookup, SensorType, SensorVolt } from "../wiring/boards";
 import { DRIVERS, getDriver, msFor, Ms } from "../wiring/drivers";
 
 const KEY_BOARD = "cnc_craft_wiring_board";
@@ -29,10 +29,10 @@ const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
   psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1",
-  spindle: "#9b5de5", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", io: "#2dd4bf"
+  spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", io: "#2dd4bf"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", io: "🔘"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", io: "🔘"
 };
 
 function esc(s: string): string {
@@ -187,7 +187,7 @@ function partGlyph(pl: Placed): string {
       return `<rect x="${n(cx - 16)}" y="${n(cy - 9)}" width="32" height="18" rx="2" fill="#1b1d21" stroke="#56606b"/><text x="${n(cx)}" y="${n(cy + 4)}" text-anchor="middle" class="wr-glyph" style="font-size:10px">→|</text>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
-      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡"
+      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡", flame: "🔥", buzzer: "🔔", pbtn: "🔘"
     }[p.kind as string] || "■"}</text>`;
   }
 }
@@ -562,7 +562,7 @@ export function initWiringPage() {
         <em>${esc(b.mcu)} · ${esc(b.volt)} · ${esc(t(b.fw))}</em>
       </label>`;
     const chips = [`<button class="wr-chip${comp === "overview" ? " active" : ""}" data-comp="overview">🗺️ ${esc(t("wr.overview"))}</button>`]
-      .concat(COMPS.filter(c => c !== "io" || b.hookups[c]).map(c => {
+      .concat(COMPS.filter(c => !OPTIONAL_COMPS.includes(c) || b.hookups[c]).map(c => {
         const h = b.hookups[c];
         const na = !h || !!h.unavailable;
         return `<button class="wr-chip${comp === c ? " active" : ""}${na ? " na" : ""}" data-comp="${c}" style="--cc:${COMP_COLOR[c]}">${COMP_ICON[c]} ${esc(t("wr.comp." + c))}</button>`;

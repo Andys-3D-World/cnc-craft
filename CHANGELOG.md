@@ -10,6 +10,10 @@
   optocoupler/level module that switches to GND. Each board shows its input type (logic voltage, optocoupler,
   sensor supply), with clear warnings where 12–24 V would destroy the input (Arduino CNC Shield, MKS DLC32), notes
   on PNP and 5 V sensors and how to invert the input ($5/$6 or *:low* in FluidNC).
+- **More parts in *Wiring*:** Arduino CNC Shield – push buttons for Hold, Resume and Abort (A1, A2, A0);
+  MKS DLC32 MAX – flame sensor (Flame, IO36), buzzer (+BEEPER−) and a note on the second laser connector (XT30);
+  PiBot V4.96 Pro and V5.88 Ultra – new view *VFD (RS485)*: Modbus wiring A/B, example VFD parameters (Huanyang)
+  and the FluidNC *config.yaml* sections, with a note on pins shared with the 0–10 V outputs.
 - **Computer stays awake during a job:** while a job runs on any connected machine, CNC Craft keeps the computer
   from going to sleep (macOS `caffeinate`, Windows power request, Linux `systemd-inhibit`) – like a video player.
   The screen may still turn off. Sleep is allowed again as soon as the job ends or stops.
@@ -82,6 +86,8 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Wiring data is checked by tests:** every drawn wire must end at a pin that exists on the board, and every text
+  of the wiring diagrams must exist in all 7 languages with the same placeholders.
 - **Shorter travel moves when milling:** within each kind of operation (drilling, inside, pocket, outside …) the
   shapes are now ordered for the shortest rapid moves, like laser and plasma already were. Inside still comes
   before outside, and anything inside a closed shape is milled before that shape. Example job with 48 holes:

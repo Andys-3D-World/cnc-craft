@@ -33,9 +33,10 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "plasma" | "air" | "estop" | "door" | "io";
-/** "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "plasma", "air", "estop", "door", "io"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "io";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "modbus", "plasma", "air", "estop", "door", "io"];
+/** "modbus" (Umrichter über RS485) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
+export const OPTIONAL_COMPS: CompId[] = ["modbus", "io"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
 /**
@@ -53,7 +54,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -794,7 +795,21 @@ function pibotHookups(): Partial<Record<CompId, Hookup>> {
     steps: [{ k: "wr.s.door.1", p: { sig: "IO26", gnd: "GND" } }, { k: "wr.s.pb.door" }],
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.26:low"]
   };
+  h.modbus = modbusHookup([{ k: "wr.n.pb.mb" }]);
   return h;
+}
+
+/** Umrichter über RS485 (Modbus) – PiBot: Klemme „RS485“ A/B, Pins der UART wie in der YAML-Vorlage von PiBot */
+function modbusHookup(notes: Step[]): Hookup {
+  return {
+    comp: "modbus",
+    parts: [{ id: "vfd", kind: "inv", name: "RS485", side: "top", pins: ["RS+", "RS−"],
+      wires: [{ from: "RS+", to: "rs485.A", color: YEL }, { from: "RS−", to: "rs485.B", color: GRN }] }],
+    steps: [{ k: "wr.s.mb.1" }, { k: "wr.s.mb.2" }, { k: "wr.s.mb.3" }, { k: "wr.s.mb.4" }],
+    notes,
+    pro: [{ k: "wr.p.mb" }],
+    settings: ["uart1:", "txd_pin / rxd_pin / rts_pin: …", "baud: 9600", "mode: 8N1", "Huanyang:", "uart_num: 1", "modbus_id: 1"]
+  };
 }
 
 /** PiBot V5.88 Ultra mit FluidNC – Belegung wie in der Test-YAML von PiBot (Einstellungen = YAML-Einträge) */
@@ -916,6 +931,7 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
     steps: [{ k: "wr.s.door.1", p: { sig: "C− IO48", gnd: "GND" } }, { k: "wr.s.pu.door" }],
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.48:low"]
   };
+  h.modbus = modbusHookup([{ k: "wr.n.pu.mb" }]);
   return h;
 }
 
@@ -1115,6 +1131,33 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     steps: [{ k: "wr.s.door.1", p: { sig: "Door S (IO38)", gnd: "Door GND" } }],
     notes: [], pro: [], settings: []
   } : { comp: "door", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: isShield ? "wr.u.door.shield" : "wr.u.door.dlc21" };
+
+  // ---- weitere Ein-/Ausgänge ----
+  // Shield: Taster an Abort (A0), Hold (A1), Resume (A2) – GRBL-Steuereingänge, Pull-up, Taster nach GND
+  const btn = (id: string, name: string, conn: string): Part => ({ id, kind: "pbtn", name, side: "right", pins: ["NO", "C"],
+    wires: [{ from: "NO", to: conn + ".S", color: YEL }, { from: "C", to: conn + ".G", color: BLACK }] });
+  if (isShield) h.io = {
+    comp: "io",
+    parts: [btn("abort", "Abort", "abort"), btn("hold", "Hold", "hold"), btn("resume", "Resume", "resume")],
+    steps: [{ k: "wr.s.sh.io.1" }, { k: "wr.s.sh.io.2" }, { k: "wr.s.sh.io.3" }],
+    notes: [{ k: "wr.n.sh.io" }],
+    pro: [{ k: "wr.p.sh.io" }],
+    settings: []
+  };
+  // MKS DLC32 MAX: Flammensensor (Flame, IO36) und Summer (+BEEPER−, IO42)
+  if (isMax) h.io = {
+    comp: "io",
+    parts: [
+      { id: "flame", kind: "flame", name: "", side: "right", pins: ["VCC", "GND", "DO"],
+        wires: [{ from: "VCC", to: "flame.5V", color: RED }, { from: "GND", to: "flame.G", color: BLACK }, { from: "DO", to: "flame.S", color: YEL }] },
+      { id: "buzzer", kind: "buzzer", name: "", side: "top", pins: ["+", "−"],
+        wires: [{ from: "+", to: "beep.+", color: RED }, { from: "−", to: "beep.-", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.max.io.1" }, { k: "wr.s.max.io.2" }, { k: "wr.s.max.io.3" }],
+    notes: [{ k: "wr.n.max.flame" }],
+    pro: [{ k: "wr.p.max.laser2" }],
+    settings: []
+  };
 
   return h;
 }
