@@ -53,10 +53,13 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
-export interface Part { id: string; kind: PartKind; name: string; side: "left" | "right" | "top" | "bottom"; pins: string[]; wires: Wire[]; outer?: boolean }
+export interface Part {
+  id: string; kind: PartKind; name: string; side: "left" | "right" | "top" | "bottom"; pins: string[]; wires: Wire[]; outer?: boolean;
+  outerPins?: string[];   // eigene Außenklemmen (z. B. Eingänge des Optokoppler-Moduls)
+}
 
 export interface Step { k: string; p?: Record<string, string> }
 export interface Hookup {
@@ -100,8 +103,15 @@ export interface Board {
   pcb?: { fill: string; edge: string; light?: boolean };   // light: helles Gehäuse → dunkle Schrift
   outline?: [number, number][];   // Umriss der Platine (sonst Rechteck), z. B. Arduino-Form
   holes?: { x: number; y: number; r: number }[];
+  /**
+   * Art der Eingänge (Endschalter/Taster) – für induktive Sensoren:
+   *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = direkt am ESP32 (3,3 V, kein Optokoppler im Pinplan)
+   *   pb496 / pb588 = PiBot mit SW-VCC-Brücke (5 V oder Vmot, nur NPN)   ruida = Ruida (5/12/24 V, NPN laut Handbuch)
+   */
+  inputs: InputKind;
   hookups: Partial<Record<CompId, Hookup>>;
 }
+export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida";
 
 // Kabelfarben
 const RED = "#e5484d", BLACK = "#2b2b2b", YEL = "#f5c518", GRN = "#30a46c", BLU = "#3e7bfa", WHT = "#d9d9d9", ORG = "#f08c00", VIO = "#9b5de5";
@@ -142,6 +152,7 @@ const shMot = (id: string, label: string, x: number, y: number): BConn => ({
 });
 const shield: Board = {
   id: "cnc-shield-v3",
+  inputs: "avr5",
   maker: "Arduino",
   name: "Arduino UNO + CNC Shield V3",
   mcu: "ATmega328P",
@@ -241,6 +252,7 @@ const esd = (axis: string, x: number, mcu = ""): BConn => ({
 // ---------------------------------------------------------------------
 const dlc21: Board = {
   id: "mks-dlc32-v21",
+  inputs: "esp33",
   maker: "Makerbase (MKS)",
   name: "MKS DLC32 V2.1",
   mcu: "ESP32",
@@ -287,6 +299,7 @@ const dlc21: Board = {
 const C_RED = "#d9452f", C_BLUE = "#2f6fd1", C_GREEN = "#2f9e57", C_PURPLE = "#94307f", C_WHITE = "#e6e6e3", C_YEL = "#e8be2a";
 const dlcMax: Board = {
   id: "mks-dlc32-max",
+  inputs: "esp33",
   maker: "Makerbase (MKS)",
   name: "MKS DLC32 MAX V1.0",
   mcu: "ESP32-S3",
@@ -352,6 +365,7 @@ const pbRight = (id: string, label: string, y: number, pins: BPin[]): BConn => (
 });
 const pibot: Board = {
   id: "pibot-v496-pro",
+  inputs: "pb496",
   maker: "PiBot",
   name: "PiBot FluidNC V4.96 Pro",
   mcu: "ESP32",
@@ -441,6 +455,7 @@ const puRight = (id: string, label: string, y: number, pins: BPin[]): BConn => (
 });
 const pibotUltra: Board = {
   id: "pibot-v588-ultra",
+  inputs: "pb588",
   maker: "PiBot",
   name: "PiBot Controller V5.88 Ultra",
   mcu: "ESP32-S3",
@@ -528,6 +543,7 @@ const rdLaser = (id: string, label: string, x: number, i: number): BConn => rdTo
 ]);
 const ruida6445: Board = {
   id: "ruida-rdc6445g",
+  inputs: "ruida",
   maker: "Ruida",
   name: "Ruida RDC6445G / RDC6445S",
   mcu: "Ruida RDC644XG",
@@ -1109,4 +1125,79 @@ for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {
   return BOARDS.find(b => b.id === id) || BOARDS[0];
+}
+
+// =====================================================================
+// Induktive Sensoren (NPN/PNP, 3 Drähte) statt Schalter bzw. Längensensor
+// =====================================================================
+
+export type SensorType = "mech" | "npn" | "pnp";
+export type SensorVolt = 5 | 12 | 24;
+const BRN = "#8b5a2b";
+
+/**
+ * Baut aus der normalen Verdrahtung (erster Draht = Signal, zweiter = GND) die Verdrahtung mit induktiven Sensoren:
+ *   - direkt: Sensor an den Stecker – PiBot (SW-VCC), Ruida (eigenes Netzteil) oder 5-V-NPN an 5V/GND/S
+ *   - Modul: Optokoppler-/Pegelmodul (12/24 V → Board) dazwischen; der Ausgang schaltet nach GND,
+ *     ans Board kommen nur OUT und GND (der Pull-up des Boards liefert HIGH – nie 5 V auf einen ESP32-Pin)
+ * Bei Endschaltern ersetzt der Sensor die Schalter, beim Taster den Werkzeuglängensensor (Tastplatte bleibt).
+ */
+export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: SensorVolt): Hookup {
+  const repl: PartKind = base.comp === "limits" ? "switch" : "wls";
+  const src = base.parts.filter(p => p.kind === repl);
+  if (!src.length) return base;
+  const inp = b.inputs;
+  const pb = inp === "pb496" || inp === "pb588";
+  if (type === "pnp" && inp === "ruida") return { ...base, parts: [], unavailable: "wr.sen.u.rdpnp" };
+
+  const conn = (ref: string) => b.conns.find(c => c.id === ref.split(".")[0]);
+  const fiveFallback = b.conns.some(c => c.id === "v5") ? "v5.5V" : b.conns.some(c => c.id === "uart") ? "uart.5V" : "";
+  const ch = src.map(p => {
+    const sig = p.wires[0].to, gnd = p.wires[1].to, c = conn(sig);
+    const sw = pb && !!c?.pins.some(x => x.k === "V") ? `${c!.id}.V` : "";
+    const five = c?.pins.some(x => x.k === "5V") ? `${c!.id}.5V` : fiveFallback;
+    return { n: p.name || "T", side: p.side, sig, gnd, sw, five };
+  });
+  const side = src[0].side;
+  const swDirect = type === "npn" && pb && ch.every(c => c.sw);
+  const fiveDirect = type === "npn" && volt === 5 && !swDirect && inp !== "ruida" && ch.every(c => c.five);
+  const direct = type === "npn" && (inp === "ruida" || swDirect || fiveDirect);
+  const prox = (c: typeof ch[number], wires: Wire[], outer = false): Part =>
+    ({ id: "px" + c.n, kind: "prox", name: c.n === "T" ? "" : c.n, side: c.side, pins: ["BN", "BU", "BK"], wires, outer });
+
+  const parts: Part[] = base.parts.filter(p => p.kind !== repl);
+  if (direct && inp === "ruida") {
+    parts.push(...ch.map(c => prox(c, [{ from: "BK", to: c.sig, color: BLACK }, { from: "BU", to: c.gnd, color: BLU }, { from: "BN", to: "@psu.+", color: BRN }])));
+    parts.push({ id: "psu", kind: "psu", name: `${volt} V`, side, pins: ["+", "-"], wires: [{ from: "-", to: ch[0].gnd, color: BLACK }] });
+  } else if (direct) {
+    parts.push(...ch.map(c => prox(c, [{ from: "BK", to: c.sig, color: BLACK }, { from: "BU", to: c.gnd, color: BLU }, { from: "BN", to: swDirect ? c.sw : c.five, color: BRN }])));
+  } else {
+    parts.push({
+      id: "mod", kind: "opto", name: type.toUpperCase(), side, pins: [...ch.map(c => "OUT " + c.n), "GND"], outerPins: [...ch.map(c => "IN " + c.n), "+V", "0V"],
+      wires: [...ch.map(c => ({ from: "OUT " + c.n, to: c.sig, color: YEL })), { from: "GND", to: ch[0].gnd, color: BLACK }]
+    });
+    parts.push(...ch.map(c => prox(c, [{ from: "BK", to: `@mod.IN ${c.n}`, color: BLACK }, { from: "BN", to: "@psu.+", color: BRN }, { from: "BU", to: "@psu.-", color: BLU }], true)));
+    parts.push({ id: "psu", kind: "psu", name: `${volt} V`, side, outer: true, pins: ["+", "-"],
+      wires: [{ from: "+", to: "@mod.+V", color: RED }, { from: "-", to: "@mod.0V", color: BLACK }] });
+  }
+
+  const steps: Step[] = [{ k: "wr.sen.s.colors" }];
+  if (direct && inp === "ruida") steps.push({ k: "wr.s.rd.lim.3" }, { k: "wr.sen.s.gnd" });
+  else if (swDirect) steps.push({ k: "wr.sen.s.pb", p: { pos: volt === 5 ? "5 V" : "Vmot", jumper: inp === "pb588" ? "④" : "⑦" } });
+  else if (fiveDirect) steps.push({ k: "wr.sen.s.d5", p: { vcc: `${conn(ch[0].five)?.label || ""} 5V`.trim() } });
+  else steps.push({ k: "wr.sen.s.mod.1", p: { volt: String(volt) } }, { k: "wr.sen.s.mod.2" }, { k: "wr.sen.s.mod.3", p: { type: type.toUpperCase() } });
+  steps.push({ k: "wr.sen.s.test" });
+  if (base.steps.length) steps.push(base.steps[base.steps.length - 1]);
+
+  const notes: Step[] = [];
+  if (inp === "avr5") notes.push({ k: "wr.sen.n.avr" });
+  if (inp === "esp33") notes.push({ k: "wr.sen.n.esp" });
+  if (type === "pnp") notes.push({ k: "wr.sen.n.pnp" });
+  if (direct && volt === 5) notes.push({ k: "wr.sen.n.v5" });
+  if (swDirect && volt !== 5) notes.push({ k: "wr.sen.n.vmot", p: { volt: String(volt) } });
+  notes.push(...base.notes.filter(s => s.k !== "wr.n.dlc.3pin"));
+
+  const pro: Step[] = [...base.pro, { k: "wr.sen.p.nc" }, { k: "wr.sen.p.dist" }];
+  if (!direct && type === "npn" && (inp === "avr5" || inp === "esp33")) pro.push({ k: "wr.sen.p.diode" });
+  return { ...base, parts, steps, notes, pro };
 }

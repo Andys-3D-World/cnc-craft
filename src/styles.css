@@ -1180,6 +1180,8 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
 .wr-ms-row label { display: flex; flex-direction: column; gap: 2px; font-size: 0.74rem; color: var(--text-muted); flex: 1; min-width: 110px; }
 .wr-ms-row select { padding: 4px 6px; font-size: 0.82rem; }
 .wr-ms-res { font-weight: 600; }
+.wr-sen { align-self: flex-start; flex-wrap: wrap; }
+.wr-sen button { padding: 6px 10px; font-size: 0.8rem; }
 @media (max-width: 1000px) {
   .wr-body { flex-direction: column; align-items: stretch; }
   .wr-draw, .wr-side { flex: none; width: 100%; min-width: 0; box-sizing: border-box; }

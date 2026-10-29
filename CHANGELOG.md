@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Inductive sensors (NPN/PNP) in *Wiring*:** for limit switches and the tool length sensor you can now choose
+  *Mechanical switch*, *Inductive NPN* or *Inductive PNP* and the sensor supply (5 / 12 / 24 V) – on every board.
+  The drawing shows the 3 wires (brown +V, blue GND, black signal) the way the board needs them: directly where the
+  inputs allow it (PiBot with the SW-VCC jumper, Ruida, 5 V NPN sensors on 5V/GND/S), otherwise through an
+  optocoupler/level module that switches to GND. Each board shows its input type (logic voltage, optocoupler,
+  sensor supply), with clear warnings where 12–24 V would destroy the input (Arduino CNC Shield, MKS DLC32), notes
+  on PNP and 5 V sensors and how to invert the input ($5/$6 or *:low* in FluidNC).
 - **Computer stays awake during a job:** while a job runs on any connected machine, CNC Craft keeps the computer
   from going to sleep (macOS `caffeinate`, Windows power request, Linux `systemd-inhibit`) – like a video player.
   The screen may still turn off. Sleep is allowed again as soon as the job ends or stops.

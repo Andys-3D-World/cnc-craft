@@ -11,13 +11,14 @@
  * Daten: src/wiring/boards.ts
  */
 import { t } from "../i18n/i18n";
-import { BOARDS, COMPS, CompId, Board, BConn, Deco, Part, Hookup, getBoard } from "../wiring/boards";
+import { BOARDS, COMPS, CompId, Board, BConn, Deco, Part, Hookup, getBoard, sensorHookup, SensorType, SensorVolt } from "../wiring/boards";
 import { DRIVERS, getDriver, msFor, Ms } from "../wiring/drivers";
 
 const KEY_BOARD = "cnc_craft_wiring_board";
 const KEY_LEVEL = "cnc_craft_wiring_level";
 const KEY_COMP = "cnc_craft_wiring_comp";
 const KEY_MS = "cnc_craft_wiring_ms";   // Treiber, Mikroschritte, A-Klon (Shield) – {drv, div, clone}
+const KEY_SEN = "cnc_craft_wiring_sensor";   // Endschalter/Längensensor: {type: mech|npn|pnp, volt: 5|12|24}
 
 /** Ansicht „Schrittmotoren“: Jumper/DIP-Stellung und A-Klon, die gezeichnet werden (sonst null) */
 let msView: { m: Ms; clone: string } | null = null;
@@ -87,6 +88,7 @@ interface Box { x0: number; y0: number; x1: number; y1: number }
 
 /** Zusatz-Pins auf der Außenseite (Relais-Kontakte) */
 function outerPins(p: Part): string[] {
+  if (p.outerPins) return p.outerPins;
   if (p.kind === "relay") return ["COM", "NO"];
   if (p.kind === "extdrv") return ["A+", "A−", "B+", "B−", "VCC", "GND"];
   // 0–10-V-Wandler: eigene Versorgung 12–24 V, Ausgang an den Analog-Eingang des Umrichters (AVI/ACM)
@@ -176,6 +178,13 @@ function partGlyph(pl: Placed): string {
     case "motor": return `<rect x="${n(cx - 15)}" y="${n(cy - 13)}" width="30" height="26" rx="4" fill="#3a3f47" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="8" fill="#22262b" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="2.5" fill="#cfd5dc"/>`;
     case "switch": return `<line x1="${n(cx - 16)}" y1="${n(cy + 6)}" x2="${n(cx + 12)}" y2="${n(cy - 6)}" stroke="#cfd5dc" stroke-width="2.5"/><circle cx="${n(cx - 16)}" cy="${n(cy + 6)}" r="3" fill="#cfd5dc"/><circle cx="${n(cx + 16)}" cy="${n(cy + 6)}" r="3" fill="#cfd5dc"/>`;
     case "estop": return `<circle cx="${n(cx)}" cy="${n(cy)}" r="14" fill="#f5c518"/><circle cx="${n(cx)}" cy="${n(cy)}" r="10" fill="#e5484d" stroke="#8b1d20"/>`;
+    case "prox":
+      // M12-Sensor: Gewindehülse, schwarze Stirnfläche, orange LED
+      return `<rect x="${n(cx - 18)}" y="${n(cy - 7)}" width="30" height="14" rx="2" fill="#b8bdc4" stroke="#7d828a"/>` +
+        [0, 1, 2, 3, 4].map(k => `<line x1="${n(cx - 15 + k * 6)}" y1="${n(cy - 7)}" x2="${n(cx - 15 + k * 6)}" y2="${n(cy + 7)}" stroke="#7d828a"/>`).join("") +
+        `<rect x="${n(cx + 12)}" y="${n(cy - 6)}" width="6" height="12" rx="2" fill="#2b2b2b"/><circle cx="${n(cx - 21)}" cy="${n(cy)}" r="2.5" fill="#f08c00"/>`;
+    case "opto":
+      return `<rect x="${n(cx - 16)}" y="${n(cy - 9)}" width="32" height="18" rx="2" fill="#1b1d21" stroke="#56606b"/><text x="${n(cx)}" y="${n(cy + 4)}" text-anchor="middle" class="wr-glyph" style="font-size:10px">→|</text>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
       probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡"
@@ -487,6 +496,19 @@ function msPanel(drv: ReturnType<typeof getDriver>, st: { div: number; m: Ms }, 
   return h;
 }
 
+/** Kasten „Art des Sensors“ (Schalter, induktiv NPN/PNP) mit Spannung und Angaben zu den Eingängen des Boards */
+function senPanel(inputs: Board["inputs"], type: SensorType, volt: SensorVolt, comp: CompId): string {
+  const btn = (v: SensorType, label: string) => `<button data-sen="${v}" class="${type === v ? "active" : ""}">${esc(label)}</button>`;
+  let h = `<div class="wr-ms"><h4>${esc(t("wr.sen.title"))}</h4><div class="wr-level wr-sen" role="group">`;
+  h += btn("mech", t(comp === "probe" ? "wr.sen.mechProbe" : "wr.sen.mech")) + btn("npn", t("wr.sen.npn")) + btn("pnp", t("wr.sen.pnp"));
+  h += `</div>`;
+  if (type !== "mech") {
+    h += `<div class="wr-ms-row"><label>${esc(t("wr.sen.volt"))}<select id="wr-sen-volt">${[5, 12, 24].map(v => `<option value="${v}"${v === volt ? " selected" : ""}>${v} V</option>`).join("")}</select></label></div>`;
+  }
+  h += `<div class="wr-p">🔎 ${esc(t("wr.sen.in." + inputs))}</div></div>`;
+  return h;
+}
+
 export function initWiringPage() {
   const root = document.getElementById("wiring-page");
   if (!root) return;
@@ -497,11 +519,20 @@ export function initWiringPage() {
 
   let ms = { drv: "a4988", div: 16, clone: "" };
   try { ms = { ...ms, ...JSON.parse(get(KEY_MS, "{}")) }; } catch { /* egal */ }
+  let sen: { type: SensorType; volt: SensorVolt } = { type: "mech", volt: 24 };
+  try {
+    const v = JSON.parse(get(KEY_SEN, "{}"));
+    if (["mech", "npn", "pnp"].includes(v.type)) sen.type = v.type;
+    if ([5, 12, 24].includes(v.volt)) sen.volt = v.volt;
+  } catch { /* egal */ }
 
   const render = () => {
     const b = getBoard(boardId);
     if (comp !== "overview" && !COMPS.includes(comp)) comp = "overview";
-    const hk = comp === "overview" ? null : b.hookups[comp] || null;
+    let hk = comp === "overview" ? null : b.hookups[comp] || null;
+    // Endschalter / Längensensor: induktiver Sensor statt Schalter
+    const senComp = !!hk && !hk.unavailable && (comp === "limits" || comp === "probe");
+    if (hk && senComp && sen.type !== "mech") hk = sensorHookup(b, hk, sen.type, sen.volt);
     // Mikroschritte / A-Klon nur in der Ansicht „Schrittmotoren“ zeichnen
     const drv = getDriver(ms.drv), st = msFor(drv, ms.div);
     const isShield = b.id === "cnc-shield-v3";
@@ -553,9 +584,12 @@ export function initWiringPage() {
       side += `<div class="wr-facts"><div><b>${esc(t("wr.fact.mcu"))}</b> ${esc(b.mcu)}</div><div><b>${esc(t("wr.fact.volt"))}</b> ${esc(b.volt)}</div><div><b>${esc(t("wr.fact.fw"))}</b> ${esc(t(b.fw))}</div></div>`;
       side += `<div class="wr-warn">⚡ ${esc(t("wr.safety"))}</div>`;
     } else if (hk.unavailable) {
-      side += `<h3>${COMP_ICON[hk.comp]} ${esc(t("wr.comp." + hk.comp))}</h3><div class="wr-note">${esc(t(hk.unavailable))}</div>`;
+      side += `<h3>${COMP_ICON[hk.comp]} ${esc(t("wr.comp." + hk.comp))}</h3>`;
+      if (senComp) side += senPanel(b.inputs, sen.type, sen.volt, hk.comp);
+      side += `<div class="wr-note">${esc(t(hk.unavailable))}</div>`;
     } else {
       side += `<h3>${COMP_ICON[hk.comp]} ${esc(t("wr.comp." + hk.comp))}</h3>`;
+      if (senComp) side += senPanel(b.inputs, sen.type, sen.volt, hk.comp);
       if (hk.notes.length) side += hk.notes.map(s => `<div class="wr-note">⚠ ${tx(s)}</div>`).join("");
       if (msView) side += msPanel(drv, st, isShield, ms.clone);
       if (level === "beginner") {
@@ -598,6 +632,12 @@ export function initWiringPage() {
   root.addEventListener("change", (e) => {
     const el = e.target as HTMLSelectElement;
     if (el.id === "wr-board") { boardId = el.value; put(KEY_BOARD, boardId); render(); }
+    if (el.id === "wr-sen-volt") {
+      const v = parseInt(el.value, 10);
+      if (v === 5 || v === 12 || v === 24) sen.volt = v;
+      put(KEY_SEN, JSON.stringify(sen));
+      render();
+    }
     if (el.id === "wr-drv" || el.id === "wr-div" || el.id === "wr-clone") {
       if (el.id === "wr-drv") { ms.drv = el.value; ms.div = getDriver(el.value).std; }
       if (el.id === "wr-div") ms.div = parseInt(el.value, 10) || 16;
@@ -610,6 +650,12 @@ export function initWiringPage() {
     const el = e.target as Element;
     const lv = el.closest("[data-level]") as HTMLElement | null;
     if (lv) { level = lv.dataset.level === "pro" ? "pro" : "beginner"; put(KEY_LEVEL, level); render(); return; }
+    const sb = el.closest("[data-sen]") as HTMLElement | null;
+    if (sb) {
+      const v = sb.dataset.sen;
+      if (v === "mech" || v === "npn" || v === "pnp") { sen.type = v; put(KEY_SEN, JSON.stringify(sen)); render(); }
+      return;
+    }
     const cc = el.closest("[data-comp]") as HTMLElement | null;
     if (cc) { comp = cc.dataset.comp as any; put(KEY_COMP, comp); render(); return; }
   });
