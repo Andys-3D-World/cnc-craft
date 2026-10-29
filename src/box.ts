@@ -491,16 +491,28 @@ function flexPanels(o: BoxOptions): Panel[] {
  * schräge Schlitze der Seitenwände greifen (beide Seitenwände gleich, x = 0 ist vorne).
  * Passt die oberste Rampe nicht mehr hinein, bleibt sie weg (mindestens zwei Rampen, sonst „zu klein“).
  */
-function diceRamps(front: Panel, left: Panel, right: Panel, t: number, f: number): Panel[] {
-  const W = front.w, D = left.w, H = left.h, Wi = W - 2 * t, Di = D - 2 * t;
+/** Würfelturm: Höhen der Rampen-Mittellinien (Rampe 3 unten … Rampe 1 oben) bei Innentiefe Di */
+function diceLevels(t: number, Di: number) {
   const tan = Math.tan((35 * Math.PI) / 180), k = 0.6, G = 26 + t; // Fallhöhe zwischen zwei Rampen (Würfel bis ~20 mm)
-  // Ausgang: so hoch wie ein großer Würfel, unten knapp über dem Boden
-  const ze = 2 * t + 1, eh = Math.min(Math.max(24, H * 0.2), H - ze - 2 * t);
-  if (Wi > 8 && eh > 8) front.holes = [rect(t + 2, ze, W - t - 2, ze + eh)];
-  // Rampen als Mittellinie (x, z) von der Wand zum freien Ende
+  const ze = 2 * t + 1;                                              // Unterkante Ausgang, knapp über dem Boden
   const z3lo = ze - t / 2, z3hi = z3lo + Di * tan;
   const z2lo = z3lo + k * Di * tan + G, z2hi = z2lo + k * Di * tan;
   const z1lo = z2hi - (1 - k) * Di * tan + G, z1hi = z1lo + k * Di * tan;
+  return { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi };
+}
+/** Würfelturm: so hoch muss er außen mindestens sein, damit zwei Rampen hineinpassen (mm, aufgerundet) */
+export function diceMinHeight(o: BoxOptions): number {
+  const t = Math.max(0.1, o.t), { D } = outerSize({ ...o, type: "dice" });
+  return Math.ceil(diceLevels(t, D - 2 * t).z2hi + t / 2 + 2);
+}
+
+function diceRamps(front: Panel, left: Panel, right: Panel, t: number, f: number): Panel[] {
+  const W = front.w, D = left.w, H = left.h, Wi = W - 2 * t, Di = D - 2 * t;
+  const { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi } = diceLevels(t, Di);
+  // Ausgang: so hoch wie ein großer Würfel
+  const eh = Math.min(Math.max(24, H * 0.2), H - ze - 2 * t);
+  if (Wi > 8 && eh > 8) front.holes = [rect(t + 2, ze, W - t - 2, ze + eh)];
+  // Rampen als Mittellinie (x, z) von der Wand zum freien Ende
   const lines: [Pt2, Pt2][] = [[{ x: D - t, y: z3hi }, { x: t, y: z3lo }], [{ x: t, y: z2hi }, { x: t + k * Di, y: z2lo }]];
   if (z1hi + t + 15 <= H) lines.push([{ x: D - t, y: z1hi }, { x: D - t - k * Di, y: z1lo }]);
   const ramps: Panel[] = [], slots: Pt2[][] = [];

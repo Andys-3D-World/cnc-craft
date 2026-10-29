@@ -3204,6 +3204,7 @@
   "box.view.3d": "Widok 3D",
   "box.view.explode": "Rozsuń",
   "box.view.hint": "Przeciągnij = obróć, kółko myszy = przybliż, dwuklik = od nowa. Tak wygląda gotowe pudełko.",
+  "box.dice.minH": "Za niska: przy tej głębokości wieża do kości musi mieć co najmniej {h} mm wysokości (albo zmniejsz głębokość).",
   "mand.motif": "Kształt wzoru",
   "mand.motif.mixed": "mieszany (losowo)",
   "mand.motif.petal": "liście",

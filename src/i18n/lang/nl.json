@@ -3204,6 +3204,7 @@
   "box.view.3d": "3D-weergave",
   "box.view.explode": "Uit elkaar",
   "box.view.hint": "Slepen = draaien, muiswiel = zoomen, dubbelklik = terug. Zo ziet de doos er klaar uit.",
+  "box.dice.minH": "Te laag: bij deze diepte moet de dobbeltoren minstens {h} mm hoog zijn (of maak hem minder diep).",
   "mand.motif": "Patroonvorm",
   "mand.motif.mixed": "gemengd (willekeurig)",
   "mand.motif.petal": "bladeren",

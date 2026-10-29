@@ -3204,6 +3204,7 @@
   "box.view.3d": "Vista 3D",
   "box.view.explode": "Separar",
   "box.view.hint": "Arrastrar = girar, rueda = zoom, doble clic = restablecer. Así queda la caja terminada.",
+  "box.dice.minH": "Demasiado baja: con esta profundidad la torre de dados necesita al menos {h} mm de altura (o hazla menos profunda).",
   "mand.motif": "Forma del motivo",
   "mand.motif.mixed": "mezclado (al azar)",
   "mand.motif.petal": "hojas",

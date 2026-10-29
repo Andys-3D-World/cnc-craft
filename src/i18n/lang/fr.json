@@ -3204,6 +3204,7 @@
   "box.view.3d": "Vue 3D",
   "box.view.explode": "Écarter",
   "box.view.hint": "Glisser = tourner, molette = zoomer, double-clic = réinitialiser. Voici la boîte terminée.",
+  "box.dice.minH": "Trop bas : avec cette profondeur, la tour à dés doit faire au moins {h} mm de haut (ou la rendre moins profonde).",
   "mand.motif": "Forme du motif",
   "mand.motif.mixed": "mélangé (au hasard)",
   "mand.motif.petal": "feuilles",

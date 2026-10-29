@@ -4,7 +4,7 @@
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { boxPanels, outerSize, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
+import { boxPanels, outerSize, diceMinHeight, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
 import { Box3DView } from "./box3d";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
@@ -122,7 +122,13 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.classList.toggle("active", el.dataset.view === mode));
     svg.style.display = mode === "2d" ? "" : "none";
     ov.querySelectorAll<HTMLElement>(".box-3d, .box-3d-only").forEach(el => { el.style.display = mode === "3d" ? "" : "none"; });
-    if (!valid(b)) { svg.innerHTML = ""; view3d.setPanels([], b.t, 0); info.textContent = t("box.tooSmall"); $<HTMLButtonElement>("box-ok").disabled = true; return; }
+    if (!valid(b)) {
+      svg.innerHTML = ""; view3d.setPanels([], b.t, 0);
+      // Würfelturm: meist fehlt nur Höhe – sagen, wie viel (bei Innenmaßen ohne den Boden)
+      const need = b.type === "dice" ? diceMinHeight(b) - (b.inner ? b.t : 0) : 0;
+      info.textContent = need > b.h ? t("box.dice.minH", { h: need }) : t("box.tooSmall");
+      $<HTMLButtonElement>("box-ok").disabled = true; return;
+    }
     $<HTMLButtonElement>("box-ok").disabled = false;
     const ps = boxPanels(b);
     // 2D: Platten nebeneinander; 3D: fertige Kiste (ohne Schnittspalt, der ist zu klein zum Sehen)

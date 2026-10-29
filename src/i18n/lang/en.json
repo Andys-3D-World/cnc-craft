@@ -3379,6 +3379,7 @@
   "box.view.3d": "3D view",
   "box.view.explode": "Pull apart",
   "box.view.hint": "Drag to rotate, mouse wheel to zoom, double-click to reset. This is how the finished box looks.",
+  "box.dice.minH": "Too low: with this depth the dice tower needs at least {h} mm height (or make it less deep).",
   "mand.motif": "Pattern shape",
   "mand.motif.mixed": "mixed (random)",
   "mand.motif.petal": "leaves",

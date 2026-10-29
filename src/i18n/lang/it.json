@@ -3204,6 +3204,7 @@
   "box.view.3d": "Vista 3D",
   "box.view.explode": "Separa",
   "box.view.hint": "Trascina = ruota, rotellina = zoom, doppio clic = ripristina. Così appare la scatola finita.",
+  "box.dice.minH": "Troppo bassa: con questa profondità la torre per dadi deve essere alta almeno {h} mm (oppure renderla meno profonda).",
   "mand.motif": "Forma del motivo",
   "mand.motif.mixed": "misto (casuale)",
   "mand.motif.petal": "foglie",

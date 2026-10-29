@@ -127,6 +127,9 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- ***Box generator*, dice tower:** if it is too low, the dialog now says how high it must be at least for the chosen
+  depth (the sloped ramps need more height in deeper towers), instead of the misleading “too small for this
+  material thickness”.
 - **MKS boards in *Wiring* checked against the Makerbase manuals:** the limit/probe inputs use a 5 V signal (texts
   no longer say 3.3 V); the MAX now lists its MKS special settings – flame $43, buzzer $41, door $48, air assist $44,
   tilt sensor $42 on “Probe”, roller mode $45 (Z connector) – and the laser power limits (up to 20 W on “Laser”,

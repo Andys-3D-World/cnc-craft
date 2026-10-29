@@ -1,7 +1,7 @@
 // Tests für den Box-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boxPanels, outerSize, cabinetDrawer, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
+import { boxPanels, outerSize, cabinetDrawer, diceMinHeight, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
 
 type Pt = { x: number; y: number };
 const base: BoxOptions = { w: 120, d: 90, h: 70, inner: false, t: 3, finger: 9, lid: true, kerf: 0, nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6 };
@@ -153,3 +153,12 @@ for (const type of BOX_TYPES) {
     }
   });
 }
+
+test("Würfelturm: Mindesthöhe stimmt (ab da zwei Rampen, darunter nicht)", () => {
+  for (const d of [60, 80, 120, 200]) for (const tt of [3, 6]) {
+    const o = opts("dice", { d, t: tt }), h = diceMinHeight(o);
+    const ramps = (hh: number) => boxPanels({ ...o, h: hh }).filter(p => p.name === "ramp").length;
+    assert.ok(ramps(h) >= 2, `Tiefe ${d}: bei ${h} mm passen zwei Rampen`);
+    assert.ok(ramps(h - 2) < 2, `Tiefe ${d}: bei ${h - 2} mm passen keine zwei Rampen`);
+  }
+});
