@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- ***Flash board* knows the new wiring boards:** 6 Pack CNC Controller and Jackpot (ESP32, FluidNC) can be flashed
+  directly, with links to their wikis. Arduino Mega + RAMPS and BTT SKR Pro are listed with a guide instead, since
+  CNC Craft cannot flash them (Mega: Arduino IDE with grbl-Mega-5X; SKR Pro: firmware.bin on the SD card, grblHAL
+  marks the board as untested). *Wiring* picks the board chosen under *Flash board*.
 - **BTT SKR Pro V1.2 (grblHAL) in *Wiring*:** pins from grblHAL's board map, layout after BTT's pin diagram – endstops
   X−/Y−/Z− (3.3V / GND / signal), seven motor connectors (Z0/Z1 ganged, E0 as A), spindle PWM on EXP1 PA8, spindle
   enable on FAN1, coolant on HEAT0/HEAT1, probe on the BLTouch connector, door and buttons on EXP1. Notes on the
@@ -129,6 +133,7 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- ***Flash board*:** the list of firmware links no longer shows an untranslated entry (“fl.link.webuiFile”) before a board is chosen.
 - **Spindle stopping on every rapid move:** a milling job no longer starts while the board is in laser mode
   ($32=1) – GRBL would switch the spindle off on each G0 and back on for cutting without spin-up time. The console
   explains how to set $32=0.

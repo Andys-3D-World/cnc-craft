@@ -4012,5 +4012,12 @@
   "wr.n.skr.estop": "Der Not-Aus muss beide Versorgungen trennen (POWER und MOTOR POWER). Die RESET-Taste startet das Board nur neu.",
   "wr.n.skr.exp1": "PG4, PD11, PG2 und PG6 liegen auf der 10-poligen EXP1-Leiste – die Zeichnung zeigt sie wie im BTT-Pinplan; die Pins sorgfältig abzählen (Pin 1 ist mit einem Dreieck markiert).",
   "wr.s.skr.io": "Taster (Schließer) zwischen Pin und GND an EXP1: PG6 Reset, PD11 Pause (Feed Hold), PG2 Start (Cycle Start).",
-  "wr.p.skr.estop": "In grblHAL kann der Reset-Eingang als Not-Aus-Eingang arbeiten (Alarm bleibt bestehen) – hängt von den Build-Optionen ab. Eingänge werden mit $14 umgekehrt."
+  "wr.p.skr.estop": "In grblHAL kann der Reset-Eingang als Not-Aus-Eingang arbeiten (Alarm bleibt bestehen) – hängt von den Build-Optionen ab. Eingänge werden mit $14 umgekehrt.",
+  "fl.link.6pack": "6-Pack-Wiki: Einrichtung, Module und FluidNC-Konfigurationen",
+  "fl.link.jackpot": "V1 Engineering: Jackpot-Anleitung und FluidNC-Konfigurationen",
+  "fl.link.grblMega5x": "grbl-Mega-5X (GRBL für Arduino Mega)",
+  "fl.chk.manual": "Das {board} kann CNC Craft nicht selbst flashen – folge der Anleitung unten.",
+  "fl.manual.title": "So kommt die Firmware aufs Board",
+  "fl.manual.mega": "Der Mega 2560 hat einen anderen Bootloader als der Uno – CNC Craft kann ihn nicht flashen. grbl-Mega-5X herunterladen, in der Arduino IDE öffnen, „Arduino Mega or Mega 2560“ wählen und hochladen. Danach in CNC Craft verbinden (115200 Baud).",
+  "fl.manual.skr": "Das SKR Pro wird über die SD-Karte geflasht: im Web Builder grblHAL für das BTT SKR Pro erstellen (Variante mit Bootloader), die Datei als firmware.bin auf die SD-Karte kopieren und das Board einschalten – der Bootloader spielt sie auf. Danach per USB verbinden. Achtung: grblHAL kennzeichnet dieses Board als ungetestet („might not boot“) – die Original-Firmware als Sicherung aufheben."
 }

@@ -3837,5 +3837,12 @@
   "wr.n.skr.estop": "L’arresto di emergenza deve togliere entrambe le alimentazioni (POWER e MOTOR POWER). Il tasto RESET riavvia solo la scheda.",
   "wr.n.skr.exp1": "PG4, PD11, PG2 e PG6 sono sul connettore EXP1 a 10 pin – il disegno li mostra come nello schema BTT; contare i pin con attenzione (il pin 1 è segnato con un triangolo).",
   "wr.s.skr.io": "Pulsanti (NA) tra pin e GND su EXP1: PG6 reset, PD11 pausa (feed hold), PG2 avvio (cycle start).",
-  "wr.p.skr.estop": "In grblHAL l’ingresso reset può funzionare come ingresso di arresto di emergenza (allarme mantenuto) – dipende dalle opzioni di compilazione. Gli ingressi si invertono con $14."
+  "wr.p.skr.estop": "In grblHAL l’ingresso reset può funzionare come ingresso di arresto di emergenza (allarme mantenuto) – dipende dalle opzioni di compilazione. Gli ingressi si invertono con $14.",
+  "fl.link.6pack": "Wiki 6-Pack: messa in servizio, moduli e config FluidNC",
+  "fl.link.jackpot": "V1 Engineering: documentazione Jackpot e config FluidNC",
+  "fl.link.grblMega5x": "grbl-Mega-5X (GRBL per Arduino Mega)",
+  "fl.chk.manual": "CNC Craft non può programmare da solo la scheda {board} – segui la guida qui sotto.",
+  "fl.manual.title": "Come caricare il firmware",
+  "fl.manual.mega": "La Mega 2560 ha un bootloader diverso dalla Uno – CNC Craft non può programmarla. Scarica grbl-Mega-5X, aprilo nell’IDE Arduino, scegli «Arduino Mega or Mega 2560» e carica. Poi collegati in CNC Craft (115200 baud).",
+  "fl.manual.skr": "La SKR Pro si programma dalla scheda SD: crea grblHAL per la BTT SKR Pro nel Web Builder (variante con bootloader), copia il file come firmware.bin sulla scheda SD e accendi la scheda – il bootloader lo installa. Poi collegati via USB. Attenzione: grblHAL indica questa scheda come non testata («might not boot») – conserva il firmware originale come copia."
 }

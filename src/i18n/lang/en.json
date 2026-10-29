@@ -4012,5 +4012,12 @@
   "wr.n.skr.estop": "The e-stop must cut both supplies (POWER and MOTOR POWER). The RESET button only restarts the board.",
   "wr.n.skr.exp1": "PG4, PD11, PG2 and PG6 are on the 10-pin EXP1 header – the drawing shows them as in BTT's pin diagram; count the pins carefully (pin 1 is marked with a triangle).",
   "wr.s.skr.io": "Push buttons (normally open) between pin and GND on EXP1: PG6 reset, PD11 feed hold, PG2 cycle start.",
-  "wr.p.skr.estop": "In grblHAL the reset input can work as an e-stop input (latching alarm) – depends on the build options. Inputs are inverted with $14."
+  "wr.p.skr.estop": "In grblHAL the reset input can work as an e-stop input (latching alarm) – depends on the build options. Inputs are inverted with $14.",
+  "fl.link.6pack": "6-Pack wiki: setup, modules and FluidNC configs",
+  "fl.link.jackpot": "V1 Engineering: Jackpot docs and FluidNC configs",
+  "fl.link.grblMega5x": "grbl-Mega-5X (GRBL for Arduino Mega)",
+  "fl.chk.manual": "CNC Craft cannot flash the {board} itself – follow the guide below.",
+  "fl.manual.title": "How to load the firmware",
+  "fl.manual.mega": "The Mega 2560 uses a different bootloader than the Uno – CNC Craft cannot flash it. Download grbl-Mega-5X, open it in the Arduino IDE, choose “Arduino Mega or Mega 2560” and upload. Then connect in CNC Craft (115200 baud).",
+  "fl.manual.skr": "The SKR Pro is flashed from the SD card: build grblHAL for the BTT SKR Pro in the Web Builder (variant with bootloader), copy the file as firmware.bin to the SD card and switch the board on – the bootloader installs it. Then connect via USB. Note: grblHAL marks this board as untested (“might not boot”) – keep the original firmware as a backup."
 }

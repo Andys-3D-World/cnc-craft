@@ -50,7 +50,7 @@ interface Board {
   id: string;
   nameKey?: string;      // Übersetzung …
   name?: string;         // … oder fester Name
-  kind: "esp" | "avr";
+  kind: "esp" | "avr" | "manual";   // manual = kann CNC Craft nicht flashen (z. B. ATmega2560, STM32) – nur Anleitung
   chipId?: number;       // ESP: 0 = ESP32, 9 = ESP32-S3 …
   chip: string;
   flash?: number;        // Flash-Größe in Bytes (falls sicher bekannt)
@@ -63,6 +63,8 @@ interface Board {
   halGuide?: string;
   /** Eigene Anleitung „Original-Firmware aufspielen“: Texte fl.orig.<origGuide>.howto / .after */
   origGuide?: string;
+  /** kind "manual": Schlüssel der Anleitung, wie man die Firmware ohne CNC Craft aufspielt */
+  manualGuide?: string;
 }
 
 const BOARDS: Board[] = [
@@ -72,6 +74,10 @@ const BOARDS: Board[] = [
     fwExpect: "MKS DLC32 2." },
   { id: "pibot-v588-ultra", name: "PiBot Controller V5.88 Ultra", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, links: ["fl.link.pibot588", "fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "pibot-v496-pro", name: "PiBot FluidNC V4.96 Pro", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.pibot", "fl.link.fluidnc", "fl.link.grblhal"] },
+  { id: "6pack", name: "6 Pack CNC Controller", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.6pack", "fl.link.fluidnc"] },
+  { id: "jackpot", name: "Jackpot CNC Controller (V1 Engineering)", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.jackpot", "fl.link.fluidnc"] },
+  { id: "mega-ramps", name: "Arduino Mega 2560 + RAMPS 1.4", kind: "manual", chip: "ATmega2560", links: ["fl.link.grblMega5x"], manualGuide: "fl.manual.mega" },
+  { id: "btt-skr-pro", name: "BTT SKR Pro V1.1 / V1.2", kind: "manual", chip: "STM32F407", links: ["fl.link.grblhal"], manualGuide: "fl.manual.skr" },
   { id: "esp32", nameKey: "fl.board.esp32", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "esp32s3", nameKey: "fl.board.esp32s3", kind: "esp", chipId: 9, chip: "ESP32-S3", links: ["fl.link.grblhal"] },
   { id: "arduino-uno", nameKey: "fl.board.uno", kind: "avr", chip: "ATmega328P", maxHex: 32256, links: ["fl.link.grbl"] },
@@ -89,6 +95,10 @@ const LINKS: Record<string, string> = {
   // PiBot: YAML-Vorlagen und Anleitungen des Herstellers
   "fl.link.pibot": "https://wiki.pibot.com/doku.php?id=pibot_cnc_laser_series:v496_pro:docs:start",
   "fl.link.pibot588": "https://wiki.pibot.com/doku.php?id=pibot_cnc_laser_series:v588_ultra:docs:start",
+  // 6 Pack und Jackpot (FluidNC), Mega + RAMPS (grbl-Mega-5X)
+  "fl.link.6pack": "https://github.com/bdring/6-Pack_CNC_Controller/wiki",
+  "fl.link.jackpot": "https://docs.v1e.com/electronics/jackpot/",
+  "fl.link.grblMega5x": "https://github.com/fra589/grbl-Mega-5X",
   // Weboberfläche für grblHAL (ESP3D-WebUI v3) – muss nach jedem Flashen neu aufs Board
   "fl.link.webuiFile": "https://github.com/luc-github/ESP3D-WEBUI/tree/3.0/dist/CNC/GRBLHal"
 };
@@ -203,6 +213,7 @@ async function inspectZip(path: string, name: string): Promise<FileInfo> {
 export function checkFile(b: Board | null, f: FileInfo | null): { blocks: string[]; warns: string[] } {
   const blocks: string[] = [], warns: string[] = [];
   if (!b) { blocks.push(t("fl.chk.noBoard")); return { blocks, warns }; }
+  if (b.kind === "manual") { blocks.push(t("fl.chk.manual", { board: boardName(b) })); return { blocks, warns }; }
   if (!f) return { blocks, warns };
   if (b.kind === "avr" && f.kind !== "avr") blocks.push(t("fl.chk.needHex", { board: boardName(b) }));
   if (b.kind === "esp" && f.kind === "avr") blocks.push(t("fl.chk.needBin", { board: boardName(b) }));
@@ -299,7 +310,7 @@ function render() {
   const chk = checkFile(board, file);
   const canFlash = !!board && !!file && !busy && chk.blocks.length === 0 && riskOk;
   const accept = board ? (board.kind === "avr" ? ".hex" : ".bin / .elf / .zip") : "";
-  const links = board ? board.links : Object.keys(LINKS);
+  const links = board ? board.links : Object.keys(LINKS).filter(k => k !== "fl.link.webuiFile");   // WebUI-Datei hat eigenen Knopf
   root.innerHTML = `
     <h2>⚡ ${T("fl.title")}</h2>
     <p class="panel-desc">${T("fl.desc")}</p>
@@ -312,14 +323,16 @@ function render() {
           ${BOARDS.map(b => `<option value="${b.id}" ${board?.id === b.id ? "selected" : ""}>${esc(boardName(b))} – ${b.chip}</option>`).join("")}
         </select>
       </div>
-      ${board ? `<div class="tool-scope">${t("fl.board.accepts", { files: accept, chip: board.chip })}</div>` : `<div class="sp-warn">⚠ ${t("fl.chk.noBoard")}</div>`}
+      ${board?.manualGuide ? `<div class="sp-warn">⚠ ${t("fl.chk.manual", { board: esc(boardName(board)) })}</div>
+        <details class="fl-help fl-hal" open><summary>🛠️ ${t("fl.manual.title")}</summary><div>${t(board.manualGuide)}</div></details>`
+        : board ? `<div class="tool-scope">${t("fl.board.accepts", { files: accept, chip: board.chip })}</div>` : `<div class="sp-warn">⚠ ${t("fl.chk.noBoard")}</div>`}
       ${boardCompareHtml()}
     </section>
 
     <section class="sp-card">
       <h3>2 · ${T("fl.step.file")}</h3>
       <div class="fl-row">
-        <button id="fl-pick" class="btn-secondary" ${busy || !board ? "disabled" : ""}>📂 ${T("fl.pick")}</button>
+        <button id="fl-pick" class="btn-secondary" ${busy || !board || board.kind === "manual" ? "disabled" : ""}>📂 ${T("fl.pick")}</button>
         <span class="fl-file">${file ? esc(file.name) : t("fl.noFile")}</span>
       </div>
       ${!board || board.kind === "avr" ? `<div class="fl-row">

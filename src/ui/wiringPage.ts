@@ -58,6 +58,7 @@ function guessBoard(): string {
     if (/DLC32\s*MAX/i.test(name)) return "mks-dlc32-max";
     if (/DLC32/i.test(name)) return "mks-dlc32-v21";
     const fl = localStorage.getItem("cnc_craft_flash_board") || "";
+    if (BOARDS.some(b => b.id === fl)) return fl;   // gleiche Kennung im Reiter „Board flashen“ (6pack, jackpot, mega-ramps …)
     if (fl === "mks-dlc32-max") return "mks-dlc32-max";
     if (fl === "mks-dlc32") return "mks-dlc32-v21";
     if (/V5\.?88/i.test(name) || fl === "pibot-v588-ultra") return "pibot-v588-ultra";

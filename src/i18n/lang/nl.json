@@ -3837,5 +3837,12 @@
   "wr.n.skr.estop": "De noodstop moet beide voedingen onderbreken (POWER en MOTOR POWER). De RESET-knop herstart het board alleen.",
   "wr.n.skr.exp1": "PG4, PD11, PG2 en PG6 zitten op de 10-polige EXP1-header – de tekening toont ze zoals in het BTT-pinschema; tel de pinnen zorgvuldig (pin 1 is met een driehoek gemarkeerd).",
   "wr.s.skr.io": "Drukknoppen (maakcontact) tussen pin en GND op EXP1: PG6 reset, PD11 pauze (feed hold), PG2 start (cycle start).",
-  "wr.p.skr.estop": "In grblHAL kan de reset-ingang als noodstopingang werken (alarm blijft staan) – afhankelijk van de build-opties. Ingangen keer je om met $14."
+  "wr.p.skr.estop": "In grblHAL kan de reset-ingang als noodstopingang werken (alarm blijft staan) – afhankelijk van de build-opties. Ingangen keer je om met $14.",
+  "fl.link.6pack": "6-Pack-wiki: instellen, modules en FluidNC-configs",
+  "fl.link.jackpot": "V1 Engineering: Jackpot-documentatie en FluidNC-configs",
+  "fl.link.grblMega5x": "grbl-Mega-5X (GRBL voor Arduino Mega)",
+  "fl.chk.manual": "CNC Craft kan het {board} niet zelf flashen – volg de handleiding hieronder.",
+  "fl.manual.title": "Zo komt de firmware op het board",
+  "fl.manual.mega": "De Mega 2560 heeft een andere bootloader dan de Uno – CNC Craft kan hem niet flashen. Download grbl-Mega-5X, open het in de Arduino IDE, kies „Arduino Mega or Mega 2560” en upload. Verbind daarna in CNC Craft (115200 baud).",
+  "fl.manual.skr": "De SKR Pro wordt via de SD-kaart geflasht: maak in de Web Builder grblHAL voor de BTT SKR Pro (variant met bootloader), kopieer het bestand als firmware.bin naar de SD-kaart en zet het board aan – de bootloader installeert het. Verbind daarna via USB. Let op: grblHAL markeert dit board als ongetest („might not boot”) – bewaar de originele firmware als reserve."
 }
