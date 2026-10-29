@@ -4,7 +4,7 @@
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { boxPanels, outerSize, diceMinHeight, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
+import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
 import { Box3DView } from "./box3d";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
@@ -145,6 +145,7 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     }).join("");
     const os = outerSize(b);
     info.textContent = t("box.info", { n: ps.length, w: os.W.toFixed(1), d: os.D.toFixed(1), h: os.H.toFixed(1) });
+    if (b.type === "dice") info.textContent += " · " + t("box.dice.angle", { a: Math.round(diceAngle(b)), n: ps.filter(p => p.name === "ramp").length });
   };
   $<HTMLSelectElement>("box-type").value = o.type || "closed";
   ov.querySelectorAll("input, select").forEach(i => i.addEventListener("input", preview));

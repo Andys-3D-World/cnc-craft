@@ -281,6 +281,7 @@ html, body {
 }
 .btn-primary:hover { filter: brightness(1.12); }
 .btn-primary:active { transform: translateY(1px); box-shadow: none; }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; transform: none; }
 
 .btn-secondary {
   background: var(--bg-panel-2);

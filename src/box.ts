@@ -485,30 +485,44 @@ function flexPanels(o: BoxOptions): Panel[] {
 }
 
 /**
- * Würfelturm: Ausgang unten in der Front, drei schräge Rampen (35°) zwischen den Seitenwänden.
+ * Würfelturm: Ausgang unten in der Front, drei schräge Rampen (20–35°) zwischen den Seitenwänden.
  * Oben fällt der Würfel auf Rampe 1 (hinten hoch), rollt nach vorne auf Rampe 2 (vorne hoch), dann auf die
  * untere Rampe, die über die ganze Tiefe bis zum Ausgang führt. Jede Rampe hat links/rechts Zapfen, die in
  * schräge Schlitze der Seitenwände greifen (beide Seitenwände gleich, x = 0 ist vorne).
  * Passt die oberste Rampe nicht mehr hinein, bleibt sie weg (mindestens zwei Rampen, sonst „zu klein“).
  */
-/** Würfelturm: Höhen der Rampen-Mittellinien (Rampe 3 unten … Rampe 1 oben) bei Innentiefe Di */
-function diceLevels(t: number, Di: number) {
-  const tan = Math.tan((35 * Math.PI) / 180), k = 0.6, G = 26 + t; // Fallhöhe zwischen zwei Rampen (Würfel bis ~20 mm)
+/**
+ * Würfelturm: Höhen der Rampen-Mittellinien (Rampe 3 unten … Rampe 1 oben) bei Innentiefe Di und Außenhöhe H.
+ * Am liebsten 35° steil; ist der Turm dafür zu niedrig, werden die Rampen flacher (bis 20°, flacher rollen Würfel
+ * schlecht). Drei Rampen, wenn sie mit mindestens 20° hineinpassen, sonst zwei.
+ */
+const DICE_TAN_MAX = Math.tan((35 * Math.PI) / 180), DICE_TAN_MIN = Math.tan((20 * Math.PI) / 180);
+function diceLevels(t: number, Di: number, H: number) {
+  const k = 0.6, G = 26 + t;                                         // Fallhöhe zwischen zwei Rampen (Würfel bis ~20 mm)
   const ze = 2 * t + 1;                                              // Unterkante Ausgang, knapp über dem Boden
-  const z3lo = ze - t / 2, z3hi = z3lo + Di * tan;
+  const z3lo = ze - t / 2;
+  // Steigung, bei der Rampe 1 (oben) bzw. Rampe 2 gerade noch hineinpasst (Platz über Rampe 1: t + 15 mm)
+  const tan3 = (H - t - 15 - z3lo - 2 * G) / ((4 * k - 1) * Di), tan2 = (H - t / 2 - 2 - z3lo - G) / (2 * k * Di);
+  const tan = tan3 >= DICE_TAN_MIN ? Math.min(tan3, DICE_TAN_MAX) : Math.max(DICE_TAN_MIN, Math.min(tan2, DICE_TAN_MAX));
+  const z3hi = z3lo + Di * tan;
   const z2lo = z3lo + k * Di * tan + G, z2hi = z2lo + k * Di * tan;
   const z1lo = z2hi - (1 - k) * Di * tan + G, z1hi = z1lo + k * Di * tan;
-  return { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi };
+  return { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi, deg: (Math.atan(tan) * 180) / Math.PI };
 }
-/** Würfelturm: so hoch muss er außen mindestens sein, damit zwei Rampen hineinpassen (mm, aufgerundet) */
+/** Würfelturm: so hoch muss er außen mindestens sein, damit zwei Rampen (20°) hineinpassen (mm, aufgerundet) */
 export function diceMinHeight(o: BoxOptions): number {
-  const t = Math.max(0.1, o.t), { D } = outerSize({ ...o, type: "dice" });
-  return Math.ceil(diceLevels(t, D - 2 * t).z2hi + t / 2 + 2);
+  const t = Math.max(0.1, o.t), Di = outerSize({ ...o, type: "dice" }).D - 2 * t;
+  return Math.ceil(t / 2 + 2 + (2 * t + 1 - t / 2) + 2 * 0.6 * Di * DICE_TAN_MIN + 26 + t);
+}
+/** Würfelturm: Neigung der Rampen in Grad (für die Anzeige) */
+export function diceAngle(o: BoxOptions): number {
+  const t = Math.max(0.1, o.t), { D, H } = outerSize({ ...o, type: "dice" });
+  return diceLevels(t, D - 2 * t, H).deg;
 }
 
 function diceRamps(front: Panel, left: Panel, right: Panel, t: number, f: number): Panel[] {
   const W = front.w, D = left.w, H = left.h, Wi = W - 2 * t, Di = D - 2 * t;
-  const { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi } = diceLevels(t, Di);
+  const { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi } = diceLevels(t, Di, H);
   // Ausgang: so hoch wie ein großer Würfel
   const eh = Math.min(Math.max(24, H * 0.2), H - ze - 2 * t);
   if (Wi > 8 && eh > 8) front.holes = [rect(t + 2, ze, W - t - 2, ze + eh)];

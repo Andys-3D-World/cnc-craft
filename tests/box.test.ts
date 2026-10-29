@@ -1,7 +1,7 @@
 // Tests für den Box-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boxPanels, outerSize, cabinetDrawer, diceMinHeight, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
+import { boxPanels, outerSize, cabinetDrawer, diceMinHeight, diceAngle, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
 
 type Pt = { x: number; y: number };
 const base: BoxOptions = { w: 120, d: 90, h: 70, inner: false, t: 3, finger: 9, lid: true, kerf: 0, nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6 };
@@ -160,5 +160,14 @@ test("Würfelturm: Mindesthöhe stimmt (ab da zwei Rampen, darunter nicht)", () 
     const ramps = (hh: number) => boxPanels({ ...o, h: hh }).filter(p => p.name === "ramp").length;
     assert.ok(ramps(h) >= 2, `Tiefe ${d}: bei ${h} mm passen zwei Rampen`);
     assert.ok(ramps(h - 2) < 2, `Tiefe ${d}: bei ${h - 2} mm passen keine zwei Rampen`);
+  }
+});
+
+test("Würfelturm: niedriger Turm bekommt flachere Rampen (35° … 20°)", () => {
+  assert.ok(Math.abs(diceAngle(opts("dice")) - 35) < 1e-6, "hoch genug: 35°");
+  for (const h of [130, 160, 200, 260]) {
+    const o = opts("dice", { w: 300, d: 200, h }), a = diceAngle(o);
+    assert.ok(a >= 20 - 1e-9 && a <= 35 + 1e-9, `Neigung ${a}`);
+    assert.ok(boxPanels(o).filter(p => p.name === "ramp").length >= 2, `bei ${h} mm Höhe passen Rampen`);
   }
 });
