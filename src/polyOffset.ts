@@ -57,15 +57,18 @@ function offsetOnce(polygon: P[], d: number, arcTol: number): P[][] {
   if (polygonArea(pts) < 0) pts = pts.slice().reverse();
   if (Math.abs(d) < 1e-9) return [pts];
 
-  const raw = buildRawOffset(pts, d, arcTol);
-  const pieces = splitAtIntersections(raw);
+  const { raw, arc } = buildRawOffset(pts, d, arcTol);
+  const pieces = splitAtIntersections(raw, arc);
 
-  // Nur Stücke behalten, die weit genug weg und auf der richtigen Seite liegen
-  const minDist = Math.abs(d) - (arcTol * 2 + 1e-6);
+  // Nur Stücke behalten, die weit genug weg und auf der richtigen Seite liegen.
+  // Eingefügte Bögen sind nur Sehnen (bis arcTol zu nah), verschobene Kanten liegen genau auf |d| –
+  // für sie gilt die enge Grenze, sonst bleiben an fein unterteilten Bögen winzige Schlaufen übrig
+  const arcMin = Math.abs(d) - (arcTol * 2 + 1e-6);
+  const edgeMin = Math.abs(d) * (1 - 1e-9) - 1e-9;
   const grid = new SegmentGrid(pts);
   const kept = pieces.filter(pc => {
     const mx = (pc.a.x + pc.b.x) / 2, my = (pc.a.y + pc.b.y) / 2;
-    return !grid.nearerThan(mx, my, minDist);
+    return !grid.nearerThan(mx, my, pc.arc ? arcMin : edgeMin);
   });
 
   // Eine fertige Kontur liegt komplett auf einer Seite -> ein Test pro Kontur reicht
@@ -94,7 +97,8 @@ function cleanPolygon(input: P[]): P[] {
   return out;
 }
 
-function buildRawOffset(pts: P[], d: number, arcTol: number): P[] {
+/** raw: verschobener Linienzug; arc[k]: Strecke raw[k] → raw[k+1] gehört zu einem eingefügten Eckbogen */
+function buildRawOffset(pts: P[], d: number, arcTol: number): { raw: P[]; arc: boolean[] } {
   const n = pts.length;
   // Normale nach außen (rechts der Fahrtrichtung bei gegen-Uhrzeigersinn-Kontur)
   const normals: P[] = [];
@@ -107,7 +111,12 @@ function buildRawOffset(pts: P[], d: number, arcTol: number): P[] {
   const r = Math.abs(d);
   const maxStep = r > arcTol ? 2 * Math.acos(1 - arcTol / r) : Math.PI / 4;
 
-  const raw: P[] = [];
+  const raw: P[] = [], arc: boolean[] = [];
+  const add = (q: P, isArc: boolean) => {
+    const last = raw[raw.length - 1];
+    if (last && Math.hypot(q.x - last.x, q.y - last.y) <= 1e-7) arc[arc.length - 1] = isArc;
+    else { raw.push(q); arc.push(isArc); }
+  };
   for (let i = 0; i < n; i++) {
     const prev = (i - 1 + n) % n;
     const p = pts[i];
@@ -119,26 +128,28 @@ function buildRawOffset(pts: P[], d: number, arcTol: number): P[] {
     const e1 = { x: pts[(i + 1) % n].x - p.x, y: pts[(i + 1) % n].y - p.y };
     const turn = e0.x * e1.y - e0.y * e1.x; // > 0 = Linkskurve (konvexe Ecke)
 
-    raw.push({ x: p.x + v0.x, y: p.y + v0.y });
-    if (turn * d > 1e-12) {
+    const gap = turn * d > 1e-12;
+    add({ x: p.x + v0.x, y: p.y + v0.y }, gap);
+    if (gap) {
       // Lücke an der Ecke -> mit Bogen um den Eckpunkt füllen
       const ang = Math.atan2(v0.x * v1.y - v0.y * v1.x, v0.x * v1.x + v0.y * v1.y);
       const steps = Math.ceil(Math.abs(ang) / maxStep);
       for (let s = 1; s < steps; s++) {
         const t = ang * s / steps;
         const c = Math.cos(t), sn = Math.sin(t);
-        raw.push({ x: p.x + v0.x * c - v0.y * sn, y: p.y + v0.x * sn + v0.y * c });
+        add({ x: p.x + v0.x * c - v0.y * sn, y: p.y + v0.x * sn + v0.y * c }, true);
       }
     }
-    raw.push({ x: p.x + v1.x, y: p.y + v1.y });
+    add({ x: p.x + v1.x, y: p.y + v1.y }, false);
   }
-  return cleanPolygon(raw);
+  while (raw.length > 1 && Math.hypot(raw[0].x - raw[raw.length - 1].x, raw[0].y - raw[raw.length - 1].y) <= 1e-7) { raw.pop(); arc.pop(); }
+  return { raw, arc };
 }
 
-interface Piece { a: P; b: P; aId: number; bId: number; }
+interface Piece { a: P; b: P; aId: number; bId: number; arc: boolean; }
 
 /** Zerlegt den geschlossenen Linienzug an allen Selbst-Kreuzungen */
-function splitAtIntersections(raw: P[]): Piece[] {
+function splitAtIntersections(raw: P[], arc: boolean[]): Piece[] {
   const n = raw.length;
   const cuts: { t: number; id: number; p: P }[][] = raw.map(() => []);
   let nextId = n; // 0..n-1 = Original-Punkte, ab n = Kreuzungspunkte
@@ -163,11 +174,11 @@ function splitAtIntersections(raw: P[]): Piece[] {
     const list = cuts[i].sort((x, y) => x.t - y.t);
     let curP = raw[i], curId = i;
     for (const c of list) {
-      pieces.push({ a: curP, b: c.p, aId: curId, bId: c.id });
+      pieces.push({ a: curP, b: c.p, aId: curId, bId: c.id, arc: arc[i] });
       curP = c.p; curId = c.id;
     }
     const endIdx = (i + 1) % n;
-    pieces.push({ a: curP, b: raw[endIdx], aId: curId, bId: endIdx });
+    pieces.push({ a: curP, b: raw[endIdx], aId: curId, bId: endIdx, arc: arc[i] });
   }
   return pieces;
 }

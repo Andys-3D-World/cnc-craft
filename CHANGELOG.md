@@ -75,11 +75,16 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Adaptive feed in curves is now off by default:** milling jobs with many curves ran too slowly. Turn it on
+  under *Milling parameters* → *Adapt feed in curves* and set the minimum feed (%) when needed.
 - **Thread mills in the tool list** now show *single-tooth* or the pitch next to the number of flutes.
 - **Resume from a line in the G-code editor:** click a line in the Simulation tab's G-code list (or a toolpath),
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **Slots and round contours no longer mill in tiny back-and-forth steps:** the inside/outside offset of finely
+  divided arcs (slots, imported circles, rounded corners) left tiny loops at every arc point, so the cutter jerked
+  forward and back and the path had up to four times as many points. Those loops are now removed.
 - **Manual jogging could drive past the bed:** a 100 mm step at X 150 on a 205 mm bed went to 300 mm – into the
   limit switch or the frame. Jog steps in X/Y are now shortened to the bed edge (bed size from the top bar, origin
   bottom left); an axis already outside the bed may only move back towards it.

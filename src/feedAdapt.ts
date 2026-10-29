@@ -17,7 +17,7 @@
  */
 
 /** Einstellungen (rechte Seite → Fräsparameter) */
-export const feedAdapt = { on: true, minPct: 50 };
+export const feedAdapt = { on: false, minPct: 50 };
 const KEY = "cnc_craft_feed_adapt";
 
 export function loadFeedAdapt() {
