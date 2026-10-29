@@ -9,7 +9,11 @@
  *   - MKS DLC32 V2.1: Makerbase-Pinplan „MKS DLC32 V2.1_003 PIN“ + MKS-Firmware
  *     (i2s_out_xyz_mks_dlc32.h): Endschalter X=IO36, Y=IO35, Z=IO34, Taster=IO22,
  *     Laser/Spindel=IO32, Kühlung=IO4 (I2C-SCL).
- *   - MKS DLC32 MAX V1.0: Makerbase-Pinplan „MKS DLC32 MAX V1.0_002 PIN“.
+ *   - MKS DLC32 MAX V1.0: Makerbase-Pinplan „MKS DLC32 MAX V1.0_002 PIN“ + „MKS DLC32 MAX Manual“ (Bildschirm RJ11 mit $47,
+ *     Sonderfunktionen $41 Summer, $42 Neigung an „Probe“, $43 Flamme, $44 Luft, $45 Rollen-Modus an Z, $48 Tür; Laser über 20 W an
+ *     „Laser 2“ MR30, über 50 W eigenes Netzteil).
+ *   - MKS DLC32 V2.x: „MKS DLC32 V2 Wiring Manual“ (Endschalter/Probe mit 5-V-Signal, Bildschirm TS24/TS35 an EXP1/EXP2,
+ *     Probe mit Laser-Firmware = Flammensensor).
  *   - PiBot FluidNC V4.96 Pro: PiBot-Wiki „Pin Definition Overview“ (wiki.pibot.com) + Test-YAML des Herstellers.
  *   - PiBot Controller V5.88 Ultra: PiBot-Wiki „Pinout Reference“ (Bild „V588 diagram V1“) + Test-YAML des Herstellers.
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
@@ -33,10 +37,10 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "io";
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "io"];
-/** "modbus" (Umrichter über RS485) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
-export const OPTIONAL_COMPS: CompId[] = ["modbus", "io"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "display" | "io";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "display", "io"];
+/** "modbus" (Umrichter über RS485), "display" (Bildschirm) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
+export const OPTIONAL_COMPS: CompId[] = ["modbus", "display", "io"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
 /**
@@ -54,7 +58,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -106,7 +110,7 @@ export interface Board {
   holes?: { x: number; y: number; r: number }[];
   /**
    * Art der Eingänge (Endschalter/Taster) – für induktive Sensoren:
-   *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = direkt am ESP32 (3,3 V, kein Optokoppler im Pinplan)
+   *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = MKS (ESP32, laut Makerbase 5-V-Signal, kein Optokoppler)
    *   pb496 / pb588 = PiBot mit SW-VCC-Brücke (5 V oder Vmot, nur NPN)   ruida = Ruida (5/12/24 V, NPN laut Handbuch)
    */
   inputs: InputKind;
@@ -292,7 +296,10 @@ const dlc21: Board = {
     { id: "sw", label: "SWITCH", x: 35, y: 401, dir: "v", labelPos: "right", rot: true, style: "pads", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
     { id: "pwr", label: "POWER 12-24V", x: 138, y: 466, dir: "h", labelPos: "above", style: "barrel", pinLbl: false, pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
     { id: "rst", label: "RESET", x: 536, y: 468, dir: "h", labelPos: "above", body: XH_BLACK, pins: [{ k: "G", label: "G" }, { k: "S", label: "S", mcu: "EN", fn: "Reset" }] },
-    esdRow("X", 95, 217), esdRow("Y", 209, 217), esdRow("Z", 324, 217)
+    esdRow("X", 95, 217), esdRow("Y", 209, 217), esdRow("Z", 324, 217),
+    // Bildschirm-Stecker (Wannenstecker, Optik in deco) – nur ein Anschlusspunkt je Stecker für die Zeichnung
+    { id: "exp1", label: "", x: 565, y: 338, dir: "h", style: "pads", pinLbl: false, pins: [{ k: "E", label: "EXP1", fn: "TS24/TS35" }] },
+    { id: "exp2", label: "", x: 565, y: 405, dir: "h", style: "pads", pinLbl: false, pins: [{ k: "E", label: "EXP2", fn: "TS24/TS35" }] }
   ],
   deco: [
     { x: 63, y: 61, w: 97, h: 143, label: "X", kind: "socket" }, { x: 177, y: 61, w: 97, h: 143, label: "Y", kind: "socket" },
@@ -339,7 +346,8 @@ const dlcMax: Board = {
     { id: "sw", label: "SWITCH", x: 27, y: 362, dir: "v", labelPos: "right", rot: true, style: "pads", pins: [{ k: "1", label: "1" }, { k: "2", label: "2" }] },
     { id: "pwr", label: "POWER 12-24V", x: 120, y: 418, dir: "h", labelPos: "above", style: "barrel", pinLbl: false, pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
     { id: "rst", label: "RESET", x: 600, y: 378, dir: "h", labelPos: "above", body: C_RED, pins: [{ k: "G", label: "G", fn: "GND" }, { k: "S", label: "RST", fn: "Reset" }] },
-    esdRow("X", 84, 196, "IO8"), esdRow("Y", 187, 196, "IO8"), esdRow("Z", 290, 196, "IO8"), esdRow("A", 393, 196, "IO8")
+    esdRow("X", 84, 196, "IO8"), esdRow("Y", 187, 196, "IO8"), esdRow("Z", 290, 196, "IO8"), esdRow("A", 393, 196, "IO8"),
+    { id: "lcd", label: "", x: 546, y: 415, dir: "h", style: "pads", pinLbl: false, pins: [{ k: "RJ", label: "LCD (RJ11)", fn: "TXD1/RXD1" }] }
   ],
   deco: [
     { x: 62, y: 56, w: 88, h: 129, label: "X", kind: "socket" }, { x: 165, y: 56, w: 88, h: 129, label: "Y", kind: "socket" },
@@ -819,6 +827,7 @@ function pibotHookups(): Partial<Record<CompId, Hookup>> {
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.26:low"]
   };
   h.modbus = modbusHookup([{ k: "wr.n.pb.mb" }]);
+  h.display = oledHookup("25", "27", [{ k: "wr.n.pb.oled" }]);
   h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/max_rate_mm_per_min", "axes/a/acceleration_mm_per_sec2", "axes/a/motor0/stepstick:"]);
   return h;
 }
@@ -833,6 +842,19 @@ function modbusHookup(notes: Step[]): Hookup {
     notes,
     pro: [{ k: "wr.p.mb" }],
     settings: ["uart1:", "txd_pin / rxd_pin / rts_pin: …", "baud: 9600", "mode: 8N1", "Huanyang:", "uart_num: 1", "modbus_id: 1"]
+  };
+}
+
+/** OLED (SSD1306, I2C) an der Stiftleiste „OLED“ – FluidNC: Abschnitte i2c0 + oled */
+function oledHookup(scl: string, sda: string, notes: Step[]): Hookup {
+  return {
+    comp: "display",
+    parts: [{ id: "oled", kind: "lcd", name: "OLED", side: "top", pins: ["GND", "VCC", "SCL", "SDA"],
+      wires: [{ from: "GND", to: "oled.G", color: BLACK }, { from: "VCC", to: "oled.3V3", color: RED }, { from: "SCL", to: `oled.${scl}`, color: YEL }, { from: "SDA", to: `oled.${sda}`, color: BLU }] }],
+    steps: [{ k: "wr.s.disp.oled.1", p: { scl: "IO" + scl, sda: "IO" + sda } }, { k: "wr.s.disp.oled.2" }],
+    notes,
+    pro: [],
+    settings: ["i2c0:", `sda_pin: gpio.${sda}`, `scl_pin: gpio.${scl}`, "oled:", "i2c_num: 0", "i2c_address: 60", "width: 128", "height: 64"]
   };
 }
 
@@ -956,6 +978,7 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.48:low"]
   };
   h.modbus = modbusHookup([{ k: "wr.n.pu.mb" }]);
+  h.display = oledHookup("13", "14", []);
   h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/max_rate_mm_per_min", "axes/a/acceleration_mm_per_sec2", "axes/a/motor0/standard_stepper:"]);
   // EXTRA IO: IO10 / IO15 als Schaltausgänge (M64/M65 P0/P1 in der Test-YAML) – Relais-Modul
   h.io = {
@@ -1060,7 +1083,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
         wires: [{ from: "S", to: `${pc}.S`, color: ORG }, { from: "G", to: `${pc}.G`, color: BLACK }] }
     ],
     steps: [{ k: "wr.s.probe.1", p: isShield ? { sig: "SCL (A5)", gnd: "GND" } : { sig: P(pc, "S"), gnd: P(pc, "GND") } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
-    notes: isShield ? [{ k: "wr.n.shield.probe" }] : [{ k: "wr.n.dlc.3pin" }],
+    notes: isShield ? [{ k: "wr.n.shield.probe" }] : [{ k: "wr.n.dlc.3pin" }, { k: isMax ? "wr.n.max.tilt" : "wr.n.dlc21.flame" }],
     pro: [{ k: "wr.p.probe" }],
     settings: ["$6"]
   };
@@ -1076,7 +1099,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     parts: laserParts,
     steps: [{ k: "wr.s.laser.1", p: { sig: isShield ? P("lz", "S (D11)") : P("ttl", b.conns.find(c => c.id === "ttl")!.pins[0].label), gnd: "GND", vcc: isShield ? "12/24 V" : P("ttl", b.conns.find(c => c.id === "ttl")!.pins[2].label) } },
       { k: "wr.s.laser.2" }, { k: "wr.s.laser.3" }],
-    notes: isShield ? [{ k: "wr.n.shield.laser" }] : [{ k: "wr.n.dlc.laser" }],
+    notes: isShield ? [{ k: "wr.n.shield.laser" }] : isMax ? [{ k: "wr.n.dlc.laser" }, { k: "wr.n.max.laser" }] : [{ k: "wr.n.dlc.laser" }],
     pro: [{ k: "wr.p.laser" }],
     settings: ["$32=1", "$30=1000", "$31=0"]
   };
@@ -1088,7 +1111,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     parts: [rotaryPart(rotConn)],
     steps: [{ k: "wr.s.rot.1", p: { conn: P(rotConn, "") } }, ...(isShield ? [] : [{ k: "wr.s.rot.y2" }]),
       { k: "wr.s.rot.app.y" }, { k: "wr.s.rot.test.y" }, { k: "wr.s.rot.back" }],
-    notes: [{ k: "wr.n.rot.hot" }, ...(isShield ? [{ k: "wr.n.rot.shield" }] : isMax ? [{ k: "wr.n.rot.max" }] : [])],
+    notes: [{ k: "wr.n.rot.hot" }, ...(isShield ? [{ k: "wr.n.rot.shield" }] : isMax ? [{ k: "wr.n.rot.max" }, { k: "wr.n.rot.maxroller" }] : [])],
     pro: [{ k: "wr.p.rot" }],
     settings: isMax ? ["$111", "$121", "$103 / $113 / $123 (grblHAL, A)"] : ["$111", "$121"]
   };
@@ -1147,7 +1170,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     comp: "air",
     parts: [{ id: "pump", kind: "pump", name: "", side: "top", pins: ["+", "-"], wires: [{ from: "+", to: "air.+", color: RED }, { from: "-", to: "air.-", color: BLACK }] }],
     steps: [{ k: "wr.s.air.max", p: { conn: "+AIR−" } }, { k: "wr.s.air.2" }],
-    notes: [{ k: "wr.n.max.air" }], pro: [], settings: []
+    notes: [{ k: "wr.n.max.air" }], pro: [], settings: ["$44=1"]
   } : {
     comp: "air",
     parts: [{ id: "relay", kind: "relay", name: "", side: "right", pins: ["IN", "GND", "VCC"],
@@ -1174,8 +1197,8 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   h.door = isMax ? {
     comp: "door",
     parts: [{ id: "door", kind: "door", name: "", side: "right", pins: ["NO", "C"], wires: [{ from: "NO", to: "door.S", color: YEL }, { from: "C", to: "door.G", color: BLACK }] }],
-    steps: [{ k: "wr.s.door.1", p: { sig: "Door S (IO38)", gnd: "Door GND" } }],
-    notes: [], pro: [], settings: []
+    steps: [{ k: "wr.s.door.1", p: { sig: "Door S (IO38)", gnd: "Door GND" } }, { k: "wr.s.max.door" }],
+    notes: [], pro: [], settings: ["$48=1"]
   } : { comp: "door", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: isShield ? "wr.u.door.shield" : "wr.u.door.dlc21" };
 
   // ---- weitere Ein-/Ausgänge ----
@@ -1201,7 +1224,26 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     ],
     steps: [{ k: "wr.s.max.io.1" }, { k: "wr.s.max.io.2" }, { k: "wr.s.max.io.3" }],
     notes: [{ k: "wr.n.max.flame" }],
-    pro: [{ k: "wr.p.max.laser2" }],
+    pro: [],
+    settings: ["$43=1", "$41=1"]
+  };
+
+  // ---- Bildschirm ----
+  if (isMax) h.display = {
+    comp: "display",
+    parts: [{ id: "lcd", kind: "lcd", name: "TFT35", side: "bottom", pins: ["RJ11"], wires: [{ from: "RJ11", to: "lcd.RJ", color: WHT }] }],
+    steps: [{ k: "wr.s.disp.rj" }, { k: "wr.s.disp.47" }],
+    notes: [{ k: "wr.n.disp.off" }],
+    pro: [{ k: "wr.p.disp.max" }],
+    settings: ["$47=1"]
+  };
+  else if (!isShield) h.display = {
+    comp: "display",
+    parts: [{ id: "lcd", kind: "lcd", name: "TS24 / TS35", side: "right", pins: ["EXP1", "EXP2"],
+      wires: [{ from: "EXP1", to: "exp1.E", color: WHT }, { from: "EXP2", to: "exp2.E", color: WHT }] }],
+    steps: [{ k: "wr.s.disp.exp" }, { k: "wr.s.disp.fw" }],
+    notes: [{ k: "wr.n.disp.off" }],
+    pro: [],
     settings: []
   };
 
@@ -1228,7 +1270,7 @@ const BRN = "#8b5a2b";
  * Baut aus der normalen Verdrahtung (erster Draht = Signal, zweiter = GND) die Verdrahtung mit induktiven Sensoren:
  *   - direkt: Sensor an den Stecker – PiBot (SW-VCC), Ruida (eigenes Netzteil) oder 5-V-NPN an 5V/GND/S
  *   - Modul: Optokoppler-/Pegelmodul (12/24 V → Board) dazwischen; der Ausgang schaltet nach GND,
- *     ans Board kommen nur OUT und GND (der Pull-up des Boards liefert HIGH – nie 5 V auf einen ESP32-Pin)
+ *     ans Board kommen nur OUT und GND (der Pull-up des Boards liefert HIGH – nie die Sensor-Spannung an S)
  * Bei Endschaltern ersetzt der Sensor die Schalter, beim Taster den Werkzeuglängensensor (Tastplatte bleibt).
  */
 export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: SensorVolt): Hookup {

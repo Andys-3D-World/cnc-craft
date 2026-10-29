@@ -11,7 +11,7 @@
   sensor supply), with clear warnings where 12–24 V would destroy the input (Arduino CNC Shield, MKS DLC32), notes
   on PNP and 5 V sensors and how to invert the input ($5/$6 or *:low* in FluidNC).
 - **More parts in *Wiring*:** Arduino CNC Shield – push buttons for Hold, Resume and Abort (A1, A2, A0);
-  MKS DLC32 MAX – flame sensor (Flame, IO36), buzzer (+BEEPER−) and a note on the second laser connector (XT30);
+  MKS DLC32 MAX – flame sensor (Flame, IO36) and buzzer (+BEEPER−);
   PiBot V4.96 Pro and V5.88 Ultra – new view *VFD (RS485)*: Modbus wiring A/B, example VFD parameters (Huanyang)
   and the FluidNC *config.yaml* sections, with a note on pins shared with the 0–10 V outputs.
 - **Rotary in *Wiring*:** new view for every board – on the Y connector instead of the Y motor (CNC Shield,
@@ -19,6 +19,9 @@
   Steps link to the *Rotary* panel in the Laser tab (Y travel per rotation, A in degrees).
 - **PiBot V5.88 Ultra:** limit switches X+ and Y+ on their own inputs, and EXTRA IO (IO10/IO15) with a relay
   module, switched with M64/M65 via *user_outputs* in the YAML.
+- **Display in *Wiring*:** MKS DLC32 V2.1 – TS24/TS35 touch screen on EXP1/EXP2 (with the matching board firmware);
+  MKS DLC32 MAX – 3.5" touch screen on the RJ11 “LCD” socket, switched on with $47=1; PiBot boards – SSD1306 OLED
+  on the OLED header with the FluidNC *i2c0* / *oled* sections.
 - **Computer stays awake during a job:** while a job runs on any connected machine, CNC Craft keeps the computer
   from going to sleep (macOS `caffeinate`, Windows power request, Linux `systemd-inhibit`) – like a video player.
   The screen may still turn off. Sleep is allowed again as soon as the job ends or stops.
@@ -91,6 +94,10 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **MKS boards in *Wiring* checked against the Makerbase manuals:** the limit/probe inputs use a 5 V signal (texts
+  no longer say 3.3 V); the MAX now lists its MKS special settings – flame $43, buzzer $41, door $48, air assist $44,
+  tilt sensor $42 on “Probe”, roller mode $45 (Z connector) – and the laser power limits (up to 20 W on “Laser”,
+  20–90 W on “Laser 2” MR30, above 50 W own power supply). On the V2.1 “Probe” is the flame input with laser firmware.
 - **Wiring data is checked by tests:** every drawn wire must end at a pin that exists on the board, and every text
   of the wiring diagrams must exist in all 7 languages with the same placeholders.
 - **Shorter travel moves when milling:** within each kind of operation (drilling, inside, pocket, outside …) the
