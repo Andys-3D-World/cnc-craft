@@ -28,11 +28,11 @@ const GAP = 86;             // Abstand Bauteile <-> Board
 const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
-  psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1",
+  psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1", rotary: "#ffa94d",
   spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", io: "#2dd4bf"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", io: "🔘"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", rotary: "🔄", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", io: "🔘"
 };
 
 function esc(s: string): string {
@@ -175,7 +175,7 @@ function partGlyph(pl: Placed): string {
   const { part: p, x, y, w, h } = pl;
   const cx = x + w / 2, cy = y + h / 2 + 4;
   switch (p.kind) {
-    case "motor": return `<rect x="${n(cx - 15)}" y="${n(cy - 13)}" width="30" height="26" rx="4" fill="#3a3f47" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="8" fill="#22262b" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="2.5" fill="#cfd5dc"/>`;
+    case "motor": case "rotary": return `<rect x="${n(cx - 15)}" y="${n(cy - 13)}" width="30" height="26" rx="4" fill="#3a3f47" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="8" fill="#22262b" stroke="#8a929c"/><circle cx="${n(cx)}" cy="${n(cy)}" r="2.5" fill="#cfd5dc"/>`;
     case "switch": return `<line x1="${n(cx - 16)}" y1="${n(cy + 6)}" x2="${n(cx + 12)}" y2="${n(cy - 6)}" stroke="#cfd5dc" stroke-width="2.5"/><circle cx="${n(cx - 16)}" cy="${n(cy + 6)}" r="3" fill="#cfd5dc"/><circle cx="${n(cx + 16)}" cy="${n(cy + 6)}" r="3" fill="#cfd5dc"/>`;
     case "estop": return `<circle cx="${n(cx)}" cy="${n(cy)}" r="14" fill="#f5c518"/><circle cx="${n(cx)}" cy="${n(cy)}" r="10" fill="#e5484d" stroke="#8b1d20"/>`;
     case "prox":

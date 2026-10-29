@@ -33,8 +33,8 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "io";
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "spindle", "modbus", "plasma", "air", "estop", "door", "io"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "io";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "io"];
 /** "modbus" (Umrichter über RS485) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
 export const OPTIONAL_COMPS: CompId[] = ["modbus", "io"];
 
@@ -54,7 +54,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -126,6 +126,19 @@ const motorPart = (axis: string, conn: string, side: Part["side"] = "top"): Part
   id: "m" + axis, kind: "motor", name: axis, side, pins: ["1A", "1B", "2A", "2B"],
   wires: [{ from: "2B", to: conn + ".2B", color: BLU }, { from: "2A", to: conn + ".2A", color: RED }, { from: "1A", to: conn + ".1A", color: BLACK }, { from: "1B", to: conn + ".1B", color: GRN }]
 });
+/** Drehachse: wie ein Motor (4 Drähte) */
+const rotaryPart = (conn: string, side: Part["side"] = "top"): Part => ({ ...motorPart("R", conn, side), id: "rot", kind: "rotary", name: "" });
+/** Drehachse an einem eigenen A-Ausgang (FluidNC / grblHAL) – PiBot */
+function rotaryA(fw: string, settings: string[]): Hookup {
+  return {
+    comp: "rotary",
+    parts: [rotaryPart("ma", "bottom")],
+    steps: [{ k: "wr.s.rot.a", p: { conn: "A", fw } }, { k: "wr.s.rot.app.a" }, { k: "wr.s.rot.test.a" }],
+    notes: [{ k: "wr.n.rot.hot" }],
+    pro: [{ k: "wr.p.rot" }],
+    settings
+  };
+}
 const switchPart = (axis: string, conn: string, sig = "S", gnd = "G", side: Part["side"] = "right"): Part => ({
   id: "sw" + axis, kind: "switch", name: axis, side, pins: ["NO", "C"],
   wires: [{ from: "NO", to: `${conn}.${sig}`, color: YEL }, { from: "C", to: `${conn}.${gnd}`, color: BLACK }]
@@ -668,6 +681,16 @@ function ruidaHookups(): Partial<Record<CompId, Hookup>> {
     steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.rd.estop.2" }],
     notes: [{ k: "wr.n.rd.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
   };
+  h.rotary = {
+    comp: "rotary",
+    parts: [
+      drv("U", "axu"),
+      { id: "rot", kind: "rotary", name: "", side: "top", outer: true, pins: ["1A", "1B", "2A", "2B"],
+        wires: [{ from: "1A", to: "@drvU.A+", color: BLACK }, { from: "1B", to: "@drvU.A−", color: GRN }, { from: "2A", to: "@drvU.B+", color: RED }, { from: "2B", to: "@drvU.B−", color: BLU }] }
+    ],
+    steps: [{ k: "wr.s.rd.rot.1" }, { k: "wr.s.rd.rot.2" }],
+    notes: [{ k: "wr.n.rd.rot" }, { k: "wr.n.rot.hot" }], pro: [{ k: "wr.p.rot" }], settings: []
+  };
   const none = (comp: CompId): Hookup => ({ comp, parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.rd" });
   h.probe = none("probe"); h.spindle = none("spindle"); h.plasma = none("plasma");
   return h;
@@ -796,6 +819,7 @@ function pibotHookups(): Partial<Record<CompId, Hookup>> {
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.26:low"]
   };
   h.modbus = modbusHookup([{ k: "wr.n.pb.mb" }]);
+  h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/max_rate_mm_per_min", "axes/a/acceleration_mm_per_sec2", "axes/a/motor0/stepstick:"]);
   return h;
 }
 
@@ -851,9 +875,9 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
   };
   h.limits = {
     comp: "limits",
-    parts: [switchPart("X", "lx"), switchPart("Y", "ly"), switchPart("Z", "lz")],
+    parts: [switchPart("X", "lx"), switchPart("X+", "lxp"), switchPart("Y", "ly"), switchPart("Y+", "lyp"), switchPart("Z", "lz")],
     steps: [{ k: "wr.s.lim.1", p: { sig: "IO42 / IO40 / IO38", gnd: "GND" } }, { k: "wr.s.lim.2" }, { k: "wr.s.pu.lim.3" }],
-    notes: [{ k: "wr.n.pu.lim" }],
+    notes: [{ k: "wr.n.pu.lim" }, { k: "wr.n.pu.lim2" }],
     pro: [{ k: "wr.p.pb.nc" }],
     settings: ["x/motor0/limit_neg_pin: gpio.42:low", "x/motor0/limit_pos_pin: gpio.41:low", "y/motor0/limit_neg_pin: gpio.40:low",
       "y/motor0/limit_pos_pin: gpio.39:low", "z/motor0/limit_neg_pin: gpio.38:low", "hard_limits: true"]
@@ -932,6 +956,16 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
     notes: [], pro: [], settings: ["control/safety_door_pin: gpio.48:low"]
   };
   h.modbus = modbusHookup([{ k: "wr.n.pu.mb" }]);
+  h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/max_rate_mm_per_min", "axes/a/acceleration_mm_per_sec2", "axes/a/motor0/standard_stepper:"]);
+  // EXTRA IO: IO10 / IO15 als Schaltausgänge (M64/M65 P0/P1 in der Test-YAML) – Relais-Modul
+  h.io = {
+    comp: "io",
+    parts: [{ id: "relay", kind: "relay", name: "IO10", side: "left", pins: ["IN", "GND", "VCC"],
+      wires: [{ from: "IN", to: "extra.10", color: YEL }, { from: "GND", to: "extra.G", color: BLACK }, { from: "VCC", to: "rs485.5V", color: RED }] }],
+    steps: [{ k: "wr.s.pu.io.1" }, { k: "wr.s.pu.io.2" }, { k: "wr.s.pu.io.3" }],
+    notes: [{ k: "wr.n.pu.io" }], pro: [],
+    settings: ["user_outputs:", "digital0_pin: gpio.10", "digital1_pin: gpio.15", "M64 P0 / M65 P0"]
+  };
   return h;
 }
 
@@ -1045,6 +1079,18 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
     notes: isShield ? [{ k: "wr.n.shield.laser" }] : [{ k: "wr.n.dlc.laser" }],
     pro: [{ k: "wr.p.laser" }],
     settings: ["$32=1", "$30=1000", "$31=0"]
+  };
+
+  // ---- Drehachse: am Y-Stecker statt des Y-Motors (geht mit jeder Firmware); MAX: A nur mit 4-Achs-Firmware ----
+  const rotConn = isShield ? "my" : "my1";
+  h.rotary = {
+    comp: "rotary",
+    parts: [rotaryPart(rotConn)],
+    steps: [{ k: "wr.s.rot.1", p: { conn: P(rotConn, "") } }, ...(isShield ? [] : [{ k: "wr.s.rot.y2" }]),
+      { k: "wr.s.rot.app.y" }, { k: "wr.s.rot.test.y" }, { k: "wr.s.rot.back" }],
+    notes: [{ k: "wr.n.rot.hot" }, ...(isShield ? [{ k: "wr.n.rot.shield" }] : isMax ? [{ k: "wr.n.rot.max" }] : [])],
+    pro: [{ k: "wr.p.rot" }],
+    settings: isMax ? ["$111", "$121", "$103 / $113 / $123 (grblHAL, A)"] : ["$111", "$121"]
   };
 
   // ---- Spindel ----
