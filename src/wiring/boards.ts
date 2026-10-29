@@ -20,6 +20,10 @@
  *     „4x Switch Input module“, „Relay Module“, „4x 5V Buffered Output Module“, „RS485 Modbus Module“, „Setup“.
  *   - Jackpot CNC Controller (V1 Engineering): FluidNC-Wiki „Jackpot CNC Controller“ (Pinbild, Beispiel-config.yaml,
  *     Eingänge links→rechts gpio.25/33/32/35/34/39/36, 5V-Ausgänge gpio.26/27, MOSFET gpio.2/16) + Foto der Platine.
+ *   - Arduino Mega 2560 + RAMPS 1.4 mit grbl-Mega-5X (github.com/fra589/grbl-Mega-5X, cpu_map.h „CPU_MAP_2560_RAMPS_BOARD“,
+ *     config.h): Endschalter X D3/D2, Y D14/D15, Z D18/D19; Spindel-PWM D8 (Standard) oder D6 (Servo 2, 0–5 V);
+ *     Spindel ein D4, Richtung D5 (Servo-Leiste); Kühlung D10, Nebel D9; Reset/Hold/Start/Tür A9–A12 (AUX-2); Taster A15.
+ *     Lage der Stecker nach dem üblichen RAMPS-1.4-Aufbau (vereinfacht).
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
  *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
@@ -843,6 +847,184 @@ function jackpotHookups(): Partial<Record<CompId, Hookup>> {
   return h;
 }
 
+// =====================================================================
+// Arduino Mega 2560 + RAMPS 1.4 (grbl-Mega-5X) – vereinfachte Lage wie auf dem RAMPS 1.4: links Strom und
+// MOSFET-Ausgänge D8/D9/D10, unten fünf Treibersockel X Y Z E0 E1 mit Motorsteckern, oben Servo-Leiste,
+// rechts oben die Endschalter-Leiste (S − + je Eingang), AUX-2 rechts.
+// =====================================================================
+const RP_RED = "#b3161b";
+/** Endschalter-Stecker: S / − / + (5 V) */
+const rpLim = (id: string, label: string, x: number, pin: string, fn: string): BConn => ({
+  id, label, x, y: 34, dir: "v", labelPos: "above", pinSide: "right", style: "header", body: "#1b1b1d",
+  pins: [{ k: "S", label: "S", mcu: pin, fn }, { k: "G", label: "−" }, { k: "5V", label: "+" }]
+});
+/** Servo-Stecker: S / + (5 V) / − */
+const rpServo = (id: string, label: string, x: number, pin: string, fn = ""): BConn => ({
+  id, label, x, y: 34, dir: "v", labelPos: "above", pinSide: "right", style: "header", body: "#1b1b1d",
+  pins: [{ k: "S", label: "S", mcu: pin, fn }, { k: "5V", label: "+" }, { k: "G", label: "−" }]
+});
+const rpMot = (id: string, label: string, x: number): BConn => ({
+  id, label, x, y: 392, dir: "h", labelPos: "below", style: "header", body: "#1b1b1d",
+  pins: [{ k: "2B", label: "2B" }, { k: "2A", label: "2A" }, { k: "1A", label: "1A" }, { k: "1B", label: "1B" }]
+});
+const ramps: Board = {
+  id: "mega-ramps",
+  inputs: "avr5",
+  maker: "Arduino",
+  name: "Arduino Mega 2560 + RAMPS 1.4",
+  mcu: "ATmega2560",
+  fw: "wr.fw.ramps",
+  source: "wr.src.ramps",
+  volt: "12 V",
+  w: 640, h: 420,
+  pcb: { fill: RP_RED, edge: "#6e0b0e" },
+  holes: [{ x: 14, y: 14, r: 9 }, { x: 626, y: 14, r: 9 }, { x: 14, y: 406, r: 9 }, { x: 626, y: 406, r: 9 }],
+  conns: [
+    { id: "p11", label: "11A", x: 34, y: 60, dir: "v", labelPos: "right", pitch: 22, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "+", label: "+", fn: "D8" }, { k: "-", label: "−" }] },
+    { id: "pwr", label: "5A", x: 34, y: 120, dir: "v", labelPos: "right", pitch: 22, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    { id: "d8", label: "D8", x: 34, y: 190, dir: "v", labelPos: "right", pitch: 22, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "D8", fn: "Spindel/Laser PWM (GRBL 1.1)" }] },
+    { id: "d9", label: "D9", x: 34, y: 245, dir: "v", labelPos: "right", pitch: 22, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "D9", fn: "Nebel M7 (Option)" }] },
+    { id: "d10", label: "D10", x: 34, y: 300, dir: "v", labelPos: "right", pitch: 22, style: "screw", body: "#2f7fd6",
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−", mcu: "D10", fn: "Kühlung M8" }] },
+    rpServo("srv1", "D11", 200, "D11"), rpServo("srv2", "D6", 230, "D6", "Laser PWM (Option)"),
+    rpServo("srv3", "D5", 260, "D5", "Spindel-Richtung"), rpServo("srv4", "D4", 290, "D4", "Spindel ein"),
+    rpLim("lx", "X−", 430, "D3", "X-Limit"), rpLim("lxp", "X+", 456, "D2", "X-Limit +"),
+    rpLim("ly", "Y−", 482, "D14", "Y-Limit"), rpLim("lyp", "Y+", 508, "D15", "Y-Limit +"),
+    rpLim("lz", "Z−", 534, "D18", "Z-Limit"), rpLim("lzp", "Z+", 560, "D19", "Z-Limit +"),
+    { id: "aux2", label: "AUX-2", x: 612, y: 140, dir: "v", labelPos: "above", pinSide: "left", style: "header", body: "#1b1b1d",
+      pins: [{ k: "A9", label: "A9", mcu: "A9", fn: "Reset/Abbruch" }, { k: "A10", label: "A10", mcu: "A10", fn: "Feed Hold" },
+        { k: "A11", label: "A11", mcu: "A11", fn: "Cycle Start" }, { k: "A12", label: "A12", mcu: "A12", fn: "Tür" }, { k: "G", label: "GND" }] },
+    { id: "a15", label: "Mega A15", x: 600, y: 270, dir: "v", labelPos: "above", pinSide: "left", style: "pads",
+      pins: [{ k: "S", label: "A15", mcu: "A15", fn: "Taster" }, { k: "G", label: "GND" }] },
+    rpMot("mx", "X", 130), rpMot("my", "Y", 226), rpMot("mz", "Z", 322), rpMot("me0", "E0", 418), rpMot("me1", "E1", 514)
+  ],
+  deco: [
+    { x: 116, y: 250, w: 74, h: 120, label: "X", kind: "driver" }, { x: 212, y: 250, w: 74, h: 120, label: "Y", kind: "driver" },
+    { x: 308, y: 250, w: 74, h: 120, label: "Z", kind: "driver" }, { x: 404, y: 250, w: 74, h: 120, label: "E0", kind: "driver" },
+    { x: 500, y: 250, w: 74, h: 120, label: "E1", kind: "driver" },
+    { x: 120, y: 214, w: 450, h: 14, label: "MS1 MS2 MS3", kind: "text", size: 9 },
+    { x: 116, y: 120, w: 280, h: 70, label: "Arduino Mega 2560", kind: "chip" },
+    { x: 410, y: 120, w: 160, h: 50, label: "RAMPS 1.4", kind: "text", size: 18 },
+    { x: 590, y: 34, w: 30, h: 60, label: "", kind: "fuse" }
+  ],
+  hookups: {}
+};
+
+/** Mega + RAMPS mit grbl-Mega-5X – Belegung wie in deren cpu_map.h (RAMPS 1.4) */
+function rampsHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "12 V", side: "left", pins: ["+", "-"],
+      wires: [{ from: "+", to: "pwr.+", color: RED }, { from: "-", to: "pwr.-", color: BLACK }, { from: "+", to: "p11.+", color: RED }, { from: "-", to: "p11.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.rp.psu" }, { k: "wr.s.psu.3", p: { volt: "12 V" } }],
+    notes: [{ k: "wr.n.rp.psu" }],
+    pro: [{ k: "wr.p.vref" }],
+    settings: []
+  };
+  h.motors = {
+    comp: "motors",
+    parts: [motorPart("X", "mx", "bottom"), motorPart("Y", "my", "bottom"), motorPart("Z", "mz", "bottom"), motorPart("A", "me0", "bottom")],
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: "X, Y, Z, E0 (A), E1 (B)" } }, { k: "wr.s.rp.mot" }, { k: "wr.s.mot.3" }],
+    notes: [{ k: "wr.n.rp.mot" }],
+    pro: [{ k: "wr.p.micro" }],
+    settings: ["$100 / $101 / $102 / $103", "$110 / $111 / $112", "$3"]
+  };
+  h.extdrv = { comp: "extdrv", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.rp.ext" };
+  h.limits = {
+    comp: "limits",
+    parts: [switchPart("X", "lx", "S", "G", "top"), switchPart("Y", "ly", "S", "G", "top"), switchPart("Z", "lz", "S", "G", "top")],
+    steps: [{ k: "wr.s.lim.1", p: { sig: "S", gnd: "−" } }, { k: "wr.s.lim.2" }, { k: "wr.s.lim.3" }],
+    notes: [{ k: "wr.n.rp.lim" }],
+    pro: [{ k: "wr.p.nc" }],
+    settings: ["$5", "$21=1", "$22=1", "$23", "$130 / $131 / $132"]
+  };
+  h.probe = {
+    comp: "probe",
+    parts: [
+      { id: "probe", kind: "probe", name: "", side: "right", pins: ["S", "G"], wires: [{ from: "S", to: "a15.S", color: YEL }, { from: "G", to: "a15.G", color: BLACK }] },
+      { id: "wls", kind: "wls", name: "", side: "right", pins: ["S", "G"], wires: [{ from: "S", to: "a15.S", color: ORG }, { from: "G", to: "a15.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.probe.1", p: { sig: "A15", gnd: "GND" } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
+    notes: [{ k: "wr.n.rp.probe" }],
+    pro: [{ k: "wr.p.probe" }],
+    settings: ["$6"]
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "laser", kind: "laser", name: "", side: "top", pins: ["PWM", "GND", "VCC"],
+        wires: [{ from: "PWM", to: "srv2.S", color: YEL }, { from: "GND", to: "srv2.G", color: BLACK }, { from: "VCC", to: "@psu.+", color: RED }] },
+      { id: "psu", kind: "psu", name: "", side: "top", pins: ["+", "-"], wires: [{ from: "-", to: "srv2.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.laser.1", p: { sig: "Servo D6 S", gnd: "−", vcc: "12/24 V" } }, { k: "wr.s.laser.2" }, { k: "wr.s.rp.laser" }],
+    notes: [{ k: "wr.n.rp.laser" }],
+    pro: [{ k: "wr.p.laser" }],
+    settings: ["$32=1", "$30=1000", "$31=0", "SPINDLE_PWM_ON_D6 (config.h)"]
+  };
+  h.rotary = rotaryA("grbl-Mega-5X", ["$103", "$113", "$123"], "me0", "E0");
+  h.spindle = {
+    comp: "spindle",
+    parts: [{ id: "spm", kind: "router", name: "12 V DC", side: "left", pins: ["+", "-"],
+      wires: [{ from: "+", to: "d8.+", color: RED }, { from: "-", to: "d8.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.rp.sp.1" }, { k: "wr.s.rp.sp.2" }, { k: "wr.s.sp.2" }],
+    notes: [{ k: "wr.n.rp.sp" }],
+    pro: [{ k: "wr.p.vfd" }],
+    settings: ["$32=0", "$30", "$31"]
+  };
+  h.plasma = {
+    comp: "plasma",
+    parts: [
+      { id: "relay", kind: "relay", name: "", side: "top", pins: ["IN", "GND", "VCC"],
+        wires: [{ from: "IN", to: "srv4.S", color: YEL }, { from: "GND", to: "srv4.G", color: BLACK }, { from: "VCC", to: "srv4.5V", color: RED }] },
+      { id: "plasma", kind: "plasma", name: "", side: "top", outer: true, pins: ["T1", "T2"],
+        wires: [{ from: "T1", to: "@relay.NO", color: WHT }, { from: "T2", to: "@relay.COM", color: WHT }] }
+    ],
+    steps: [{ k: "wr.s.rp.pl" }, { k: "wr.s.pl.2" }, { k: "wr.s.pl.4" }],
+    notes: [{ k: "wr.n.plasma.hf" }],
+    pro: [{ k: "wr.p.arcok" }],
+    settings: []
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "pump", kind: "pump", name: "12 V", side: "left", pins: ["+", "-"],
+      wires: [{ from: "+", to: "d10.+", color: RED }, { from: "-", to: "d10.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.rp.air" }, { k: "wr.s.air.2" }],
+    notes: [{ k: "wr.n.rp.air" }], pro: [], settings: []
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "left", pins: ["+", "-"], wires: [{ from: "-", to: "pwr.-", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "left", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "pwr.+", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.estop.2" }],
+    notes: [{ k: "wr.n.rp.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "right", pins: ["NO", "C"], wires: [{ from: "NO", to: "aux2.A12", color: YEL }, { from: "C", to: "aux2.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.door.1", p: { sig: "AUX-2 A12", gnd: "GND" } }],
+    notes: [{ k: "wr.n.rp.aux" }], pro: [], settings: []
+  };
+  const btn = (id: string, name: string, pin: string): Part => ({ id, kind: "pbtn", name, side: "right", pins: ["NO", "C"],
+    wires: [{ from: "NO", to: "aux2." + pin, color: YEL }, { from: "C", to: "aux2.G", color: BLACK }] });
+  h.io = {
+    comp: "io",
+    parts: [btn("abort", "Reset", "A9"), btn("hold", "Hold", "A10"), btn("resume", "Start", "A11")],
+    steps: [{ k: "wr.s.rp.io" }, { k: "wr.s.sh.io.2" }, { k: "wr.s.sh.io.3" }],
+    notes: [{ k: "wr.n.sh.io" }, { k: "wr.n.rp.aux" }],
+    pro: [],
+    settings: []
+  };
+  return h;
+}
+
 /** 6 Pack mit FluidNC – Belegung wie gezeichnet (Module #1 #2 Eingänge, #3 5V-Ausgang, #4 Relais) */
 function sixPackHookups(): Partial<Record<CompId, Hookup>> {
   const h: Partial<Record<CompId, Hookup>> = {};
@@ -1345,6 +1527,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   if (b.maker === "Ruida") return ruidaHookups();
   if (b.id === "6pack") return sixPackHookups();
   if (b.id === "jackpot") return jackpotHookups();
+  if (b.id === "mega-ramps") return rampsHookups();
   if (b.id === "pibot-v588-ultra") return pibotUltraHookups();
   if (b.maker === "PiBot") return pibotHookups();
   const isShield = b.id === "cnc-shield-v3";
@@ -1602,7 +1785,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack, jackpot];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack, jackpot, ramps];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {

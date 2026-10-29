@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **Arduino Mega 2560 + RAMPS 1.4 (grbl-Mega-5X) in *Wiring*:** pins from grbl-Mega-5X's RAMPS map – endstop header
+  (X/Y/Z min and max, S − +), five driver sockets X Y Z E0 E1, MOSFET outputs D8 (spindle PWM), D9/D10 (mist,
+  coolant), servo header (D4 spindle enable, D6 for laser TTL), AUX-2 buttons and door (A9–A12). Notes on 12 V
+  only, the + / − short on endstops, the probe on Mega pin A15 and the config.h option for the laser on D6.
 - **Jackpot CNC Controller (V1 Engineering, FluidNC) in *Wiring*:** the board of many MPCNC and LowRider machines,
   drawn after the FluidNC wiki page and V1 Engineering's example *config.yaml* – seven inputs (X Y Z A B C, probe),
   5V outputs (laser on gpio.27, router SSR), two MOSFET outputs (air, plasma relay), module socket, six TMC2209
