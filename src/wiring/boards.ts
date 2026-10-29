@@ -16,6 +16,8 @@
  *     Probe mit Laser-Firmware = Flammensensor).
  *   - PiBot FluidNC V4.96 Pro: PiBot-Wiki „Pin Definition Overview“ (wiki.pibot.com) + Test-YAML des Herstellers.
  *   - PiBot Controller V5.88 Ultra: PiBot-Wiki „Pinout Reference“ (Bild „V588 diagram V1“) + Test-YAML des Herstellers.
+ *   - 6 Pack CNC Controller: 6-Pack-Wiki (github.com/bdring/6-Pack_CNC_Controller/wiki) – „Socket Pin Number Mapping“,
+ *     „4x Switch Input module“, „Relay Module“, „4x 5V Buffered Output Module“, „RS485 Modbus Module“, „Setup“.
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
  *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
@@ -58,7 +60,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd" | "router";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -112,11 +114,12 @@ export interface Board {
    * Art der Eingänge (Endschalter/Taster) – für induktive Sensoren:
    *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = MKS (ESP32, laut Makerbase 5-V-Signal, kein Optokoppler)
    *   pb496 / pb588 = PiBot mit SW-VCC-Brücke (5 V oder Vmot, nur NPN)   ruida = Ruida (5/12/24 V, NPN laut Handbuch)
+   *   opto5 = 6-Pack-Eingangsmodul (Optokoppler, liefert 5 V; höhere Spannung mit eigenem Netzteil, Minus an ⏚)
    */
   inputs: InputKind;
   hookups: Partial<Record<CompId, Hookup>>;
 }
-export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida";
+export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5";
 
 // Kabelfarben
 const RED = "#e5484d", BLACK = "#2b2b2b", YEL = "#f5c518", GRN = "#30a46c", BLU = "#3e7bfa", WHT = "#d9d9d9", ORG = "#f08c00", VIO = "#9b5de5";
@@ -133,11 +136,11 @@ const motorPart = (axis: string, conn: string, side: Part["side"] = "top"): Part
 /** Drehachse: wie ein Motor (4 Drähte) */
 const rotaryPart = (conn: string, side: Part["side"] = "top"): Part => ({ ...motorPart("R", conn, side), id: "rot", kind: "rotary", name: "" });
 /** Drehachse an einem eigenen A-Ausgang (FluidNC / grblHAL) – PiBot */
-function rotaryA(fw: string, settings: string[]): Hookup {
+function rotaryA(fw: string, settings: string[], conn = "ma", label = "A"): Hookup {
   return {
     comp: "rotary",
-    parts: [rotaryPart("ma", "bottom")],
-    steps: [{ k: "wr.s.rot.a", p: { conn: "A", fw } }, { k: "wr.s.rot.app.a" }, { k: "wr.s.rot.test.a" }],
+    parts: [rotaryPart(conn, "bottom")],
+    steps: [{ k: "wr.s.rot.a", p: { conn: label, fw } }, { k: "wr.s.rot.app.a" }, { k: "wr.s.rot.test.a" }],
     notes: [{ k: "wr.n.rot.hot" }],
     pro: [{ k: "wr.p.rot" }],
     settings
@@ -600,6 +603,179 @@ const ruida6445: Board = {
   hookups: {}
 };
 
+// =====================================================================
+// 6 Pack CNC Controller (Bart Dring, FluidNC) – Lage nach dem Foto und der Platinen-Ansicht im 6-Pack-Wiki
+// (github.com/bdring/6-Pack_CNC_Controller/wiki). Fünf Steckplätze für CNC-I/O-Module, hier bestückt wie häufig:
+// #1 und #2 „4x Input“ (Optokoppler, Klemmen S ⏚ 5), #3 „4x 5V Output“, #4 Relais, #5 frei (nur Ausgänge über
+// Schieberegister, kein PWM). Sechs Treibersockel 1–6 mit Motorklemmen, Hauptstrom rechts (Gnd oben, VMot unten).
+// Pins nach „Socket Pin Number Mapping“ und den Modul-Seiten des Wikis.
+// =====================================================================
+const SP_GREEN = "#2f9e57";
+/** Eingangsmodul: ein Klemmenblock S ⏚ 5 je Kanal */
+const spIn = (id: string, label: string, x: number, y: number, gpio: string, fn = ""): BConn => ({
+  id, label, x, y, dir: "h", labelPos: "below", pitch: 15, style: "screw", body: SP_GREEN,
+  pins: [{ k: "S", label: "S", mcu: gpio, fn }, { k: "G", label: "⏚" }, { k: "5V", label: "5" }]
+});
+const spMot = (n: number, x: number): BConn => ({
+  id: "m" + n, label: String(n), x, y: 598, dir: "h", labelPos: "above", pitch: 15, style: "screw", body: SP_GREEN, pinLbl: false,
+  pins: [{ k: "1B", label: "1B" }, { k: "1A", label: "1A" }, { k: "2A", label: "2A" }, { k: "2B", label: "2B" }]
+});
+const sixPack: Board = {
+  id: "6pack",
+  inputs: "opto5",
+  maker: "FluidNC (Bart Dring)",
+  name: "6 Pack CNC Controller",
+  mcu: "ESP32 (DevKit)",
+  fw: "wr.fw.6p",
+  source: "wr.src.6p",
+  volt: "12–36 V (V1p5)",
+  w: 640, h: 620,
+  pcb: { fill: "#121316", edge: "#2d3137" },
+  holes: [{ x: 16, y: 16, r: 10 }, { x: 624, y: 16, r: 10 }, { x: 16, y: 604, r: 10 }, { x: 624, y: 604, r: 10 }],
+  conns: [
+    // #1 4x Input: Kanal 1 hinten links, 2 vorne links, 3 hinten rechts, 4 vorne rechts
+    spIn("i1a", "#1.1", 30, 52, "GPIO33", "X-Limit"), spIn("i1c", "#1.3", 98, 52, "GPIO35", "Z-Limit"),
+    spIn("i1b", "#1.2", 30, 124, "GPIO32", "Y-Limit"), spIn("i1d", "#1.4", 98, 124, "GPIO34"),
+    spIn("i2a", "#2.1", 188, 52, "GPIO2", "GPIO2 (boot)"), spIn("i2c", "#2.3", 256, 52, "GPIO39", "TLS"),
+    spIn("i2b", "#2.2", 188, 124, "GPIO25", "Taster"), spIn("i2d", "#2.4", 256, 124, "GPIO36", "Tür"),
+    { id: "o3", label: "#3 · 5V Output", x: 356, y: 78, dir: "h", labelPos: "below", pitch: 16, style: "screw", body: SP_GREEN,
+      pins: [{ k: "1", label: "1", mcu: "GPIO26", fn: "Laser PWM" }, { k: "2", label: "2", mcu: "GPIO4", fn: "Kühlung M8" },
+        { k: "3", label: "3", mcu: "GPIO16" }, { k: "4", label: "4", mcu: "GPIO27" }, { k: "G", label: "G" }] },
+    { id: "relay", label: "#4 · Relay", x: 520, y: 78, dir: "h", labelPos: "below", pitch: 22, style: "screw", body: SP_GREEN,
+      pins: [{ k: "NC", label: "NC" }, { k: "COM", label: "COM" }, { k: "NO", label: "NO", mcu: "GPIO14", fn: "Relay" }] },
+    { id: "pwr", label: "9-40V", x: 626, y: 470, dir: "v", labelPos: "left", rot: true, pitch: 20, style: "screw", body: SP_GREEN, pinSide: "right",
+      pins: [{ k: "-", label: "Gnd" }, { k: "+", label: "VMot" }] },
+    spMot(1, 36), spMot(2, 136), spMot(3, 236), spMot(4, 336), spMot(5, 436), spMot(6, 536)
+  ],
+  deco: [
+    { x: 10, y: 14, w: 150, h: 180, label: "", kind: "chip" }, { x: 168, y: 14, w: 150, h: 180, label: "", kind: "chip" },
+    { x: 326, y: 14, w: 150, h: 180, label: "", kind: "chip" }, { x: 484, y: 14, w: 146, h: 180, label: "", kind: "chip" },
+    { x: 10, y: 180, w: 150, h: 12, label: "4x Input (Opto)", kind: "text", size: 10 },
+    { x: 168, y: 180, w: 150, h: 12, label: "4x Input (Opto)", kind: "text", size: 10 },
+    { x: 326, y: 180, w: 150, h: 12, label: "4x 5V Output", kind: "text", size: 10 },
+    { x: 484, y: 180, w: 146, h: 12, label: "Relay", kind: "text", size: 10 },
+    { x: 452, y: 222, w: 178, h: 170, label: "", kind: "chip" },
+    { x: 452, y: 296, w: 178, h: 16, label: "#5 (output only)", kind: "text", size: 11 },
+    { x: 16, y: 222, w: 330, h: 150, label: "ESP32 DevKit", kind: "esp" },
+    { x: 20, y: 270, w: 30, h: 50, label: "USB", kind: "usb" },
+    { x: 360, y: 226, w: 80, h: 34, label: "6-Pack", kind: "text", size: 15 },
+    { x: 360, y: 252, w: 80, h: 14, label: "@buildlog", kind: "text", size: 9 },
+    { x: 360, y: 350, w: 0, h: 0, label: "", kind: "pins", cols: 3, rows: 1, gap: 12 },
+    { x: 340, y: 368, w: 70, h: 12, label: "Vcc 3.3V / 5V", kind: "text", size: 8 },
+    { x: 20, y: 452, w: 78, h: 110, label: "1", kind: "driver" }, { x: 120, y: 452, w: 78, h: 110, label: "2", kind: "driver" },
+    { x: 220, y: 452, w: 78, h: 110, label: "3", kind: "driver" }, { x: 320, y: 452, w: 78, h: 110, label: "4", kind: "driver" },
+    { x: 420, y: 452, w: 78, h: 110, label: "5", kind: "driver" }, { x: 520, y: 452, w: 78, h: 110, label: "6", kind: "driver" },
+    { x: 20, y: 410, w: 300, h: 14, label: "MS / SPI · TMC5160", kind: "text", size: 9, align: "start" }
+  ],
+  hookups: {}
+};
+
+/** 6 Pack mit FluidNC – Belegung wie gezeichnet (Module #1 #2 Eingänge, #3 5V-Ausgang, #4 Relais) */
+function sixPackHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"],
+      wires: [{ from: "+", to: "pwr.+", color: RED }, { from: "-", to: "pwr.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.6p.psu" }, { k: "wr.s.psu.3", p: { volt: "24 V (12–36 V)" } }],
+    notes: [{ k: "wr.n.6p.psu" }],
+    pro: [{ k: "wr.p.vref" }],
+    settings: []
+  };
+  const axes = ["X", "Y", "Z", "A", "B", "C"];
+  h.motors = {
+    comp: "motors",
+    parts: axes.map((a, i) => motorPart(a, "m" + (i + 1), "bottom")),
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: "1, 2, 3, 4, 5, 6" } }, { k: "wr.s.6p.mot" }, { k: "wr.s.mot.3" }],
+    notes: [{ k: "wr.n.6p.mot" }],
+    pro: [{ k: "wr.p.6p.micro" }],
+    settings: ["axes/x/motor0/stepstick:", "step_pin: I2SO.2", "direction_pin: I2SO.1", "disable_pin: I2SO.0", "ms3_pin: I2SO.3"]
+  };
+  h.extdrv = { comp: "extdrv", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.6p.ext" };
+  h.limits = {
+    comp: "limits",
+    parts: [switchPart("X", "i1a", "S", "G", "top"), switchPart("Y", "i1b", "S", "G", "top"), switchPart("Z", "i1c", "S", "G", "top")],
+    steps: [{ k: "wr.s.lim.1", p: { sig: "S", gnd: "⏚" } }, { k: "wr.s.lim.2" }, { k: "wr.s.6p.lim" }],
+    notes: [{ k: "wr.n.6p.in" }],
+    pro: [{ k: "wr.p.6p.nc" }],
+    settings: ["x/motor0/limit_neg_pin: gpio.33", "y/motor0/limit_neg_pin: gpio.32", "z/motor0/limit_neg_pin: gpio.35", "hard_limits: true"]
+  };
+  h.probe = {
+    comp: "probe",
+    parts: [
+      { id: "probe", kind: "probe", name: "", side: "top", pins: ["S", "G"], wires: [{ from: "S", to: "i2b.S", color: YEL }, { from: "G", to: "i2b.G", color: BLACK }] },
+      { id: "wls", kind: "wls", name: "", side: "top", pins: ["S", "G"], wires: [{ from: "S", to: "i2c.S", color: ORG }, { from: "G", to: "i2c.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.probe.1", p: { sig: "#2.2 S (IO25)", gnd: "⏚" } }, { k: "wr.s.6p.probe" }, { k: "wr.s.probe.3" }],
+    notes: [{ k: "wr.n.6p.gpio2" }],
+    pro: [{ k: "wr.p.6p.nc" }],
+    settings: ["probe/pin: gpio.25", "probe/toolsetter_pin: gpio.39"]
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "laser", kind: "laser", name: "", side: "top", pins: ["PWM", "GND", "VCC"],
+        wires: [{ from: "PWM", to: "o3.1", color: YEL }, { from: "GND", to: "o3.G", color: BLACK }, { from: "VCC", to: "@psu.+", color: RED }] },
+      { id: "psu", kind: "psu", name: "", side: "top", pins: ["+", "-"], wires: [{ from: "-", to: "o3.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.laser.1", p: { sig: "#3 · 1 (IO26)", gnd: "G", vcc: "12/24 V" } }, { k: "wr.s.laser.2" }, { k: "wr.s.6p.laser" }],
+    notes: [{ k: "wr.n.6p.laser" }],
+    pro: [{ k: "wr.p.pb.laser" }],
+    settings: ["Laser:", "output_pin: gpio.26", "speed_map: 0=0% 1000=100%", "tool_num: 0"]
+  };
+  const relayYaml = ["relay:", "output_pin: gpio.14", "speed_map: 0=0.000% 0=100.000% 1=100%"];
+  h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/motor0/stepstick:", "step_pin: I2SO.13", "direction_pin: I2SO.12", "disable_pin: I2SO.15"], "m4", "4");
+  h.spindle = {
+    comp: "spindle",
+    parts: [{ id: "router", kind: "router", name: "", side: "top", pins: ["L"], wires: [{ from: "L", to: "relay.NO", color: "#8b5a2b" }] }],
+    steps: [{ k: "wr.s.6p.sp.1" }, { k: "wr.s.6p.sp.2" }],
+    notes: [{ k: "wr.n.6p.mains" }],
+    pro: [{ k: "wr.p.6p.vfd" }],
+    settings: relayYaml
+  };
+  h.modbus = {
+    comp: "modbus",
+    parts: [],
+    steps: [{ k: "wr.s.6p.mb" }, { k: "wr.s.mb.1" }, { k: "wr.s.mb.2" }, { k: "wr.s.mb.4" }],
+    notes: [], pro: [{ k: "wr.p.mb" }],
+    settings: ["uart1:", "txd_pin: gpio.14", "rxd_pin: gpio.15", "rts_pin: gpio.13", "baud: 9600", "mode: 8N1", "Huanyang:", "uart_num: 1", "modbus_id: 1"]
+  };
+  h.plasma = {
+    comp: "plasma",
+    parts: [{ id: "plasma", kind: "plasma", name: "", side: "top", pins: ["T1", "T2"],
+      wires: [{ from: "T1", to: "relay.NO", color: WHT }, { from: "T2", to: "relay.COM", color: WHT }] }],
+    steps: [{ k: "wr.s.6p.pl" }, { k: "wr.s.pl.2" }, { k: "wr.s.pl.4" }],
+    notes: [{ k: "wr.n.plasma.hf" }],
+    pro: [{ k: "wr.p.arcok" }],
+    settings: relayYaml
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "ssr", kind: "relay", name: "SSR", side: "top", pins: ["+", "-"],
+      wires: [{ from: "+", to: "o3.2", color: GRN }, { from: "-", to: "o3.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.6p.air" }, { k: "wr.s.air.2" }],
+    notes: [{ k: "wr.n.6p.air" }], pro: [],
+    settings: ["coolant:", "flood_pin: gpio.4"]
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"], wires: [{ from: "-", to: "pwr.-", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "right", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "pwr.+", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.estop.2" }],
+    notes: [{ k: "wr.n.6p.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "top", pins: ["NO", "C"], wires: [{ from: "NO", to: "i2d.S", color: YEL }, { from: "C", to: "i2d.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.door.1", p: { sig: "#2.4 S (IO36)", gnd: "⏚" } }],
+    notes: [], pro: [{ k: "wr.p.6p.nc" }], settings: ["control/safety_door_pin: gpio.36"]
+  };
+  return h;
+}
+
 /** Verdrahtung Ruida: externe Treiber (gemeinsame Anode), Endschalter an GND, CO2-Laser-Netzteil an CN5 */
 function ruidaHookups(): Partial<Record<CompId, Hookup>> {
   const h: Partial<Record<CompId, Hookup>> = {};
@@ -994,6 +1170,7 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
 
 function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   if (b.maker === "Ruida") return ruidaHookups();
+  if (b.id === "6pack") return sixPackHookups();
   if (b.id === "pibot-v588-ultra") return pibotUltraHookups();
   if (b.maker === "PiBot") return pibotHookups();
   const isShield = b.id === "cnc-shield-v3";
@@ -1251,7 +1428,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {
@@ -1292,12 +1469,14 @@ export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: 
   const side = src[0].side;
   const swDirect = type === "npn" && pb && ch.every(c => c.sw);
   const fiveDirect = type === "npn" && volt === 5 && !swDirect && inp !== "ruida" && ch.every(c => c.five);
-  const direct = type === "npn" && (inp === "ruida" || swDirect || fiveDirect);
+  // eigenes Netzteil für den Sensor, Minus an GND des Eingangs (Ruida, 6-Pack-Eingangsmodul über 5 V)
+  const extPsu = type === "npn" && !fiveDirect && (inp === "ruida" || inp === "opto5");
+  const direct = type === "npn" && (extPsu || swDirect || fiveDirect);
   const prox = (c: typeof ch[number], wires: Wire[], outer = false): Part =>
     ({ id: "px" + c.n, kind: "prox", name: c.n === "T" ? "" : c.n, side: c.side, pins: ["BN", "BU", "BK"], wires, outer });
 
   const parts: Part[] = base.parts.filter(p => p.kind !== repl);
-  if (direct && inp === "ruida") {
+  if (extPsu) {
     parts.push(...ch.map(c => prox(c, [{ from: "BK", to: c.sig, color: BLACK }, { from: "BU", to: c.gnd, color: BLU }, { from: "BN", to: "@psu.+", color: BRN }])));
     parts.push({ id: "psu", kind: "psu", name: `${volt} V`, side, pins: ["+", "-"], wires: [{ from: "-", to: ch[0].gnd, color: BLACK }] });
   } else if (direct) {
@@ -1313,7 +1492,7 @@ export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: 
   }
 
   const steps: Step[] = [{ k: "wr.sen.s.colors" }];
-  if (direct && inp === "ruida") steps.push({ k: "wr.s.rd.lim.3" }, { k: "wr.sen.s.gnd" });
+  if (extPsu) steps.push({ k: inp === "ruida" ? "wr.s.rd.lim.3" : "wr.sen.s.6p", p: { volt: String(volt) } }, { k: "wr.sen.s.gnd" });
   else if (swDirect) steps.push({ k: "wr.sen.s.pb", p: { pos: volt === 5 ? "5 V" : "Vmot", jumper: inp === "pb588" ? "④" : "⑦" } });
   else if (fiveDirect) steps.push({ k: "wr.sen.s.d5", p: { vcc: `${conn(ch[0].five)?.label || ""} 5V`.trim() } });
   else steps.push({ k: "wr.sen.s.mod.1", p: { volt: String(volt) } }, { k: "wr.sen.s.mod.2" }, { k: "wr.sen.s.mod.3", p: { type: type.toUpperCase() } });

@@ -3,6 +3,12 @@
 ## Next version (unreleased)
 
 **New**
+- **6 Pack CNC Controller (FluidNC) in *Wiring*:** Bart Dring's modular board, drawn after the 6-Pack wiki with a
+  common module set – two 4x opto input modules (limits, probe, tool setter, door), 4x 5V output (laser PWM on IO26,
+  air via SSR), relay module (router on/off, plasma torch) and six driver sockets with motor terminals. Every part has
+  steps and the FluidNC *config.yaml* lines; inductive NPN sensors work with 5 V or their own supply. Notes on
+  jumpers (MS/SPI, Vcc, TMC5160), GPIO2 at boot, socket #5 (no PWM, random state at power-on), RS485 in socket #4
+  and external drivers.
 - **Inductive sensors (NPN/PNP) in *Wiring*:** for limit switches and the tool length sensor you can now choose
   *Mechanical switch*, *Inductive NPN* or *Inductive PNP* and the sensor supply (5 / 12 / 24 V) – on every board.
   The drawing shows the 3 wires (brown +V, blue GND, black signal) the way the board needs them: directly where the
