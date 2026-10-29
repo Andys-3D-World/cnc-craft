@@ -18,6 +18,8 @@
  *   - PiBot Controller V5.88 Ultra: PiBot-Wiki „Pinout Reference“ (Bild „V588 diagram V1“) + Test-YAML des Herstellers.
  *   - 6 Pack CNC Controller: 6-Pack-Wiki (github.com/bdring/6-Pack_CNC_Controller/wiki) – „Socket Pin Number Mapping“,
  *     „4x Switch Input module“, „Relay Module“, „4x 5V Buffered Output Module“, „RS485 Modbus Module“, „Setup“.
+ *   - Jackpot CNC Controller (V1 Engineering): FluidNC-Wiki „Jackpot CNC Controller“ (Pinbild, Beispiel-config.yaml,
+ *     Eingänge links→rechts gpio.25/33/32/35/34/39/36, 5V-Ausgänge gpio.26/27, MOSFET gpio.2/16) + Foto der Platine.
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
  *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
@@ -114,12 +116,13 @@ export interface Board {
    * Art der Eingänge (Endschalter/Taster) – für induktive Sensoren:
    *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = MKS (ESP32, laut Makerbase 5-V-Signal, kein Optokoppler)
    *   pb496 / pb588 = PiBot mit SW-VCC-Brücke (5 V oder Vmot, nur NPN)   ruida = Ruida (5/12/24 V, NPN laut Handbuch)
+   *   jack  = Jackpot (ESP32 direkt, 10 kΩ Pull-up auf dem Board, 5-V-Schiene für Schalter, kein Optokoppler)
    *   opto5 = 6-Pack-Eingangsmodul (Optokoppler, liefert 5 V; höhere Spannung mit eigenem Netzteil, Minus an ⏚)
    */
   inputs: InputKind;
   hookups: Partial<Record<CompId, Hookup>>;
 }
-export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5";
+export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5" | "jack";
 
 // Kabelfarben
 const RED = "#e5484d", BLACK = "#2b2b2b", YEL = "#f5c518", GRN = "#30a46c", BLU = "#3e7bfa", WHT = "#d9d9d9", ORG = "#f08c00", VIO = "#9b5de5";
@@ -670,6 +673,176 @@ const sixPack: Board = {
   hookups: {}
 };
 
+// =====================================================================
+// Jackpot CNC Controller V1 (V1 Engineering, FluidNC) – weiße Platine, Lage nach dem Foto im FluidNC-Wiki.
+// Oben: 5V OUT (gpio.27 / gpio.26), 7 Eingänge S/G/5V (X Y Z A B C Probe), MOSFET (gpio.2 / gpio.16);
+// rechts Modul-Steckplatz und 9–24 V; unten sechs TMC2209-Sockel X Y Z A B C mit Motorsteckern.
+// =====================================================================
+const JP_BLACK = "#1b1b1d", JP_GREEN = "#2f9e57";
+/** Eingang: senkrecht S / G / 5V, Name = GPIO darüber */
+const jpIn = (id: string, gpio: string, x: number, fn: string): BConn => ({
+  id, label: gpio, x, y: 58, dir: "v", labelPos: "above", pinLbl: false, style: "header", body: JP_BLACK,
+  pins: [{ k: "S", label: "S", mcu: "GPIO" + gpio, fn }, { k: "G", label: "G" }, { k: "5V", label: "5V" }]
+});
+/** Motorstecker: benachbarte Pins = eine Spule */
+const jpMot = (axis: string, x: number): BConn => ({
+  id: "m" + axis.toLowerCase(), label: axis, x, y: 508, dir: "h", labelPos: "above", pitch: 12, body: JP_BLACK, pinLbl: false,
+  pins: [{ k: "1A", label: "1" }, { k: "1B", label: "2" }, { k: "2A", label: "3" }, { k: "2B", label: "4" }]
+});
+const jackpot: Board = {
+  id: "jackpot",
+  inputs: "jack",
+  maker: "V1 Engineering",
+  name: "Jackpot CNC Controller V1",
+  mcu: "ESP32",
+  fw: "wr.fw.jp",
+  source: "wr.src.jp",
+  volt: "9–24 V",
+  w: 640, h: 536,
+  pcb: { fill: "#eceae4", edge: "#a8a49a", light: true },
+  holes: [{ x: 16, y: 16, r: 10 }, { x: 624, y: 16, r: 10 }, { x: 16, y: 520, r: 10 }, { x: 624, y: 520, r: 10 }],
+  conns: [
+    { id: "out", label: "5V OUT", x: 54, y: 40, dir: "h", labelPos: "above", pitch: 16, style: "screw", body: JP_GREEN, pinRot: true,
+      pins: [{ k: "G", label: "Gnd" }, { k: "27", label: "gpio.27", mcu: "GPIO27", fn: "Laser PWM" }, { k: "G2", label: "Gnd" }, { k: "26", label: "gpio.26", mcu: "GPIO26" }] },
+    jpIn("in25", "25", 212, "X-Limit"), jpIn("in33", "33", 228, "Y-Limit"), jpIn("in32", "32", 244, "Z-Limit"),
+    jpIn("in35", "35", 260, "A-Limit"), jpIn("in34", "34", 276, "B-Limit"), jpIn("in39", "39", 292, "C-Limit"), jpIn("in36", "36", 308, "Taster"),
+    { id: "mos", label: "MOSFET", x: 460, y: 40, dir: "h", labelPos: "above", pitch: 16, style: "screw", body: JP_GREEN, pinRot: true,
+      pins: [{ k: "2", label: "gpio.2", mcu: "GPIO2", fn: "Kühlung M8" }, { k: "V1", label: "VMot" }, { k: "16", label: "gpio.16", mcu: "GPIO16", fn: "Nebel M7 (Option)" }, { k: "V2", label: "VMot" }] },
+    { id: "mod", label: "MOD1", x: 398, y: 108, dir: "v", labelPos: "above", pinSide: "left", pitch: 16, style: "header", body: JP_BLACK,
+      pins: [{ k: "G", label: "Gnd" }, { k: "12", label: "gpio.12" }, { k: "15", label: "gpio.15" }, { k: "13", label: "gpio.13" },
+        { k: "14", label: "gpio.14" }, { k: "5V", label: "5V" }, { k: "VM", label: "VMot" }] },
+    { id: "pwr", label: "9-24 VDC", x: 620, y: 282, dir: "v", labelPos: "above", pinSide: "left", pitch: 30, style: "screw", body: JP_GREEN,
+      pins: [{ k: "-", label: "−" }, { k: "+", label: "+" }] },
+    jpMot("X", 64), jpMot("Y", 164), jpMot("Z", 264), jpMot("A", 364), jpMot("B", 464), jpMot("C", 564)
+  ],
+  deco: [
+    { x: 0, y: 165, w: 92, h: 104, label: "TF", kind: "sd" },
+    { x: 0, y: 118, w: 0, h: 0, label: "", kind: "pins", cols: 22, rows: 1, gap: 14 },
+    { x: 0, y: 290, w: 0, h: 0, label: "", kind: "pins", cols: 22, rows: 1, gap: 14 },
+    { x: 150, y: 140, w: 220, h: 120, label: "ESP32", kind: "esp" },
+    { x: 210, y: 20, w: 120, h: 12, label: "INPUT", kind: "text", size: 10 },
+    { x: 322, y: 52, w: 30, h: 50, label: "S G 5V", kind: "text", size: 8 },
+    { x: 440, y: 150, w: 170, h: 40, label: "V1 ENGINEERING", kind: "text", size: 13 },
+    { x: 150, y: 314, w: 260, h: 14, label: "Jackpot CNC Controller V1 · FluidNC", kind: "text", size: 10 },
+    { x: 0, y: 342, w: 96, h: 140, label: "X", kind: "driver" }, { x: 100, y: 342, w: 96, h: 140, label: "Y", kind: "driver" },
+    { x: 200, y: 342, w: 96, h: 140, label: "Z", kind: "driver" }, { x: 300, y: 342, w: 96, h: 140, label: "A", kind: "driver" },
+    { x: 400, y: 342, w: 96, h: 140, label: "B", kind: "driver" }, { x: 500, y: 342, w: 96, h: 140, label: "C", kind: "driver" }
+  ],
+  hookups: {}
+};
+
+/** Jackpot mit FluidNC – Belegung wie in der Beispiel-config.yaml im FluidNC-Wiki */
+function jackpotHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"],
+      wires: [{ from: "+", to: "pwr.+", color: RED }, { from: "-", to: "pwr.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.jp.psu" }, { k: "wr.s.psu.3", p: { volt: "24 V (9–24 V)" } }],
+    notes: [{ k: "wr.n.jp.psu" }],
+    pro: [],
+    settings: []
+  };
+  const axes = ["X", "Y", "Z", "A", "B", "C"];
+  h.motors = {
+    comp: "motors",
+    parts: axes.map(a => motorPart(a, "m" + a.toLowerCase(), "bottom")),
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: "X, Y, Z, A, B, C" } }, { k: "wr.s.jp.mot" }, { k: "wr.s.mot.3" }],
+    notes: [{ k: "wr.n.jp.mot" }, { k: "wr.n.jp.coil" }],
+    pro: [],
+    settings: ["axes/x/motor0/tmc_2209:", "uart_num: 1", "addr: 0", "run_amps: 0.600", "microsteps: 8", "step_pin: I2SO.2", "direction_pin: I2SO.1", "disable_pin: I2SO.0"]
+  };
+  h.extdrv = { comp: "extdrv", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.jp.ext" };
+  const sw = (axis: string, conn: string) => switchPart(axis, conn, "S", "G", "top");
+  h.limits = {
+    comp: "limits",
+    parts: [sw("X", "in25"), sw("Y", "in33"), sw("Z", "in32")],
+    steps: [{ k: "wr.s.lim.1", p: { sig: "S", gnd: "G" } }, { k: "wr.s.lim.2" }, { k: "wr.s.jp.lim" }],
+    notes: [{ k: "wr.n.jp.in" }],
+    pro: [{ k: "wr.p.jp.nc" }],
+    settings: ["x/motor0/limit_neg_pin: gpio.25:low", "y/motor0/limit_neg_pin: gpio.33:low", "z/motor0/limit_neg_pin: gpio.32:low",
+      "x/motor1/limit_neg_pin: gpio.35:low", "y/motor1/limit_neg_pin: gpio.34:low"]
+  };
+  h.probe = {
+    comp: "probe",
+    parts: [
+      { id: "probe", kind: "probe", name: "", side: "top", pins: ["S", "G"], wires: [{ from: "S", to: "in36.S", color: YEL }, { from: "G", to: "in36.G", color: BLACK }] },
+      { id: "wls", kind: "wls", name: "", side: "top", pins: ["S", "G"], wires: [{ from: "S", to: "in36.S", color: ORG }, { from: "G", to: "in36.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.probe.1", p: { sig: "INPUT 36 S", gnd: "G" } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
+    notes: [{ k: "wr.n.jp.in" }],
+    pro: [{ k: "wr.p.jp.nc" }],
+    settings: ["probe/pin: gpio.36:low"]
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "laser", kind: "laser", name: "", side: "top", pins: ["PWM", "GND", "VCC"],
+        wires: [{ from: "PWM", to: "out.27", color: YEL }, { from: "GND", to: "out.G", color: BLACK }, { from: "VCC", to: "@psu.+", color: RED }] },
+      { id: "psu", kind: "psu", name: "", side: "top", pins: ["+", "-"], wires: [{ from: "-", to: "out.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.laser.1", p: { sig: "5V OUT gpio.27", gnd: "Gnd", vcc: "12/24 V" } }, { k: "wr.s.laser.2" }, { k: "wr.s.jp.laser" }],
+    notes: [{ k: "wr.n.jp.out" }],
+    pro: [{ k: "wr.p.pb.laser" }],
+    settings: ["Laser:", "output_pin: gpio.27", "pwm_hz: 5000", "speed_map: 0=0% 1000=100%", "tool_num: 0"]
+  };
+  h.rotary = rotaryA("FluidNC", ["axes/a/steps_per_mm", "axes/a/motor0/tmc_2209:", "addr: 3", "cs_pin: i2so.14", "step_pin: I2SO.13", "direction_pin: I2SO.12", "disable_pin: I2SO.15"], "ma", "A");
+  h.spindle = {
+    comp: "spindle",
+    parts: [{ id: "ssr", kind: "relay", name: "SSR", side: "top", pins: ["+", "-"],
+      wires: [{ from: "+", to: "out.27", color: GRN }, { from: "-", to: "out.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.jp.sp.1" }, { k: "wr.s.jp.sp.2" }],
+    notes: [{ k: "wr.n.jp.mains" }],
+    pro: [{ k: "wr.p.jp.vfd" }],
+    settings: ["relay:", "output_pin: gpio.27", "speed_map: 0=0.000% 0=100.000% 1=100%"]
+  };
+  h.modbus = {
+    comp: "modbus",
+    parts: [],
+    steps: [{ k: "wr.s.jp.mb" }, { k: "wr.s.mb.1" }, { k: "wr.s.mb.2" }, { k: "wr.s.mb.4" }],
+    notes: [{ k: "wr.n.jp.mb" }], pro: [{ k: "wr.p.mb" }],
+    settings: ["uart2:", "txd_pin: gpio.14", "rxd_pin: gpio.15", "rts_pin: gpio.13", "baud: 9600", "mode: 8N1", "Huanyang:", "uart_num: 2", "modbus_id: 1"]
+  };
+  h.plasma = {
+    comp: "plasma",
+    parts: [
+      { id: "relay", kind: "relay", name: "24 V", side: "top", pins: ["+", "-"],
+        wires: [{ from: "+", to: "mos.V1", color: RED }, { from: "-", to: "mos.2", color: BLACK }] },
+      { id: "plasma", kind: "plasma", name: "", side: "top", outer: true, pins: ["T1", "T2"],
+        wires: [{ from: "T1", to: "@relay.NO", color: WHT }, { from: "T2", to: "@relay.COM", color: WHT }] }
+    ],
+    steps: [{ k: "wr.s.jp.pl" }, { k: "wr.s.pl.2" }, { k: "wr.s.pl.4" }],
+    notes: [{ k: "wr.n.plasma.hf" }, { k: "wr.n.jp.mos" }],
+    pro: [{ k: "wr.p.arcok" }],
+    settings: ["relay:", "output_pin: gpio.2", "coolant/flood_pin: NO_PIN"]
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "pump", kind: "pump", name: "", side: "top", pins: ["+", "-"],
+      wires: [{ from: "+", to: "mos.V1", color: RED }, { from: "-", to: "mos.2", color: BLACK }] }],
+    steps: [{ k: "wr.s.jp.air" }, { k: "wr.s.air.2" }],
+    notes: [{ k: "wr.n.jp.mos" }], pro: [],
+    settings: ["coolant:", "flood_pin: gpio.2", "mist_pin: gpio.16"]
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"], wires: [{ from: "-", to: "pwr.-", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "right", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "pwr.+", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.estop.2" }],
+    notes: [{ k: "wr.n.jp.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "top", pins: ["NO", "C"], wires: [{ from: "NO", to: "in39.S", color: YEL }, { from: "C", to: "in39.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.door.1", p: { sig: "INPUT 39 S", gnd: "G" } }, { k: "wr.s.jp.door" }],
+    notes: [], pro: [{ k: "wr.p.jp.nc" }], settings: ["control/safety_door_pin: gpio.39:low"]
+  };
+  return h;
+}
+
 /** 6 Pack mit FluidNC – Belegung wie gezeichnet (Module #1 #2 Eingänge, #3 5V-Ausgang, #4 Relais) */
 function sixPackHookups(): Partial<Record<CompId, Hookup>> {
   const h: Partial<Record<CompId, Hookup>> = {};
@@ -1171,6 +1344,7 @@ function pibotUltraHookups(): Partial<Record<CompId, Hookup>> {
 function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   if (b.maker === "Ruida") return ruidaHookups();
   if (b.id === "6pack") return sixPackHookups();
+  if (b.id === "jackpot") return jackpotHookups();
   if (b.id === "pibot-v588-ultra") return pibotUltraHookups();
   if (b.maker === "PiBot") return pibotHookups();
   const isShield = b.id === "cnc-shield-v3";
@@ -1428,7 +1602,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack, jackpot];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {
@@ -1502,12 +1676,13 @@ export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: 
   const notes: Step[] = [];
   if (inp === "avr5") notes.push({ k: "wr.sen.n.avr" });
   if (inp === "esp33") notes.push({ k: "wr.sen.n.esp" });
+  if (inp === "jack") notes.push({ k: "wr.sen.n.jack" });
   if (type === "pnp") notes.push({ k: "wr.sen.n.pnp" });
   if (direct && volt === 5) notes.push({ k: "wr.sen.n.v5" });
   if (swDirect && volt !== 5) notes.push({ k: "wr.sen.n.vmot", p: { volt: String(volt) } });
   notes.push(...base.notes.filter(s => s.k !== "wr.n.dlc.3pin"));
 
   const pro: Step[] = [...base.pro, { k: "wr.sen.p.nc" }, { k: "wr.sen.p.dist" }];
-  if (!direct && type === "npn" && (inp === "avr5" || inp === "esp33")) pro.push({ k: "wr.sen.p.diode" });
+  if (!direct && type === "npn" && (inp === "avr5" || inp === "esp33" || inp === "jack")) pro.push({ k: "wr.sen.p.diode" });
   return { ...base, parts, steps, notes, pro };
 }

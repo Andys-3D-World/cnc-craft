@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **Jackpot CNC Controller (V1 Engineering, FluidNC) in *Wiring*:** the board of many MPCNC and LowRider machines,
+  drawn after the FluidNC wiki page and V1 Engineering's example *config.yaml* – seven inputs (X Y Z A B C, probe),
+  5V outputs (laser on gpio.27, router SSR), two MOSFET outputs (air, plasma relay), module socket, six TMC2209
+  sockets. Notes on UART-only drivers, active-low inputs (:low for NO switches) and the start-up pulse on gpio.26.
 - **6 Pack CNC Controller (FluidNC) in *Wiring*:** Bart Dring's modular board, drawn after the 6-Pack wiki with a
   common module set – two 4x opto input modules (limits, probe, tool setter, door), 4x 5V output (laser PWM on IO26,
   air via SSR), relay module (router on/off, plasma torch) and six driver sockets with motor terminals. Every part has
