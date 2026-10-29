@@ -24,6 +24,9 @@
  *     config.h): Endschalter X D3/D2, Y D14/D15, Z D18/D19; Spindel-PWM D8 (Standard) oder D6 (Servo 2, 0–5 V);
  *     Spindel ein D4, Richtung D5 (Servo-Leiste); Kühlung D10, Nebel D9; Reset/Hold/Start/Tür A9–A12 (AUX-2); Taster A15.
  *     Lage der Stecker nach dem üblichen RAMPS-1.4-Aufbau (vereinfacht).
+ *   - BTT SKR Pro V1.2 mit grblHAL: grblHAL STM32F4xx „boards/btt_skr_pro_v1_1_map.h“ (Endschalter X− PB10, Y− PE12,
+ *     Z− PG8; Spindel-PWM PA8 EXP1, ein PE5 FAN1, Richtung PE6 FAN2; Kühlung PB1 HEAT0, Nebel PD14 HEAT1; Taster PA1
+ *     BLTouch; Tür PG4, Pause PD11, Start PG2, Reset PG6 an EXP1) + BTT „SKR-PRO-V1.2PIN“, Handbuch und Anschlussbild.
  *   - Ruida RDC6445G/S: Ruida „RDC6445G Control System manual V1.2“, Bild der Hauptplatine (3.1) und
  *     Kapitel 4 (CN0 Strom, CN1 Ausgänge, CN2 Eingänge, CN3/CN4 Endschalter, AXIS_X…U, CN5/CN6 Laser).
  *
@@ -120,13 +123,14 @@ export interface Board {
    * Art der Eingänge (Endschalter/Taster) – für induktive Sensoren:
    *   avr5  = direkt am ATmega (5 V, kein Optokoppler)      esp33 = MKS (ESP32, laut Makerbase 5-V-Signal, kein Optokoppler)
    *   pb496 / pb588 = PiBot mit SW-VCC-Brücke (5 V oder Vmot, nur NPN)   ruida = Ruida (5/12/24 V, NPN laut Handbuch)
+   *   stm33 = STM32 direkt (3,3 V, 3,3 V am Stecker, kein Optokoppler) – BTT SKR Pro
    *   jack  = Jackpot (ESP32 direkt, 10 kΩ Pull-up auf dem Board, 5-V-Schiene für Schalter, kein Optokoppler)
    *   opto5 = 6-Pack-Eingangsmodul (Optokoppler, liefert 5 V; höhere Spannung mit eigenem Netzteil, Minus an ⏚)
    */
   inputs: InputKind;
   hookups: Partial<Record<CompId, Hookup>>;
 }
-export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5" | "jack";
+export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5" | "jack" | "stm33";
 
 // Kabelfarben
 const RED = "#e5484d", BLACK = "#2b2b2b", YEL = "#f5c518", GRN = "#30a46c", BLU = "#3e7bfa", WHT = "#d9d9d9", ORG = "#f08c00", VIO = "#9b5de5";
@@ -1025,6 +1029,186 @@ function rampsHookups(): Partial<Record<CompId, Hookup>> {
   return h;
 }
 
+// =====================================================================
+// BTT SKR Pro V1.2 (STM32F407, grblHAL) – Lage nach dem BTT-Pinplan „SKR-PRO-V1.2PIN“: links die gelben Stromklemmen
+// (Motor, Board, Heizbett), oben sieben Motorstecker (X Y Z0 Z1 E0 E1 E2) über sechs Treibersockeln, rechts die
+// Endschalter (3,3 V / GND / Signal) und EXP1/EXP2, unten HEAT0–2 und FAN0–2.
+// =====================================================================
+const BT_YEL = "#d9a21b", BT_WHITE = "#e8e8e4";
+const btMot = (id: string, label: string, x: number): BConn => ({
+  id, label, x, y: 13, dir: "h", labelPos: "above", body: BT_WHITE, pinLbl: false,
+  pins: [{ k: "2B", label: "2B" }, { k: "2A", label: "2A" }, { k: "1A", label: "1A" }, { k: "1B", label: "1B" }]
+});
+/** Endschalter: 3,3 V / GND / Signal (von oben nach unten) */
+const btLim = (id: string, label: string, x: number, y: number, pin: string, fn: string): BConn => ({
+  id, label, x, y, dir: "v", labelPos: "below", pinSide: "left", body: BT_WHITE, pinLbl: false,
+  pins: [{ k: "3V3", label: "3.3V" }, { k: "G", label: "GND" }, { k: "S", label: pin, mcu: pin, fn }]
+});
+/** Ausgang unten (HEATx / FANx): − und + */
+const btOut = (id: string, label: string, x: number, pitch: number, pin: string, fn: string): BConn => ({
+  id, label, x, y: 388, dir: "h", labelPos: "above", pitch, style: "screw", body: XH_BLACK,
+  pins: [{ k: "-", label: "−", mcu: pin, fn }, { k: "+", label: "+" }]
+});
+const sktPro: Board = {
+  id: "btt-skr-pro",
+  inputs: "stm33",
+  maker: "BIGTREETECH (BTT)",
+  name: "BTT SKR Pro V1.2",
+  mcu: "STM32F407",
+  fw: "wr.fw.skr",
+  source: "wr.src.skr",
+  volt: "12–24 V",
+  w: 640, h: 412,
+  pcb: { fill: "#141619", edge: "#2d3137" },
+  holes: [{ x: 18, y: 18, r: 11 }, { x: 622, y: 18, r: 11 }, { x: 18, y: 394, r: 11 }, { x: 622, y: 394, r: 11 }],
+  conns: [
+    { id: "mpwr", label: "MOTOR POWER", x: 36, y: 52, dir: "v", labelPos: "right", rot: true, pitch: 62, style: "screw", body: BT_YEL,
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    { id: "pwr", label: "POWER", x: 36, y: 132, dir: "v", labelPos: "right", rot: true, pitch: 62, style: "screw", body: BT_YEL,
+      pins: [{ k: "+", label: "+" }, { k: "-", label: "−" }] },
+    btMot("mx", "X", 140), btMot("my", "Y", 206), btMot("mz", "Z0", 272), btMot("mz1", "Z1", 338),
+    btMot("me0", "E0", 404), btMot("me1", "E1", 466), btMot("me2", "E2", 528),
+    btLim("le0", "E0", 500, 160, "PE15", "A-Limit"), btLim("le1", "E1", 540, 160, "PE10", ""), btLim("le2", "E2", 580, 160, "PG5", "B-Limit"),
+    btLim("lx", "X−", 500, 212, "PB10", "X-Limit"), btLim("ly", "Y−", 540, 212, "PE12", "Y-Limit"), btLim("lz", "Z−", 580, 212, "PG8", "Z-Limit"),
+    { id: "exp1", label: "EXP1", x: 606, y: 40, dir: "v", labelPos: "above", pinSide: "left", style: "header", body: XH_BLACK,
+      pins: [{ k: "PG4", label: "PG4", mcu: "PG4", fn: "Tür" }, { k: "PD11", label: "PD11", mcu: "PD11", fn: "Feed Hold" },
+        { k: "PG2", label: "PG2", mcu: "PG2", fn: "Cycle Start" }, { k: "PG6", label: "PG6", mcu: "PG6", fn: "Reset/Abbruch" }, { k: "G", label: "GND" }] },
+    { id: "exp1b", label: "", x: 622, y: 40, dir: "v", pinSide: "right", style: "header", body: XH_BLACK, pinLbl: false,
+      pins: [{ k: "PA8", label: "PA8", mcu: "PA8", fn: "Spindel/Laser PWM (GRBL 1.1)" }, { k: "PD10", label: "PD10" }, { k: "PG3", label: "PG3" }, { k: "PG7", label: "PG7" }, { k: "5V", label: "5V" }] },
+    { id: "blt", label: "BLTouch", x: 432, y: 300, dir: "h", labelPos: "below", body: BT_WHITE,
+      pins: [{ k: "5V", label: "5V" }, { k: "S", label: "PA1", mcu: "PA1", fn: "Taster" }, { k: "G", label: "GND" }, { k: "PA2", label: "PA2" }] },
+    btOut("heat0", "HEAT0", 106, 30, "PB1", "Kühlung M8"), btOut("heat1", "HEAT1", 150, 30, "PD14", "Nebel M7 (Option)"),
+    btOut("heat2", "HEAT2", 194, 30, "PB0", ""), btOut("fan0", "FAN0", 240, 16, "PC8", ""),
+    btOut("fan1", "FAN1", 272, 16, "PE5", "Spindel ein"), btOut("fan2", "FAN2", 304, 16, "PE6", "Spindel-Richtung")
+  ],
+  deco: [
+    { x: 30, y: 216, w: 12, h: 160, label: "", kind: "fuse" },
+    { x: 130, y: 26, w: 60, h: 122, label: "X", kind: "driver" }, { x: 206, y: 26, w: 60, h: 122, label: "Y", kind: "driver" },
+    { x: 282, y: 26, w: 60, h: 122, label: "Z", kind: "driver" }, { x: 358, y: 26, w: 60, h: 122, label: "E0", kind: "driver" },
+    { x: 434, y: 26, w: 60, h: 122, label: "E1", kind: "driver" }, { x: 510, y: 26, w: 60, h: 122, label: "E2", kind: "driver" },
+    { x: 322, y: 170, w: 80, h: 80, label: "STM32F407", kind: "chip" },
+    { x: 420, y: 170, w: 50, h: 110, label: "SKR-PRO-V1.2", kind: "text", size: 12, rot: true },
+    { x: 340, y: 360, w: 52, h: 52, label: "USB", kind: "usb" }, { x: 482, y: 336, w: 72, h: 70, label: "TF", kind: "sd" },
+    { x: 600, y: 140, w: 34, h: 96, label: "EXP2", kind: "exp" }
+  ],
+  hookups: {}
+};
+
+/** BTT SKR Pro mit grblHAL – Belegung wie in grblHALs btt_skr_pro_v1_1_map.h */
+function skrProHookups(): Partial<Record<CompId, Hookup>> {
+  const h: Partial<Record<CompId, Hookup>> = {};
+  h.psu = {
+    comp: "psu",
+    parts: [{ id: "psu", kind: "psu", name: "", side: "left", pins: ["+", "-"],
+      wires: [{ from: "+", to: "pwr.+", color: RED }, { from: "-", to: "pwr.-", color: BLACK }, { from: "+", to: "mpwr.+", color: RED }, { from: "-", to: "mpwr.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.skr.psu" }, { k: "wr.s.psu.3", p: { volt: "24 V (12–24 V)" } }],
+    notes: [{ k: "wr.n.skr.psu" }],
+    pro: [{ k: "wr.p.vref" }],
+    settings: []
+  };
+  h.motors = {
+    comp: "motors",
+    parts: [motorPart("X", "mx"), motorPart("Y", "my"), motorPart("Z", "mz"), motorPart("A", "me0")],
+    steps: [{ k: "wr.s.mot.1" }, { k: "wr.s.mot.2", p: { conns: "X, Y, Z0 (Z1), E0 (A)" } }, { k: "wr.s.skr.mot" }, { k: "wr.s.mot.3" }],
+    notes: [{ k: "wr.n.skr.mot" }],
+    pro: [{ k: "wr.p.skr.tmc" }],
+    settings: ["$100 / $101 / $102 / $103", "$110 / $111 / $112", "$3"]
+  };
+  h.extdrv = { comp: "extdrv", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.skr.ext" };
+  h.limits = {
+    comp: "limits",
+    parts: [switchPart("X", "lx"), switchPart("Y", "ly"), switchPart("Z", "lz")],
+    steps: [{ k: "wr.s.lim.1", p: { sig: "S (PB10 / PE12 / PG8)", gnd: "GND" } }, { k: "wr.s.lim.2" }, { k: "wr.s.lim.3" }],
+    notes: [{ k: "wr.n.skr.lim" }],
+    pro: [{ k: "wr.p.nc" }],
+    settings: ["$5", "$21=1", "$22=1", "$23", "$130 / $131 / $132"]
+  };
+  h.probe = {
+    comp: "probe",
+    parts: [
+      { id: "probe", kind: "probe", name: "", side: "bottom", pins: ["S", "G"], wires: [{ from: "S", to: "blt.S", color: YEL }, { from: "G", to: "blt.G", color: BLACK }] },
+      { id: "wls", kind: "wls", name: "", side: "bottom", pins: ["S", "G"], wires: [{ from: "S", to: "blt.S", color: ORG }, { from: "G", to: "blt.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.probe.1", p: { sig: "BLTouch PA1", gnd: "GND" } }, { k: "wr.s.probe.2" }, { k: "wr.s.probe.3" }],
+    notes: [{ k: "wr.n.skr.probe" }],
+    pro: [{ k: "wr.p.probe" }],
+    settings: ["$6"]
+  };
+  h.laser = {
+    comp: "laser",
+    parts: [
+      { id: "laser", kind: "laser", name: "", side: "right", pins: ["PWM", "GND", "VCC"],
+        wires: [{ from: "PWM", to: "exp1b.PA8", color: YEL }, { from: "GND", to: "exp1.G", color: BLACK }, { from: "VCC", to: "@psu.+", color: RED }] },
+      { id: "psu", kind: "psu", name: "", side: "right", pins: ["+", "-"], wires: [{ from: "-", to: "exp1.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.laser.1", p: { sig: "EXP1 PA8", gnd: "EXP1 GND", vcc: "12/24 V" } }, { k: "wr.s.laser.2" }, { k: "wr.s.laser.3" }],
+    notes: [{ k: "wr.n.skr.laser" }],
+    pro: [{ k: "wr.p.laser" }],
+    settings: ["$32=1", "$30=1000", "$31=0", "$33 (PWM Hz)"]
+  };
+  h.rotary = rotaryA("grblHAL", ["$103", "$113", "$123"], "me0", "E0");
+  h.spindle = {
+    comp: "spindle",
+    parts: [
+      { id: "relay", kind: "relay", name: "24 V", side: "bottom", pins: ["+", "-"],
+        wires: [{ from: "+", to: "fan1.+", color: RED }, { from: "-", to: "fan1.-", color: BLACK }] },
+      { id: "vfd", kind: "vfd", name: "", side: "right", pins: ["PWM", "GND"],
+        wires: [{ from: "PWM", to: "exp1b.PA8", color: VIO }, { from: "GND", to: "exp1.G", color: BLACK }] }
+    ],
+    steps: [{ k: "wr.s.skr.sp.1" }, { k: "wr.s.skr.sp.2" }, { k: "wr.s.sp.2" }, { k: "wr.s.sp.4" }],
+    notes: [{ k: "wr.n.skr.out" }],
+    pro: [{ k: "wr.p.vfd" }],
+    settings: ["$32=0", "$30", "$31"]
+  };
+  h.plasma = {
+    comp: "plasma",
+    parts: [
+      { id: "relay", kind: "relay", name: "24 V", side: "bottom", pins: ["+", "-"],
+        wires: [{ from: "+", to: "fan1.+", color: RED }, { from: "-", to: "fan1.-", color: BLACK }] },
+      { id: "plasma", kind: "plasma", name: "", side: "bottom", outer: true, pins: ["T1", "T2"],
+        wires: [{ from: "T1", to: "@relay.NO", color: WHT }, { from: "T2", to: "@relay.COM", color: WHT }] }
+    ],
+    steps: [{ k: "wr.s.skr.pl" }, { k: "wr.s.pl.2" }, { k: "wr.s.pl.4" }],
+    notes: [{ k: "wr.n.plasma.hf" }, { k: "wr.n.skr.out" }],
+    pro: [{ k: "wr.p.arcok" }],
+    settings: []
+  };
+  h.air = {
+    comp: "air",
+    parts: [{ id: "pump", kind: "pump", name: "", side: "bottom", pins: ["+", "-"],
+      wires: [{ from: "+", to: "heat0.+", color: RED }, { from: "-", to: "heat0.-", color: BLACK }] }],
+    steps: [{ k: "wr.s.skr.air" }, { k: "wr.s.air.2" }],
+    notes: [{ k: "wr.n.skr.out" }], pro: [], settings: []
+  };
+  h.estop = {
+    comp: "estop",
+    parts: [
+      { id: "psu", kind: "psu", name: "", side: "left", pins: ["+", "-"], wires: [{ from: "-", to: "pwr.-", color: BLACK }, { from: "-", to: "mpwr.-", color: BLACK }] },
+      { id: "estop", kind: "estop", name: "", side: "left", pins: ["1", "2"],
+        wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "pwr.+", color: RED }, { from: "2", to: "mpwr.+", color: RED }] }
+    ],
+    steps: [{ k: "wr.s.estop.1" }, { k: "wr.s.estop.2" }],
+    notes: [{ k: "wr.n.skr.estop" }], pro: [{ k: "wr.p.estop" }], settings: []
+  };
+  h.door = {
+    comp: "door",
+    parts: [{ id: "door", kind: "door", name: "", side: "right", pins: ["NO", "C"], wires: [{ from: "NO", to: "exp1.PG4", color: YEL }, { from: "C", to: "exp1.G", color: BLACK }] }],
+    steps: [{ k: "wr.s.door.1", p: { sig: "EXP1 PG4", gnd: "EXP1 GND" } }],
+    notes: [{ k: "wr.n.skr.exp1" }], pro: [], settings: []
+  };
+  const btn = (id: string, name: string, pin: string): Part => ({ id, kind: "pbtn", name, side: "right", pins: ["NO", "C"],
+    wires: [{ from: "NO", to: "exp1." + pin, color: YEL }, { from: "C", to: "exp1.G", color: BLACK }] });
+  h.io = {
+    comp: "io",
+    parts: [btn("abort", "Reset", "PG6"), btn("hold", "Hold", "PD11"), btn("resume", "Start", "PG2")],
+    steps: [{ k: "wr.s.skr.io" }, { k: "wr.s.sh.io.2" }, { k: "wr.s.sh.io.3" }],
+    notes: [{ k: "wr.n.skr.exp1" }],
+    pro: [{ k: "wr.p.skr.estop" }],
+    settings: ["$14"]
+  };
+  return h;
+}
+
 /** 6 Pack mit FluidNC – Belegung wie gezeichnet (Module #1 #2 Eingänge, #3 5V-Ausgang, #4 Relais) */
 function sixPackHookups(): Partial<Record<CompId, Hookup>> {
   const h: Partial<Record<CompId, Hookup>> = {};
@@ -1528,6 +1712,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
   if (b.id === "6pack") return sixPackHookups();
   if (b.id === "jackpot") return jackpotHookups();
   if (b.id === "mega-ramps") return rampsHookups();
+  if (b.id === "btt-skr-pro") return skrProHookups();
   if (b.id === "pibot-v588-ultra") return pibotUltraHookups();
   if (b.maker === "PiBot") return pibotHookups();
   const isShield = b.id === "cnc-shield-v3";
@@ -1785,7 +1970,7 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack, jackpot, ramps];
+export const BOARDS: Board[] = [shield, dlc21, dlcMax, pibot, pibotUltra, ruida6445, sixPack, jackpot, ramps, sktPro];
 for (const b of BOARDS) b.hookups = hookupsFor(b);
 
 export function getBoard(id: string): Board {
@@ -1860,6 +2045,7 @@ export function sensorHookup(b: Board, base: Hookup, type: "npn" | "pnp", volt: 
   if (inp === "avr5") notes.push({ k: "wr.sen.n.avr" });
   if (inp === "esp33") notes.push({ k: "wr.sen.n.esp" });
   if (inp === "jack") notes.push({ k: "wr.sen.n.jack" });
+  if (inp === "stm33") notes.push({ k: "wr.sen.n.stm" });
   if (type === "pnp") notes.push({ k: "wr.sen.n.pnp" });
   if (direct && volt === 5) notes.push({ k: "wr.sen.n.v5" });
   if (swDirect && volt !== 5) notes.push({ k: "wr.sen.n.vmot", p: { volt: String(volt) } });

@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **BTT SKR Pro V1.2 (grblHAL) in *Wiring*:** pins from grblHAL's board map, layout after BTT's pin diagram – endstops
+  X−/Y−/Z− (3.3V / GND / signal), seven motor connectors (Z0/Z1 ganged, E0 as A), spindle PWM on EXP1 PA8, spindle
+  enable on FAN1, coolant on HEAT0/HEAT1, probe on the BLTouch connector, door and buttons on EXP1. Notes on the
+  3.3 V inputs and PWM (level shifter for 5 V lasers), the two power inputs and Trinamic drivers.
 - **Arduino Mega 2560 + RAMPS 1.4 (grbl-Mega-5X) in *Wiring*:** pins from grbl-Mega-5X's RAMPS map – endstop header
   (X/Y/Z min and max, S − +), five driver sockets X Y Z E0 E1, MOSFET outputs D8 (spindle PWM), D9/D10 (mist,
   coolant), servo header (D4 spindle enable, D6 for laser TTL), AUX-2 buttons and door (A9–A12). Notes on 12 V
