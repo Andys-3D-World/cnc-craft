@@ -202,6 +202,15 @@
   times faster. Results are exactly the same as before. Measured: 1 GB lithophane 3MF (12.5 million triangles)
   ~45 s → ~8 s; 3MF with 1.6 million triangles 2.1 s → 0.25 s; height search over all 6 views of a 2.7 MB STEP
   11 s → 1.6 s.
+- **Milling G-code is created much faster for fine contours:** contours with very many points (STL slices, traced
+  pictures, DXF made of tiny pieces) are simplified to 0.005 mm before the cutter offset – far below what a machine
+  can cut, corners always stay. Offsetting gets up to 50× faster and the G-code much shorter, so the machine also
+  gets fewer tiny moves. Measured with 400 contours of 1,000 points, 6 mm deep: inside 59 s → about 2 s, outside
+  18 s → under 1 s, pockets 24 s → about 2 s; G-code 3.9 million → 0.7 million lines with the same cut length.
+  Finding islands in pockets no longer recalculates every shape for every pocket, and *Adapt feed in curves* no
+  longer slows down with many shapes.
+- ***Generate G-code* shows only the start and end of long G-code in the console** (first and last 100 lines and a
+  note where to see all of it) – hundreds of thousands of lines made the console and the whole program sluggish.
 - **Console stays fast during long jobs:** it keeps the last 1,000 lines, adds new messages once per frame instead
   of one by one, and counts repeated messages (“… (×25)”) instead of filling up. Before, every message cost more the
   fuller the console was (about 30 ms each with 40,000 lines), so the whole program got slower the longer a job ran.

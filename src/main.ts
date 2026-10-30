@@ -115,7 +115,9 @@ function flushConsole() {
 }
 
 function appendToConsole(text: string) {
-  consoleQueue.push(...text.split("\n"));
+  // ohne „...“: bei sehr langen Texten würde das den Aufrufstapel sprengen
+  for (const zeile of text.split("\n")) consoleQueue.push(zeile);
+  if (consoleQueue.length > 4 * CONSOLE_MAX) consoleQueue = consoleQueue.slice(-CONSOLE_MAX);
   // einmal pro Bild einfügen; falls das Fenster gerade nicht zeichnet (verdeckt), spätestens nach 200 ms
   if (!consoleFlush) {
     consoleFlush = requestAnimationFrame(flushConsole);

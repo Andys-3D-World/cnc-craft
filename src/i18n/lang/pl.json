@@ -784,6 +784,7 @@
   "gcw.noObjects": "[System] Nie ma czego obrabiać. Najpierw coś narysuj lub zaimportuj!",
   "gcw.saved": "[OK] Zapisano G-code: {p}",
   "gcw.saveError": "[Błąd] Zapis nie powiódł się: {e}",
+  "gcw.shortened": "… pominięto tu {n} wierszy (konsola pozostaje szybka). Cały G-code: „{sim}” lub „{save}”.",
   "mode.part": "Na zewnątrz (element)",
   "mode.hole": "Wewnątrz (wycięcie)",
   "mode.engrave": "Po linii",

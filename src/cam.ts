@@ -3,7 +3,7 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
 import { berechne3PunktBogen } from "./arcEngine";
-import { offsetPolygon, polygonArea, pointInPoly, P } from "./polyOffset";
+import { offsetPolygon, polygonArea, pointInPoly, simplifyPolygon, simplifyPolyline, P } from "./polyOffset";
 import { pocketPaths, pocketWallPaths, PocketStrategy } from "./pocket";
 import { vcarvePaths } from "./vcarve";
 import { CONE_TYPES } from "./toolLibrary";
@@ -32,6 +32,19 @@ const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
 const encoder = new TextEncoder();
 
 /** Hinweise aus der letzten G-Code-Erzeugung (werden in der Konsole angezeigt) */
+/**
+ * Konturen vor dem Fräsen vereinfachen: Punkte, die weniger als 0,005 mm von der Linie ihrer Nachbarn abweichen,
+ * fallen weg (weit unter dem, was eine Fräse fahren kann). Fein aufgelöste Konturen (STL-Schnitt, nachgezeichnete
+ * Bilder, DXF aus vielen Stückchen) haben sonst tausende Punkte: Versetzen um den Fräser-Radius dauert dann ~50×
+ * länger und der G-Code wird viel länger – die Maschine fährt lauter Mini-Stücke (ruckelig).
+ * Ecken bleiben immer erhalten (sie weichen weit ab).
+ */
+export const CAM_SIMPLIFY_MM = 0.005;
+function simplifyMm(pts: P[], closed: boolean): P[] {
+  if (pts.length < 8) return pts;
+  return closed ? simplifyPolygon(pts, CAM_SIMPLIFY_MM) : simplifyPolyline(pts, CAM_SIMPLIFY_MM);
+}
+
 export let lastGcodeWarnings: string[] = [];
 /** Gewinde des letzten G-Codes (für die 3D-Ansicht: Gewindegänge einzeichnen) */
 export let lastThreads: ThreadInfo[] = [];
@@ -412,21 +425,35 @@ const generateGcodeInner = (shapes: any): string | null => {
   };
 
   // ---- TASCHE: Kontur in mm (Kreise als Vieleck) und die Inseln darin ----
-  const closedMm = (s: any): P[] | null => {
-    if (s.type === "circle") return makeEllipsePoints(s.x, s.y, Math.abs(s.w), Math.abs(s.w)).map(p => toMachine(p.x, p.y));
-    if (s.type === "polyline" && s.closed && s.points?.length >= 3) return s.points.map((p: any) => toMachine(p.x, p.y));
-    return null;
+  // je Form nur einmal umrechnen (die Inselsuche fragt bei jeder Tasche alle anderen Formen ab)
+  const closedCache = new Map<any, { pts: P[] | null; area: number; minX: number; minY: number; maxX: number; maxY: number }>();
+  const closedInfo = (s: any) => {
+    let c = closedCache.get(s);
+    if (!c) {
+      let pts: P[] | null = null;
+      if (s.type === "circle") pts = makeEllipsePoints(s.x, s.y, Math.abs(s.w), Math.abs(s.w)).map(p => toMachine(p.x, p.y));
+      else if (s.type === "polyline" && s.closed && s.points?.length >= 3) pts = simplifyMm(s.points.map((p: any) => toMachine(p.x, p.y)), true);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      if (pts) for (const q of pts) { if (q.x < minX) minX = q.x; if (q.x > maxX) maxX = q.x; if (q.y < minY) minY = q.y; if (q.y > maxY) maxY = q.y; }
+      c = { pts, area: pts ? Math.abs(polygonArea(pts)) : 0, minX, minY, maxX, maxY };
+      closedCache.set(s, c);
+    }
+    return c;
   };
+  const closedMm = (s: any): P[] | null => closedInfo(s).pts;
   /** Inseln = geschlossene Formen direkt in der Tasche (was in einer Insel liegt, zählt nicht extra) */
   const islandsOf = (shape: any, outer: P[]): P[][] => {
     const area = Math.abs(polygonArea(outer));
+    const me = closedInfo(shape);
     const cand: { pts: P[]; area: number }[] = [];
     for (const s of shapes) {
       if (s === shape) continue;
-      const pts = closedMm(s);
-      if (!pts) continue;
-      const a = Math.abs(polygonArea(pts));
-      if (a < area && pointInPoly(pts[0].x, pts[0].y, outer)) cand.push({ pts, area: a });
+      const o = closedInfo(s);
+      if (!o.pts) continue;
+      // Punkt außerhalb des umgebenden Rechtecks -> kann nicht drin liegen
+      const q = o.pts[0];
+      if (me.pts && (q.x < me.minX || q.x > me.maxX || q.y < me.minY || q.y > me.maxY)) continue;
+      if (o.area < area && pointInPoly(q.x, q.y, outer)) cand.push({ pts: o.pts, area: o.area });
     }
     return cand.filter(c => !cand.some(o => o !== c && o.area > c.area && pointInPoly(c.pts[0].x, c.pts[0].y, o.pts))).map(c => c.pts);
   };
@@ -909,7 +936,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
     else if (shape.type === "polyline") {
       // KONTUR AUS VIELEN PUNKTEN (z.B. STL-Import) - mit echter Radius-Korrektur
-      const pts: P[] = shape.points.map((p: any) => toMachine(p.x, p.y));
+      const pts: P[] = simplifyMm(shape.points.map((p: any) => toMachine(p.x, p.y)), !!shape.closed);
 
       // (Tasche bei geschlossenen Polylinien: siehe millPocket oben)
       if (!shape.closed || mode === "on-line" || mode === "pocket") {
@@ -952,10 +979,14 @@ const generateGcodeInner = (shapes: any): string | null => {
   group.shapes.forEach((shape: any) => {
     // sichere Stelle (Fräser oben) – hier darf später zum Nachmessen angehalten werden (driftPoints.ts)
     if (driftOn) gcode += DRIFT_SLOT + "\n";
-    const from = gcode.length;
-    millShape(shape);
-    // Vorschub in engen Kurven und Innenecken senken (feedAdapt.ts)
-    if (feedAdapt.on && adaptsFeed(shape)) gcode = gcode.slice(0, from) + adaptFeed(gcode.slice(from), toolRadius, feedAdapt.minPct);
+    // Vorschub in engen Kurven und Innenecken senken (feedAdapt.ts): G-Code dieser Form getrennt erzeugen,
+    // anpassen und anhängen (den ganzen bisherigen Text je Form zu zerschneiden wurde bei vielen Formen sehr langsam)
+    if (feedAdapt.on && adaptsFeed(shape)) {
+      const before = gcode;
+      gcode = "";
+      millShape(shape);
+      gcode = before + adaptFeed(gcode, toolRadius, feedAdapt.minPct);
+    } else millShape(shape);
   });
   });
 
@@ -991,7 +1022,13 @@ function showWarnings(appendToConsole: (t: string) => void) {
 export const handleGcodeGeneration = (shapes: any, appendToConsole: (t: string) => void) => {
   const gcode = generateGcode(shapes);
   if (!gcode) { appendToConsole(noGcodeMessage()); return; }
-  appendToConsole(gcode);
+  // Langer G-Code: nur Anfang und Ende in die Konsole (hunderttausende Zeilen machten sie und das Programm zäh)
+  const lines = gcode.split("\n");
+  if (lines.length > 400) {
+    appendToConsole(lines.slice(0, 100).join("\n"));
+    appendToConsole(t("gcw.shortened", { n: lines.length - 200, sim: t("rp.simulate"), save: t("rp.saveGcode") }));
+    appendToConsole(lines.slice(-100).join("\n"));
+  } else appendToConsole(gcode);
   showWarnings(appendToConsole);
 };
 

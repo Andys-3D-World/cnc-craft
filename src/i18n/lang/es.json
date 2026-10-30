@@ -784,6 +784,7 @@
   "gcw.noObjects": "[Sistema] No hay nada que cortar. ¡Dibuja o importa algo primero!",
   "gcw.saved": "[OK] G-code guardado: {p}",
   "gcw.saveError": "[Error] Error al guardar: {e}",
+  "gcw.shortened": "… {n} líneas omitidas aquí (la consola sigue rápida). El G-code completo está en «{sim}» o «{save}».",
   "mode.part": "Exterior (pieza)",
   "mode.hole": "Interior (recorte)",
   "mode.engrave": "Sobre la línea",

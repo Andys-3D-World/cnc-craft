@@ -784,6 +784,7 @@
   "gcw.noObjects": "[System] Keine Objekte vorhanden. Erst etwas zeichnen oder importieren!",
   "gcw.saved": "[Erfolg] G-Code gespeichert: {p}",
   "gcw.saveError": "[Fehler] Speichern fehlgeschlagen: {e}",
+  "gcw.shortened": "… {n} Zeilen hier ausgelassen (die Konsole bleibt so schnell). Den ganzen G-Code zeigen „{sim}“ und „{save}“.",
   "mode.part": "Außen (Teil)",
   "mode.hole": "Innen (Ausschnitt)",
   "mode.engrave": "Mitte (auf der Linie)",

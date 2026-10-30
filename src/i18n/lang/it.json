@@ -784,6 +784,7 @@
   "gcw.noObjects": "[Sistema] Niente da lavorare. Disegna o importa prima qualcosa!",
   "gcw.saved": "[OK] G-code salvato: {p}",
   "gcw.saveError": "[Errore] Salvataggio non riuscito: {e}",
+  "gcw.shortened": "… {n} righe omesse qui (la console resta veloce). Il G-code completo si vede con «{sim}» o «{save}».",
   "mode.part": "Esterno (pezzo)",
   "mode.hole": "Interno (ritaglio)",
   "mode.engrave": "Sulla linea",

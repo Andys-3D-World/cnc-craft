@@ -784,6 +784,7 @@
   "gcw.noObjects": "[Systeem] Niets te frezen. Teken of importeer eerst iets!",
   "gcw.saved": "[OK] G-code opgeslagen: {p}",
   "gcw.saveError": "[Fout] Opslaan mislukt: {e}",
+  "gcw.shortened": "… {n} regels hier weggelaten (de console blijft snel). De volledige G-code zie je via „{sim}” of „{save}”.",
   "mode.part": "Buiten (onderdeel)",
   "mode.hole": "Binnen (uitsparing)",
   "mode.engrave": "Op de lijn",

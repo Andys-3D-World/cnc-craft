@@ -784,6 +784,7 @@
   "gcw.noObjects": "[Système] Rien à usiner. Dessinez ou importez d'abord quelque chose !",
   "gcw.saved": "[OK] G-code enregistré : {p}",
   "gcw.saveError": "[Erreur] Échec de l'enregistrement : {e}",
+  "gcw.shortened": "… {n} lignes omises ici (la console reste rapide). Le G-code complet est visible avec « {sim} » ou « {save} ».",
   "mode.part": "Extérieur (pièce)",
   "mode.hole": "Intérieur (découpe)",
   "mode.engrave": "Sur la ligne",

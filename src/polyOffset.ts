@@ -120,6 +120,30 @@ export function simplifyPolygon(pts: P[], tol: number): P[] {
   return out.length >= 3 ? out : pts;
 }
 
+/** Offene Linie vereinfachen (Douglas-Peucker): Anfang und Ende bleiben, Abweichung höchstens tol */
+export function simplifyPolyline(pts: P[], tol: number): P[] {
+  if (pts.length < 3) return pts;
+  const n = pts.length, keep = new Uint8Array(n), tol2 = tol * tol;
+  keep[0] = 1; keep[n - 1] = 1;
+  const stack: [number, number][] = [[0, n - 1]];
+  while (stack.length) {
+    const [s, e] = stack.pop()!;
+    const a = pts[s], b = pts[e];
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    let maxD = 0, idx = -1;
+    for (let i = s + 1; i < e; i++) {
+      const p = pts[i];
+      let t = l2 > 0 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = p.x - a.x - t * dx, ey = p.y - a.y - t * dy;
+      const d2 = ex * ex + ey * ey;
+      if (d2 > maxD) { maxD = d2; idx = i; }
+    }
+    if (idx >= 0 && maxD > tol2) { keep[idx] = 1; stack.push([s, idx], [idx, e]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+
 // ---------------------------------------------------------------------
 
 function cleanPolygon(input: P[]): P[] {

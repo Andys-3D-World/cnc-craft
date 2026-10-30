@@ -784,6 +784,7 @@
   "gcw.noObjects": "[System] Nothing to cut. Draw or import something first!",
   "gcw.saved": "[OK] G-code saved: {p}",
   "gcw.saveError": "[Error] Saving failed: {e}",
+  "gcw.shortened": "… {n} lines left out here (keeps the console fast). See the whole G-code with “{sim}” or “{save}”.",
   "mode.part": "Outside (part)",
   "mode.hole": "Inside (cut-out)",
   "mode.engrave": "On line",
