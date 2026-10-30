@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Connected names with score lines in the *Name generator*:** where letters overlap (negative letter spacing,
+  script fonts), the edge of the upper letter is kept as a fine engraving line (weakest line layer), so the name is
+  cut as one piece but still reads clearly – also where the symbols touch the name. New: *Finished width* in mm
+  (the lettering is scaled to exactly that width), *Boldness* (thickens thin fonts, the holes of o, a, e stay open),
+  *engrave as line* for the name inside an outline, ten new symbols drawn for CNC Craft (cat, dog, fish, bird,
+  butterfly, bunny, crown, music note, bone, anchor) and your own symbol from an SVG file. Tests check that score
+  lines lie inside the part and hidden edges are left out.
 - **3D view in the *Box generator*:** shows the finished box built from the panels – drag to rotate, mouse wheel to
   zoom, double-click to reset. *Pull apart* moves the panels away from each other so you can see how the finger
   joints, dividers, ramps and drawers fit. Works for every box type (the round box shows its bent wall as a plain

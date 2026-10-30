@@ -127,10 +127,21 @@ export function traceText(p: TextParams, cssFamily = p.font): TracedText {
   const val = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) val[i] = img[i * 4]; // Rot-Kanal reicht (weiß auf schwarz)
 
-  const rawLoops = marchingSquares(val, W, H, 127.5);
+  const { loops, holes } = loopsFromPixels(val, W, H, p.heightMm / (fontPx * capRatio));
 
-  // Pixel -> mm (Großbuchstaben-Höhe = heightMm)
-  const mmPerPx = p.heightMm / (fontPx * capRatio);
+  // Auf linke untere Ecke = (0,0) verschieben
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const l of loops) for (const q of l) {
+    if (q.x < minX) minX = q.x; if (q.x > maxX) maxX = q.x;
+    if (q.y < minY) minY = q.y; if (q.y > maxY) maxY = q.y;
+  }
+  if (!loops.length) return { loops: [], holes: [], width: 0, height: 0 };
+  return { loops: loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY }))), holes, width: maxX - minX, height: maxY - minY };
+}
+
+/** Kanten im Bild (weiß auf schwarz) → Konturen in mm (Y nach oben, Ursprung = Bild-Unterkante), Löcher erkannt */
+function loopsFromPixels(val: Float32Array, W: number, H: number, mmPerPx: number): { loops: Pt[][]; holes: boolean[] } {
+  const rawLoops = marchingSquares(val, W, H, 127.5);
   let loops = rawLoops
     .map(l => simplifyClosed(l, 0.25))
     .filter(l => l.length >= 3 && Math.abs(pathArea(l)) > 2)
@@ -147,16 +158,62 @@ export function traceText(p: TextParams, cssFamily = p.font): TracedText {
     return depth % 2 === 1;
   });
   loops = loops.map((l, i) => ((areas[i] > 0) === !holes[i] ? l : l.slice().reverse()));
+  return { loops, holes };
+}
 
-  // Auf linke untere Ecke = (0,0) verschieben
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const l of loops) for (const q of l) {
-    if (q.x < minX) minX = q.x; if (q.x > maxX) maxX = q.x;
-    if (q.y < minY) minY = q.y; if (q.y > maxY) maxY = q.y;
+/**
+ * Jeden Buchstaben einzeln nachzeichnen, aber an seiner Stelle im Schriftzug (eine Zeile, Zeichen für Zeichen
+ * gesetzt wie bei Buchstabenabstand ≠ 0). Für den Namen-Generator: so weiß man, wo sich Buchstaben überlappen.
+ * Leerzeichen liefern leere Einträge. Gemeinsamer Nullpunkt = linke untere Ecke aller Buchstaben.
+ */
+export function traceGlyphs(p: TextParams, cssFamily = p.font): TracedText[] {
+  const line = p.text.replace(/\s*\n\s*/g, " ");
+  const fontCss = (px: number) => `${p.italic ? "italic " : ""}${p.bold ? "bold " : ""}${px}px "${cssFamily.replace(/"/g, "")}", sans-serif`;
+  const probe = document.createElement("canvas").getContext("2d")!;
+  probe.font = fontCss(100);
+  const capRatio = (probe.measureText("H").actualBoundingBoxAscent || 72) / 100;
+  const fontPx = 220;
+  probe.font = fontCss(fontPx);
+  const mmPerPx = p.heightMm / (fontPx * capRatio);
+  const lsPx = p.letterSpacing / mmPerPx;
+  const pad = Math.ceil(fontPx * 0.15); // Rand – Schnörkel ragen manchmal über die gemessene Box hinaus
+  const raw: { loops: Pt[][]; holes: boolean[] }[] = [];
+  let x = 0;
+  for (const ch of line) {
+    const m = probe.measureText(ch);
+    const left = Math.ceil(m.actualBoundingBoxLeft || 0) + pad, right = Math.ceil(m.actualBoundingBoxRight || m.width) + pad;
+    const up = Math.ceil(m.actualBoundingBoxAscent || fontPx) + pad, down = Math.ceil(m.actualBoundingBoxDescent || 0) + pad;
+    const W = Math.max(2, left + right), H = Math.max(2, up + down);
+    let g = { loops: [] as Pt[][], holes: [] as boolean[] };
+    if (ch.trim()) {
+      const c = document.createElement("canvas");
+      c.width = W; c.height = H;
+      const ctx = c.getContext("2d", { willReadFrequently: true })!;
+      ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+      ctx.fillStyle = "#fff"; ctx.font = fontCss(fontPx); ctx.textBaseline = "alphabetic";
+      ctx.fillText(ch, left, up);
+      const img = ctx.getImageData(0, 0, W, H).data, val = new Float32Array(W * H);
+      for (let i = 0; i < W * H; i++) val[i] = img[i * 4];
+      g = loopsFromPixels(val, W, H, mmPerPx);
+      // Bild-Ursprung → Schriftzug: Grundlinie bei y = 0, Zeichen-Anfang bei x
+      const ox = (x - left) * mmPerPx, oy = -down * mmPerPx;
+      g.loops = g.loops.map(l => l.map(q => ({ x: q.x + ox, y: q.y + oy })));
+    }
+    raw.push(g);
+    x += m.width + lsPx;
   }
-  if (!loops.length) return { loops: [], holes: [], width: 0, height: 0 };
-  loops = loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY })));
-  return { loops, holes, width: maxX - minX, height: maxY - minY };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const g of raw) for (const l of g.loops) for (const q of l) {
+    minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
+  }
+  if (!isFinite(minX)) return raw.map(() => ({ loops: [], holes: [], width: 0, height: 0 }));
+  return raw.map(g => ({ loops: g.loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY }))), holes: g.holes, width: maxX - minX, height: maxY - minY }));
+}
+
+/** traceGlyphs mit geladener Schrift; null bei Einzellinien-Schrift (die hat keine Flächen) */
+export async function traceGlyphsWithFont(p: TextParams): Promise<TracedText[] | null> {
+  const rf = await resolveFont(p.font, p.bold, p.italic);
+  return rf.singleLine ? null : traceGlyphs(p, rf.css);
 }
 
 // =====================================================================

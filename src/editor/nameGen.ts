@@ -5,17 +5,23 @@
  *  - die Buchstaben (Schrift aus fonts.ts, Abstand auch negativ = überlappen) werden vereinigt
  *  - Verbindung: keine (Schreibschrift berührt sich selbst), Grundlinie (Steg unter den Buchstaben) oder
  *    Umriss (Versatz um alle Buchstaben, Innenräume gefüllt – die Buchstaben auf Wunsch als Gravur obendrauf)
- *  - Symbole aus der Formen-Bibliothek vorn/hinten, Aufhänger als Ring oder Loch
+ *  - Symbole aus der Formen-Bibliothek oder nameIcons.ts (Tiere …) vorn/hinten, auch ein eigenes SVG;
+ *    Aufhänger als Ring oder Loch
+ *  - Ritzlinien: wo sich Buchstaben überlappen, bleibt die Kante des oberen als Gravurlinie (nameConnect.ts) –
+ *    dafür wird jeder Buchstabe einzeln nachgezeichnet. Fettung macht dünne Schriften stabiler.
+ *  - Fertige Breite: der Schriftzug wird so skaliert, dass er genau so breit wird
  *  - Vorlagen „Weihnachtskugel“ und „Weihnachtsstern“: Anhänger mit Kappe/Loch, der Name graviert oder ausgeschnitten
  * Die Vorschau zeigt, ob alles ein Teil ist (sonst Warnung mit der Anzahl). Rechnung in mm mit polygon-clipping,
  * „Aufs Bett“ legt das Ergebnis als Gruppe in die Bettmitte.
  */
 import polygonClipping, { MultiPolygon, Polygon, Ring } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
-import { MM_TO_PIXEL, Pt, newId, makeRectPoints, makeEllipsePoints } from "../shapeTransform";
-import { simplifyClosed } from "../traceUtil";
+import { MM_TO_PIXEL, Pt, newId, makeRectPoints, makeEllipsePoints, createPolyline } from "../shapeTransform";
 import { toShapes } from "./shapeOps";
-import { traceTextWithFont, TracedText } from "./textTool";
+import { traceTextWithFont, traceGlyphsWithFont, TracedText, TextParams } from "./textTool";
+import { NAME_ICONS } from "./nameIcons";
+import { parseSvg } from "../importers/svgImport";
+import { grow, union, bounds, overlapScores, clipLines, outlineLines, scaleArea, scaleLines, ScoreLine, XY } from "../nameConnect";
 import { createFontPicker } from "./fontPicker";
 import { SHAPES } from "./shapeLibrary";
 import { getLayers } from "../laserLayers";
@@ -24,7 +30,7 @@ import { t } from "../i18n/i18n";
 export type Connect = "none" | "baseline" | "outline";
 export type Hanger = "none" | "ringLeft" | "ringTop" | "hole";
 export type Template = "name" | "ball" | "star";
-export type Inner = "engrave" | "cut" | "layer";
+export type Inner = "engrave" | "cut" | "layer" | "score";
 
 export interface NameOptions {
   text: string; font: string; bold: boolean;
@@ -38,6 +44,10 @@ export interface NameOptions {
   hanger: Hanger;
   holeD: number;       // Loch-Ø des Aufhängers (mm)
   template: Template;
+  score: boolean;      // Ritzlinien, wo sich Buchstaben/Symbole überlappen
+  thicken: number;     // Fettung: jeder Buchstabe wächst um so viel (mm), Innenräume bleiben
+  width: number;       // fertige Breite (mm), 0 = die Höhe gilt
+  own: XY[][];         // eigenes Symbol (Ringe aus einem SVG, mm, y nach oben) für front/back = "own"
 }
 
 export const NAME_SYMBOLS = ["heart", "star5", "star6", "moon", "drop", "leaf", "paw", "flower", "tree", "cloud", "bolt", "check"];
@@ -45,79 +55,23 @@ export const NAME_SYMBOLS = ["heart", "star5", "star6", "moon", "drop", "leaf", 
 export interface NameResult {
   cut: MultiPolygon; engrave: MultiPolygon;
   top: MultiPolygon;   // „eigenes Teil“: Schriftzug, der auf die Rückplatte (cut) geklebt wird
+  lines: ScoreLine[];  // Gravurlinien (Ritzlinien an Überlappungen, Konturen bei „als Linie gravieren“)
+  linesTop: boolean;   // Linien gehören zum Schriftzug („eigenes Teil“), nicht zur Rückplatte
   pieces: number; w: number; h: number; openFont: boolean;
 }
 
 const KEY = "cnc_craft_namegen";
 const DEF: NameOptions = {
   text: "Andreas", font: "Pacifico", bold: false, height: 25, spacing: 0, connect: "baseline", bar: 4, outline: 2.5,
-  inner: "engrave", front: "", back: "heart", hanger: "none", holeD: 4, template: "name"
+  inner: "engrave", front: "", back: "heart", hanger: "none", holeD: 4, template: "name",
+  score: true, thicken: 0, width: 0, own: []
 };
 
 // ---------- kleine Flächen-Helfer (mm) ----------
 const ring = (pts: Pt[]): Ring => pts.map(p => [p.x, p.y] as [number, number]);
-const union = (list: MultiPolygon[]): MultiPolygon => {
-  const l = list.filter(m => m.length);
-  return l.length > 1 ? polygonClipping.union(l[0], ...l.slice(1)) : l[0] || [];
-};
 const diff = (a: MultiPolygon, b: MultiPolygon): MultiPolygon => (a.length && b.length ? polygonClipping.difference(a, b) : a);
 const disk = (cx: number, cy: number, r: number): MultiPolygon => [[ring(makeEllipsePoints(cx, cy, r, r))]];
 const box = (x0: number, y0: number, x1: number, y1: number, r = 0): MultiPolygon => [[ring(makeRectPoints(x0, y0, x1, y1, r))]];
-
-function bounds(m: MultiPolygon) {
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-  for (const poly of m) for (const [x, y] of poly[0] || []) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  return { x0, y0, x1, y1 };
-}
-
-/**
- * Umriss: jede Außenkontur um d nach außen, Innenräume (Löcher) bleiben gefüllt. Fläche ∪ „Kapsel“ (Streifen mit
- * runden Enden) entlang jeder Kante – robust auch bei verschnörkelten Schriften, wo ein Versatz der Kontur scheitert.
- */
-function grow(m: MultiPolygon, d: number): MultiPolygon {
-  const parts: MultiPolygon[] = [];
-  const steps = Math.max(8, Math.min(16, Math.ceil(d * 5)));
-  for (const poly of m) {
-    if (!poly[0]) continue;
-    const r = poly[0], last = r[r.length - 1];
-    const pts = simplifyClosed((r.length > 1 && last[0] === r[0][0] && last[1] === r[0][1] ? r.slice(0, -1) : r).map(([x, y]) => ({ x, y })), Math.min(0.15, d / 8));
-    if (pts.length < 3) continue;
-    parts.push([[ring(pts)]]);
-    for (let i = 0; i < pts.length; i++) {
-      const a = pts[i], c = pts[(i + 1) % pts.length];
-      const L = Math.hypot(c.x - a.x, c.y - a.y);
-      if (L > 1e-9) {
-        const nx = (-(c.y - a.y) / L) * d, ny = ((c.x - a.x) / L) * d;
-        parts.push([[[[a.x + nx, a.y + ny], [c.x + nx, c.y + ny], [c.x - nx, c.y - ny], [a.x - nx, a.y - ny]]]]);
-      }
-      parts.push([[Array.from({ length: steps }, (_, k) => [a.x + d * Math.cos((k / steps) * Math.PI * 2), a.y + d * Math.sin((k / steps) * Math.PI * 2)] as [number, number])]]);
-    }
-  }
-  return unionMany(parts);
-}
-
-/**
- * Viele Flächen vereinigen: Koordinaten auf 1/1000 mm runden und in kleinen Paketen (Baum) vereinigen – sonst
- * verschluckt sich polygon-clipping bei sehr vielen fast deckungsgleichen Kanten („Unable to find segment“).
- */
-function unionMany(parts: MultiPolygon[]): MultiPolygon {
-  const q = (v: number) => Math.round(v * 1000) / 1000;
-  let list = parts.map(m => m.map(p => p.map(r => r.map(([x, y]) => [q(x), q(y)] as [number, number]))));
-  while (list.length > 1) {
-    const next: MultiPolygon[] = [];
-    for (let i = 0; i < list.length; i += 16) {
-      const chunk = list.slice(i, i + 16);
-      try { next.push(polygonClipping.union(chunk[0], ...chunk.slice(1))); }
-      catch { // einzeln nacheinander; was trotzdem scheitert, bleibt weg (nur ein Stück Rand)
-        let acc = chunk[0];
-        for (const c of chunk.slice(1)) { try { acc = polygonClipping.union(acc, c); } catch { /* überspringen */ } }
-        next.push(acc);
-      }
-    }
-    list = next;
-  }
-  return list[0] || [];
-}
 
 /** nur die Außenkonturen (Innenräume gefüllt) */
 const solid = (m: MultiPolygon): MultiPolygon => union(m.filter(p => p[0]).map(p => [[p[0]]] as MultiPolygon));
@@ -141,9 +95,20 @@ function baselineOf(m: MultiPolygon): number {
   return ys.length ? ys[Math.floor(ys.length / 2)] : 0;
 }
 
-/** Form aus der Bibliothek (SVG-Pfad im 100er-Feld, y nach unten) als Fläche mit Höhe h, unten links bei (x, y) */
-function libShape(id: string, x: number, y: number, h: number): MultiPolygon {
-  const s = SHAPES.find(q => q.id === id);
+/** Fläche auf Höhe h bringen, unten links bei (x, y) */
+function fit(m: MultiPolygon, x: number, y: number, h: number): MultiPolygon {
+  const b = bounds(m), k = h / Math.max(1e-6, b.y1 - b.y0);
+  return m.map(poly => poly.map(r => r.map(([px, py]) => [x + (px - b.x0) * k, y + (py - b.y0) * k] as [number, number])));
+}
+const xorAll = (rings: Polygon[]): MultiPolygon => rings.length === 1 ? [rings[0]] : polygonClipping.xor(rings[0], ...rings.slice(1));
+
+/**
+ * Symbol als Fläche mit Höhe h, unten links bei (x, y): Form aus der Bibliothek bzw. nameIcons.ts
+ * (SVG-Pfad im 100er-Feld, y nach unten) oder „own“ = eigenes SVG
+ */
+function libShape(id: string, x: number, y: number, h: number, own: XY[][] = []): MultiPolygon {
+  if (id === "own") return own.length ? fit(xorAll(own.map(r => [r])), x, y, h) : [];
+  const s = SHAPES.find(q => q.id === id) || NAME_ICONS.find(q => q.id === id);
   if (!s) return [];
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("style", "position:absolute;left:-9999px;width:0;height:0;");
@@ -161,28 +126,48 @@ function libShape(id: string, x: number, y: number, h: number): MultiPolygon {
       if (pts.length >= 3) rings.push([pts]);
     }
   } finally { svg.remove(); }
-  if (!rings.length) return [];
-  const m = rings.length === 1 ? [rings[0]] : polygonClipping.xor(rings[0], ...rings.slice(1));
-  const b = bounds(m), k = h / Math.max(1e-6, b.y1 - b.y0);
-  return m.map(poly => poly.map(r => r.map(([px, py]) => [x + (px - b.x0) * k, y + (py - b.y0) * k] as [number, number])));
+  return rings.length ? fit(xorAll(rings), x, y, h) : [];
 }
-const libWidth = (id: string, h: number) => { const m = libShape(id, 0, 0, h); const b = bounds(m); return m.length ? b.x1 - b.x0 : 0; };
 
 /** Anzahl zusammenhängender Teile (Fläche mit ihren Löchern = ein Teil) */
 const countPieces = (m: MultiPolygon) => m.filter(p => p[0] && p[0].length >= 3).length;
 
+/** Schriftzug bauen; mit fertiger Breite: zweimal rechnen (Höhe anpassen) und das Ergebnis genau skalieren */
 export async function buildName(o: NameOptions): Promise<NameResult> {
-  const traced = (await traceTextWithFont({
+  const r1 = await buildAt(o);
+  if (!(o.width > 0) || !(r1.w > 0)) return r1;
+  const k1 = o.width / r1.w;
+  const r = await buildAt({ ...o, height: o.height * k1, spacing: o.spacing * k1 });
+  if (!(r.w > 0)) return r;
+  const k = o.width / r.w;
+  return { ...r, cut: scaleArea(r.cut, k), engrave: scaleArea(r.engrave, k), top: scaleArea(r.top, k), lines: scaleLines(r.lines, k), w: r.w * k, h: r.h * k };
+}
+
+async function buildAt(o: NameOptions): Promise<NameResult> {
+  const tp: TextParams = {
     text: o.text.replace(/\s*\n\s*/g, " ").trim() || " ", font: o.font, heightMm: o.height, bold: o.bold, italic: false,
     align: "left", lineSpacing: 170, letterSpacing: o.spacing
-  })).traced;
-  const openFont = !!traced.closed?.some(c => !c);
-  let letters = textRegion(traced);
-  if (letters.length > 1) letters = union([letters]);
-  const empty: NameResult = { cut: [], engrave: [], top: [], pieces: 0, w: 0, h: 0, openFont };
+  };
+  // Ritzlinien/Fettung brauchen jeden Buchstaben einzeln (Einzellinien-Schrift: null → wie bisher)
+  let glyphs: MultiPolygon[] = [];
+  if (o.score || o.thicken > 0) {
+    const g = await traceGlyphsWithFont(tp);
+    if (g) glyphs = g.map(textRegion).filter(m => m.length).map(m => (o.thicken > 0 ? grow(m, o.thicken, true) : m));
+  }
+  let letters: MultiPolygon, openFont = false;
+  if (glyphs.length) letters = union(glyphs);
+  else {
+    const traced = (await traceTextWithFont(tp)).traced;
+    openFont = !!traced.closed?.some(c => !c);
+    letters = textRegion(traced);
+    if (letters.length > 1) letters = union([letters]);
+    if (o.thicken > 0 && !openFont) letters = grow(letters, o.thicken, true);
+  }
+  const empty: NameResult = { cut: [], engrave: [], top: [], lines: [], linesTop: false, pieces: 0, w: 0, h: 0, openFont };
   if (!letters.length) return empty;
   const lb = bounds(letters), base = baselineOf(letters);
   let cut: MultiPolygon, engrave: MultiPolygon = [], top: MultiPolygon = [];
+  let scores: ScoreLine[] = [], lines: ScoreLine[] = [];
   let hole: MultiPolygon = [];
   const H = o.height;
 
@@ -191,8 +176,14 @@ export async function buildName(o: NameOptions): Promise<NameResult> {
     // Symbole vorn/hinten: so hoch wie die Großbuchstaben, 0,8 mm in den Schriftzug geschoben (damit sie hängen)
     const ov = Math.min(1.5, H * 0.06);
     let x0 = lb.x0, x1 = lb.x1;
-    if (o.front) { const w = libWidth(o.front, H); parts.push(libShape(o.front, lb.x0 - w + ov, base, H)); x0 = lb.x0 - w + ov; }
-    if (o.back) { parts.push(libShape(o.back, lb.x1 - ov, base, H)); x1 = lb.x1 - ov + libWidth(o.back, H); }
+    let fr: MultiPolygon = [], bk: MultiPolygon = [];
+    if (o.front) {
+      const m0 = libShape(o.front, 0, 0, H, o.own), w = m0.length ? bounds(m0).x1 : 0;
+      fr = libShape(o.front, lb.x0 - w + ov, base, H, o.own); parts.push(fr); x0 = lb.x0 - w + ov;
+    }
+    if (o.back) { bk = libShape(o.back, lb.x1 - ov, base, H, o.own); parts.push(bk); if (bk.length) x1 = bounds(bk).x1; }
+    // Ritzlinien: vorderes Symbol zuunterst, dann die Buchstaben, das hintere Symbol obenauf
+    if (o.score && glyphs.length) scores = overlapScores([fr, ...glyphs, bk]);
     if (o.connect === "baseline") {
       const bh = Math.max(0.5, o.bar);
       parts.push(box(x0 + bh / 2, base - bh * 0.6, x1 - bh / 2, base + bh * 0.4, bh / 2));
@@ -201,9 +192,11 @@ export async function buildName(o: NameOptions): Promise<NameResult> {
     if (o.connect === "outline") {
       engrave = o.inner === "engrave" ? shape : [];
       if (o.inner === "layer") top = shape;
+      if (o.inner === "score") lines = [...outlineLines(shape), ...scores];
+      else if (o.inner === "layer") lines = scores;
       const outer = solid(grow(shape, Math.max(0.3, o.outline)));
       shape = o.inner === "cut" ? diff(outer, solid(shape)) : outer;
-    }
+    } else lines = scores;
     // Aufhänger
     const b = bounds(shape), rIn = Math.max(0.5, o.holeD / 2), rOut = rIn + Math.max(1.5, H * 0.08);
     const midY = (base + H * 0.5);
@@ -253,13 +246,25 @@ export async function buildName(o: NameOptions): Promise<NameResult> {
       body = union([body, disk(cx, ccy, rOut)]); hole = disk(cx, ccy, rIn);
     }
     // Name: gravieren oder ausschneiden (wie eine Schablone – Innenräume von o, a … fallen mit heraus)
+    if (o.score && glyphs.length) scores = overlapScores(glyphs);
     if (o.inner === "engrave") { engrave = letters; cut = diff(body, hole); }
-    else if (o.inner === "layer") { top = letters; cut = diff(body, hole); }
+    else if (o.inner === "score") { lines = [...outlineLines(letters), ...scores]; cut = diff(body, hole); }
+    else if (o.inner === "layer") { top = letters; lines = scores; cut = diff(body, hole); }
     else cut = diff(body, union([hole, solid(letters)]));
   }
   top = diff(top, hole);
+  const linesTop = !!top.length;
+  lines = clipLines(lines, linesTop ? top : cut, 0.2);
   const all = bounds(union([cut, engrave, top]));
-  return { cut, engrave, top, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, openFont };
+  return { cut, engrave, top, lines, linesTop, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, openFont };
+}
+
+/** SVG-Text → geschlossene Konturen (mm, y nach oben), höchstens 400 Punkte je Kontur */
+function svgRings(text: string): XY[][] {
+  const res = parseSvg(text);
+  const rings: XY[][] = res.paths.filter(p => p.closed && p.pts.length >= 3).map(p => p.pts.map(q => [q.x, q.y] as XY));
+  for (const c of res.circles) rings.push(Array.from({ length: 48 }, (_, i) => [c.cx + c.r * Math.cos((i / 48) * Math.PI * 2), c.cy + c.r * Math.sin((i / 48) * Math.PI * 2)] as XY));
+  return rings.slice(0, 200).map(r => { const k = Math.ceil(r.length / 400); return k > 1 ? r.filter((_, i) => i % k === 0) : r; });
 }
 
 // =====================================================================
@@ -271,6 +276,7 @@ function load(): NameOptions {
 }
 
 function previewSvg(r: NameResult): string {
+  const ln = (l: ScoreLine) => l.pts.map(([x, y], i) => `${i ? "L" : "M"}${(x - b.x0 + pad).toFixed(2)},${(b.y1 - y + pad).toFixed(2)}`).join("") + (l.closed ? "Z" : "");
   const b = bounds(union([r.cut, r.engrave, r.top]));
   if (!isFinite(b.x0)) return "";
   const pad = Math.max(b.x1 - b.x0, b.y1 - b.y0) * 0.04 + 1;
@@ -279,7 +285,8 @@ function previewSvg(r: NameResult): string {
   return `<svg viewBox="0 0 ${(b.x1 - b.x0 + 2 * pad).toFixed(2)} ${(b.y1 - b.y0 + 2 * pad).toFixed(2)}" style="width:100%;height:240px;">
     <path d="${d(r.cut)}" fill="#c98a4b" fill-rule="evenodd" stroke="#ffd28a" stroke-width="${sw.toFixed(2)}"/>
     <path d="${d(r.engrave)}" fill="#5a3a1c" fill-rule="evenodd"/>
-    <path d="${d(r.top)}" fill="#efdcb4" fill-rule="evenodd" stroke="#5a3a1c" stroke-width="${(sw * 1.5).toFixed(2)}"/></svg>`;
+    <path d="${d(r.top)}" fill="#efdcb4" fill-rule="evenodd" stroke="#5a3a1c" stroke-width="${(sw * 1.5).toFixed(2)}"/>
+    <path d="${r.lines.map(ln).join("")}" fill="none" stroke="#3ccf4e" stroke-width="${(sw * 1.6).toFixed(2)}" stroke-linecap="round"/></svg>`;
 }
 
 export function openNameGenerator(log: (s: string) => void, done: () => void) {
@@ -292,7 +299,8 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>`;
   const num = (id: string, key: string, step: string, min = "0") =>
     `<label class="dlg-row"><span>${t(key)}</span><span class="dlg-num"><input id="${id}" type="number" min="${min}" step="${step}"><em>mm</em></span></label>`;
-  const sym = [["", t("ng.symNone")] as [string, string], ...NAME_SYMBOLS.map(s => [s, t("sl." + s)] as [string, string])];
+  const sym = [["", t("ng.symNone")] as [string, string], ...NAME_SYMBOLS.map(s => [s, t("sl." + s)] as [string, string]),
+    ...NAME_ICONS.map(s => [s.id, t("ng.ic." + s.id)] as [string, string]), ["own", t("ng.ownSym")] as [string, string]];
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
       <h3>✍ ${t("ngen.title")}</h3>
@@ -304,15 +312,21 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
           <label class="dlg-row"><span>${t("text.font")}</span><div id="ng-font" style="width:170px;"></div></label>
           <label class="dlg-row" style="cursor:pointer;"><span>${t("text.bold")}</span><input id="ng-bold" type="checkbox" style="width:auto;"></label>
           ${num("ng-h", "ng.height", "1", "3")}
+          ${num("ng-w", "ng.width", "1")}
           ${num("ng-sp", "ng.spacing", "0.1", "-20")}
+          ${num("ng-thick", "ng.thicken", "0.1")}
+          <label class="dlg-row" style="cursor:pointer;" title="${t("ng.scoreTip")}"><span>${t("ng.score")}</span><input id="ng-score" type="checkbox" style="width:auto;"></label>
           <div class="ng-only-name">
             ${sel("ng-con", "ng.connect", [["none", t("ng.con.none")], ["baseline", t("ng.con.baseline")], ["outline", t("ng.con.outline")]])}
             <div class="ng-only-bar">${num("ng-bar", "ng.bar", "0.5")}</div>
             <div class="ng-only-outline">${num("ng-out", "ng.outline", "0.5")}</div>
             ${sel("ng-front", "ng.front", sym)}
             ${sel("ng-back", "ng.back", sym)}
+            <div class="ng-only-own dlg-row"><span id="ng-own-info" class="dlg-hint" style="margin:0;"></span>
+              <button id="ng-own" class="btn-secondary" type="button">${t("ng.ownLoad")}</button>
+              <input id="ng-own-file" type="file" accept=".svg,image/svg+xml" style="display:none;"></div>
           </div>
-          <div class="ng-only-inner">${sel("ng-inner", "ng.inner", [["engrave", t("ng.inner.engrave")], ["cut", t("ng.inner.cut")], ["layer", t("ng.inner.layer")]])}</div>
+          <div class="ng-only-inner">${sel("ng-inner", "ng.inner", [["engrave", t("ng.inner.engrave")], ["cut", t("ng.inner.cut")], ["layer", t("ng.inner.layer")], ["score", t("ng.inner.score")]])}</div>
           ${sel("ng-hang", "ng.hanger", [["none", t("ng.hang.none")], ["ringLeft", t("ng.hang.ringLeft")], ["ringTop", t("ng.hang.ringTop")], ["hole", t("ng.hang.hole")]])}
           <div class="ng-only-hole">${num("ng-hd", "ng.holeD", "0.5", "1")}</div>
         </div>
@@ -333,6 +347,8 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
   $<HTMLSelectElement>("ng-tpl").value = init.template;
   $("ng-bold").checked = init.bold;
   $("ng-h").value = String(init.height); $("ng-sp").value = String(init.spacing);
+  $("ng-w").value = String(init.width); $("ng-thick").value = String(init.thicken); $("ng-score").checked = init.score;
+  let own: XY[][] = Array.isArray(init.own) ? init.own : [];
   $<HTMLSelectElement>("ng-con").value = init.connect;
   $("ng-bar").value = String(init.bar); $("ng-out").value = String(init.outline);
   $<HTMLSelectElement>("ng-front").value = init.front; $<HTMLSelectElement>("ng-back").value = init.back;
@@ -346,7 +362,8 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
       text: $("ng-text").value, font, bold: $("ng-bold").checked, height: n("ng-h", DEF.height, 3), spacing: n("ng-sp", 0, -20),
       connect: v("ng-con") as Connect, bar: n("ng-bar", DEF.bar, 0.5), outline: n("ng-out", DEF.outline, 0.3),
       inner: v("ng-inner") as Inner, front: v("ng-front"), back: v("ng-back"), hanger: v("ng-hang") as Hanger,
-      holeD: n("ng-hd", DEF.holeD, 1), template: v("ng-tpl") as Template
+      holeD: n("ng-hd", DEF.holeD, 1), template: v("ng-tpl") as Template,
+      score: $("ng-score").checked, thicken: Math.min(5, n("ng-thick", 0, 0)), width: n("ng-w", 0, 0), own
     };
   };
   const sync = (o: NameOptions) => {
@@ -356,6 +373,20 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
     show("ng-only-outline", o.connect === "outline");
     show("ng-only-inner", o.template !== "name" || o.connect === "outline");
     show("ng-only-hole", o.hanger !== "none");
+    show("ng-only-own", o.front === "own" || o.back === "own");
+    $<HTMLElement>("ng-own-info").textContent = own.length ? t("ng.ownOk") : t("ng.ownMissing");
+    $<HTMLInputElement>("ng-h").disabled = o.width > 0; // fertige Breite bestimmt dann die Höhe
+  };
+
+  // Eigenes Symbol: SVG lesen (nur die Pfade, nichts davon kommt ins innerHTML), geschlossene Konturen als Ringe
+  $<HTMLElement>("ng-own").onclick = () => $<HTMLInputElement>("ng-own-file").click();
+  $<HTMLInputElement>("ng-own-file").onchange = async () => {
+    const f = $<HTMLInputElement>("ng-own-file").files?.[0];
+    if (!f) return;
+    try { own = svgRings(await f.text()); } catch { own = []; }
+    $<HTMLInputElement>("ng-own-file").value = "";
+    if (!own.length) log(t("ng.ownNone"));
+    schedule();
   };
 
   let last: NameResult | null = null, run = 0, timer = 0;
@@ -366,7 +397,8 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
     if (my !== run) return; // inzwischen neu eingegeben
     last = r;
     $<HTMLElement>("ng-svg").innerHTML = r ? previewSvg(r) : "";
-    $<HTMLElement>("ng-info").textContent = r && r.cut.length ? t("ng.info", { w: r.w.toFixed(1), h: r.h.toFixed(1) }) : "";
+    $<HTMLElement>("ng-info").textContent = r && r.cut.length ? t("ng.info", { w: r.w.toFixed(1), h: r.h.toFixed(1) })
+      + (r.lines.length ? " · " + t("ng.lines", { n: r.lines.length }) : "") : "";
     $<HTMLElement>("ng-warn").textContent = !r ? "" : r.openFont ? t("ng.openFont") : r.pieces > 1 ? t("ng.pieces", { n: r.pieces }) : "";
     $<HTMLButtonElement>("ng-ok").disabled = !r || !r.cut.length;
   };
@@ -414,7 +446,11 @@ function placeName(r: NameResult, o: NameOptions) {
     .map(s => ({ ...s, groupId, millingMode: "pocket", millingDepth: -0.5, source: o.text.slice(0, 40) }));
   const topId = "name-" + newId();
   const top = toShapes(px(r.top, 2 * lift), cutL ? { laserLayerId: cutL.id } : {}).map(s => ({ ...s, groupId: topId, source: o.text.slice(0, 40) }));
-  const made = [...cut, ...eng, ...top];
+  // Gravurlinien: schwächste Linien-Ebene (wie „Verbinden + anritzen“), an der Fräse flach graviert
+  const mark = layers.filter(l => l.mode === "line").sort((a, c) => a.power - c.power)[0];
+  const lines = r.lines.map(l => createPolyline(l.pts.map(([x, y]) => ({ x: (x + dx) * MM_TO_PIXEL, y: (y + dy + (r.linesTop ? 2 * lift : 0)) * MM_TO_PIXEL })),
+    l.closed, "on-line", { ...(mark ? { laserLayerId: mark.id } : {}), millingDepth: -0.3, isScore: true, groupId: r.linesTop ? topId : groupId, source: o.text.slice(0, 40) }));
+  const made = [...cut, ...eng, ...top, ...lines];
   st.shapes = [...st.shapes, ...made];
   st.selectedShapeIds = made.map(s => s.id);
 }
