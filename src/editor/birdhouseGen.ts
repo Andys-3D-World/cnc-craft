@@ -6,7 +6,7 @@
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { birdhousePanels, birdProblem, birdhouseSize, holeFloor, HOLE_SIZES, HANGERS, ENTRANCES, BASES, type BirdhouseOptions, type BirdKind } from "../birdhouse";
+import { birdhousePanels, birdProblem, birdhouseSize, holeFloor, HOLE_SIZES, HANGERS, ENTRANCES, BASES, ROOF_EDGES, type BirdhouseOptions, type BirdKind } from "../birdhouse";
 import { Box3DView } from "./box3d";
 import { layout } from "./boxGen";
 
@@ -15,12 +15,13 @@ const VIEW_KEY = "cnc_craft_box_view"; // dieselbe Wahl wie beim Box-Generator: 
 const KINDS: BirdKind[] = ["nest", "ornament"];
 const DEF: Record<BirdKind, BirdhouseOptions> = {
   nest: { w: 120, d: 120, h: 180, t: 6, finger: 15, kerf: 0.1, pitch: 40, overhang: 20, hole: 32,
-    perch: false, drain: true, vent: true, hang: true, door: false, kind: "nest" },
+    perch: false, drain: true, vent: true, hang: true, door: false, kind: "nest", roofTabs: true, roofEdge: "plain", edgeCount: 0 },
   ornament: { w: 40, d: 34, h: 32, t: 3, finger: 8, kerf: 0.1, pitch: 45, overhang: 4, hole: 14, perch: true,
-    drain: false, vent: false, hang: false, door: false, kind: "ornament", hanger: "ring", entrance: "circle", frame: true, base: "rect", baseMargin: 5 }
+    drain: false, vent: false, hang: false, door: false, kind: "ornament", hanger: "ring", entrance: "circle", frame: true, base: "rect", baseMargin: 5,
+    roofTabs: true, roofEdge: "scallops", edgeCount: 0 }
 };
-const NUMS = ["w", "d", "h", "t", "finger", "kerf", "pitch", "overhang", "hole", "baseMargin"] as const;
-const FLAGS = ["perch", "drain", "vent", "hang", "door", "frame"] as const;
+const NUMS = ["w", "d", "h", "t", "finger", "kerf", "pitch", "overhang", "hole", "baseMargin", "edgeCount"] as const;
+const FLAGS = ["perch", "drain", "vent", "hang", "door", "frame", "roofTabs"] as const;
 
 type Store = { kind: BirdKind } & Record<BirdKind, BirdhouseOptions>;
 function clean(s: any, kind: BirdKind): BirdhouseOptions {
@@ -31,6 +32,7 @@ function clean(s: any, kind: BirdKind): BirdhouseOptions {
   if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
   if (ENTRANCES.includes(s.entrance)) o.entrance = s.entrance;
   if (BASES.includes(s.base)) o.base = s.base;
+  if (ROOF_EDGES.includes(s.roofEdge)) o.roofEdge = s.roofEdge;
   if (kind === "nest" && !HOLE_SIZES.includes(o.hole)) o.hole = DEF.nest.hole;
   o.kind = kind;
   return o;
@@ -70,6 +72,9 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
           ${num("bh-h", "bh.h")}
           ${num("bh-pitch", "bh.pitch", "1", "20")}
           ${num("bh-ov", "bh.overhang")}
+          ${sel("bh-edge", "bh.edge", ROOF_EDGES, "bh.edge.")}
+          ${num("bh-ec", "bh.edgeCount", "1", "0")}
+          ${chk("bh-tabs", "bh.roofTabs")}
           <div class="box-x" data-for="nest">${sel("bh-hole", "bh.hole", HOLE_SIZES, "bh.hole.")}</div>
           <div class="box-x" data-for="ornament">
             ${sel("bh-ent", "bh.entrance", ENTRANCES, "bh.entrance.")}
@@ -118,7 +123,8 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
     set("bh-t", o.t); set("bh-f", o.finger); set("bh-kerf", o.kerf);
     if (kind === "nest") set("bh-hole", o.hole); else set("bh-holeD", o.hole);
     set("bh-ent", o.entrance || "circle"); set("bh-hanger", o.hanger || "ring"); set("bh-base", o.base || "rect"); set("bh-bm", o.baseMargin ?? 5);
-    for (const [id, k] of [["bh-door", "door"], ["bh-frame", "frame"], ["bh-perch", "perch"], ["bh-drain", "drain"], ["bh-vent", "vent"], ["bh-hang", "hang"]] as const)
+    set("bh-edge", o.roofEdge || "plain"); set("bh-ec", o.edgeCount ?? 0);
+    for (const [id, k] of [["bh-door", "door"], ["bh-frame", "frame"], ["bh-tabs", "roofTabs"], ["bh-perch", "perch"], ["bh-drain", "drain"], ["bh-vent", "vent"], ["bh-hang", "hang"]] as const)
       $(id).checked = !!o[k];
   };
   const read = (): BirdhouseOptions => {
@@ -131,7 +137,8 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
       perch: $("bh-perch").checked, drain: !orn && $("bh-drain").checked, vent: !orn && $("bh-vent").checked,
       hang: !orn && $("bh-hang").checked, door: !orn && $("bh-door").checked,
       entrance: $<HTMLSelectElement>("bh-ent").value as BirdhouseOptions["entrance"], hanger: $<HTMLSelectElement>("bh-hanger").value as BirdhouseOptions["hanger"],
-      base: $<HTMLSelectElement>("bh-base").value as BirdhouseOptions["base"], frame: $("bh-frame").checked, baseMargin: n("bh-bm", d.baseMargin ?? 5, 0, 100) };
+      base: $<HTMLSelectElement>("bh-base").value as BirdhouseOptions["base"], frame: $("bh-frame").checked, baseMargin: n("bh-bm", d.baseMargin ?? 5, 0, 100),
+      roofTabs: $("bh-tabs").checked, roofEdge: $<HTMLSelectElement>("bh-edge").value as BirdhouseOptions["roofEdge"], edgeCount: Math.round(n("bh-ec", 0, 0, 200)) };
   };
   const preview = () => {
     const b = read();
@@ -142,7 +149,7 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
     ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.classList.toggle("active", el.dataset.view === mode));
     svg.style.display = mode === "2d" ? "" : "none";
     ov.querySelectorAll<HTMLElement>(".box-3d, .box-3d-only").forEach(el => { el.style.display = mode === "3d" ? "" : "none"; });
-    $<HTMLElement>("bh-hint").textContent = t(kind === "ornament" ? "bh.hintOrn" : b.door ? "bh.hintDoor" : "bh.hint");
+    $<HTMLElement>("bh-hint").textContent = t(kind === "ornament" ? "bh.hintOrn" : b.door ? "bh.hintDoor" : "bh.hint") + (b.roofTabs ? " " + t("bh.hintTabs") : "");
     const problem = birdProblem(b);
     if (problem) {
       svg.innerHTML = ""; view3d.setPanels([], b.t, 0);

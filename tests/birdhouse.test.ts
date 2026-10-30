@@ -1,7 +1,7 @@
 // Tests für den Vogelhaus-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { birdhousePanels, birdDims, birdProblem, holeSpot, holeFloor, worldPt, birdhouseSize, HOLE_SIZES, HANGERS, ENTRANCES, BASES, type BirdhouseOptions, type BirdPanel } from "../src/birdhouse.ts";
+import { birdhousePanels, birdDims, birdProblem, holeSpot, holeFloor, worldPt, birdhouseSize, HOLE_SIZES, HANGERS, ENTRANCES, BASES, ROOF_EDGES, type BirdhouseOptions, type BirdPanel } from "../src/birdhouse.ts";
 import type { V3 } from "../src/box.ts";
 
 type Pt = { x: number; y: number };
@@ -158,26 +158,76 @@ const orn: BirdhouseOptions = { w: 40, d: 34, h: 32, t: 3, finger: 8, kerf: 0, p
   drain: false, vent: false, hang: false, door: false, kind: "ornament", hanger: "ring", entrance: "circle", frame: true, base: "rect", baseMargin: 5 };
 const wallsOf = (ps: BirdPanel[]) => ps.filter(p => ["front", "back", "left", "right"].includes(p.name));
 
-for (const hanger of HANGERS) for (const entrance of ENTRANCES) for (const base of BASES) {
-  test(`Anhänger: Umrisse geschlossen (${hanger}, ${entrance}, ${base})`, () => {
-    for (const kerf of [0, 0.1]) {
-      const o = { ...orn, hanger, entrance, base, kerf };
-      assert.equal(birdProblem(o), "");
-      const ps = birdhousePanels(o);
-      for (const p of ps) {
-        assert.ok(p.pts.length >= 3 && p.pts.every(q => Number.isFinite(q.x) && Number.isFinite(q.y)), `${p.name}: Umriss`);
-        assert.ok(!selfIntersects(p.pts), `${p.name}: Umriss überschneidet sich`);
-        for (const h of p.holes || []) {
-          assert.ok(!selfIntersects(h), `${p.name}: Loch überschneidet sich`);
-          assert.ok(h.every(q => inside(q, p.pts)), `${p.name}: Loch liegt nicht in der Platte`);
-        }
+/** Umrisse geschlossen, ohne Überschneidung, Löcher in der Platte – für eine Einstellung (mit und ohne Kerf) */
+function checkClosed(o: BirdhouseOptions, what: string) {
+  for (const kerf of [0, 0.1]) {
+    assert.equal(birdProblem({ ...o, kerf }), "", what);
+    for (const p of birdhousePanels({ ...o, kerf })) {
+      assert.ok(p.pts.length >= 3 && p.pts.every(q => Number.isFinite(q.x) && Number.isFinite(q.y)), `${what} ${p.name}: Umriss`);
+      assert.ok(p.pts.every(q => q.x > -1e-6 && q.y > -1e-6 && q.x < p.w + 1e-6 && q.y < p.h + 1e-6), `${what} ${p.name}: Größe`);
+      assert.ok(!selfIntersects(p.pts), `${what} ${p.name}: Umriss überschneidet sich`);
+      for (const h of p.holes || []) {
+        assert.ok(!selfIntersects(h), `${what} ${p.name}: Loch überschneidet sich`);
+        assert.ok(h.every(q => inside(q, p.pts)), `${what} ${p.name}: Loch liegt nicht in der Platte`);
       }
-      assert.equal(ps.some(p => p.name === "hanger"), hanger !== "none");
-      assert.equal(ps.some(p => p.name === "base"), base !== "none");
-      assert.equal(ps.some(p => p.name === "frame"), entrance !== "none");
     }
-  });
+  }
 }
+for (const hanger of HANGERS) test(`Anhänger: Aufhänger ${hanger}`, () => {
+  for (const pitch of [30, 45, 60]) for (const roofTabs of [false, true]) {
+    const o = { ...orn, hanger, pitch, roofTabs };
+    checkClosed(o, `${hanger} ${pitch}°`);
+    assert.equal(birdhousePanels(o).some(p => p.name === "hanger"), hanger !== "none");
+  }
+});
+for (const entrance of ENTRANCES) test(`Anhänger: Einflugloch ${entrance}`, () => {
+  for (const frame of [false, true]) for (const hole of [10, 16]) {
+    const o = { ...orn, entrance, frame, hole };
+    checkClosed(o, `${entrance} ${hole}`);
+    assert.equal(birdhousePanels(o).some(p => p.name === "frame"), frame && entrance !== "none");
+  }
+});
+for (const base of BASES) test(`Anhänger: Grundplatte ${base}`, () => {
+  for (const baseMargin of [0, 5, 10]) checkClosed({ ...orn, base, baseMargin }, `${base} ${baseMargin}`);
+  assert.equal(birdhousePanels({ ...orn, base }).some(p => p.name === "base"), base !== "none");
+});
+for (const roofEdge of ROOF_EDGES) test(`Traufkante ${roofEdge}`, () => {
+  for (const edgeCount of [0, 3, 9]) {
+    checkClosed({ ...orn, roofEdge, edgeCount, roofTabs: true }, `Anhänger ${roofEdge}`);
+    checkClosed({ ...orn, roofEdge, edgeCount, hanger: "none", roofTabs: true }, `Anhänger ohne Firstplatte ${roofEdge}`);
+    checkClosed({ ...base, roofEdge, edgeCount, roofTabs: true }, `Nistkasten ${roofEdge}`);
+    checkClosed({ ...base, roofEdge, edgeCount, roofTabs: true, door: true }, `Nistkasten mit Klappe ${roofEdge}`);
+  }
+});
+
+test("Steckdach: jeder Schlitz im Dach sitzt auf einem Zapfen des Giebels", () => {
+  const cases: [string, BirdhouseOptions][] = [];
+  for (const pitch of [25, 40, 55]) {
+    cases.push([`Nistkasten ${pitch}°`, { ...base, pitch, roofTabs: true }], [`Klappe ${pitch}°`, { ...base, pitch, roofTabs: true, door: true }],
+      [`Anhänger ${pitch}°`, { ...orn, pitch, roofTabs: true, roofEdge: "scallops" }], [`Anhänger ohne Platte ${pitch}°`, { ...orn, pitch, roofTabs: true, hanger: "none" }]);
+  }
+  for (const [what, o] of cases) {
+    const ps = birdhousePanels(o), { t } = birdDims(o);
+    const gables = ps.filter(p => ["front", "back"].includes(p.name));
+    let slots = 0;
+    for (const r of ps.filter(p => p.name.startsWith("roof"))) for (const sl of r.holes!.filter(h => h.length === 4)) {
+      slots++;
+      const cx = sl.reduce((s, q) => s + q.x, 0) / 4, cy = sl.reduce((s, q) => s + q.y, 0) / 4;
+      // durch die ganze Dicke des Daches steckt ein Giebel-Zapfen
+      for (const s of [0.05 * t, 0.5 * t, 0.95 * t]) {
+        const w = worldPt(r.at!, cx, cy, s);
+        const hit = gables.some(p => {
+          const d = sub(w, p.at!.o), lx = dot(d, p.at!.u), ly = dot(d, p.at!.v), ln = dot(d, p.at!.n);
+          return ln > 0 && ln < t && inside({ x: lx, y: ly }, p.pts);
+        });
+        assert.ok(hit, `${what}: Schlitz in ${r.name} ohne Zapfen`);
+      }
+    }
+    assert.ok(slots >= (o.door ? 2 : 4), `${what}: Schlitze ${slots}`);
+  }
+  // ohne Häkchen gibt es keine Schlitze
+  assert.ok(birdhousePanels({ ...base, roofTabs: false }).filter(p => p.name.startsWith("roof")).every(p => !(p.holes || []).some(h => h.length === 4)));
+});
 
 test("Anhänger: jeder Zapfen der Wände hat einen Schlitz in der Grundplatte", () => {
   for (const base of ["rect", "round", "oval", "wave"] as const) {

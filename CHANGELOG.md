@@ -27,6 +27,14 @@
   hole for a toothpick perch. Each kind remembers its own values. Tests check closed outlines for every combination,
   that every tab has its slot in the base, that the roof halves touch the ridge plate without overlapping, that the
   loop is free above the roof and that the frame fits around the entrance.
+- **Plug-in roof and many more shapes in the *Birdhouse generator*:** the roof no longer needs glue – tabs on the
+  gable slopes go through slots in both roof halves (nest box and ornament; with the cleaning flap only the back
+  gable has tabs). New decorative roof edges at the eaves (scallops, points, teeth, waves, petals, scallops with
+  holes) with an adjustable pattern count. Ornament: more hangers on the ridge (heart, star, crown, wings, fir tree
+  besides ring, arch and point), more entrance shapes (triangle, pentagon, star, diamond, flower, leaf, fir tree,
+  clover) and more base plates (circle, flower, rosette, notched or concave corners). All shapes are drawn for
+  CNC Craft. Tests check that every roof slot sits on a gable tab through the full roof thickness and that all
+  shapes give closed outlines with their holes inside.
 - **Connected names with score lines in the *Name generator*:** where letters overlap (negative letter spacing,
   script fonts), the edge of the upper letter is kept as a fine engraving line (weakest line layer), so the name is
   cut as one piece but still reads clearly – also where the symbols touch the name. New: *Finished width* in mm
