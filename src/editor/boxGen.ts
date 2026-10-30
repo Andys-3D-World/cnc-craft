@@ -4,7 +4,7 @@
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
+import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType } from "../box";
 import { Box3DView } from "./box3d";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
@@ -26,7 +26,7 @@ function loadBox(): BoxOptions {
 }
 
 /** Platten nebeneinander (Reihen) – Rückgabe: Rechtecke der Lage in mm */
-function layout(panels: Panel[], gap: number, maxW: number): { x: number; y: number }[] {
+export function layout(panels: { w: number; h: number }[], gap: number, maxW: number): { x: number; y: number }[] {
   const pos: { x: number; y: number }[] = [];
   let x = 0, y = 0, rowH = 0;
   for (const p of panels) {

@@ -3,7 +3,10 @@
  * Ohne 3D-Bibliothek (wie die 3D-Simulation): jede Platte wird zu Flächen (oben, unten, Kanten), die Flächen werden
  * von hinten nach vorne gemalt. „Auseinander“ schiebt die Platten von der Mitte weg – so sieht man die Zinken.
  */
-import type { Panel, V3 } from "../box";
+import type { Panel as BoxPanel, V3 } from "../box";
+
+/** alles, was die Ansicht von einer Platte braucht (auch für den Vogelhaus-Generator) */
+export type Panel = Pick<BoxPanel, "pts" | "holes" | "at" | "wrap">;
 
 type Face = { pts: V3[][]; nrm: V3; edge: boolean };
 const sub = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];

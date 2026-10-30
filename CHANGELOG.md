@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Birdhouse generator** (Extras): a nest box from flat panels for laser or CNC – front with entry hole, back,
+  two side walls, floor and a two-part pitched roof. Walls and floor hold with finger joints like in the *Box
+  generator*. Choose inner width, depth and height, roof pitch (20–60°), roof overhang, material thickness, finger
+  width, kerf and the entry hole (26 / 28 / 32 / 34 / 45 mm, with the matching birds); the hole sits just below the
+  eaves. Options: perch hole, drainage holes in the floor, vent holes under the eaves, hanging holes in the roof
+  overhang, and a front flap for cleaning that swings on pins through the side walls. Live preview of the panels or
+  a rotatable 3D view, finished size in mm, then the panels are placed on the bed (each panel with its holes as a
+  group). Tests check closed outlines, matching finger joints, that the roof halves lie on the gables and side
+  walls without overlapping, and that the entry hole sits inside the front.
 - **Connected names with score lines in the *Name generator*:** where letters overlap (negative letter spacing,
   script fonts), the edge of the upper letter is kept as a fine engraving line (weakest line layer), so the name is
   cut as one piece but still reads clearly – also where the symbols touch the name. New: *Finished width* in mm

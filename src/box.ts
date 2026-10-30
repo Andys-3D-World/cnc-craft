@@ -80,9 +80,9 @@ export interface Panel {
 export type V3 = [number, number, number];
 export interface Place { o: V3; u: V3; v: V3; n: V3 }
 const EX: V3 = [1, 0, 0], EY: V3 = [0, 1, 0], EZ: V3 = [0, 0, 1];
-const flat = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EY, n: EZ });       // liegend
-const across = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EZ, n: EY });     // stehend, parallel zur Front
-const along = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EY, v: EZ, n: EX });      // stehend, parallel zur Seite
+export const flat = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EY, n: EZ });       // liegend
+export const across = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EX, v: EZ, n: EY });     // stehend, parallel zur Front
+export const along = (x: number, y: number, z: number): Place => ({ o: [x, y, z], u: EY, v: EZ, n: EX });      // stehend, parallel zur Seite
 /** Lage mit einer Abbildung (Drehung/Spiegelung M, danach verschieben um T) umrechnen */
 function movePlace(pl: Place, M: (v: V3) => V3, T: V3): Place {
   const o = M(pl.o);
@@ -101,7 +101,7 @@ export function outerSize(o: BoxOptions): { W: number; D: number; H: number } {
 type Pt2 = { x: number; y: number };
 const rect = (x0: number, y0: number, x1: number, y1: number): Pt2[] => [{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }];
 /** Kreis als Vieleck (Mitte cx, cy) */
-const circle = (cx: number, cy: number, r: number, n = 64): Pt2[] =>
+export const circle = (cx: number, cy: number, r: number, n = 64): Pt2[] =>
   Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos((2 * Math.PI * i) / n), y: cy + r * Math.sin((2 * Math.PI * i) / n) }));
 /** Fenster mit Rundbogen oben (unten links x0,y0, Breite w, Höhe h) */
 function archWindow(x0: number, y0: number, w: number, h: number): Pt2[] {
@@ -117,10 +117,10 @@ function slot(cx: number, cy: number, len: number, hgt: number): Pt2[] {
   return pts;
 }
 
-type Seg = { a: number; b: number; out: boolean };
+export type Seg = { a: number; b: number; out: boolean };
 
 /** Abschnitte einer Kante (Länge L): Ecken [0,t] und [L-t,L] gehören `corner`; dazwischen k ungerade Teile */
-function profile(L: number, t: number, finger: number, corner: boolean, odd: boolean, fingers = true): Seg[] {
+export function profile(L: number, t: number, finger: number, corner: boolean, odd: boolean, fingers = true): Seg[] {
   const segs: Seg[] = [];
   const Li = L - 2 * t;
   if (Li <= 0) return [{ a: 0, b: L, out: corner }];
@@ -140,7 +140,7 @@ function profile(L: number, t: number, finger: number, corner: boolean, odd: boo
  * Umriss einer Platte W × H aus vier Kanten-Profilen (Achse aufsteigend): unten/oben entlang x, links/rechts entlang y.
  * „out“ = auf der Außenlinie, sonst um t nach innen.
  */
-function outline(W: number, H: number, t: number, bottom: Seg[], right: Seg[], top: Seg[], left: Seg[]) {
+export function outline(W: number, H: number, t: number, bottom: Seg[], right: Seg[], top: Seg[], left: Seg[]) {
   const pts: { x: number; y: number }[] = [];
   const add = (x: number, y: number) => {
     const l = pts[pts.length - 1];
@@ -186,7 +186,7 @@ export function boxPanels(o: BoxOptions): Panel[] {
 }
 
 /** Zusammenhängende Abschnitte gleicher Art zusammenfassen */
-function merge(segs: Seg[]): Seg[] {
+export function merge(segs: Seg[]): Seg[] {
   const m: Seg[] = [];
   for (const g of segs) { const last = m[m.length - 1]; if (last && last.out === g.out) last.b = g.b; else m.push({ ...g }); }
   return m;
