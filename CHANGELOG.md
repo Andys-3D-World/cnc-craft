@@ -184,6 +184,9 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Own *Generators* menu** in the left tool bar: box, mandala, birdhouse, name, Christmas ornament and letter
+  topper generators and the QR code are now in their own flyout, so *Extras* (nesting, surfacing, shape library,
+  material test, serial numbers, 3D view, STL export, node graph) stays short – room for more generators.
 - ***Name generator*:** the *Christmas bauble* and *Christmas star* templates moved to the new *Christmas
   ornament generator*, so the name generator is only about lettering. Saved settings that used one of these templates
   open as normal lettering.

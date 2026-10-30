@@ -30,6 +30,7 @@ const P: Record<string, string> = {
   stlExport: `<path d="M4 15l8 4 8-4M4 15V9l8-4 8 4v6M12 19v-6M4 9l8 4 8-4"/><path d="M12 2v3" stroke-width="1.5"/><path d="M3 21h18" stroke-width="1.5"/>`,
   surface: `<rect x="3" y="14" width="18" height="6" rx="1"/><path d="M5 11h14M5 8h14" stroke-dasharray="2 2"/><path d="M12 3v5M9.5 5.5 12 8l2.5-2.5"/>`,
   mandala: `<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.2"/><path d="M12 9.8c-1.2-1.6-1.2-3.4 0-5 1.2 1.6 1.2 3.4 0 5zM12 14.2c1.2 1.6 1.2 3.4 0 5-1.2-1.6-1.2-3.4 0-5zM9.8 12c-1.6 1.2-3.4 1.2-5 0 1.6-1.2 3.4-1.2 5 0zM14.2 12c1.6-1.2 3.4-1.2 5 0-1.6 1.2-3.4 1.2-5 0z" stroke-width="1.4"/>`,
+  extras: `<rect x="3" y="8" width="18" height="12" rx="1.5"/><path d="M9 8V5.5h6V8M3 13h18M10.5 13v2h3v-2"/>`,
   letterTopper: `<ellipse cx="12" cy="9" rx="6" ry="7.5"/><path d="M9.6 12.5L12 5.5l2.4 7M10.4 10.3h3.2" stroke-width="1.5"/><path d="M12 16.5V23" stroke-width="1.8"/>`,
   ornament: `<circle cx="12" cy="14" r="7"/><path d="M10 7.3V5.5h4v1.8"/><path d="M12 5.5V2.5" stroke-width="1.5"/><path d="M5.6 12.5c4 1.6 8.8 1.6 12.8 0M5.6 15.8c4 1.6 8.8 1.6 12.8 0" stroke-width="1.4"/>`,
   birdhouse: `<path d="M3.5 10L12 3l8.5 7"/><path d="M5.5 8.5V21h13V8.5"/><circle cx="12" cy="11.5" r="2.4"/><path d="M12 15.5v2M10 17.5h4" stroke-width="1.5"/><path d="M12 3V1.5" stroke-width="1.5"/>`,

@@ -36,9 +36,12 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"]])}
     ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
-    ${flyCmds("extras", "boxgen", [["nest", "nest", "tip.cmd.nest"], ["boxgen", "boxgen", "tip.cmd.boxgen"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["nameGen", "nameGen", "tip.cmd.nameGen"],
-      ["materialTest", "materialTest", "tip.cmd.materialTest"],
-      ["qrCode", "qrCode", "tip.cmd.qrCode"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
+    ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
+      ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"],
+      ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
+    ${flyCmds("extras", "extras", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
+      ["materialTest", "materialTest", "tip.cmd.materialTest"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"],
+      ["stlExport", "stlExport", "tip.cmd.stlExport"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
