@@ -195,6 +195,23 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- **Much faster with large 3D models (3MF, STEP, STL):** the vertex and triangle lists of a 3MF are read straight
+  from the bytes instead of through the XML parser, several model files at once in background threads (the window
+  stays usable); merging equal corners, the shaded 3D preview (own depth-buffer drawing instead of sorting millions
+  of triangles) and the automatic height search (each cut only looks at the triangles near its height) are many
+  times faster. Results are exactly the same as before. Measured: 1 GB lithophane 3MF (12.5 million triangles)
+  ~45 s → ~8 s; 3MF with 1.6 million triangles 2.1 s → 0.25 s; height search over all 6 views of a 2.7 MB STEP
+  11 s → 1.6 s.
+- **Scaling an engrave picture no longer stutters:** while you drag, the picture is shown stretched instead of
+  being rastered again on every mouse move (a large photo at 0.1 mm took about 1 s each time). When the size stays
+  still, it is rastered once in a background thread, so the window does not freeze; the G-code always uses the exact
+  result. The blur behind *Sharpen* and *Local contrast* is also about 40 % faster with exactly the same result.
+  Measured with a 24 × 34 cm puzzle photo: about 900 ms → under 10 ms per mouse move.
+- **Smoother drawing area with large drawings:** only shapes in the visible area are drawn, points closer than half
+  a pixel on screen are skipped, and the cutter-width view no longer recomputes offset outlines while shapes are only
+  moved. Offsets are worked out on a simplified outline and spread over several frames instead of freezing the
+  window. Measured with 2,000 shapes / 500,000 points: dragging 300 shapes 933 → 59 ms per frame, first draw
+  5.5 s frozen → no frame over 80 ms, normal redraw 138 → 57 ms.
 - **Own *Generators* menu** in the left tool bar: box, mandala, birdhouse, name, Christmas ornament and letter
   topper generators and the QR code are now in their own flyout, so *Extras* (nesting, surfacing, shape library,
   material test, serial numbers, 3D view, STL export, node graph) stays short – room for more generators.
@@ -224,6 +241,8 @@
   then *Resume from here* starts the resume dialog at exactly that line.
 
 **Fixed**
+- **V-carve inlay:** the plug shapes now get correct bounds, so they can be clicked and are not hidden by the
+  visible-area check.
 - ***Flash board*:** the list of firmware links no longer shows an untranslated entry (“fl.link.webuiFile”) before a board is chosen.
 - **Spindle stopping on every rapid move:** a milling job no longer starts while the board is in laser mode
   ($32=1) – GRBL would switch the spindle off on each G0 and back on for cutting without spin-up time. The console

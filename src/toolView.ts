@@ -12,34 +12,51 @@
  */
 import { toolForShape, toolNumber, toolColor, MillingTool } from "./toolLibrary";
 import { arcGeometry, shapeBounds, makeEllipsePoints, MM_TO_PIXEL, Pt } from "./shapeTransform";
-import { offsetPolygon } from "./polyOffset";
+import { offsetPolygon, simplifyPolygon } from "./polyOffset";
 import { tabSettings, tabCenters, cumulative, pointAt, outline } from "./tabs";
 
 type SX = (x: number) => number;
 
-interface Cached { sig: string; loops: Pt[][]; tooBig: boolean }
+interface Cached { sig: string; loops: Pt[][]; tooBig: boolean; ox: number; oy: number }
 const cache = new WeakMap<object, Cached>();
 /** Konturen, in die das Werkzeug nicht passt (werden nach den Konturlinien rot gestrichelt) */
 let pendingTooBig: any[] = [];
 let lastScale = 1;
 
-/** Billige Prüfsumme der Punkte (ändert sich bei jedem Verschieben/Skalieren/Drehen) */
+/**
+ * Billige Prüfsumme der Punkte – bezogen auf den ersten Punkt: Verschieben ändert sie nicht
+ * (die versetzte Kontur wird dann nur mitverschoben), Skalieren/Drehen/Bearbeiten schon
+ */
 function pointsSig(pts: Pt[]): string {
   let a = 0, b = 0;
-  for (let i = 0; i < pts.length; i++) { a += pts[i].x * (i % 7 + 1); b += pts[i].y * (i % 5 + 1); }
+  const x0 = pts[0]?.x ?? 0, y0 = pts[0]?.y ?? 0;
+  for (let i = 0; i < pts.length; i++) { a += (pts[i].x - x0) * (i % 7 + 1); b += (pts[i].y - y0) * (i % 5 + 1); }
   return `${pts.length}:${a.toFixed(3)}:${b.toFixed(3)}`;
 }
 
-/** Versetzte Kontur(en) für geschlossene Polylinien, aus dem Zwischenspeicher */
-function offsetLoops(shape: any, d: number): Cached {
+/** Rechenzeit je Bild für neue versetzte Konturen; was nicht fertig wird, kommt im nächsten Bild */
+const FRAME_BUDGET_MS = 25;
+let frameDeadline = 0;
+let behind = false;
+
+/**
+ * Versetzte Kontur(en) für geschlossene Polylinien, aus dem Zwischenspeicher.
+ * null = in diesem Bild keine Zeit mehr (wird gleich nachgeholt).
+ */
+function offsetLoops(shape: any, d: number): (Cached & { dx: number; dy: number }) | null {
   const sig = `${shape.millingMode}|${d}|${pointsSig(shape.points)}`;
-  const c = cache.get(shape);
-  if (c && c.sig === sig) return c;
-  let loops: Pt[][] = [];
-  try { loops = offsetPolygon(shape.points, d, 0.05); } catch { loops = []; }
-  const res = { sig, loops, tooBig: loops.length === 0 };
-  cache.set(shape, res);
-  return res;
+  const p0 = shape.points[0];
+  let c = cache.get(shape);
+  if (!c || c.sig !== sig) {
+    if (performance.now() > frameDeadline) { behind = true; return null; }
+    let loops: Pt[][] = [];
+    // Für die Anzeige reicht eine vereinfachte Kontur (0,05 px Abweichung) – bei fein aufgelösten Konturen
+    // (STL-Schnitt, nachgezeichnete Bilder) ist das Versetzen so 10–30× schneller
+    try { loops = offsetPolygon(simplifyPolygon(shape.points, 0.05), d, 0.05); } catch { loops = []; }
+    c = { sig, loops, tooBig: loops.length === 0, ox: p0.x, oy: p0.y };
+    cache.set(shape, c);
+  }
+  return { ...c, dx: p0.x - c.ox, dy: p0.y - c.oy };
 }
 
 /**
@@ -56,6 +73,11 @@ export function drawToolBands(
   const tooBig: any[] = [];
   pendingTooBig = tooBig;
   lastScale = scale;
+  frameDeadline = performance.now() + FRAME_BUDGET_MS;
+  behind = false;
+  // sichtbarer Bereich in Welt-Koordinaten (aus sx/sy zurückgerechnet): Formen außerhalb überspringen
+  const W = ctx.canvas.width, H = ctx.canvas.height, ox = sx(0), oy = sy(0);
+  const vis = { minX: -ox / scale, maxX: (W - ox) / scale, minY: (oy - H) / scale, maxY: oy / scale };
 
   for (const shape of shapes) {
     const r0 = resolve ? resolve(shape) : (() => { const tl = toolForShape(shape); return tl ? { diameter: tl.diameter, color: toolColor(tl) } : null; })();
@@ -64,6 +86,8 @@ export function drawToolBands(
     const mode = shape.millingMode || "outside";
     if (mode === "vcarve" || mode === "vplug") continue; // V-Carve: Breite hängt von der Tiefe ab – keine Fräserspur
     const rPx = (tool.diameter / 2) * MM_TO_PIXEL;
+    const bb = shapeBounds(shape), pad = rPx + 20 / scale;
+    if (bb && (bb.maxX + pad < vis.minX || bb.minX - pad > vis.maxX || bb.maxY + pad < vis.minY || bb.minY - pad > vis.maxY)) continue;
     if (mode === "drill") {
       // Bohrung: Fräser-Kreis in der Mitte der Form
       const b = shape.type === "circle" ? null : shapeBounds(shape);
@@ -92,9 +116,15 @@ export function drawToolBands(
         tracePts(ctx, shape.points, !!shape.closed, sx, sy);
       } else {
         const c = offsetLoops(shape, sign * rPx);
-        if (c.tooBig) tooBig.push(shape);
-        for (const loop of c.loops) tracePts(ctx, loop, true, sx, sy);
-        if (mode !== "pocket" && c.loops.length) tabRing = c.loops[0];
+        if (c) {
+          if (c.tooBig) tooBig.push(shape);
+          // seit dem Berechnen nur verschoben -> Kontur mitverschieben
+          const tx: SX = c.dx ? x => sx(x + c.dx) : sx, ty: SX = c.dy ? y => sy(y + c.dy) : sy;
+          for (const loop of c.loops) tracePts(ctx, loop, true, tx, ty);
+          if (mode !== "pocket" && c.loops.length) {
+            tabRing = c.dx || c.dy ? c.loops[0].map(p => ({ x: p.x + c.dx, y: p.y + c.dy })) : c.loops[0];
+          }
+        }
       }
     } else if (shape.type === "line") {
       ctx.moveTo(sx(shape.x), sy(shape.y));
@@ -119,6 +149,8 @@ export function drawToolBands(
     }
   }
   ctx.restore();
+  // nicht alle versetzten Konturen geschafft -> gleich nochmal zeichnen (Fenster bleibt bedienbar)
+  if (behind) window.dispatchEvent(new CustomEvent("cnc-redraw"));
 }
 
 /** Haltestege als gelbe Stücke auf der Fräserbahn (gleiche Lage wie im G-Code, siehe tabs.ts) */

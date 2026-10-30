@@ -27,6 +27,69 @@ function project(vc: ViewCoords, cu: number, cv: number, cw: number): Projected 
 }
 
 /**
+ * Schattiertes Bild mit Tiefenpuffer (z-Buffer) selbst ausrechnen – in doppelter Auflösung, dann verkleinert
+ * (glatte Kanten). Kein Sortieren und kein Canvas-Pfad je Dreieck: auch 10 Mio. Dreiecke dauern nur Sekundenbruchteile.
+ */
+function rasterize(mesh: WeldedMesh, pr: Projected, W: number, H: number, scale: number, cx: number, cy: number): HTMLCanvasElement {
+  const SS = 2, w = W * SS, h = H * SS;
+  const k = scale * SS, ox = cx * SS, oy = cy * SS;
+  const n = pr.sx.length;
+  const X = new Float32Array(n), Y = new Float32Array(n);
+  for (let i = 0; i < n; i++) { X[i] = ox + pr.sx[i] * k; Y[i] = oy - pr.sy[i] * k; }
+  const D = pr.depth;
+  const zbuf = new Float32Array(w * h).fill(-Infinity);
+  const img = new ImageData(w, h);
+  const px = new Uint32Array(img.data.buffer);
+  px.fill(0xff161212); // #121216 (ABGR im Speicher)
+  const tris = mesh.tris, T = mesh.triangleCount;
+
+  for (let t = 0; t < T; t++) {
+    const a = tris[t * 3], b = tris[t * 3 + 1], c = tris[t * 3 + 2];
+    const x0 = X[a], y0 = Y[a], x1 = X[b], y1 = Y[b], x2 = X[c], y2 = Y[c];
+    // doppelte Fläche (Bildschirm); 0 = Dreieck von der Kante gesehen
+    const area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+    if (area === 0 || area !== area) continue;
+    const minX = Math.max(0, Math.ceil(Math.min(x0, x1, x2) - 0.5)), maxX = Math.min(w - 1, Math.floor(Math.max(x0, x1, x2) - 0.5));
+    const minY = Math.max(0, Math.ceil(Math.min(y0, y1, y2) - 0.5)), maxY = Math.min(h - 1, Math.floor(Math.max(y0, y1, y2) - 0.5));
+    if (minX > maxX || minY > maxY) continue;
+    // Licht: Normale im Bildschirm-Raum (wie früher beim Malen mit Pfaden)
+    const ux = pr.sx[b] - pr.sx[a], uy = pr.sy[b] - pr.sy[a], uz = D[b] - D[a];
+    const vx = pr.sx[c] - pr.sx[a], vy = pr.sy[c] - pr.sy[a], vz = D[c] - D[a];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const len = Math.hypot(nx, ny, nz) || 1;
+    const light = Math.abs((nx * 0.35 + ny * 0.6 + nz * 0.72) / len);
+    const g = Math.round(60 + 150 * light);
+    const col = 0xff000000 | (g << 16) | (Math.round(g * 0.55) << 8) | Math.round(g * 0.62);
+    const inv = 1 / area, d0 = D[a], d1 = D[b], d2 = D[c];
+    for (let py = minY; py <= maxY; py++) {
+      const fy = py + 0.5;
+      for (let pxi = minX; pxi <= maxX; pxi++) {
+        const fx = pxi + 0.5;
+        // Schwerpunkt-Koordinaten: alle >= 0 -> Pixelmitte liegt im Dreieck
+        const l1 = ((fx - x0) * (y2 - y0) - (x2 - x0) * (fy - y0)) * inv;
+        const l2 = ((x1 - x0) * (fy - y0) - (fx - x0) * (y1 - y0)) * inv;
+        const l0 = 1 - l1 - l2;
+        if (l0 < 0 || l1 < 0 || l2 < 0) continue;
+        const z = l0 * d0 + l1 * d1 + l2 * d2;
+        const o = py * w + pxi;
+        if (z > zbuf[o]) { zbuf[o] = z; px[o] = col; }
+      }
+    }
+  }
+
+  const big = document.createElement("canvas");
+  big.width = w; big.height = h;
+  big.getContext("2d")!.putImageData(img, 0, 0);
+  const base = document.createElement("canvas");
+  base.width = W; base.height = H;
+  const ctx = base.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(big, 0, 0, W, H);
+  return base;
+}
+
+/**
  * Zeichnet das Modell schattiert. "height" = aktuelle Schnitthöhe (rote Linien).
  * Das teure Grundbild wird zwischengespeichert, damit der Schieberegler flüssig bleibt.
  */
@@ -63,45 +126,7 @@ export class Mesh3DPreview {
     const scale = 0.85 * Math.min(W / Math.max(maxX - minX, 1e-6), H / Math.max(maxY - minY, 1e-6));
     this.fit = { scale, cx: W / 2 - ((minX + maxX) / 2) * scale, cy: H / 2 + ((minY + maxY) / 2) * scale, cu, cv, cw };
 
-    // Dreiecke von hinten nach vorne sortieren (Maler-Verfahren)
-    const T = mesh.triangleCount, tris = mesh.tris;
-    const order = new Uint32Array(T);
-    const tDepth = new Float64Array(T);
-    for (let t = 0; t < T; t++) {
-      order[t] = t;
-      tDepth[t] = pr.depth[tris[t * 3]] + pr.depth[tris[t * 3 + 1]] + pr.depth[tris[t * 3 + 2]];
-    }
-    order.sort((a, b) => tDepth[a] - tDepth[b]);
-
-    const base = document.createElement("canvas");
-    base.width = W; base.height = H;
-    const ctx = base.getContext("2d")!;
-    ctx.fillStyle = "#121216";
-    ctx.fillRect(0, 0, W, H);
-
-    const X = (i: number) => this.fit.cx + pr.sx[i] * scale;
-    const Y = (i: number) => this.fit.cy - pr.sy[i] * scale;
-    const thin = T > 60000; // bei sehr großen Modellen keine Kantenlinien
-
-    for (let k = 0; k < T; k++) {
-      const t = order[k];
-      const a = tris[t * 3], b = tris[t * 3 + 1], c = tris[t * 3 + 2];
-      // Licht: Normale im Bildschirm-Raum
-      const ux = pr.sx[b] - pr.sx[a], uy = pr.sy[b] - pr.sy[a], uz = pr.depth[b] - pr.depth[a];
-      const vx = pr.sx[c] - pr.sx[a], vy = pr.sy[c] - pr.sy[a], vz = pr.depth[c] - pr.depth[a];
-      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-      const len = Math.hypot(nx, ny, nz) || 1;
-      nx /= len; ny /= len; nz /= len;
-      const light = Math.abs(nx * 0.35 + ny * 0.6 + nz * 0.72);
-      const g = Math.round(60 + 150 * light);
-      ctx.fillStyle = `rgb(${Math.round(g * 0.62)},${Math.round(g * 0.55)},${g})`;
-      ctx.beginPath();
-      ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.lineTo(X(c), Y(c));
-      ctx.closePath();
-      ctx.fill();
-      if (!thin) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); }
-    }
-    this.base = base;
+    this.base = rasterize(mesh, pr, W, H, scale, this.fit.cx, this.fit.cy);
   }
 
   draw(slice: SliceResult | null) {

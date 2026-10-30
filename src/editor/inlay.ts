@@ -7,7 +7,7 @@
  * Rechnung der Bahnen: vcarve.ts, G-Code: cam.ts (Arten "vcarve" und "vplug").
  */
 import { t } from "../i18n/i18n";
-import { isClosedShape, cloneShape, groupBounds, newId, MM_TO_PIXEL } from "../shapeTransform";
+import { isClosedShape, cloneShape, groupBounds, newId, MM_TO_PIXEL, updatePolylineBounds } from "../shapeTransform";
 import { mirrorX } from "../vcarve";
 
 const KEY = "cnc_craft_inlay";
@@ -62,7 +62,7 @@ export function openInlayDialog(state: any, redraw: () => void, log: (s: string)
       const c = cloneShape(s);
       c.id = newId();
       if (c.type === "circle") c.x = 2 * mid - c.x + shift;
-      else c.points = mirrorX(c.points, mid).map((p: any) => ({ ...p, x: p.x + shift }));
+      else { c.points = mirrorX(c.points, mid).map((p: any) => ({ ...p, x: p.x + shift })); updatePolylineBounds(c); }
       c.millingMode = "vplug"; c.vStart = start; c.millingDepth = -(start + v.depth);
       delete c.groupId; delete c.parentChainId; delete c.tabs;
       return c;

@@ -85,6 +85,41 @@ function offsetOnce(polygon: P[], d: number, arcTol: number): P[][] {
   return loops.filter((l, i) => { const c = centre(l); return !loops.some((o, j) => j < i && pointInPoly(c.x, c.y, o)); });
 }
 
+/**
+ * Geschlossene Kontur vereinfachen (Douglas-Peucker): Punkte, die weniger als tol von der Verbindungslinie
+ * ihrer Nachbarn abweichen, fallen weg. Für die Anzeige der Fräserbreite – spart bei sehr vielen Punkten viel Zeit.
+ */
+export function simplifyPolygon(pts: P[], tol: number): P[] {
+  if (pts.length < 8) return pts;
+  // am weitesten vom ersten Punkt entfernten Punkt teilen, beide Hälften vereinfachen
+  let far = 0, farD = -1;
+  for (let i = 1; i < pts.length; i++) {
+    const dd = (pts[i].x - pts[0].x) ** 2 + (pts[i].y - pts[0].y) ** 2;
+    if (dd > farD) { farD = dd; far = i; }
+  }
+  const keep = new Uint8Array(pts.length);
+  keep[0] = 1; keep[far] = 1;
+  const tol2 = tol * tol, n = pts.length;
+  const stack: [number, number][] = [[0, far], [far, n]];
+  while (stack.length) {
+    const [s, e] = stack.pop()!;
+    const a = pts[s], b = pts[e % n];
+    const dx = b.x - a.x, dy = b.y - a.y, l2 = dx * dx + dy * dy;
+    let maxD = 0, idx = -1;
+    for (let i = s + 1; i < e; i++) {
+      const p = pts[i];
+      let t = l2 > 0 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const ex = p.x - a.x - t * dx, ey = p.y - a.y - t * dy;
+      const d2 = ex * ex + ey * ey;
+      if (d2 > maxD) { maxD = d2; idx = i; }
+    }
+    if (idx >= 0 && maxD > tol2) { keep[idx] = 1; stack.push([s, idx], [idx, e]); }
+  }
+  const out = pts.filter((_, i) => keep[i]);
+  return out.length >= 3 ? out : pts;
+}
+
 // ---------------------------------------------------------------------
 
 function cleanPolygon(input: P[]): P[] {

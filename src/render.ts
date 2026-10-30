@@ -8,7 +8,7 @@
  * PLASMA-Modus: Streifen = Schnittspalt in Schnitt-Farbe, Punkt = Einstich, Pfeil = Schneidrichtung
  * Material-Platte: rot schraffiert = schon verbraucht; roter Schein = Form liegt darauf (stock.ts)
  */
-import { arcGeometry } from "./shapeTransform";
+import { arcGeometry, shapeBounds } from "./shapeTransform";
 import { options } from "./editor/editorState";
 import { drawToolBands, drawToolBadges, drawLaserTabs } from "./toolView";
 import { isLaser, isPlasma } from "./machineMode";
@@ -149,7 +149,11 @@ export function drawEverything(
   const selected = new Set(selectedShapeIds);
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
+  // Nur Formen im sichtbaren Bereich zeichnen (beim Hineinzoomen in große Zeichnungen viel schneller).
+  // Bewusst je Form ein eigener Pfad: ein riesiger gemeinsamer Pfad ist im Browser langsamer (gemessen).
+  const view = visibleWorld(canvas, offsetX, offsetY, scale, bedHPx);
   for (const shape of shapes) {
+    if (!inView(shape, view)) continue;
     const isSel = selected.has(shape.id);
     ctx.strokeStyle = isSel ? "#34d17b" : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
     ctx.lineWidth = isSel ? 2.2 : 1.5;
@@ -189,12 +193,41 @@ function drawCrosshair(ctx: CanvasRenderingContext2D, sx: (x: number) => number,
   ctx.stroke();
 }
 
+export interface WorldRect { minX: number; minY: number; maxX: number; maxY: number }
+
+/** Sichtbarer Ausschnitt in Welt-Koordinaten (mit etwas Rand für Linienbreite und Fräserbreite) */
+export function visibleWorld(canvas: HTMLCanvasElement, offsetX: number, offsetY: number, scale: number, bedHPx: number): WorldRect {
+  const m = 40 / scale;
+  return {
+    minX: -offsetX / scale - m, maxX: (canvas.width - offsetX) / scale + m,
+    minY: bedHPx - (canvas.height - offsetY) / scale - m, maxY: bedHPx + offsetY / scale + m
+  };
+}
+
+/** Liegt die Form (ganz oder teilweise) im Ausschnitt? Unbekannte Formen immer zeichnen */
+export function inView(shape: any, r: WorldRect): boolean {
+  const b = shapeBounds(shape);
+  if (!b) return true;
+  // Polylinie ohne gültigen Rahmen (nie berechnet) lieber zeichnen als verlieren
+  if (shape.type === "polyline" && !shape.w && !shape.h && shape.points?.length > 1) return true;
+  return b.maxX >= r.minX && b.minX <= r.maxX && b.maxY >= r.minY && b.minY <= r.maxY;
+}
+
 /** Umriss einer Form als Pfad anlegen (ohne beginPath/stroke) */
 export function tracePath(ctx: CanvasRenderingContext2D, shape: any, sx: (x: number) => number, sy: (y: number) => number, scale: number) {
   if ((shape.type === "polyline" || shape.type === "image") && shape.points?.length > 1) {
     const pts = shape.points;
-    ctx.moveTo(sx(pts[0].x), sy(pts[0].y));
-    for (let i = 1; i < pts.length; i++) ctx.lineTo(sx(pts[i].x), sy(pts[i].y));
+    let lx = sx(pts[0].x), ly = sy(pts[0].y);
+    ctx.moveTo(lx, ly);
+    // Punkte, die auf dem Bildschirm weniger als ein halbes Pixel auseinander liegen, überspringen:
+    // sieht gleich aus, spart bei fein aufgelösten Konturen (STL-Schnitt, Bild nachgezeichnet) sehr viel Zeit
+    const last = pts.length - 1;
+    for (let i = 1; i < last; i++) {
+      const x = sx(pts[i].x), y = sy(pts[i].y);
+      if (Math.abs(x - lx) < 0.5 && Math.abs(y - ly) < 0.5) continue;
+      ctx.lineTo(x, y); lx = x; ly = y;
+    }
+    ctx.lineTo(sx(pts[last].x), sy(pts[last].y));
     if (shape.closed || shape.type === "image") ctx.closePath();
   } else if (shape.type === "line") {
     ctx.moveTo(sx(shape.x), sy(shape.y));
@@ -205,6 +238,8 @@ export function tracePath(ctx: CanvasRenderingContext2D, shape: any, sx: (x: num
   } else if (shape.type === "arc") {
     const g = arcGeometry(shape);
     if (g) {
+      // eigener Startpunkt, damit der Bogen in einem gemeinsamen Pfad nicht mit der vorigen Form verbunden wird
+      ctx.moveTo(sx(g.cx) + g.r * scale * Math.cos(-g.start), sy(g.cy) + g.r * scale * Math.sin(-g.start));
       // Bildschirm-Y ist gespiegelt -> Winkel umdrehen
       ctx.arc(sx(g.cx), sy(g.cy), g.r * scale, -g.start, -(g.start + g.sweep), !g.clockwise);
     }

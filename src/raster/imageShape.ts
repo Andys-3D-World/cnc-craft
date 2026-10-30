@@ -106,13 +106,18 @@ export function gridSize(s: any, img: ImageSettings = s.img): { gw: number; gh: 
 export interface Processed { burn: Float32Array; gw: number; gh: number; step: number; canvas: HTMLCanvasElement | null; tinted?: Map<string, HTMLCanvasElement> }
 const results = new Map<string, { key: string; res: Processed }>();
 
+/** Schlüssel für ein Ergebnis: alle Einstellungen (ohne das Bild selbst) + Rastergröße */
+function resultKey(img: ImageSettings, gw: number, gh: number): string {
+  const { src: _ignore, ...rest } = img;
+  return JSON.stringify([rest, gw, gh, img.src.length, img.src.slice(-40)]);
+}
+
 /** Gerastertes Bild (burn 0…1 je Punkt, Zeile 0 = oben) – null, solange das Quellbild noch lädt */
 export function processed(s: any, img: ImageSettings = s.img, withCanvas = true): Processed | null {
   const src = sourceGray(img);
   if (!src) return null;
   const { gw, gh, step } = gridSize(s, img);
-  const { src: _ignore, ...rest } = img;
-  const key = JSON.stringify([rest, gw, gh, img.src.length, img.src.slice(-40)]);
+  const key = resultKey(img, gw, gh);
   const hit = results.get(s.id);
   if (hit && hit.key === key && (hit.res.canvas || !withCanvas)) return hit.res;
   const base = img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray;
@@ -122,6 +127,80 @@ export function processed(s: any, img: ImageSettings = s.img, withCanvas = true)
   const res: Processed = { burn, gw, gh, step, canvas: withCanvas ? burnCanvas(burn, gw, gh) : null };
   results.set(s.id, { key, res });
   return res;
+}
+
+/**
+ * Für die Zeichenfläche: ändert sich nur die Größe (Skalieren mit der Maus), wird nicht bei jeder Bewegung neu
+ * gerastert (bei großen Fotos 1 s und mehr), sondern das letzte Ergebnis gestreckt gezeigt. Steht die Größe kurz
+ * still, wird einmal neu gerechnet – im Hintergrund-Thread, das gestreckte Bild bleibt solange stehen.
+ * Der G-Code nimmt immer das genaue Ergebnis (processed).
+ */
+const SETTLE_MS = 250;
+const sizeChange = new Map<string, { key: string; t: number }>();
+let settleTimer = 0;
+function displayed(s: any): Processed | null {
+  const hit = results.get(s.id);
+  const img: ImageSettings = s.img;
+  const src = sourceGray(img);
+  if (hit?.res.canvas && src) {
+    const { gw, gh, step } = gridSize(s, img);
+    if (hit.res.gw !== gw || hit.res.gh !== gh) {
+      const { src: _ignore, ...rest } = img;
+      const sameSettings = hit.key.startsWith(JSON.stringify([rest]).slice(0, -1) + ",");
+      if (sameSettings) {
+        const size = `${gw}x${gh}`, now = performance.now();
+        const last = sizeChange.get(s.id);
+        if (!last || last.key !== size) sizeChange.set(s.id, { key: size, t: now });
+        if (!last || last.key !== size || now - last.t < SETTLE_MS) {
+          clearTimeout(settleTimer);
+          settleTimer = window.setTimeout(() => window.dispatchEvent(new Event("cnc-redraw")), SETTLE_MS + 20);
+          return hit.res;
+        }
+        if (rasterAsync(s.id, img, src, gw, gh, step)) return hit.res;
+      }
+    }
+  }
+  sizeChange.delete(s.id);
+  return processed(s);
+}
+
+// ---- Hintergrund-Thread fürs Rastern (siehe rasterWorker.ts) ----
+let rWorker: Worker | null = null, rBroken = false, rSeq = 0;
+const rPending = new Map<string, string>(); // Form-ID -> Schlüssel, der gerade gerechnet wird
+const rJobs = new Map<number, { id: string; key: string; img: ImageSettings; gw: number; gh: number; step: number }>();
+
+/** Rastern im Hintergrund starten. false = geht nicht (dann im Hauptfenster rechnen) */
+function rasterAsync(id: string, img: ImageSettings, src: { gray: Float32Array; w: number; h: number }, gw: number, gh: number, step: number): boolean {
+  if (rBroken) return false;
+  const key = resultKey(img, gw, gh);
+  if (rPending.get(id) === key) return true;   // läuft schon
+  try {
+    if (!rWorker) {
+      rWorker = new Worker(new URL("./rasterWorker.ts", import.meta.url), { type: "module" });
+      rWorker.onmessage = (ev: MessageEvent) => {
+        const job = rJobs.get(ev.data?.seq);
+        if (!job) return;
+        rJobs.delete(ev.data.seq);
+        if (rPending.get(job.id) === job.key) rPending.delete(job.id);
+        if (!ev.data.ok) return;
+        const burn = ev.data.burn as Float32Array;
+        if (job.img.mask?.length) applyMask(burn, job.gw, job.gh, job.img.mask);
+        results.set(job.id, { key: job.key, res: { burn, gw: job.gw, gh: job.gh, step: job.step, canvas: burnCanvas(burn, job.gw, job.gh) } });
+        window.dispatchEvent(new Event("cnc-redraw"));
+      };
+      rWorker.onerror = (ev) => {
+        ev.preventDefault();
+        rBroken = true; rWorker?.terminate(); rWorker = null; rPending.clear(); rJobs.clear();
+        window.dispatchEvent(new Event("cnc-redraw"));
+      };
+    }
+  } catch { rBroken = true; return false; }
+  const base = (img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray).slice();
+  const seq = ++rSeq;
+  rPending.set(id, key);
+  rJobs.set(seq, { id, key, img, gw, gh, step });
+  rWorker.postMessage({ seq, base, sw: src.w, sh: src.h, gw, gh, adjust: img.adjust || NO_ADJUST, raster: img.raster }, [base.buffer]);
+  return true;
 }
 
 /** Hintergrund entfernt – zuletzt benutztes Ergebnis je Bild merken (Regler ziehen rechnet sonst ständig neu) */
@@ -200,7 +279,7 @@ function tintCanvas(r: Processed, c: [number, number, number]): HTMLCanvasElemen
 /** Bild auf der Zeichenfläche (unter den Konturen); tint = Brandfarbe für die Materialansicht */
 export function drawImageShape(ctx: CanvasRenderingContext2D, s: any, sx: (x: number) => number, sy: (y: number) => number, tint?: [number, number, number]) {
   const [p0, p1, , p3] = s.points as Pt[];
-  const r = processed(s);
+  const r = displayed(s);
   const tl = { x: sx(p3.x), y: sy(p3.y) };
   const tr = { x: sx(p3.x + p1.x - p0.x), y: sy(p3.y + p1.y - p0.y) };
   const bl = { x: sx(p0.x), y: sy(p0.y) };

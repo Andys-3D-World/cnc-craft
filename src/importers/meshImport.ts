@@ -14,6 +14,7 @@
  */
 import { StlMesh, meshFromPositions } from "../stlLoader";
 import { t } from "../i18n/i18n";
+import { extractMeshLists, MeshLists } from "./meshScan";
 
 // =====================================================================
 // Deflate entpacken (RFC 1951) – nach dem bewährten „puff“-Verfahren
@@ -207,9 +208,12 @@ function compose(a: M, b: M): M {
 
 interface Obj3 { verts: Float64Array | null; tris: Uint32Array | null; comps: { id: string; path: string | null; m: M }[] }
 
-function parseModelXml(xml: string): { unit: number; objects: Map<string, Obj3>; build: { id: string; path: string | null; m: M }[] } {
-  const doc = new DOMParser().parseFromString(xml, "application/xml");
+function parseModelXml(lists: MeshLists): { unit: number; objects: Map<string, Obj3>; build: { id: string; path: string | null; m: M }[] } {
+  const doc = new DOMParser().parseFromString(lists.xml, "application/xml");
   if (doc.getElementsByTagName("parsererror").length) throw new Error(t("m3d.err3mf"));
+  const vIndex = new Map<Element, number>(), tIndex = new Map<Element, number>();
+  Array.from(doc.getElementsByTagNameNS("*", "vertices")).forEach((e, i) => vIndex.set(e, i));
+  Array.from(doc.getElementsByTagNameNS("*", "triangles")).forEach((e, i) => tIndex.set(e, i));
   const model = doc.getElementsByTagNameNS("*", "model")[0];
   const unit = UNITS[(model?.getAttribute("unit") || "millimeter").toLowerCase()] ?? 1;
   const pathOf = (el: Element) => el.getAttributeNS(NS_PROD, "path") || el.getAttribute("p:path");
@@ -219,21 +223,11 @@ function parseModelXml(xml: string): { unit: number; objects: Map<string, Obj3>;
     const obj: Obj3 = { verts: null, tris: null, comps: [] };
     const mesh = o.getElementsByTagNameNS("*", "mesh")[0];
     if (mesh) {
-      const vs = mesh.getElementsByTagNameNS("*", "vertex");
-      const verts = new Float64Array(vs.length * 3);
-      for (let i = 0; i < vs.length; i++) {
-        verts[i * 3] = +(vs[i].getAttribute("x") || 0);
-        verts[i * 3 + 1] = +(vs[i].getAttribute("y") || 0);
-        verts[i * 3 + 2] = +(vs[i].getAttribute("z") || 0);
-      }
-      const ts = mesh.getElementsByTagNameNS("*", "triangle");
-      const tris = new Uint32Array(ts.length * 3);
-      for (let i = 0; i < ts.length; i++) {
-        tris[i * 3] = +(ts[i].getAttribute("v1") || 0);
-        tris[i * 3 + 1] = +(ts[i].getAttribute("v2") || 0);
-        tris[i * 3 + 2] = +(ts[i].getAttribute("v3") || 0);
-      }
-      obj.verts = verts; obj.tris = tris;
+      // Listen wurden vorab schnell gelesen (gleiche Reihenfolge wie im Dokument)
+      const ve = mesh.getElementsByTagNameNS("*", "vertices")[0], te = mesh.getElementsByTagNameNS("*", "triangles")[0];
+      const vk = ve ? vIndex.get(ve) : undefined, tk = te ? tIndex.get(te) : undefined;
+      obj.verts = vk !== undefined ? lists.verts[vk] ?? new Float64Array(0) : new Float64Array(0);
+      obj.tris = tk !== undefined ? lists.tris[tk] ?? new Uint32Array(0) : new Uint32Array(0);
     }
     for (const c of Array.from(o.getElementsByTagNameNS("*", "component"))) {
       obj.comps.push({ id: c.getAttribute("objectid") || "", path: pathOf(c), m: parseMatrix(c.getAttribute("transform")) });
@@ -250,11 +244,12 @@ export async function parse3mf(bytes: Uint8Array): Promise<StlMesh> {
   const entries = readZipDirectory(bytes);
   const norm = (n: string) => n.replace(/^\/+/, "").toLowerCase();
   const byName = new Map(entries.map(e => [norm(e.name), e]));
-  const text = async (name: string) => {
+  const raw = async (name: string) => {
     const e = byName.get(norm(name));
     if (!e) throw new Error(t("m3d.err3mfPart", { p: name }));
-    return new TextDecoder("utf-8").decode(await readZipEntry(bytes, e));
+    return readZipEntry(bytes, e);
   };
+  const text = async (name: string) => new TextDecoder("utf-8").decode(await raw(name));
   // Hauptmodell über _rels/.rels finden, sonst die erste .model-Datei
   let root = "";
   try {
@@ -266,40 +261,114 @@ export async function parse3mf(bytes: Uint8Array): Promise<StlMesh> {
   if (!root || !byName.has(norm(root))) root = entries.find(e => /\.model$/i.test(e.name))?.name || "";
   if (!root) throw new Error(t("m3d.err3mf"));
 
+  // Alle Modell-Dateien gleichzeitig entpacken und in Hintergrund-Threads lesen (Bambu Studio / PrusaSlicer legen
+  // jedes Objekt in eine eigene Datei – so arbeiten mehrere Prozessorkerne, und das Fenster bleibt bedienbar)
   const files = new Map<string, ReturnType<typeof parseModelXml>>();
+  const pool = new ScanPool();
+  try {
+    const models = entries.filter(e => /\.model$/i.test(e.name));
+    await Promise.all(models.map(async e => {
+      const lists = await pool.scan(() => readZipEntry(bytes, e));
+      files.set(norm(e.name), parseModelXml(lists));
+    }));
+  } finally { pool.close(); }
   const load = async (path: string) => {
     const k = norm(path);
-    if (!files.has(k)) files.set(k, parseModelXml(await text(path)));
+    if (!files.has(k)) files.set(k, parseModelXml(extractMeshLists(await raw(path))));
     return files.get(k)!;
   };
   const main = await load(root);
   const scale = main.unit;
 
-  const out: number[] = [];
+  // Erst alle Teile mit ihrer Lage sammeln, dann das Ergebnis in passender Größe anlegen und füllen
+  const parts: { v: Float64Array; tr: Uint32Array; m: M }[] = [];
   let guard = 0;
-  const emit = async (path: string, id: string, m: M, depth: number) => {
+  const collect = async (path: string, id: string, m: M, depth: number) => {
     if (depth > 32 || ++guard > 200000) return;
     const file = await load(path);
     const o = file.objects.get(id);
     if (!o) return;
-    if (o.verts && o.tris) {
-      const v = o.verts, tr = o.tris;
-      for (let i = 0; i < tr.length; i++) {
-        const k = tr[i] * 3;
-        if (k + 2 >= v.length) continue;
+    if (o.verts && o.tris && o.tris.length) parts.push({ v: o.verts, tr: o.tris, m });
+    for (const c of o.comps) await collect(c.path || path, c.id, compose(c.m, m), depth + 1);
+  };
+  if (main.build.length) for (const it of main.build) await collect(it.path || root, it.id, it.m, 0);
+  else for (const [id, o] of main.objects) if (o.verts) await collect(root, id, IDENT, 0);
+
+  let total = 0;
+  for (const p of parts) total += Math.floor(p.tr.length / 3) * 9;
+  const out = new Float32Array(total);
+  let on = 0;
+  for (const { v, tr, m } of parts) {
+    for (let i = 0; i + 2 < tr.length; i += 3) {
+      // Dreieck mit ungültiger Eckpunkt-Nummer ganz weglassen (sonst verrutscht alles)
+      const ka = tr[i] * 3, kb = tr[i + 1] * 3, kc = tr[i + 2] * 3;
+      if (ka + 2 >= v.length || kb + 2 >= v.length || kc + 2 >= v.length) continue;
+      for (let c = 0; c < 3; c++) {
+        const k = c === 0 ? ka : c === 1 ? kb : kc;
         const x = v[k], y = v[k + 1], z = v[k + 2];
-        out.push((x * m[0] + y * m[3] + z * m[6] + m[9]) * scale,
-                 (x * m[1] + y * m[4] + z * m[7] + m[10]) * scale,
-                 (x * m[2] + y * m[5] + z * m[8] + m[11]) * scale);
+        out[on++] = (x * m[0] + y * m[3] + z * m[6] + m[9]) * scale;
+        out[on++] = (x * m[1] + y * m[4] + z * m[7] + m[10]) * scale;
+        out[on++] = (x * m[2] + y * m[5] + z * m[8] + m[11]) * scale;
       }
     }
-    for (const c of o.comps) await emit(c.path || path, c.id, compose(c.m, m), depth + 1);
-  };
-  if (main.build.length) for (const it of main.build) await emit(it.path || root, it.id, it.m, 0);
-  else for (const [id, o] of main.objects) if (o.verts) await emit(root, id, IDENT, 0);
-  const usable = out.length - (out.length % 9);
-  if (!usable) throw new Error(t("stl.errNoTriangles"));
-  return meshFromPositions(new Float32Array(out.slice(0, usable)), "3mf");
+  }
+  if (!on) throw new Error(t("stl.errNoTriangles"));
+  return meshFromPositions(on === out.length ? out : out.slice(0, on), "3mf");
+}
+
+/**
+ * Hintergrund-Threads für den Schnell-Leser. Geht kein Worker (alte WebView), wird im Hauptfenster gelesen.
+ * Höchstens so viele Dateien gleichzeitig entpackt wie Threads da sind (spart Speicher bei 1-GB-Dateien).
+ */
+class ScanPool {
+  private free: Worker[] = [];
+  private all: Worker[] = [];
+  private waiting: (() => void)[] = [];
+  private size = Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1));
+  private broken = false;
+
+  private async take(): Promise<Worker | null> {
+    if (this.broken) return null;
+    if (this.free.length) return this.free.pop()!;
+    if (this.all.length < this.size) {
+      try {
+        const w = new Worker(new URL("./meshScanWorker.ts", import.meta.url), { type: "module" });
+        this.all.push(w);
+        return w;
+      } catch { this.broken = true; return null; }
+    }
+    await new Promise<void>(r => this.waiting.push(r));
+    return this.take();
+  }
+
+  private give(w: Worker) {
+    this.free.push(w);
+    this.waiting.shift()?.();
+  }
+
+  async scan(getBytes: () => Promise<Uint8Array>): Promise<MeshLists> {
+    const w = await this.take();
+    const bytes = await getBytes();
+    if (!w) return extractMeshLists(bytes);
+    try {
+      return await new Promise<MeshLists>((resolve, reject) => {
+        w.onmessage = (ev: MessageEvent) => ev.data?.ok ? resolve(ev.data.lists) : reject(new Error(String(ev.data?.error)));
+        w.onerror = (ev) => { ev.preventDefault(); reject(new Error(ev.message || "worker")); };
+        // eigene Kopie, falls die Bytes nur ein Ausschnitt der ZIP-Datei sind (ungepackt gespeichert)
+        const buf = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes : bytes.slice();
+        w.postMessage(buf, [buf.buffer]);
+      });
+    } catch {
+      // Worker ging nicht (z. B. nicht ladbar) -> ab jetzt im Hauptfenster
+      this.broken = true;
+      return extractMeshLists(await getBytes());
+    } finally {
+      w.onmessage = null; w.onerror = null;
+      this.give(w);
+    }
+  }
+
+  close() { for (const w of this.all) w.terminate(); this.all = []; this.free = []; }
 }
 
 // =====================================================================

@@ -147,27 +147,32 @@ export function removeBackground(g: Float32Array, w: number, h: number, tol: num
 // Verbessern
 // ---------------------------------------------------------------------
 
-/** Weichzeichnen (3 × Kastenfilter ≈ Gauß), Radius in Bildpunkten */
+/**
+ * Weichzeichnen (3 × Kastenfilter ≈ Gauß), Radius in Bildpunkten.
+ * Senkrecht wird zeilenweise mit einer laufenden Summe je Spalte gerechnet (gleiche Rechenschritte wie spaltenweise,
+ * also gleiches Ergebnis – aber viel schneller, weil der Speicher der Reihe nach gelesen wird).
+ */
 function blur(g: Float32Array, w: number, h: number, r: number): Float32Array {
   if (r < 1) return g.slice();
   let a = g.slice(), b = new Float32Array(g.length);
+  const col = new Float64Array(w);
   for (let pass = 0; pass < 3; pass++) {
     for (let y = 0; y < h; y++) {
+      const row = y * w;
       let s = 0, n = 0;
-      for (let x = -r; x < w + r; x++) {
-        if (x + r < w) { s += a[y * w + x + r]; n++; }
-        if (x - r - 1 >= 0) { s -= a[y * w + x - r - 1]; n--; }
-        if (x >= 0 && x < w) b[y * w + x] = s / Math.max(1, n);
+      for (let x = -r; x < w; x++) {
+        if (x + r < w) { s += a[row + x + r]; n++; }
+        if (x - r - 1 >= 0) { s -= a[row + x - r - 1]; n--; }
+        if (x >= 0) b[row + x] = s / Math.max(1, n);
       }
     }
     [a, b] = [b, a];
-    for (let x = 0; x < w; x++) {
-      let s = 0, n = 0;
-      for (let y = -r; y < h + r; y++) {
-        if (y + r < h) { s += a[(y + r) * w + x]; n++; }
-        if (y - r - 1 >= 0) { s -= a[(y - r - 1) * w + x]; n--; }
-        if (y >= 0 && y < h) b[y * w + x] = s / Math.max(1, n);
-      }
+    col.fill(0);
+    let n = 0;
+    for (let y = -r; y < h; y++) {
+      if (y + r < h) { const o = (y + r) * w; for (let x = 0; x < w; x++) col[x] += a[o + x]; n++; }
+      if (y - r - 1 >= 0) { const o = (y - r - 1) * w; for (let x = 0; x < w; x++) col[x] -= a[o + x]; n--; }
+      if (y >= 0) { const o = y * w, d = Math.max(1, n); for (let x = 0; x < w; x++) b[o + x] = col[x] / d; }
     }
     [a, b] = [b, a];
   }
