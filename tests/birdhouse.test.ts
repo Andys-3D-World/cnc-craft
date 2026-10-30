@@ -1,7 +1,7 @@
 // Tests für den Vogelhaus-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { birdhousePanels, birdDims, birdProblem, holeSpot, worldPt, birdhouseSize, HOLE_SIZES, type BirdhouseOptions, type BirdPanel } from "../src/birdhouse.ts";
+import { birdhousePanels, birdDims, birdProblem, holeSpot, holeFloor, worldPt, birdhouseSize, HOLE_SIZES, HANGERS, ENTRANCES, BASES, type BirdhouseOptions, type BirdPanel } from "../src/birdhouse.ts";
 import type { V3 } from "../src/box.ts";
 
 type Pt = { x: number; y: number };
@@ -151,4 +151,99 @@ test("Kerf macht Platten größer und Löcher kleiner", () => {
   assert.ok(area(fb.holes![0]) < area(fa.holes![0]));
   const sz = birdhouseSize(base);
   assert.ok(sz.W > birdDims(base).W + 2 * base.overhang - 1e-9 && sz.H > birdDims(base).Zr);
+});
+
+// ───────── Anhänger (Mini-Vogelhaus) ─────────
+const orn: BirdhouseOptions = { w: 40, d: 34, h: 32, t: 3, finger: 8, kerf: 0, pitch: 45, overhang: 4, hole: 14, perch: true,
+  drain: false, vent: false, hang: false, door: false, kind: "ornament", hanger: "ring", entrance: "circle", frame: true, base: "rect", baseMargin: 5 };
+const wallsOf = (ps: BirdPanel[]) => ps.filter(p => ["front", "back", "left", "right"].includes(p.name));
+
+for (const hanger of HANGERS) for (const entrance of ENTRANCES) for (const base of BASES) {
+  test(`Anhänger: Umrisse geschlossen (${hanger}, ${entrance}, ${base})`, () => {
+    for (const kerf of [0, 0.1]) {
+      const o = { ...orn, hanger, entrance, base, kerf };
+      assert.equal(birdProblem(o), "");
+      const ps = birdhousePanels(o);
+      for (const p of ps) {
+        assert.ok(p.pts.length >= 3 && p.pts.every(q => Number.isFinite(q.x) && Number.isFinite(q.y)), `${p.name}: Umriss`);
+        assert.ok(!selfIntersects(p.pts), `${p.name}: Umriss überschneidet sich`);
+        for (const h of p.holes || []) {
+          assert.ok(!selfIntersects(h), `${p.name}: Loch überschneidet sich`);
+          assert.ok(h.every(q => inside(q, p.pts)), `${p.name}: Loch liegt nicht in der Platte`);
+        }
+      }
+      assert.equal(ps.some(p => p.name === "hanger"), hanger !== "none");
+      assert.equal(ps.some(p => p.name === "base"), base !== "none");
+      assert.equal(ps.some(p => p.name === "frame"), entrance !== "none");
+    }
+  });
+}
+
+test("Anhänger: jeder Zapfen der Wände hat einen Schlitz in der Grundplatte", () => {
+  for (const base of ["rect", "round", "oval", "wave"] as const) {
+    const o = { ...orn, base }, ps = birdhousePanels(o), b = get(ps, "base"), { t } = birdDims(o);
+    // Zapfen = Kanten der Wand-Umrisse, die ganz unten (y = 0) liegen
+    let tabs = 0;
+    for (const p of wallsOf(ps)) p.pts.forEach((q, i) => { const n = p.pts[(i + 1) % p.pts.length]; if (q.y < 1e-9 && n.y < 1e-9) tabs++; });
+    assert.equal(b.holes!.length, tabs, base);
+    // Mitte jedes Schlitzes liegt in einer Wand (Welt → Wand-Koordinaten)
+    for (const sl of b.holes!) {
+      const cx = sl.reduce((s, q) => s + q.x, 0) / 4, cy = sl.reduce((s, q) => s + q.y, 0) / 4;
+      const w = worldPt(b.at!, cx, cy, t / 2);
+      const hit = wallsOf(ps).some(p => {
+        const at = p.at!, d = sub(w, at.o), lx = dot(d, at.u), ly = dot(d, at.v), ln = dot(d, at.n);
+        return ln > 0 && ln < t && inside({ x: lx, y: ly }, p.pts);
+      });
+      assert.ok(hit, `Schlitz ohne Zapfen (${base})`);
+    }
+  }
+});
+
+test("Anhänger: Dachhälften lehnen an der Firstplatte, Öse über dem Dach", () => {
+  for (const pitch of [30, 45, 60]) for (const hanger of ["ring", "arch", "point"] as const) {
+    const o = { ...orn, pitch, hanger }, ps = birdhousePanels(o), { t, W, D, Hs, a } = birdDims(o);
+    const L = get(ps, "roofL"), R = get(ps, "roofR"), hg = get(ps, "hanger");
+    const plane = (p: BirdPanel, q: V3) => dot(sub(q, worldPt(p.at!, 0, 0, 0)), p.at!.n);
+    for (const y of [0, D]) {
+      assert.ok(Math.abs(plane(L, [0, y, Hs])) < 1e-9 && Math.abs(plane(R, [W, y, Hs])) < 1e-9, "auf den Seitenwänden");
+    }
+    assert.ok(Math.abs(L.w - R.w) < 1e-9, "gleich lang");
+    // obere Innenkanten genau an den Seiten der Firstplatte, keine Ecke ragt hinein
+    for (const s of [0, t]) {
+      assert.ok(worldPt(L.at!, L.w, 0, s)[0] <= W / 2 - t / 2 + 1e-9, "links nicht in der Firstplatte");
+      assert.ok(worldPt(R.at!, 0, 0, s)[0] >= W / 2 + t / 2 - 1e-9, "rechts nicht in der Firstplatte");
+    }
+    assert.ok(Math.abs(worldPt(L.at!, L.w, 0, 0)[0] - (W / 2 - t / 2)) < 1e-9);
+    // Firstplatte steckt genau so tief, wie der Schlitz im Giebel ist
+    const fr = get(ps, "front"), z0 = t;
+    const slotBottom = Math.min(...fr.pts.filter(q => Math.abs(Math.abs(q.x - W / 2) - t / 2) < 1e-9).map(q => q.y)) - z0;
+    const plateBottom = Math.min(...hg.pts.map(q => worldPt(hg.at!, q.x, q.y, 0)[2]));
+    assert.ok(Math.abs(slotBottom - plateBottom) < 1e-9, `Schlitz ${slotBottom} / Platte ${plateBottom}`);
+    // Aufhänge-Loch liegt über dem höchsten Punkt des Daches
+    const roofTop = Math.max(...[L, R].flatMap(p => p.pts.flatMap(q => [0, t].map(s => worldPt(p.at!, q.x, q.y, s)[2]))));
+    const holeLow = Math.min(...hg.holes![0].map(q => worldPt(hg.at!, q.x, q.y, 0)[2]));
+    assert.ok(holeLow > roofTop, `Öse (${hanger}, ${pitch}°) frei über dem Dach`);
+    assert.ok(Math.abs(a - (pitch * Math.PI) / 180) < 1e-9);
+  }
+});
+
+test("Anhänger: Zierrahmen passt um das Einflugloch und liegt auf der Front", () => {
+  for (const entrance of ["circle", "arch", "heart", "square"] as const) {
+    const o = { ...orn, entrance }, ps = birdhousePanels(o), fr = get(ps, "front"), fm = get(ps, "frame"), { t } = birdDims(o);
+    const toFront = (q: Pt) => { const w = worldPt(fm.at!, q.x, q.y, 0); return { x: w[0], y: w[2] + t }; };
+    const inner = fm.holes![0].map(toFront), hole = fr.holes![0];
+    const box = (p: Pt[]) => [Math.min(...p.map(q => q.x)), Math.min(...p.map(q => q.y)), Math.max(...p.map(q => q.x)), Math.max(...p.map(q => q.y))];
+    box(inner).forEach((v, i) => assert.ok(Math.abs(v - box(hole)[i]) < 1e-6, `${entrance}: Rahmen-Loch = Einflugloch`));
+    assert.ok(fm.pts.map(toFront).every(q => inside(q, fr.pts)), `${entrance}: Rahmen auf der Front`);
+    assert.ok(area(fm.pts) > area(fm.holes![0]));
+    assert.ok(holeFloor(o) > 0);
+  }
+});
+
+test("Anhänger: zu klein wird erkannt, Größe stimmt", () => {
+  assert.equal(birdProblem({ ...orn, w: 10 }), "small");
+  assert.equal(birdProblem({ ...orn, hole: 40 }), "holeWide");
+  assert.equal(birdProblem({ ...orn, h: 16, hole: 14, entrance: "arch" }), "holeLow");
+  const sz = birdhouseSize(orn);
+  assert.ok(sz.W > 40 && sz.W < 80 && sz.H > 40 && sz.H < 100, JSON.stringify(sz));
 });

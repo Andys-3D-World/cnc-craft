@@ -1,63 +1,90 @@
 /**
- * VOGELHAUS-GENERATOR – Fenster (wie der Box-Generator): Maße eingeben, Vorschau (Platten oder 3D), Platten aufs Bett.
- * Die Geometrie entsteht in birdhouse.ts.
+ * VOGELHAUS-GENERATOR – Fenster (wie der Box-Generator): Art wählen (Nistkasten oder Anhänger), Maße eingeben,
+ * Vorschau (Platten oder 3D), Platten aufs Bett. Die Geometrie entsteht in birdhouse.ts.
+ * Jede Art merkt sich ihre eigenen Werte – beim Umschalten kommen die zuletzt benutzten wieder.
  */
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { birdhousePanels, birdProblem, birdhouseSize, holeSpot, HOLE_SIZES, type BirdhouseOptions } from "../birdhouse";
+import { birdhousePanels, birdProblem, birdhouseSize, holeFloor, HOLE_SIZES, HANGERS, ENTRANCES, BASES, type BirdhouseOptions, type BirdKind } from "../birdhouse";
 import { Box3DView } from "./box3d";
 import { layout } from "./boxGen";
 
 const KEY = "cnc_craft_birdhouse";
 const VIEW_KEY = "cnc_craft_box_view"; // dieselbe Wahl wie beim Box-Generator: "2d" oder "3d"
-const DEF: BirdhouseOptions = { w: 120, d: 120, h: 180, t: 6, finger: 15, kerf: 0.1, pitch: 40, overhang: 20, hole: 32,
-  perch: false, drain: true, vent: true, hang: true, door: false };
-const NUMS = ["w", "d", "h", "t", "finger", "kerf", "pitch", "overhang", "hole"] as const;
-const FLAGS = ["perch", "drain", "vent", "hang", "door"] as const;
+const KINDS: BirdKind[] = ["nest", "ornament"];
+const DEF: Record<BirdKind, BirdhouseOptions> = {
+  nest: { w: 120, d: 120, h: 180, t: 6, finger: 15, kerf: 0.1, pitch: 40, overhang: 20, hole: 32,
+    perch: false, drain: true, vent: true, hang: true, door: false, kind: "nest" },
+  ornament: { w: 40, d: 34, h: 32, t: 3, finger: 8, kerf: 0.1, pitch: 45, overhang: 4, hole: 14, perch: true,
+    drain: false, vent: false, hang: false, door: false, kind: "ornament", hanger: "ring", entrance: "circle", frame: true, base: "rect", baseMargin: 5 }
+};
+const NUMS = ["w", "d", "h", "t", "finger", "kerf", "pitch", "overhang", "hole", "baseMargin"] as const;
+const FLAGS = ["perch", "drain", "vent", "hang", "door", "frame"] as const;
 
-function load(): BirdhouseOptions {
+type Store = { kind: BirdKind } & Record<BirdKind, BirdhouseOptions>;
+function clean(s: any, kind: BirdKind): BirdhouseOptions {
+  const o: BirdhouseOptions = { ...DEF[kind] };
+  if (!s || typeof s !== "object") return o;
+  for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
+  for (const k of FLAGS) if (typeof s[k] === "boolean") o[k] = s[k];
+  if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
+  if (ENTRANCES.includes(s.entrance)) o.entrance = s.entrance;
+  if (BASES.includes(s.base)) o.base = s.base;
+  if (kind === "nest" && !HOLE_SIZES.includes(o.hole)) o.hole = DEF.nest.hole;
+  o.kind = kind;
+  return o;
+}
+function load(): Store {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "{}");
-    const o: BirdhouseOptions = { ...DEF };
-    for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
-    for (const k of FLAGS) if (typeof s[k] === "boolean") o[k] = s[k];
-    if (!HOLE_SIZES.includes(o.hole)) o.hole = DEF.hole;
-    return o;
-  } catch { return { ...DEF }; }
+    // ältere Version: ein einzelner Nistkasten ohne „kind“
+    if (!s.nest && !s.ornament) return { kind: "nest", nest: clean(s, "nest"), ornament: clean(null, "ornament") };
+    return { kind: KINDS.includes(s.kind) ? s.kind : "nest", nest: clean(s.nest, "nest"), ornament: clean(s.ornament, "ornament") };
+  } catch { return { kind: "nest", nest: clean(null, "nest"), ornament: clean(null, "ornament") }; }
 }
 
 export function openBirdhouseDialog(log: (s: string) => void, done: () => void) {
-  const o = load();
+  const store = load();
   document.getElementById("bird-dialog-overlay")?.remove();
   const ov = document.createElement("div");
   ov.id = "bird-dialog-overlay";
   ov.className = "dlg-overlay";
-  const num = (id: string, key: string, v: number, step = "1", min = "0") =>
-    `<label class="prop-row">${t(key)}<input id="${id}" type="number" step="${step}" min="${min}" value="${v}" class="prop-input"></label>`;
-  const chk = (id: string, key: string, on: boolean) =>
-    `<label class="prop-row" style="cursor:pointer;"><span>${t(key)}</span><input id="${id}" type="checkbox" ${on ? "checked" : ""} style="width:auto;"></label>`;
+  const num = (id: string, key: string, step = "1", min = "0") =>
+    `<label class="prop-row">${t(key)}<input id="${id}" type="number" step="${step}" min="${min}" class="prop-input"></label>`;
+  const chk = (id: string, key: string) =>
+    `<label class="prop-row" style="cursor:pointer;"><span>${t(key)}</span><input id="${id}" type="checkbox" style="width:auto;"></label>`;
+  const sel = (id: string, key: string, list: (string | number)[], prefix: string) =>
+    `<label class="prop-row">${t(key)}<select id="${id}" class="prop-input" style="width:auto;max-width:125px;">${list.map(k => `<option value="${k}">${t(prefix + k)}</option>`).join("")}</select></label>`;
+  // data-for: Feld nur bei dieser Art zeigen
   ov.innerHTML = `
-    <div class="dlg-box" role="dialog" style="width:580px;">
+    <div class="dlg-box" role="dialog" style="width:600px;">
       <h3>🐦 ${t("bh.title")}</h3>
       <div class="dlg-hint">${t("bh.desc")}</div>
+      ${sel("bh-kind", "bh.kind", KINDS, "bh.kind.")}
+      <div id="bh-kdesc" class="dlg-hint"></div>
       <div class="box-grid">
         <div class="box-fields">
-          ${num("bh-w", "bh.w", o.w)}
-          ${num("bh-d", "bh.d", o.d)}
-          ${num("bh-h", "bh.h", o.h)}
-          ${num("bh-pitch", "bh.pitch", o.pitch, "1", "20")}
-          ${num("bh-ov", "bh.overhang", o.overhang)}
-          <label class="prop-row">${t("bh.hole")}
-            <select id="bh-hole" class="prop-input" style="width:auto;max-width:125px;">${HOLE_SIZES.map(d => `<option value="${d}">${t("bh.hole." + d)}</option>`).join("")}</select></label>
-          ${num("bh-t", "box.t", o.t, "0.1", "0.5")}
-          ${num("bh-f", "box.finger", o.finger, "0.5", "1")}
-          ${num("bh-kerf", "box.kerf", o.kerf, "0.01", "0")}
-          ${chk("bh-door", "bh.door", o.door)}
-          ${chk("bh-perch", "bh.perch", o.perch)}
-          ${chk("bh-drain", "bh.drain", o.drain)}
-          ${chk("bh-vent", "bh.vent", o.vent)}
-          ${chk("bh-hang", "bh.hang", o.hang)}
+          ${num("bh-w", "bh.w")}
+          ${num("bh-d", "bh.d")}
+          ${num("bh-h", "bh.h")}
+          ${num("bh-pitch", "bh.pitch", "1", "20")}
+          ${num("bh-ov", "bh.overhang")}
+          <div class="box-x" data-for="nest">${sel("bh-hole", "bh.hole", HOLE_SIZES, "bh.hole.")}</div>
+          <div class="box-x" data-for="ornament">
+            ${sel("bh-ent", "bh.entrance", ENTRANCES, "bh.entrance.")}
+            ${num("bh-holeD", "bh.holeD", "0.5", "3")}
+            ${sel("bh-hanger", "bh.hanger", HANGERS, "bh.hanger.")}
+            ${sel("bh-base", "bh.base", BASES, "bh.base.")}
+            ${num("bh-bm", "bh.baseMargin", "0.5", "0")}
+          </div>
+          ${num("bh-t", "box.t", "0.1", "0.5")}
+          ${num("bh-f", "box.finger", "0.5", "1")}
+          ${num("bh-kerf", "box.kerf", "0.01", "0")}
+          <div class="box-x" data-for="nest">${chk("bh-door", "bh.door")}</div>
+          <div class="box-x" data-for="ornament">${chk("bh-frame", "bh.frame")}</div>
+          ${chk("bh-perch", "bh.perch")}
+          <div class="box-x" data-for="nest">${chk("bh-drain", "bh.drain")}${chk("bh-vent", "bh.vent")}${chk("bh-hang", "bh.hang")}</div>
         </div>
         <div class="box-prev">
           <div class="box-view">
@@ -79,26 +106,43 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
     </div>`;
   document.body.appendChild(ov);
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => ov.querySelector("#" + id) as E;
-  $<HTMLSelectElement>("bh-hole").value = String(o.hole);
   const view3d = new Box3DView($<HTMLCanvasElement>("bh-3d"));
   let mode: "2d" | "3d" = "2d";
   try { if (localStorage.getItem(VIEW_KEY) === "3d") mode = "3d"; } catch { /* egal */ }
+  let kind: BirdKind = store.kind;
 
+  /** Werte einer Art in die Felder schreiben */
+  const fill = (o: BirdhouseOptions) => {
+    const set = (id: string, v: number | string) => { $(id).value = String(v); };
+    set("bh-w", o.w); set("bh-d", o.d); set("bh-h", o.h); set("bh-pitch", o.pitch); set("bh-ov", o.overhang);
+    set("bh-t", o.t); set("bh-f", o.finger); set("bh-kerf", o.kerf);
+    if (kind === "nest") set("bh-hole", o.hole); else set("bh-holeD", o.hole);
+    set("bh-ent", o.entrance || "circle"); set("bh-hanger", o.hanger || "ring"); set("bh-base", o.base || "rect"); set("bh-bm", o.baseMargin ?? 5);
+    for (const [id, k] of [["bh-door", "door"], ["bh-frame", "frame"], ["bh-perch", "perch"], ["bh-drain", "drain"], ["bh-vent", "vent"], ["bh-hang", "hang"]] as const)
+      $(id).checked = !!o[k];
+  };
   const read = (): BirdhouseOptions => {
-    const n = (id: string, d: number, min = 0, max = 5000) => { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? Math.min(max, Math.max(min, v)) : d; };
-    return { w: n("bh-w", o.w), d: n("bh-d", o.d), h: n("bh-h", o.h), t: n("bh-t", o.t, 0.5, 50), finger: n("bh-f", o.finger, 1),
-      kerf: n("bh-kerf", o.kerf, 0, 2), pitch: n("bh-pitch", o.pitch, 20, 60), overhang: n("bh-ov", o.overhang, 0, 200),
-      hole: Number($<HTMLSelectElement>("bh-hole").value) || o.hole,
-      perch: $("bh-perch").checked, drain: $("bh-drain").checked, vent: $("bh-vent").checked, hang: $("bh-hang").checked, door: $("bh-door").checked };
+    const d = store[kind];
+    const n = (id: string, def: number, min = 0, max = 5000) => { const v = parseFloat($(id).value); return Number.isFinite(v) && v >= 0 ? Math.min(max, Math.max(min, v)) : def; };
+    const orn = kind === "ornament";
+    return { kind, w: n("bh-w", d.w), d: n("bh-d", d.d), h: n("bh-h", d.h), t: n("bh-t", d.t, 0.5, 50), finger: n("bh-f", d.finger, 1),
+      kerf: n("bh-kerf", d.kerf, 0, 2), pitch: n("bh-pitch", d.pitch, 20, 60), overhang: n("bh-ov", d.overhang, 0, 200),
+      hole: orn ? n("bh-holeD", d.hole, 3, 500) : Number($<HTMLSelectElement>("bh-hole").value) || d.hole,
+      perch: $("bh-perch").checked, drain: !orn && $("bh-drain").checked, vent: !orn && $("bh-vent").checked,
+      hang: !orn && $("bh-hang").checked, door: !orn && $("bh-door").checked,
+      entrance: $<HTMLSelectElement>("bh-ent").value as BirdhouseOptions["entrance"], hanger: $<HTMLSelectElement>("bh-hanger").value as BirdhouseOptions["hanger"],
+      base: $<HTMLSelectElement>("bh-base").value as BirdhouseOptions["base"], frame: $("bh-frame").checked, baseMargin: n("bh-bm", d.baseMargin ?? 5, 0, 100) };
   };
   const preview = () => {
     const b = read();
+    ov.querySelectorAll<HTMLElement>(".box-x").forEach(el => { el.style.display = (el.dataset.for || "").split(" ").includes(kind) ? "" : "none"; });
+    $<HTMLElement>("bh-kdesc").textContent = t("bh.kdesc." + kind);
     const svg = $<HTMLElement>("bh-svg") as unknown as SVGSVGElement;
     const info = $<HTMLElement>("bh-info");
     ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.classList.toggle("active", el.dataset.view === mode));
     svg.style.display = mode === "2d" ? "" : "none";
     ov.querySelectorAll<HTMLElement>(".box-3d, .box-3d-only").forEach(el => { el.style.display = mode === "3d" ? "" : "none"; });
-    $<HTMLElement>("bh-hint").textContent = t(b.door ? "bh.hintDoor" : "bh.hint");
+    $<HTMLElement>("bh-hint").textContent = t(kind === "ornament" ? "bh.hintOrn" : b.door ? "bh.hintDoor" : "bh.hint");
     const problem = birdProblem(b);
     if (problem) {
       svg.innerHTML = ""; view3d.setPanels([], b.t, 0);
@@ -108,19 +152,30 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
     $<HTMLButtonElement>("bh-ok").disabled = false;
     const ps = birdhousePanels(b);
     if (mode === "3d") view3d.setPanels(birdhousePanels({ ...b, kerf: 0 }), b.t, parseFloat($("bh-explode").value) || 0);
-    const pos = layout(ps, 4, Math.max(b.w, b.d) * 5);
+    const pos = layout(ps, kind === "ornament" ? 2 : 4, Math.max(b.w, b.d) * 5);
     let W = 0, H = 0;
     ps.forEach((p, i) => { W = Math.max(W, pos[i].x + p.w); H = Math.max(H, pos[i].y + p.h); });
     svg.setAttribute("viewBox", `-2 -2 ${W + 4} ${H + 4}`);
     svg.innerHTML = ps.map((p, i) => {
       const ring = (pts: { x: number; y: number }[]) => pts.map((q, k) => `${k ? "L" : "M"}${(pos[i].x + q.x).toFixed(2)},${(pos[i].y + p.h - q.y).toFixed(2)}`).join("") + "Z";
       const d = ring(p.pts) + (p.holes || []).map(ring).join("");
-      return `<path d="${d}" fill-rule="evenodd" class="box-panel"/><text x="${pos[i].x + p.w / 2}" y="${pos[i].y + p.h / 2}" class="box-lbl" style="font-size:${Math.max(4, Math.min(p.w, p.h) / 7)}px">${t("bh.p." + p.name)}</text>`;
+      // kleine Teile (Rahmen, Firstplatte) ohne Beschriftung – die würde die Form verdecken
+      const lbl = Math.min(p.w, p.h) > 12 ? `<text x="${pos[i].x + p.w / 2}" y="${pos[i].y + p.h / 2}" class="box-lbl" style="font-size:${Math.max(2.5, Math.min(p.w, p.h) / 7)}px">${t("bh.p." + p.name)}</text>` : "";
+      return `<path d="${d}" fill-rule="evenodd" class="box-panel"/>${lbl}`;
     }).join("");
     const sz = birdhouseSize(b);
-    info.textContent = t("bh.info", { n: ps.length, w: sz.W.toFixed(0), d: sz.D.toFixed(0), h: sz.H.toFixed(0) }) + " · " +
-      t("bh.holeInfo", { d: b.hole, h: Math.round(holeSpot(b).floor) });
+    info.textContent = t("bh.info", { n: ps.length, w: sz.W.toFixed(0), d: sz.D.toFixed(0), h: sz.H.toFixed(0) }) +
+      (kind === "ornament" && b.entrance === "none" ? "" : " · " + t("bh.holeInfo", { d: b.hole, h: Math.round(holeFloor(b)) }));
   };
+  fill(store[kind]);
+  $<HTMLSelectElement>("bh-kind").value = kind;
+  $<HTMLSelectElement>("bh-kind").addEventListener("change", () => {
+    // Werte der alten Art merken, die der neuen Art einsetzen
+    store[kind] = read();
+    kind = KINDS.includes($<HTMLSelectElement>("bh-kind").value as BirdKind) ? $<HTMLSelectElement>("bh-kind").value as BirdKind : "nest";
+    fill(store[kind]);
+    preview();
+  });
   ov.querySelectorAll("input, select").forEach(i => i.addEventListener("input", preview));
   ov.querySelectorAll<HTMLElement>("[data-view]").forEach(el => el.addEventListener("click", () => {
     mode = el.dataset.view === "3d" ? "3d" : "2d";
@@ -136,7 +191,8 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
   $<HTMLElement>("bh-ok").onclick = () => {
     const b = read();
     if (birdProblem(b)) return;
-    try { localStorage.setItem(KEY, JSON.stringify(b)); } catch { /* egal */ }
+    store[kind] = b; store.kind = kind;
+    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* egal */ }
     close();
     const ps = birdhousePanels(b);
     const bed = bedSizeMm();

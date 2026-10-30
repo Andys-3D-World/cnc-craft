@@ -19,6 +19,14 @@
   a rotatable 3D view, finished size in mm, then the panels are placed on the bed (each panel with its holes as a
   group). Tests check closed outlines, matching finger joints, that the roof halves lie on the gables and side
   walls without overlapping, and that the entry hole sits inside the front.
+- **Ornament (mini birdhouse) in the *Birdhouse generator*:** a second kind next to the nest box – a small hanging
+  birdhouse for the Christmas tree or the window (about 25–120 mm). The walls plug into a base plate with tabs (base
+  rectangular, rounded, oval or with a wavy edge, adjustable margin – or a finger-jointed floor). A ridge plate sits
+  in slots in both gables and carries the hanging loop (ring, arch or point); the two equal roof halves lean against
+  it. Entrance as circle, arch, heart or square with any width, optional decorative frame to glue around it and a
+  hole for a toothpick perch. Each kind remembers its own values. Tests check closed outlines for every combination,
+  that every tab has its slot in the base, that the roof halves touch the ridge plate without overlapping, that the
+  loop is free above the roof and that the frame fits around the entrance.
 - **Connected names with score lines in the *Name generator*:** where letters overlap (negative letter spacing,
   script fonts), the edge of the upper letter is kept as a fine engraving line (weakest line layer), so the name is
   cut as one piece but still reads clearly – also where the symbols touch the name. New: *Finished width* in mm
