@@ -215,3 +215,11 @@ export const outlineLines = (m: MultiPolygon): ScoreLine[] =>
 
 export const scaleArea = (m: MultiPolygon, k: number): MultiPolygon => m.map(p => p.map(r => r.map(([x, y]) => [x * k, y * k] as XY)));
 export const scaleLines = (l: ScoreLine[], k: number): ScoreLine[] => l.map(s => ({ closed: s.closed, pts: s.pts.map(([x, y]) => [x * k, y * k] as XY) }));
+
+/** Fläche um ihre Mitte drehen (Grad, gegen den Uhrzeigersinn) */
+export function rotateArea(m: MultiPolygon, deg: number): MultiPolygon {
+  if (!deg || !m.length) return m;
+  const b = bounds(m), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+  const c = Math.cos((deg * Math.PI) / 180), s = Math.sin((deg * Math.PI) / 180);
+  return m.map(p => p.map(r => r.map(([x, y]) => [cx + (x - cx) * c - (y - cy) * s, cy + (x - cx) * s + (y - cy) * c] as XY)));
+}

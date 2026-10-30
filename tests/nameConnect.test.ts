@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MultiPolygon } from "polygon-clipping";
-import { overlapScores, grow, union, inRegion, clipLines, outlineLines, bounds, scaleArea, type ScoreLine } from "../src/nameConnect.ts";
+import { overlapScores, grow, union, inRegion, clipLines, outlineLines, bounds, scaleArea, rotateArea, type ScoreLine } from "../src/nameConnect.ts";
 
 const rect = (x0: number, y0: number, x1: number, y1: number): MultiPolygon => [[[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]];
 /** „o“: Quadrat mit Loch */
@@ -79,4 +79,17 @@ test("Linien beschneiden (Loch des Aufhängers) und Konturen als geschlossene Li
 test("Skalieren für die fertige Breite", () => {
   const b = bounds(scaleArea(rect(0, 0, 50, 10), 1.5));
   assert.equal(b.x1 - b.x0, 75);
+});
+
+test("Symbol drehen: um die eigene Mitte, 90° tauscht Breite und Höhe", () => {
+  const b = bounds(rotateArea(rect(10, 0, 30, 10), 90));
+  assert.ok(Math.abs(b.x1 - b.x0 - 10) < 1e-9 && Math.abs(b.y1 - b.y0 - 20) < 1e-9);
+  assert.ok(Math.abs((b.x0 + b.x1) / 2 - 20) < 1e-9 && Math.abs((b.y0 + b.y1) / 2 - 5) < 1e-9);
+});
+
+test("mehrere Symbole über dem Namen: jede Überlappung bekommt ihre Linie", () => {
+  const name = rect(0, 0, 40, 10), s1 = rect(-4, 2, 3, 8), s2 = rect(37, 2, 44, 8), s3 = rect(18, 8, 22, 14);
+  const s = overlapScores([name, s1, s2, s3], 0.2);
+  assert.equal(s.length, 3, "eine Linie je Symbol");
+  allInside(s, union([name, s1, s2, s3]));
 });

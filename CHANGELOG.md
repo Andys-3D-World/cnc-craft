@@ -10,6 +10,11 @@
   *engrave as line* for the name inside an outline, ten new symbols drawn for CNC Craft (cat, dog, fish, bird,
   butterfly, bunny, crown, music note, bone, anchor) and your own symbol from an SVG file. Tests check that score
   lines lie inside the part and hidden edges are left out.
+- **As many symbols as you like in the *Name generator*:** instead of one symbol in front and one behind, the symbols
+  are shown as a picture grid – click to add, drag them in the preview to any place (on top of the name, above,
+  below), set size and rotation, remove them again. Each symbol is merged into the one-piece outline and gets score
+  lines where it covers the name. Symbols at the end stay at the end when the name gets longer; old settings with
+  front/back symbols are taken over.
 - **3D view in the *Box generator*:** shows the finished box built from the panels – drag to rotate, mouse wheel to
   zoom, double-click to reset. *Pull apart* moves the panels away from each other so you can see how the finger
   joints, dividers, ramps and drawers fit. Works for every box type (the round box shows its bent wall as a plain
