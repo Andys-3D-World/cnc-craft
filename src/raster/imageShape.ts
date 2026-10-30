@@ -10,6 +10,8 @@
  * zwischengespeichert und neu gerechnet, wenn sich Größe oder Einstellungen ändern.
  */
 import { MM_TO_PIXEL, Pt, newId, updatePolylineBounds } from "../shapeTransform";
+import { enableGpuAdjust } from "./gpuAdjust";
+import { maskBurn, burnPixels } from "./burnImage";
 import { Adjust, NO_ADJUST, RasterSettings, EngravePreset, presetSettings, toGray, resample, applyAdjust, rasterize, autoAdjust, removeBackground } from "./dither";
 
 export interface ImageSettings {
@@ -25,6 +27,9 @@ export interface ImageSettings {
   /** Bildmaske: nur innerhalb dieser Konturen gravieren (Gerade/Ungerade). Punkte in Bild-Anteilen: u nach rechts, v nach oben */
   mask?: { u: number; v: number }[][];
 }
+
+// Große Bilder auf der Grafikkarte verbessern (fällt von selbst auf die CPU zurück)
+enableGpuAdjust();
 
 /** höchstens so viele Raster-Punkte (sonst wird der Linienabstand für die Rechnung gröber) */
 const MAX_CELLS = 12_000_000;
@@ -130,10 +135,10 @@ export function processed(s: any, img: ImageSettings = s.img, withCanvas = true)
 }
 
 /**
- * Für die Zeichenfläche: ändert sich nur die Größe (Skalieren mit der Maus), wird nicht bei jeder Bewegung neu
- * gerastert (bei großen Fotos 1 s und mehr), sondern das letzte Ergebnis gestreckt gezeigt. Steht die Größe kurz
- * still, wird einmal neu gerechnet – im Hintergrund-Thread, das gestreckte Bild bleibt solange stehen.
- * Der G-Code nimmt immer das genaue Ergebnis (processed).
+ * Für die Zeichenfläche: Neu gerastert wird im Hintergrund-Thread (Grafikkarte, wenn möglich) – bis dahin bleibt
+ * das bisherige Bild stehen (beim Skalieren gestreckt). Ändert sich nur die Größe (Skalieren mit der Maus), wird
+ * erst gerechnet, wenn sie kurz still steht. Der G-Code nimmt immer das genaue Ergebnis (processed) – meist schon
+ * fertig im Zwischenspeicher, also mit genau denselben Punkten wie die Vorschau.
  */
 const SETTLE_MS = 250;
 const sizeChange = new Map<string, { key: string; t: number }>();
@@ -142,38 +147,47 @@ function displayed(s: any): Processed | null {
   const hit = results.get(s.id);
   const img: ImageSettings = s.img;
   const src = sourceGray(img);
-  if (hit?.res.canvas && src) {
-    const { gw, gh, step } = gridSize(s, img);
-    if (hit.res.gw !== gw || hit.res.gh !== gh) {
-      const { src: _ignore, ...rest } = img;
-      const sameSettings = hit.key.startsWith(JSON.stringify([rest]).slice(0, -1) + ",");
-      if (sameSettings) {
-        const size = `${gw}x${gh}`, now = performance.now();
-        const last = sizeChange.get(s.id);
-        if (!last || last.key !== size) sizeChange.set(s.id, { key: size, t: now });
-        if (!last || last.key !== size || now - last.t < SETTLE_MS) {
-          clearTimeout(settleTimer);
-          settleTimer = window.setTimeout(() => window.dispatchEvent(new Event("cnc-redraw")), SETTLE_MS + 20);
-          return hit.res;
-        }
-        if (rasterAsync(s.id, img, src, gw, gh, step)) return hit.res;
-      }
+  if (!src) return null;
+  const { gw, gh, step } = gridSize(s, img);
+  if (hit?.res.canvas && hit.key === resultKey(img, gw, gh)) { sizeChange.delete(s.id); return hit.res; }
+  if (hit?.res.canvas && (hit.res.gw !== gw || hit.res.gh !== gh)) {
+    const size = `${gw}x${gh}`, now = performance.now();
+    const last = sizeChange.get(s.id);
+    if (!last || last.key !== size) sizeChange.set(s.id, { key: size, t: now });
+    if (!last || last.key !== size || now - last.t < SETTLE_MS) {
+      clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(() => window.dispatchEvent(new Event("cnc-redraw")), SETTLE_MS + 20);
+      return hit.res;
     }
   }
   sizeChange.delete(s.id);
+  if (rasterAsync(s.id, img, src, gw, gh, step)) return hit?.res.canvas ? hit.res : null;
   return processed(s);
 }
 
-// ---- Hintergrund-Thread fürs Rastern (siehe rasterWorker.ts) ----
-let rWorker: Worker | null = null, rBroken = false, rSeq = 0;
-const rPending = new Map<string, string>(); // Form-ID -> Schlüssel, der gerade gerechnet wird
-const rJobs = new Map<number, { id: string; key: string; img: ImageSettings; gw: number; gh: number; step: number }>();
+/** Ergebnis einer anderen Form übernehmen (Gravur-Dialog → Bild auf dem Bett: gleiches Raster, nicht nochmal rechnen) */
+export function adoptResult(fromId: string, s: any) {
+  const hit = results.get(fromId);
+  if (!hit) return;
+  const { gw, gh } = gridSize(s);
+  if (hit.key === resultKey(s.img, gw, gh)) results.set(s.id, hit);
+}
 
-/** Rastern im Hintergrund starten. false = geht nicht (dann im Hauptfenster rechnen) */
-function rasterAsync(id: string, img: ImageSettings, src: { gray: Float32Array; w: number; h: number }, gw: number, gh: number, step: number): boolean {
-  if (rBroken) return false;
+// ---- Hintergrund-Thread fürs Rastern (siehe rasterWorker.ts) ----
+type Job = { id: string; key: string; img: ImageSettings; gw: number; gh: number; step: number; done: Promise<Processed | null>; finish: (r: Processed | null) => void };
+let rWorker: Worker | null = null, rBroken = false, rSeq = 0;
+const rPending = new Map<string, Job>(); // Form-ID -> Auftrag, der gerade gerechnet wird
+const rJobs = new Map<number, Job>();
+
+/**
+ * Rastern im Hintergrund starten (Ergebnis landet im Zwischenspeicher, danach wird neu gezeichnet).
+ * null = geht nicht (dann im Hauptfenster rechnen). Läuft derselbe Auftrag schon, kommt dessen Ergebnis.
+ */
+function rasterAsync(id: string, img: ImageSettings, src: { gray: Float32Array; w: number; h: number }, gw: number, gh: number, step: number): Promise<Processed | null> | null {
+  if (rBroken) return null;
   const key = resultKey(img, gw, gh);
-  if (rPending.get(id) === key) return true;   // läuft schon
+  const running = rPending.get(id);
+  if (running?.key === key) return running.done;
   try {
     if (!rWorker) {
       rWorker = new Worker(new URL("./rasterWorker.ts", import.meta.url), { type: "module" });
@@ -181,26 +195,50 @@ function rasterAsync(id: string, img: ImageSettings, src: { gray: Float32Array; 
         const job = rJobs.get(ev.data?.seq);
         if (!job) return;
         rJobs.delete(ev.data.seq);
-        if (rPending.get(job.id) === job.key) rPending.delete(job.id);
-        if (!ev.data.ok) return;
+        if (rPending.get(job.id) === job) rPending.delete(job.id);
+        if (!ev.data.ok) { job.finish(null); return; }
         const burn = ev.data.burn as Float32Array;
-        if (job.img.mask?.length) applyMask(burn, job.gw, job.gh, job.img.mask);
-        results.set(job.id, { key: job.key, res: { burn, gw: job.gw, gh: job.gh, step: job.step, canvas: burnCanvas(burn, job.gw, job.gh) } });
+        // Maske und Vorschau-Pixel macht normalerweise schon der Thread
+        if (job.img.mask?.length && !ev.data.masked) applyMask(burn, job.gw, job.gh, job.img.mask);
+        const res: Processed = { burn, gw: job.gw, gh: job.gh, step: job.step, canvas: burnCanvas(burn, job.gw, job.gh, ev.data.masked ? ev.data.px : undefined) };
+        results.set(job.id, { key: job.key, res });
+        job.finish(res);
         window.dispatchEvent(new Event("cnc-redraw"));
       };
       rWorker.onerror = (ev) => {
         ev.preventDefault();
-        rBroken = true; rWorker?.terminate(); rWorker = null; rPending.clear(); rJobs.clear();
+        rBroken = true; rWorker?.terminate(); rWorker = null;
+        for (const j of rJobs.values()) j.finish(null);
+        rPending.clear(); rJobs.clear();
         window.dispatchEvent(new Event("cnc-redraw"));
       };
     }
-  } catch { rBroken = true; return false; }
+  } catch { rBroken = true; return null; }
   const base = (img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray).slice();
   const seq = ++rSeq;
-  rPending.set(id, key);
-  rJobs.set(seq, { id, key, img, gw, gh, step });
-  rWorker.postMessage({ seq, base, sw: src.w, sh: src.h, gw, gh, adjust: img.adjust || NO_ADJUST, raster: img.raster }, [base.buffer]);
-  return true;
+  let finish: (r: Processed | null) => void = () => {};
+  const done = new Promise<Processed | null>(r => { finish = r; });
+  // Einstellungen festhalten (der Dialog verändert sein Objekt weiter, während gerechnet wird)
+  const snap: ImageSettings = { ...img, adjust: { ...(img.adjust || NO_ADJUST) }, raster: { ...img.raster } };
+  const job: Job = { id, key, img: snap, gw, gh, step, done, finish };
+  rPending.set(id, job);
+  rJobs.set(seq, job);
+  rWorker.postMessage({ seq, base, sw: src.w, sh: src.h, gw, gh, adjust: snap.adjust, raster: snap.raster, mask: snap.mask }, [base.buffer]);
+  return done;
+}
+
+/**
+ * Wie processed, aber im Hintergrund-Thread (Grafikkarte, wenn möglich) – das Fenster bleibt bedienbar.
+ * Für den Gravur-Dialog: jede Regler-Änderung rechnet sonst ein großes Foto im Hauptfenster.
+ */
+export async function processedAsync(s: any, img: ImageSettings = s.img): Promise<Processed | null> {
+  const src = sourceGray(img);
+  if (!src) return null;
+  const { gw, gh, step } = gridSize(s, img);
+  const hit = results.get(s.id);
+  if (hit && hit.key === resultKey(img, gw, gh) && hit.res.canvas) return hit.res;
+  const p = rasterAsync(s.id, img, src, gw, gh, step);
+  return p ? (await p) ?? processed(s, img) : processed(s, img);
 }
 
 /** Hintergrund entfernt – zuletzt benutztes Ergebnis je Bild merken (Regler ziehen rechnet sonst ständig neu) */
@@ -215,15 +253,7 @@ function withoutBackground(key: string, src: { gray: Float32Array; w: number; h:
 
 /** Alles außerhalb der Maske löschen (Maske über eine Zeichenfläche füllen – schnell auch bei vielen Punkten) */
 function applyMask(burn: Float32Array, gw: number, gh: number, rings: { u: number; v: number }[][]) {
-  const c = document.createElement("canvas");
-  c.width = gw; c.height = gh;
-  const ctx = c.getContext("2d", { willReadFrequently: true })!;
-  ctx.beginPath();
-  for (const r of rings) r.forEach((q, i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, q.u * gw, (1 - q.v) * gh));
-  ctx.fillStyle = "#000";
-  ctx.fill("evenodd");
-  const a = ctx.getImageData(0, 0, gw, gh).data;
-  for (let i = 0; i < burn.length; i++) if (a[i * 4 + 3] < 128) burn[i] = 0;
+  maskBurn(burn, gw, gh, rings);
 }
 
 /** Welt-Punkt → Bild-Anteile (u, v) für eine Bild-Form */
@@ -236,20 +266,10 @@ export function toImageUV(s: any, q: Pt): { u: number; v: number } {
 }
 
 /** Ergebnis als Bild: gebrannt = dunkelbraun, frei = helles Holz */
-export function burnCanvas(burn: Float32Array, gw: number, gh: number): HTMLCanvasElement {
+export function burnCanvas(burn: Float32Array, gw: number, gh: number, px: Uint8ClampedArray<ArrayBuffer> = burnPixels(burn)): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = gw; c.height = gh;
-  const ctx = c.getContext("2d")!;
-  const id = ctx.createImageData(gw, gh);
-  const L = [236, 222, 196], D = [52, 36, 26];
-  for (let i = 0; i < burn.length; i++) {
-    const b = burn[i];
-    id.data[i * 4] = L[0] + (D[0] - L[0]) * b;
-    id.data[i * 4 + 1] = L[1] + (D[1] - L[1]) * b;
-    id.data[i * 4 + 2] = L[2] + (D[2] - L[2]) * b;
-    id.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(id, 0, 0);
+  c.getContext("2d")!.putImageData(new ImageData(px, gw, gh), 0, 0);
   return c;
 }
 

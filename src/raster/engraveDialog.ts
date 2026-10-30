@@ -8,7 +8,7 @@
 import { t } from "../i18n/i18n";
 import { layerForShape } from "../laserLayers";
 import { Adjust, NO_ADJUST, ENGRAVE_PRESETS, EngravePreset, RASTER_METHODS, CELL_METHODS, RasterMethod, presetSettings, autoAdjust, AutoProfile, applyAdjust, resample, stats, curveLut, curveIsIdentity } from "./dither";
-import { ImageSettings, imageSizeMm, gridSize, processed, sourceGray } from "./imageShape";
+import { ImageSettings, imageSizeMm, gridSize, processed, processedAsync, adoptResult, sourceGray } from "./imageShape";
 
 const ICON: Record<EngravePreset, string> = { photo: "📷", graphic: "🎨", bw: "◐", lines: "〰️", dots: "⠿", newspaper: "📰" };
 /** Bildeffekte als eigene Knöpfe (Verfahren + Zellgröße) */
@@ -166,7 +166,8 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   // ---- Vorschau ----
   const cv = $<HTMLCanvasElement>("eng-cv");
   let split = 0.5, panX = 0, panY = 0;
-  let res = processed(preview, img);
+  // erste Vorschau kommt aus dem Hintergrund-Thread (update unten) – ein großes Foto würde das Öffnen sonst bremsen
+  let res: ReturnType<typeof processed> = null;
   const draw = () => {
     const dpr = window.devicePixelRatio || 1;
     const cw = cv.clientWidth * dpr, ch = cv.clientHeight * dpr;
@@ -235,12 +236,27 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
     $<HTMLElement>("eng-dpi").textContent = `(${Math.round(25.4 / img.interval)} DPI)`;
   };
 
-  let timer = 0;
+  // Neu rechnen im Hintergrund-Thread (Grafikkarte, wenn möglich): das Fenster bleibt bedienbar, bis dahin bleibt
+  // die alte Vorschau stehen. Immer nur der neueste Stand – Zwischenstände beim Regler-Ziehen werden übersprungen.
+  let timer = 0, busy = false, again = false;
   const update = (now = false) => {
     clearTimeout(timer);
-    const run = () => { res = processed(preview, img); draw(); rating(); info(); };
-    if (now) run(); else timer = window.setTimeout(run, 90);
+    const run = async () => {
+      if (busy) { again = true; return; }
+      busy = true;
+      try {
+        do {
+          again = false;
+          const r = await processedAsync(preview, img);
+          if (!ov.isConnected) return;
+          if (r) res = r;
+          draw(); rating(); info();
+        } while (again);
+      } finally { busy = false; }
+    };
+    if (now) void run(); else timer = window.setTimeout(() => void run(), 90);
   };
+  update(true);
 
   // ---- Bedienung ----
   ov.querySelectorAll<HTMLElement>(".eng-fx .eng-pre").forEach(b => b.addEventListener("click", () => {
@@ -291,6 +307,7 @@ export function openEngraveDialog(shape: any, log: (s: string) => void = default
   $("eng-ok").addEventListener("click", () => {
     read();
     shape.img = img;
+    adoptResult(preview.id, shape); // schon gerechnet – auf dem Bett nicht nochmal
     close();
     log(t("eng.applied", { type: img.preset === "custom" ? t("eng.m." + img.raster.method) : t("eng.p." + img.preset) }));
     onDone();

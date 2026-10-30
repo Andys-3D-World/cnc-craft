@@ -202,6 +202,13 @@
   times faster. Results are exactly the same as before. Measured: 1 GB lithophane 3MF (12.5 million triangles)
   ~45 s → ~8 s; 3MF with 1.6 million triangles 2.1 s → 0.25 s; height search over all 6 views of a 2.7 MB STEP
   11 s → 1.6 s.
+- **Picture engraving uses the graphics card (GPU):** *Adjust picture* (levels, curve, local contrast, denoise,
+  sharpen, invert) runs on the GPU via WebGL2 for large pictures – about 60 ms instead of 400–500 ms for a
+  24 × 34 cm photo at 0.1 mm. The engrave dialog now computes its preview in a background thread, so it opens at once
+  and moving a slider no longer freezes the window (before: 1.5–2 s per change). Error diffusion (Jarvis, Floyd,
+  Stucki, Atkinson, Sierra) is up to 6× faster on the CPU (Jarvis 1.4 s → 0.23 s) with exactly the same dots. Mask
+  and preview pixels are also made in the background thread, and the G-code reuses the finished result, so it has
+  the same dots as the preview. Without WebGL2 (e.g. some Linux systems) everything runs on the CPU as before.
 - **Scaling an engrave picture no longer stutters:** while you drag, the picture is shown stretched instead of
   being rastered again on every mouse move (a large photo at 0.1 mm took about 1 s each time). When the size stays
   still, it is rastered once in a background thread, so the window does not freeze; the G-code always uses the exact

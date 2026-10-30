@@ -218,7 +218,26 @@ export function curveLut(pts: number[][]): Float32Array {
   return lut;
 }
 
+/**
+ * Beschleuniger für große Bilder (Grafikkarte, siehe gpuAdjust.ts). Gibt null zurück, wenn er nicht kann –
+ * dann rechnet die CPU. Diese Datei selbst bleibt ohne Oberfläche (läuft auch im Test und im Worker).
+ */
+export type AdjustAccelerator = (src: Float32Array, w: number, h: number, a: Adjust) => Float32Array | null;
+let accelerator: AdjustAccelerator | null = null;
+/** ab so vielen Bildpunkten lohnt sich die Grafikkarte (kleine Bilder sind auf der CPU schneller fertig) */
+const ACCEL_MIN_PIXELS = 250_000;
+export function setAdjustAccelerator(f: AdjustAccelerator | null) { accelerator = f; }
+
 export function applyAdjust(src: Float32Array, w: number, h: number, a: Adjust): Float32Array {
+  if (accelerator && w * h >= ACCEL_MIN_PIXELS) {
+    const r = accelerator(src, w, h, a);
+    if (r) return r;
+  }
+  return applyAdjustCpu(src, w, h, a);
+}
+
+/** Bild verbessern auf der CPU (Referenz – die Grafikkarte rechnet genauso) */
+export function applyAdjustCpu(src: Float32Array, w: number, h: number, a: Adjust): Float32Array {
   let g: Float32Array = new Float32Array(src.length);
   const span = Math.max(0.02, a.white - a.black);
   const inv = 1 / Math.max(0.1, a.gamma);
@@ -366,6 +385,10 @@ export function rasterize(g: Float32Array, w: number, h: number, s: RasterSettin
   const k = KERNELS[s.method] || KERNELS.floyd;
   const e = new Float32Array(g.length);
   for (let i = 0; i < g.length; i++) e[i] = 1 - g[i];
+  // Kern als flache Zahlenlisten (gleiche Rechnung, aber ohne kleine Arrays je Punkt – mehrfach schneller)
+  const n = k.k.length, kdx = new Int32Array(n), kdy = new Int32Array(n), kw = new Float64Array(n);
+  for (let t = 0; t < n; t++) { kdx[t] = k.k[t][0]; kdy[t] = k.k[t][1]; kw[t] = k.k[t][2]; }
+  const kd = k.d;
   for (let y = 0; y < h; y++) {
     const rtl = y % 2 === 1;
     for (let j = 0; j < w; j++) {
@@ -374,10 +397,10 @@ export function rasterize(g: Float32Array, w: number, h: number, s: RasterSettin
       out[i] = on;
       const err = e[i] - on;
       if (!err) continue;
-      for (const [dx0, dy, wt] of k.k) {
-        const xx = x + (rtl ? -dx0 : dx0), yy = y + dy;
+      for (let t = 0; t < n; t++) {
+        const xx = rtl ? x - kdx[t] : x + kdx[t], yy = y + kdy[t];
         if (xx < 0 || xx >= w || yy >= h) continue;
-        e[yy * w + xx] += (err * wt) / k.d;
+        e[yy * w + xx] += (err * kw[t]) / kd;
       }
     }
   }
