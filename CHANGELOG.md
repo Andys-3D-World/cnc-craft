@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.4 Beta
 
 **New**
 - **Puzzle generator** (Generators): jigsaw cut lines with real tabs (neck and round head, drawn for CNC Craft) –
