@@ -10,6 +10,11 @@
   on top, optional decorative line along the edge, text size in %. Live preview with the finished size in mm, then
   the ornament is placed on the bed as a group. Tests check closed one-piece outlines, that the hole and the name
   lie inside the shape and that the name stays clear of the hole.
+- ***Christmas ornament generator*: name in a band and decorations.** *In a band* cuts a window around the name –
+  the letters stay and hang on a thin bar along the baseline, like a lace ornament (loose bits such as the dot on an
+  i are left out, with a note). *Decoration* cuts small motifs into the free space around the name: stars,
+  snowflakes, little trees, hearts, dots or mixed – evenly spread and mirrored, with enough material between them,
+  to the edge, the name and the hanging hole so the ornament stays one piece. Tests check exactly that.
 - **Birdhouse generator** (Extras): a nest box from flat panels for laser or CNC – front with entry hole, back,
   two side walls, floor and a two-part pitched roof. Walls and floor hold with finger joints like in the *Box
   generator*. Choose inner width, depth and height, roof pitch (20–60°), roof overhang, material thickness, finger

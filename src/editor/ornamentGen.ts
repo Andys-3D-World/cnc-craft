@@ -12,15 +12,15 @@ import { createFontPicker } from "./fontPicker";
 import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
-import { ornament, ORNAMENT_SHAPES, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
-  type OrnamentHanger, type OrnamentInner } from "../ornament";
+import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
+  type OrnamentHanger, type OrnamentInner, type OrnamentDeco } from "../ornament";
 
 const KEY = "cnc_craft_ornament";
 interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean }
-const DEF: Opts = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false,
+const DEF: Opts = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
   text: "Andreas", line2: "", font: "Pacifico", bold: false };
 const HANGERS: OrnamentHanger[] = ["hole", "ring", "none"];
-const INNERS: OrnamentInner[] = ["engrave", "cut", "score", "layer"];
+const INNERS: OrnamentInner[] = ["engrave", "cut", "band", "score", "layer"];
 
 function load(): Opts {
   try {
@@ -32,6 +32,7 @@ function load(): Opts {
     if (ORNAMENT_SHAPES.includes(s.shape)) o.shape = s.shape;
     if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
     if (INNERS.includes(s.inner)) o.inner = s.inner;
+    if (ORNAMENT_DECOS.includes(s.deco)) o.deco = s.deco;
     return o;
   } catch { return { ...DEF }; }
 }
@@ -91,6 +92,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
           ${sel("orn-inner", "orn.inner", INNERS, "orn.inner.")}
           ${sel("orn-hang", "orn.hanger", HANGERS, "orn.hang.")}
           <div class="orn-only-hole">${num("orn-hd", "orn.holeD", "0.5", "1")}</div>
+          ${sel("orn-deco", "orn.deco", ORNAMENT_DECOS, "orn.deco.")}
           <label class="dlg-row" style="cursor:pointer;"><span>${t("orn.border")}</span><input id="orn-border" type="checkbox" style="width:auto;"></label>
         </div>
         <div class="box-prev" style="min-height:280px;"><div id="orn-svg" style="flex:1;display:flex;align-items:center;"></div>
@@ -112,6 +114,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   $("orn-bold").checked = init.bold; $("orn-ts").value = String(init.textSize);
   $<HTMLSelectElement>("orn-inner").value = init.inner; $<HTMLSelectElement>("orn-hang").value = init.hanger;
   $("orn-hd").value = String(init.holeD); $("orn-border").checked = init.border;
+  $<HTMLSelectElement>("orn-deco").value = init.deco;
 
   const read = (): Opts => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
@@ -120,7 +123,8 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       shape: v("orn-shape") as OrnamentShape, points: Math.round(n("orn-pts", DEF.points, 5, 12)), size: n("orn-size", DEF.size, 20, 1000),
       text: $("orn-text").value, line2: $("orn-line2").value, font, bold: $("orn-bold").checked,
       textSize: n("orn-ts", 100, 20, 100), inner: v("orn-inner") as OrnamentInner, hanger: v("orn-hang") as OrnamentHanger,
-      holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked
+      holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked,
+      deco: v("orn-deco") as OrnamentDeco
     };
   };
 
@@ -135,7 +139,8 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     last = r;
     $<HTMLElement>("orn-svg").innerHTML = previewSvg(r);
     $<HTMLElement>("orn-info").textContent = t("orn.info", { w: r.w.toFixed(1), h: r.h.toFixed(1) });
-    $<HTMLElement>("orn-warn").textContent = text.lines.length && o.inner !== "score" ? t("orn.openFont") : r.pieces > 1 ? t("orn.pieces", { n: r.pieces }) : "";
+    $<HTMLElement>("orn-warn").textContent = text.lines.length && o.inner !== "score" ? t("orn.openFont") : r.pieces > 1 ? t("orn.pieces", { n: r.pieces })
+      : r.dropped ? t("orn.dropped", { n: r.dropped }) : "";
     $<HTMLButtonElement>("orn-ok").disabled = !r.cut.length;
   };
   const schedule = () => { clearTimeout(timer); timer = window.setTimeout(update, 160); };

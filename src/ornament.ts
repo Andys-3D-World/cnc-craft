@@ -3,9 +3,11 @@
  *
  * Formen: Kugel (mit Kappe), Stern (5 … 12 Zacken), Tannenbaum, Glocke, Herz, Schneeflocke – alle für CNC Craft
  * gezeichnet. Jede Form hat ein Textfeld (Rechteck, das sicher in der Form liegt); der Name wird hineingesetzt:
- * gravieren, ausschneiden (wie eine Schablone), als Linie gravieren oder als eigenes Teil zum Aufkleben.
+ * gravieren, ausschneiden (wie eine Schablone), im Band (Fenster ausgeschnitten, die Buchstaben bleiben stehen und
+ * hängen an einem Steg auf der Grundlinie), als Linie gravieren oder als eigenes Teil zum Aufkleben.
  * Aufhänger: Loch (so weit oben, wie es mit Rand hineinpasst), Ring oben oder keiner. Auf Wunsch eine Zierlinie
- * innen am Rand entlang.
+ * innen am Rand entlang und Verzierung: kleine Motive (Sterne, Schneeflocken, Bäume, Herzen, Punkte), die im freien
+ * Platz um den Namen ausgeschnitten werden – mit Steg dazwischen, damit alles ein Teil bleibt.
  *
  * Die Schrift kommt fertig als Fläche (bzw. Linien bei Einzellinien-Schriften) aus dem Fenster – hier ist nur
  * Geometrie, ohne Oberfläche (Tests: `npm test`). Alles in mm, Y nach oben; Form unten bei y = 0, Mitte bei x = 0.
@@ -17,7 +19,9 @@ import { bounds, union, unionMany, grow, inRegion, clipLines, outlineLines, type
 export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowflake";
 export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake"];
 export type OrnamentHanger = "hole" | "ring" | "none";
-export type OrnamentInner = "engrave" | "cut" | "score" | "layer";
+export type OrnamentInner = "engrave" | "cut" | "band" | "score" | "layer";
+export type OrnamentDeco = "none" | "stars" | "flakes" | "trees" | "hearts" | "dots" | "mixed";
+export const ORNAMENT_DECOS: OrnamentDeco[] = ["none", "stars", "flakes", "trees", "hearts", "dots", "mixed"];
 
 export interface OrnamentOptions {
   shape: OrnamentShape;
@@ -28,6 +32,7 @@ export interface OrnamentOptions {
   inner: OrnamentInner;
   textSize: number;   // Schriftgröße in % des Textfelds (20 … 100)
   border: boolean;    // Zierlinie innen am Rand
+  deco: OrnamentDeco; // ausgeschnittene Motive um den Namen
 }
 
 /** Schrift, wie sie aus dem Fenster kommt (beliebige Größe/Lage – wird ins Textfeld eingepasst) */
@@ -43,6 +48,7 @@ export interface OrnamentResult {
   top: MultiPolygon;     // Schrift als eigenes Teil
   lines: ScoreLine[];    // Gravurlinien auf der Form (Zierlinie, Schrift als Linie)
   pieces: number; w: number; h: number;
+  dropped: number;       // Name im Band: so viele lose Teilchen fallen weg (z. B. i-Punkte)
 }
 
 // ---------- kleine Helfer ----------
@@ -211,13 +217,72 @@ export function fitText(text: OrnamentText, box: Box, pct = 100): OrnamentText {
 /** nur Außenkonturen (Innenräume gefüllt) */
 const solid = (m: MultiPolygon): MultiPolygon => union(m.filter(p => p[0]).map(p => [[p[0]]] as MultiPolygon));
 const countPieces = (m: MultiPolygon) => m.filter(p => p[0] && p[0].length >= 3).length;
+const ringArea = (r: XY[] | [number, number][]) => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return Math.abs(a / 2); };
 
-/** Fertiger Anhänger: Form, Aufhänger, Zierlinie und Name */
+/** Rechteck mit runden Ecken */
+function roundRect(x0: number, y0: number, x1: number, y1: number, r: number): MultiPolygon {
+  r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
+  const pts: XY[] = [];
+  for (const [cx, cy, a0] of [[x1 - r, y0 + r, -90], [x1 - r, y1 - r, 0], [x0 + r, y1 - r, 90], [x0 + r, y0 + r, 180]] as const)
+    for (let k = 0; k <= 6; k++) { const a = ((a0 + k * 15) * Math.PI) / 180; pts.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]); }
+  return poly(pts);
+}
+
+/** Grundlinie der Schrift: Median der Unterkanten der Teile (Unterlängen wie g, y zählen kaum) */
+function baselineOf(m: MultiPolygon): number {
+  const ys = m.map(p => Math.min(...(p[0] || []).map(q => q[1]))).filter(Number.isFinite).sort((a, b) => a - b);
+  return ys.length ? ys[Math.floor(ys.length / 2)] : 0;
+}
+
+const MIXED: OrnamentDeco[] = ["stars", "flakes", "trees", "hearts"];
+
+/** Kleines Motiv zum Ausschneiden, Mitte (cx, cy), passt in einen Kreis mit Ø s */
+export function motif(kind: OrnamentDeco, cx: number, cy: number, s: number): MultiPolygon {
+  const at = (pts: XY[]) => poly(pts.map(([x, y]) => [cx + x * s, cy + y * s] as XY));
+  switch (kind) {
+    case "stars": return at(starPts(0, 0.03, 5, 0.5, 0.21));
+    case "flakes": return at(starPts(0, 0, 6, 0.5, 0.15));
+    case "trees": return at([[0, 0.5], [0.38, -0.22], [0.09, -0.22], [0.09, -0.47], [-0.09, -0.47], [-0.09, -0.22], [-0.38, -0.22]]);
+    case "hearts": return at(Array.from({ length: 48 }, (_, i) => {
+      const a = (i / 48) * Math.PI * 2, q = Math.sin(a);
+      return [(16 * q * q * q) / 32, (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a) + 2.5) / 32] as XY;
+    }));
+    default: return at(circle(0, 0, 0.32, 32));
+  }
+}
+
+/** Motivgröße und Steg (Material zwischen den Motiven und zum Rand) */
+export const decoSize = (o: OrnamentOptions) => ({ s: Math.max(4, o.size * 0.11), web: Math.max(1.5, o.size * 0.025) });
+
+/**
+ * Motive im freien Platz verteilen: versetztes Raster, spiegelgleich zur Mitte. Ein Motiv kommt nur dorthin, wo sein
+ * Kreis mit Steg ganz in der Form liegt, weg vom Namen (keep) und vom Aufhänge-Loch.
+ */
+function decorate(o: OrnamentOptions, shape: MultiPolygon, keep: Box | null, edge: number, hole?: { at: XY; r: number }): MultiPolygon[] {
+  if (o.deco === "none") return [];
+  const { s, web } = decoSize(o), step = s + web, dy = step * 0.87, b = bounds(shape);
+  const cy0 = keep ? (keep.y0 + keep.y1) / 2 : (b.y0 + b.y1) / 2;
+  const out: MultiPolygon[] = [];
+  for (let j = Math.floor((b.y0 - cy0) / dy); cy0 + j * dy <= b.y1; j++) {
+    const y = cy0 + j * dy, off = Math.abs(j) % 2 ? 0.5 : 0;
+    for (let k = Math.floor(b.x0 / step) - 1; k * step <= b.x1 + step; k++) {
+      const x = (k + off) * step;
+      if (keep && x + s / 2 + web > keep.x0 && x - s / 2 - web < keep.x1 && y + s / 2 + web > keep.y0 && y - s / 2 - web < keep.y1) continue;
+      if (hole && Math.hypot(x - hole.at[0], y - hole.at[1]) < hole.r + s / 2 + web) continue;
+      if (!diskFits(shape, x, y, s / 2 + edge)) continue;
+      const kind = o.deco === "mixed" ? MIXED[(Math.abs(j) + Math.abs(Math.round(x / step * 2))) % MIXED.length] : o.deco;
+      out.push(motif(kind, x, y, s));
+    }
+  }
+  return out;
+}
+
+/** Fertiger Anhänger: Form, Aufhänger, Zierlinie, Verzierung und Name */
 export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
   const ob = ornamentBody(o);
   const shape = diff(ob.body, ob.hole);
   const box = { ...ob.textBox };
-  let lines: ScoreLine[] = [];
+  let lines: ScoreLine[] = [], inset = 0;
   if (o.border) {
     // Zierlinie: Form (mit Loch) um d nach innen – die Ränder wachsen von beiden Seiten in die Form hinein
     // (Umgebung = Rahmen minus Form, mit Rand wachsen lassen und von der Form abziehen)
@@ -225,19 +290,43 @@ export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult
     const around = diff(poly([[b.x0 - 5, b.y0 - 5], [b.x1 + 5, b.y0 - 5], [b.x1 + 5, b.y1 + 5], [b.x0 - 5, b.y1 + 5]]), shape);
     lines = outlineLines(diff(shape, grow(around, d, true)));
     box.x0 += d; box.x1 -= d; box.y0 += d; box.y1 -= d;
+    inset = d;
   }
-  const tx = fitText(text, box, o.textSize);
+  // Band: um die Schrift bleibt Platz für das Fenster
+  const pad = o.inner === "band" ? Math.max(1.2, (box.y1 - box.y0) * 0.13) : 0;
+  const tx = fitText(text, { x0: box.x0 + pad, y0: box.y0 + pad, x1: box.x1 - pad, y1: box.y1 - pad }, o.textSize);
   // Einzellinien-Schrift: immer als Linie gravieren
   const open = tx.lines.length > 0;
-  let cut = shape, engrave: MultiPolygon = [], top: MultiPolygon = [], textLines: ScoreLine[] = [];
-  if (open) textLines = tx.lines;
-  else if (tx.area.length) {
+  let cut = shape, engrave: MultiPolygon = [], top: MultiPolygon = [], textLines: ScoreLine[] = [], dropped = 0;
+  let keep: Box | null = null;
+  if (open) {
+    textLines = tx.lines;
+    keep = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
+    for (const l of tx.lines) for (const [x, y] of l.pts) { keep.x0 = Math.min(keep.x0, x); keep.x1 = Math.max(keep.x1, x); keep.y0 = Math.min(keep.y0, y); keep.y1 = Math.max(keep.y1, y); }
+  } else if (tx.area.length) {
+    keep = bounds(tx.area);
     if (o.inner === "engrave") engrave = tx.area;
     else if (o.inner === "score") textLines = outlineLines(tx.area);
     else if (o.inner === "layer") top = tx.area;
+    else if (o.inner === "band") {
+      // Fenster ausschneiden, Buchstaben und Steg auf der Grundlinie bleiben stehen
+      const tb = keep, th = tb.y1 - tb.y0, bar = Math.max(1.2, th * 0.08), base = baselineOf(tx.area);
+      const win = roundRect(tb.x0 - pad, tb.y0 - pad, tb.x1 + pad, tb.y1 + pad, pad * 0.8);
+      const steg: MultiPolygon = poly([[tb.x0 - pad, base - bar * 0.6], [tb.x1 + pad, base - bar * 0.6], [tb.x1 + pad, base + bar * 0.4], [tb.x0 - pad, base + bar * 0.4]]);
+      cut = diff(shape, diff(win, union([tx.area, steg])));
+      // lose Teilchen (i-Punkte, Innenteil vom o ohne Steg) würden herausfallen – nur das größte Teil bleibt
+      if (cut.length > 1) {
+        const big = cut.reduce((a, p) => (ringArea(p[0]) > ringArea(a[0]) ? p : a));
+        dropped = cut.length - 1;
+        cut = [big];
+      }
+      keep = { x0: tb.x0 - pad, y0: tb.y0 - pad, x1: tb.x1 + pad, y1: tb.y1 + pad };
+    }
     else cut = diff(shape, solid(tx.area)); // wie eine Schablone: Innenräume von o, a … fallen mit heraus
   }
-  lines = [...lines, ...clipLines(textLines, cut, 0.2)];
+  const motifs = decorate(o, shape, keep, decoSize(o).web + inset, ob.holeAt && ob.holeR ? { at: ob.holeAt, r: ob.holeR } : undefined);
+  if (motifs.length) cut = polygonClipping.difference(cut, ...motifs);
+  lines = [...clipLines(lines, cut, 0.2), ...clipLines(textLines, cut, 0.2)];
   const all = bounds(union([cut, top]));
-  return { cut, engrave, top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0 };
+  return { cut, engrave, top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped };
 }

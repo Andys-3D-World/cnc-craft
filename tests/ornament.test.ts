@@ -2,11 +2,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MultiPolygon } from "polygon-clipping";
-import { ornament, ornamentBody, fitText, holeMargin, ORNAMENT_SHAPES, type OrnamentOptions } from "../src/ornament.ts";
+import { ornament, ornamentBody, fitText, holeMargin, decoSize, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions } from "../src/ornament.ts";
 import { inRegion, bounds } from "../src/nameConnect.ts";
 
 type XY = [number, number];
-const base: OrnamentOptions = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false };
+const base: OrnamentOptions = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none" };
 const rect = (x0: number, y0: number, x1: number, y1: number): MultiPolygon => [[[[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]]]];
 /** Ersatz-Schrift: drei „Buchstaben“, einer mit Loch (wie ein o) */
 const word: MultiPolygon = [...rect(0, 0, 6, 10), [[[8, 0], [14, 0], [14, 10], [8, 10], [8, 0]], [[10, 3], [12, 3], [12, 7], [10, 7], [10, 3]]], ...rect(16, 0, 22, 10)];
@@ -110,4 +110,46 @@ test("ohne Aufhänger: kein Loch", () => {
   const r = ornament({ ...base, hanger: "none" }, { area: [], lines: [] });
   assert.equal(r.cut.length, 1);
   assert.equal(r.cut[0].length, 1);
+});
+
+/** „Schrift“ mit i-Punkt: zwei Buchstaben auf der Grundlinie, ein schwebendes Teilchen darüber, ein o mit Loch */
+const withDot: MultiPolygon = [...rect(0, 0, 6, 10), ...rect(8, 0, 10, 6), ...rect(8, 8, 10, 10),
+  [[[12, 0], [18, 0], [18, 10], [12, 10], [12, 0]], [[14, 3], [16, 3], [16, 7], [14, 7], [14, 3]]]];
+
+test("Name im Band: Fenster ausgeschnitten, Buchstaben bleiben stehen, ein Teil, i-Punkt fällt weg", () => {
+  for (const shape of ORNAMENT_SHAPES) {
+    const r = ornament({ ...base, shape, inner: "band" }, { area: withDot, lines: [] });
+    assert.equal(r.pieces, 1, shape);
+    // nur der i-Punkt hängt nicht am Steg (das Innere vom o gehört zum Fenster und wird mit ausgeschnitten)
+    assert.equal(r.dropped, 1, shape);
+    // Fenster = Loch (Aufhänger ist eigenes Loch); die Buchstaben liegen im Material, nicht im Fenster
+    assert.ok(r.cut[0].length >= 3, shape);
+    const b = bounds(r.cut);
+    assert.ok(Math.abs(b.y1 - b.y0 - 80) < 0.01, shape);
+  }
+});
+
+for (const deco of ORNAMENT_DECOS.filter(d => d !== "none")) test(`Verzierung ${deco}: auf jeder Form ein Teil, Motive in der Form, weg vom Namen`, () => {
+  for (const shape of ORNAMENT_SHAPES) for (const inner of ["engrave", "band"] as const) {
+    const o = { ...base, shape, deco, inner, border: shape === "ball" };
+    const plain = ornament({ ...o, deco: "none" }, { area: word, lines: [] });
+    const r = ornament(o, { area: word, lines: [] });
+    assert.equal(r.pieces, 1, `${shape}/${inner}`);
+    const holes = r.cut[0].length - plain.cut[0].length;
+    if (shape === "ball") assert.ok(holes >= 6, `ball: nur ${holes} Motive`);
+    // Name bleibt unberührt: alle Gravur-Punkte liegen im Material
+    for (const p of r.engrave) for (const ring of p) for (const [x, y] of ring) assert.ok(inRegion(r.cut, x, y), `${shape}: Motiv im Namen`);
+    // Zierlinie wird von keinem Motiv geschnitten
+    assert.equal(r.lines.length, plain.lines.length, `${shape}: Zierlinie zerschnitten`);
+  }
+});
+
+test("Motive halten den Steg zum Rand und zueinander", () => {
+  const o = { ...base, deco: "dots" as const, hanger: "none" as const };
+  const r = ornament(o, { area: [], lines: [] }), { web } = decoSize(o);
+  const holes = r.cut[0].slice(1);
+  assert.ok(holes.length > 10);
+  const c = holes.map(h => { const b = bounds([[h]]); return [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2]; });
+  for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++)
+    assert.ok(Math.hypot(c[i][0] - c[j][0], c[i][1] - c[j][1]) - c[i][2] - c[j][2] >= web - 1e-6);
 });
