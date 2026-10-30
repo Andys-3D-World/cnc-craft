@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Puzzle generator** (Generators): jigsaw cut lines with real tabs (neck and round head, drawn for CNC Craft) –
+  every piece looks different, neighbouring pieces always share the same edge so they fit exactly. Choose columns
+  and rows, tab size, irregularity and a new random pattern (🎲); shape rectangle, rounded rectangle, oval or heart.
+  If something is selected – e.g. an imported picture to engrave – the puzzle is laid exactly over it (the preview
+  shows the picture under the lines); otherwise it goes to the middle of the bed. The lines go on the cut layer, so
+  the picture is engraved first and then cut. Tests check that lines never cross except at the piece corners, that
+  the same seed gives the same puzzle, and that lines end at the outline.
 - **Letter topper generator** (Extras): every character becomes its own topper – a letter, number or sign in a
   decorative frame, or the whole text on one topper (e.g. *50* for a birthday cake). Frames: oval, circle,
   rectangle, hexagon or heart; edge plain, scalloped, with beads (scallops with small holes) or double (engraved line
