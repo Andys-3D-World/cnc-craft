@@ -74,17 +74,52 @@ export const state = {
 
 (window as any).cncState = state;
 
-// Schreibt Meldungen in die Konsole rechts unten (und in die Entwickler-Konsole)
-function appendToConsole(text: string) {
+// Schreibt Meldungen in die Konsole rechts unten (und in die Entwickler-Konsole).
+// Damit sie bei langen Jobs nicht immer langsamer wird:
+//  - höchstens CONSOLE_MAX Zeilen, die ältesten fliegen raus (jede Zeile kostete sonst bei 40 000 Zeilen ~30 ms)
+//  - Meldungen werden gesammelt und einmal pro Bild eingefügt (statt Layout + Scrollen je Zeile)
+//  - gleiche Meldung direkt hintereinander wird nur gezählt: „… (×25)“
+//  - nach unten scrollen nur, wenn man schon unten war (sonst springt es beim Zurücklesen weg)
+const CONSOLE_MAX = 1000;
+let consoleQueue: string[] = [];
+let consoleFlush = 0;
+let lastLine: { el: HTMLElement; text: string; n: number } | null = null;
+
+function flushConsole() {
+  cancelAnimationFrame(consoleFlush);
+  consoleFlush = 0;
   const consoleEl = document.getElementById("console-log");
-  if (consoleEl) {
-    text.split("\n").forEach(zeile => {
-      const el = document.createElement("p");
-      el.className = "system-msg";
-      el.textContent = zeile;
-      consoleEl.appendChild(el);
-    });
-    consoleEl.scrollTop = consoleEl.scrollHeight;
+  const lines = consoleQueue;
+  consoleQueue = [];
+  if (!consoleEl || !lines.length) return;
+  const atBottom = consoleEl.scrollHeight - consoleEl.scrollTop - consoleEl.clientHeight < 40;
+  const frag = document.createDocumentFragment();
+  let added = 0;
+  for (const zeile of lines.slice(-CONSOLE_MAX)) {
+    if (lastLine && lastLine.text === zeile && (lastLine.el.isConnected || lastLine.el.parentNode === frag)) {
+      lastLine.n++;
+      lastLine.el.textContent = `${zeile} (×${lastLine.n})`;
+      continue;
+    }
+    const el = document.createElement("p");
+    el.className = "system-msg";
+    el.textContent = zeile;
+    frag.appendChild(el);
+    lastLine = { el, text: zeile, n: 1 };
+    added++;
+  }
+  if (added) consoleEl.appendChild(frag);
+  let extra = consoleEl.childElementCount - CONSOLE_MAX;
+  while (extra-- > 0 && consoleEl.firstElementChild) consoleEl.firstElementChild.remove();
+  if (atBottom) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+function appendToConsole(text: string) {
+  consoleQueue.push(...text.split("\n"));
+  // einmal pro Bild einfügen; falls das Fenster gerade nicht zeichnet (verdeckt), spätestens nach 200 ms
+  if (!consoleFlush) {
+    consoleFlush = requestAnimationFrame(flushConsole);
+    setTimeout(() => { if (consoleQueue.length) flushConsole(); }, 200);
   }
   console.log(text);
 }

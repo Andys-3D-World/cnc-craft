@@ -202,6 +202,10 @@
   times faster. Results are exactly the same as before. Measured: 1 GB lithophane 3MF (12.5 million triangles)
   ~45 s → ~8 s; 3MF with 1.6 million triangles 2.1 s → 0.25 s; height search over all 6 views of a 2.7 MB STEP
   11 s → 1.6 s.
+- **Console stays fast during long jobs:** it keeps the last 1,000 lines, adds new messages once per frame instead
+  of one by one, and counts repeated messages (“… (×25)”) instead of filling up. Before, every message cost more the
+  fuller the console was (about 30 ms each with 40,000 lines), so the whole program got slower the longer a job ran.
+  It only scrolls down if you are already at the bottom, so reading older messages is no longer interrupted.
 - **G-code simulation draws the toolpaths on the graphics card (GPU):** all moves are uploaded once (WebGL2), so
   rotating, zooming and the live progress stay smooth even with huge programs. Measured with 1 million moves:
   about 1,070 ms → 31 ms per frame; with 100,000 moves 81 → 7 ms. Same colours, dashes and line widths as before;
