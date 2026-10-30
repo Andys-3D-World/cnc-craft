@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Letter topper generator** (Extras): every character becomes its own topper – a letter, number or sign in a
+  decorative frame, or the whole text on one topper (e.g. *50* for a birthday cake). Frames: oval, circle,
+  rectangle, hexagon or heart; edge plain, scalloped, with beads (scallops with small holes) or double (engraved line
+  in the ring). Mount: a pointed stick for a cake or flower pot, a hole on top, two holes for a garland, or none.
+  Buttons fill in A–Z, a–z or 0–9. The character is sized so it reaches into the ring and is firmly joined to the
+  frame; single-line fonts become strokes, *Boldness* thickens thin fonts, and loose bits that would fall out are
+  left out with a note. Preview of all toppers, then they are placed on the bed in rows, each as a group. Tests check
+  for every frame, edge and mount that each topper is one piece and the holes have enough material around them.
 - **Christmas ornament generator** (Extras): a pendant with a name to laser or mill – bauble with cap, star (5–12
   points), Christmas tree, bell, heart or snowflake, all drawn for CNC Craft. The name (with an optional second
   line, e.g. the year) is fitted into the shape and engraved, cut out like a stencil, engraved as a line or made a

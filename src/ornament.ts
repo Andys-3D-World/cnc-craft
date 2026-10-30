@@ -81,7 +81,7 @@ function smooth(p: XY[], n = 6): XY[] {
 }
 
 /** Streifen mit runden Enden von a nach b, Breite w */
-function capsule(a: XY, b: XY, w: number): MultiPolygon {
+export function capsule(a: XY, b: XY, w: number): MultiPolygon {
   // gleich als ein Umriss (zwei Halbkreise) – eine Vereinigung von Rechteck und Kreisen verschluckt sich leicht
   const dir = Math.atan2(b[1] - a[1], b[0] - a[0]), r = w / 2, n = 12;
   const half = (c: XY, from: number): XY[] => Array.from({ length: n + 1 }, (_, i) => {
@@ -152,7 +152,7 @@ function rawShape(o: OrnamentOptions): { body: MultiPolygon; box: Box } {
 }
 
 /** liegt ein Kreis (mit Rand) ganz in der Fläche? */
-function diskFits(m: MultiPolygon, cx: number, cy: number, r: number): boolean {
+export function diskFits(m: MultiPolygon, cx: number, cy: number, r: number): boolean {
   if (!inRegion(m, cx, cy)) return false;
   return circle(cx, cy, r, 32).every(([x, y]) => inRegion(m, x, y));
 }
@@ -220,7 +220,7 @@ const countPieces = (m: MultiPolygon) => m.filter(p => p[0] && p[0].length >= 3)
 const ringArea = (r: XY[] | [number, number][]) => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return Math.abs(a / 2); };
 
 /** Rechteck mit runden Ecken */
-function roundRect(x0: number, y0: number, x1: number, y1: number, r: number): MultiPolygon {
+export function roundRect(x0: number, y0: number, x1: number, y1: number, r: number): MultiPolygon {
   r = Math.max(0, Math.min(r, (x1 - x0) / 2, (y1 - y0) / 2));
   const pts: XY[] = [];
   for (const [cx, cy, a0] of [[x1 - r, y0 + r, -90], [x1 - r, y1 - r, 0], [x0 + r, y1 - r, 90], [x0 + r, y0 + r, 180]] as const)
