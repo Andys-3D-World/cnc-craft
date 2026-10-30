@@ -10,6 +10,10 @@
   shows the picture under the lines); otherwise it goes to the middle of the bed. The lines go on the cut layer, so
   the picture is engraved first and then cut. Tests check that lines never cross except at the piece corners, that
   the same seed gives the same puzzle, and that lines end at the outline.
+- ***Puzzle generator*: load the picture right in the dialog and engrave only inside the puzzle.** *Load picture*
+  puts the picture on the bed together with the puzzle (height follows the picture, on the engrave layer).
+  *Engrave only inside the puzzle* gives the picture the puzzle outline as a mask – with an oval or heart nothing is
+  engraved outside (also works for a picture that was selected before). The preview shows the clipped picture.
 - **Letter topper generator** (Extras): every character becomes its own topper – a letter, number or sign in a
   decorative frame, or the whole text on one topper (e.g. *50* for a birthday cake). Frames: oval, circle,
   rectangle, hexagon or heart; edge plain, scalloped, with beads (scallops with small holes) or double (engraved line
