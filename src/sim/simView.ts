@@ -5,8 +5,11 @@
  *        links klicken (ohne Ziehen) = Bahn anklicken -> onPick(Zeile)
  * Farben: Schnitte nach Tiefe (hell = flach, dunkel = tief), Eilgänge orange gestrichelt,
  *         Leerfahrten grau. Bereits gefahrene Bahnen kräftig, noch kommende blass.
+ * Die Bahnen zeichnet die Grafikkarte (simGl.ts) – flüssig auch bei Millionen Bewegungen. Geht WebGL2 nicht,
+ * zeichnet das Canvas sie wie früher selbst.
  */
 import { SimProgram, MOVE_CUT, MOVE_RAPID } from "./gcodeParser";
+import { PathRenderer } from "./simGl";
 
 export type ViewPreset = "top" | "iso" | "front";
 
@@ -41,6 +44,9 @@ export class SimView {
   hiLine = -1;
 
   private dirty = true;
+  /** Bahnen auf der Grafikkarte zeichnen (false = immer mit dem Canvas, z. B. zum Vergleichen) */
+  useGpu = true;
+  private gpu = new PathRenderer();
   /** wie lange das Zeichnen dauert (ms, geglättet) – danach richtet sich die Bildrate im Live-Betrieb */
   drawMs = 0;
   onChange: () => void = () => {};
@@ -253,7 +259,14 @@ export class SimView {
       return Math.max(0, Math.min(DEPTH_COLORS.length - 1, Math.floor(t * DEPTH_COLORS.length)));
     };
     const cur = this.curIdx < 0 ? (this.live ? -1 : p.n) : this.curIdx;
+    const gpuImg = this.useGpu ? this.gpu.render(p, {
+      W, H, originX: W / 2 + this.panX, originY: H / 2 + this.panY, center: this.center,
+      yaw: this.yaw, pitch: this.pitch, scale: s, cur, started: this.curIdx >= 0, showRapids: this.showRapids,
+      depthColors: DEPTH_COLORS, rapidColor: RAPID_COLOR, travelColor: TRAVEL_COLOR
+    }) : null;
+    if (gpuImg) ctx.drawImage(gpuImg, 0, 0);
     const drawSet = (done: boolean) => {
+      if (gpuImg) return;
       const from = done ? 0 : Math.max(0, cur);
       const to = done ? Math.min(p.n, cur) : p.n;
       if (to <= from) return;

@@ -202,6 +202,10 @@
   times faster. Results are exactly the same as before. Measured: 1 GB lithophane 3MF (12.5 million triangles)
   ~45 s → ~8 s; 3MF with 1.6 million triangles 2.1 s → 0.25 s; height search over all 6 views of a 2.7 MB STEP
   11 s → 1.6 s.
+- **G-code simulation draws the toolpaths on the graphics card (GPU):** all moves are uploaded once (WebGL2), so
+  rotating, zooming and the live progress stay smooth even with huge programs. Measured with 1 million moves:
+  about 1,070 ms → 31 ms per frame; with 100,000 moves 81 → 7 ms. Same colours, dashes and line widths as before;
+  clicking a toolpath still jumps to its line. Without WebGL2 the canvas draws them as before.
 - **Picture engraving uses the graphics card (GPU):** *Adjust picture* (levels, curve, local contrast, denoise,
   sharpen, invert) runs on the GPU via WebGL2 for large pictures – about 60 ms instead of 400–500 ms for a
   24 × 34 cm photo at 0.1 mm. The engrave dialog now computes its preview in a background thread, so it opens at once
