@@ -3,6 +3,13 @@
 ## Next version (unreleased)
 
 **New**
+- **Christmas ornament generator** (Extras): a pendant with a name to laser or mill – bauble with cap, star (5–12
+  points), Christmas tree, bell, heart or snowflake, all drawn for CNC Craft. The name (with an optional second
+  line, e.g. the year) is fitted into the shape and engraved, cut out like a stencil, engraved as a line or made a
+  separate part to glue on. Hanger as a hole (placed as high as it fits with enough material around it) or a ring
+  on top, optional decorative line along the edge, text size in %. Live preview with the finished size in mm, then
+  the ornament is placed on the bed as a group. Tests check closed one-piece outlines, that the hole and the name
+  lie inside the shape and that the name stays clear of the hole.
 - **Birdhouse generator** (Extras): a nest box from flat panels for laser or CNC – front with entry hole, back,
   two side walls, floor and a two-part pitched roof. Walls and floor hold with finger joints like in the *Box
   generator*. Choose inner width, depth and height, roof pitch (20–60°), roof overhang, material thickness, finger
@@ -148,6 +155,9 @@
   asking. No guessed drift formula – only measured values are used. GRBL/grblHAL only.
 
 **Improved**
+- ***Name generator*:** the *Christmas bauble* and *Christmas star* templates moved to the new *Christmas
+  ornament generator*, so the name generator is only about lettering. Saved settings that used one of these templates
+  open as normal lettering.
 - ***Box generator*, dice tower:** the ramps adapt to the height – 35° when there is room, flatter in a low tower
   (down to 20°), two ramps instead of three if needed; the dialog shows ramp count and angle. If it is still too low,
   it says how high it must be at least for the chosen depth, instead of the misleading “too small for this material

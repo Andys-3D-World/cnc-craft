@@ -10,7 +10,7 @@
  *  - Ritzlinien: wo sich Buchstaben überlappen, bleibt die Kante des oberen als Gravurlinie (nameConnect.ts) –
  *    dafür wird jeder Buchstabe einzeln nachgezeichnet. Fettung macht dünne Schriften stabiler.
  *  - Fertige Breite: der Schriftzug wird so skaliert, dass er genau so breit wird
- *  - Vorlagen „Weihnachtskugel“ und „Weihnachtsstern“: Anhänger mit Kappe/Loch, der Name graviert oder ausgeschnitten
+ *  (Weihnachtskugel und -stern mit Namen gibt es im Weihnachtsschmuck-Generator, editor/ornamentGen.ts)
  * Die Vorschau zeigt, ob alles ein Teil ist (sonst Warnung mit der Anzahl). Rechnung in mm mit polygon-clipping,
  * „Aufs Bett“ legt das Ergebnis als Gruppe in die Bettmitte.
  */
@@ -29,7 +29,6 @@ import { t } from "../i18n/i18n";
 
 export type Connect = "none" | "baseline" | "outline";
 export type Hanger = "none" | "ringLeft" | "ringTop" | "hole";
-export type Template = "name" | "ball" | "star";
 export type Inner = "engrave" | "cut" | "layer" | "score";
 
 export interface NameOptions {
@@ -39,11 +38,10 @@ export interface NameOptions {
   connect: Connect;
   bar: number;         // Dicke der Grundlinie (mm)
   outline: number;     // Abstand des Umrisses (mm)
-  inner: Inner;        // Umriss/Vorlage: Buchstaben gravieren, ausschneiden oder als eigenes Teil (Rückplatte)
+  inner: Inner;        // Umriss: Buchstaben gravieren, ausschneiden oder als eigenes Teil (Rückplatte)
   syms: NameSym[];     // Symbole am Namen
   hanger: Hanger;
   holeD: number;       // Loch-Ø des Aufhängers (mm)
-  template: Template;
   score: boolean;      // Ritzlinien, wo sich Buchstaben/Symbole überlappen
   thicken: number;     // Fettung: jeder Buchstabe wächst um so viel (mm), Innenräume bleiben
   width: number;       // fertige Breite (mm), 0 = die Höhe gilt
@@ -73,7 +71,7 @@ export interface NameResult {
 const KEY = "cnc_craft_namegen";
 const DEF: NameOptions = {
   text: "Andreas", font: "Pacifico", bold: false, height: 25, spacing: 0, connect: "baseline", bar: 4, outline: 2.5,
-  inner: "engrave", syms: [{ id: "heart", a: 1, x: -0.06, y: 0, s: 1, r: 0 }], hanger: "none", holeD: 4, template: "name",
+  inner: "engrave", syms: [{ id: "heart", a: 1, x: -0.06, y: 0, s: 1, r: 0 }], hanger: "none", holeD: 4,
   score: true, thicken: 0, width: 0, own: []
 };
 
@@ -192,87 +190,54 @@ async function buildAt(o: NameOptions): Promise<NameResult> {
   const empty: NameResult = { cut: [], engrave: [], top: [], syms: [], origin: [0, 0], originR: 0, unit: 1, lines: [], linesTop: false, pieces: 0, w: 0, h: 0, openFont };
   if (!letters.length) return empty;
   const lb = bounds(letters), base = baselineOf(letters);
-  let cut: MultiPolygon, engrave: MultiPolygon = [], top: MultiPolygon = [];
+  let engrave: MultiPolygon = [], top: MultiPolygon = [];
   let scores: ScoreLine[] = [], lines: ScoreLine[] = [];
   let hole: MultiPolygon = [];
   const H = o.height;
-  let symAreas: MultiPolygon[] = [];
 
-  if (o.template === "name") {
-    // Symbole liegen über den Buchstaben (ihre Kanten werden zu Ritzlinien, wo sie den Namen überdecken)
-    symAreas = (o.syms || []).map(q => rotateArea(libShape(q.id, (q.a ? lb.x1 : lb.x0) + q.x * H, base + q.y * H, Math.max(0.1, q.s) * H, o.own), q.r));
-    const parts: MultiPolygon[] = [letters, ...symAreas];
-    const sb = bounds(union(parts));
-    const x0 = sb.x0, x1 = sb.x1;
-    if (o.score && glyphs.length) scores = overlapScores([...glyphs, ...symAreas]);
-    if (o.connect === "baseline") {
-      const bh = Math.max(0.5, o.bar);
-      parts.push(box(x0 + bh / 2, base - bh * 0.6, x1 - bh / 2, base + bh * 0.4, bh / 2));
-    }
-    let shape = dropPinholes(union(parts), Math.max(1, (H * 0.08) ** 2));
-    if (o.connect === "outline") {
-      engrave = o.inner === "engrave" ? shape : [];
-      if (o.inner === "layer") top = shape;
-      if (o.inner === "score") lines = [...outlineLines(shape), ...scores];
-      else if (o.inner === "layer") lines = scores;
-      const outer = solid(grow(shape, Math.max(0.3, o.outline)));
-      shape = o.inner === "cut" ? diff(outer, solid(shape)) : outer;
-    } else lines = scores;
-    // Aufhänger
-    const b = bounds(shape), rIn = Math.max(0.5, o.holeD / 2), rOut = rIn + Math.max(1.5, H * 0.08);
-    const midY = (base + H * 0.5);
-    if (o.hanger === "ringLeft") {
-      const cx = b.x0 - rOut + rOut * 0.45;
-      shape = union([shape, disk(cx, midY, rOut)]); hole = disk(cx, midY, rIn);
-    } else if (o.hanger === "ringTop") {
-      // am höchsten Punkt des Schriftzugs (z. B. Oberlänge vom d), sonst hinge der Ring in der Luft
-      let hi: [number, number] = [(b.x0 + b.x1) / 2, b.y1];
-      for (const poly of shape) for (const q of poly[0] || []) if (q[1] > hi[1] - 1e-9) hi = q;
-      const cx = hi[0], cy = hi[1] + rOut - rOut * 0.45;
-      shape = union([shape, disk(cx, cy, rOut)]); hole = disk(cx, cy, rIn);
-    } else if (o.hanger === "hole") {
-      // Loch im ersten Stück Material links (beim Umriss bzw. im vorderen Symbol): wo eine waagerechte Linie
-      // durch die Mitte zuerst aufs Material trifft, plus Rand
-      let xIn = Infinity;
-      for (const poly of shape) for (const rg of poly) for (let i = 0, j = rg.length - 1; i < rg.length; j = i++) {
-        const [ax, ay] = rg[j], [bx, by] = rg[i];
-        if ((ay > midY) !== (by > midY)) { const x = ax + ((midY - ay) * (bx - ax)) / (by - ay); xIn = Math.min(xIn, x); }
-      }
-      hole = disk((isFinite(xIn) ? xIn : b.x0) + rOut, midY, rIn);
-    }
-    cut = diff(shape, hole);
-    engrave = diff(engrave, hole);
-  } else {
-    // Vorlagen: Kugel oder Stern, Name in der Mitte
-    const W = lb.x1 - lb.x0, cx = (lb.x0 + lb.x1) / 2, cy = (base + lb.y1) / 2;
-    let body: MultiPolygon, topY: number;
-    if (o.template === "ball") {
-      const R = Math.max(W * 0.62, H * 1.3);
-      const capW = R * 0.42, capH = R * 0.24;
-      body = union([disk(cx, cy, R), box(cx - capW / 2, cy + R - capH * 0.4, cx + capW / 2, cy + R + capH * 0.6, capH * 0.15)]);
-      topY = cy + R + capH * 0.6;
-      if (o.hanger !== "ringTop" && o.hanger !== "none") hole = disk(cx, cy + R + capH * 0.12, Math.min(o.holeD / 2, capW * 0.3, capH * 0.3));
-    } else {
-      const Ro = Math.max(W * 0.8, H * 2.2), Ri = Ro * 0.48;
-      const pts: Pt[] = Array.from({ length: 10 }, (_, i) => {
-        const a = Math.PI / 2 + (i * Math.PI) / 5, r = i % 2 ? Ri : Ro;
-        return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
-      });
-      body = [[ring(pts)]];
-      topY = cy + Ro;
-      if (o.hanger !== "ringTop" && o.hanger !== "none") hole = disk(cx, cy + Ro * 0.72, Math.min(o.holeD / 2, Ro * 0.07));
-    }
-    if (o.hanger === "ringTop") {
-      const rIn = Math.max(0.5, o.holeD / 2), rOut = rIn + Math.max(1.5, H * 0.08), ccy = topY + rOut * 0.55;
-      body = union([body, disk(cx, ccy, rOut)]); hole = disk(cx, ccy, rIn);
-    }
-    // Name: gravieren oder ausschneiden (wie eine Schablone – Innenräume von o, a … fallen mit heraus)
-    if (o.score && glyphs.length) scores = overlapScores(glyphs);
-    if (o.inner === "engrave") { engrave = letters; cut = diff(body, hole); }
-    else if (o.inner === "score") { lines = [...outlineLines(letters), ...scores]; cut = diff(body, hole); }
-    else if (o.inner === "layer") { top = letters; lines = scores; cut = diff(body, hole); }
-    else cut = diff(body, union([hole, solid(letters)]));
+  // Symbole liegen über den Buchstaben (ihre Kanten werden zu Ritzlinien, wo sie den Namen überdecken)
+  const symAreas = (o.syms || []).map(q => rotateArea(libShape(q.id, (q.a ? lb.x1 : lb.x0) + q.x * H, base + q.y * H, Math.max(0.1, q.s) * H, o.own), q.r));
+  const parts: MultiPolygon[] = [letters, ...symAreas];
+  const sb = bounds(union(parts));
+  const x0 = sb.x0, x1 = sb.x1;
+  if (o.score && glyphs.length) scores = overlapScores([...glyphs, ...symAreas]);
+  if (o.connect === "baseline") {
+    const bh = Math.max(0.5, o.bar);
+    parts.push(box(x0 + bh / 2, base - bh * 0.6, x1 - bh / 2, base + bh * 0.4, bh / 2));
   }
+  let shape = dropPinholes(union(parts), Math.max(1, (H * 0.08) ** 2));
+  if (o.connect === "outline") {
+    engrave = o.inner === "engrave" ? shape : [];
+    if (o.inner === "layer") top = shape;
+    if (o.inner === "score") lines = [...outlineLines(shape), ...scores];
+    else if (o.inner === "layer") lines = scores;
+    const outer = solid(grow(shape, Math.max(0.3, o.outline)));
+    shape = o.inner === "cut" ? diff(outer, solid(shape)) : outer;
+  } else lines = scores;
+  // Aufhänger
+  const b = bounds(shape), rIn = Math.max(0.5, o.holeD / 2), rOut = rIn + Math.max(1.5, H * 0.08);
+  const midY = (base + H * 0.5);
+  if (o.hanger === "ringLeft") {
+    const cx = b.x0 - rOut + rOut * 0.45;
+    shape = union([shape, disk(cx, midY, rOut)]); hole = disk(cx, midY, rIn);
+  } else if (o.hanger === "ringTop") {
+    // am höchsten Punkt des Schriftzugs (z. B. Oberlänge vom d), sonst hinge der Ring in der Luft
+    let hi: [number, number] = [(b.x0 + b.x1) / 2, b.y1];
+    for (const poly of shape) for (const q of poly[0] || []) if (q[1] > hi[1] - 1e-9) hi = q;
+    const cx = hi[0], cy = hi[1] + rOut - rOut * 0.45;
+    shape = union([shape, disk(cx, cy, rOut)]); hole = disk(cx, cy, rIn);
+  } else if (o.hanger === "hole") {
+    // Loch im ersten Stück Material links (beim Umriss bzw. im vorderen Symbol): wo eine waagerechte Linie
+    // durch die Mitte zuerst aufs Material trifft, plus Rand
+    let xIn = Infinity;
+    for (const poly of shape) for (const rg of poly) for (let i = 0, j = rg.length - 1; i < rg.length; j = i++) {
+      const [ax, ay] = rg[j], [bx, by] = rg[i];
+      if ((ay > midY) !== (by > midY)) { const x = ax + ((midY - ay) * (bx - ax)) / (by - ay); xIn = Math.min(xIn, x); }
+    }
+    hole = disk((isFinite(xIn) ? xIn : b.x0) + rOut, midY, rIn);
+  }
+  const cut = diff(shape, hole);
+  engrave = diff(engrave, hole);
   top = diff(top, hole);
   const linesTop = !!top.length;
   lines = clipLines(lines, linesTop ? top : cut, 0.2);
@@ -301,6 +266,8 @@ function load(): NameOptions {
       if (raw.front) raw.syms.push({ id: raw.front, a: 0, x: -1, y: 0, s: 1, r: 0 });
       if (raw.back) raw.syms.push({ id: raw.back, a: 1, x: -0.06, y: 0, s: 1, r: 0 });
     }
+    // ältere Fassung: Vorlagen Kugel/Stern (jetzt im Weihnachtsschmuck-Generator) → normaler Schriftzug
+    delete raw.template;
     const o = { ...DEF, ...raw };
     o.syms = (Array.isArray(o.syms) ? o.syms : []).filter((q: any) => q && typeof q.id === "string")
       .map((q: any) => ({ id: q.id, a: q.a ? 1 : 0, x: +q.x || 0, y: +q.y || 0, s: +q.s || 1, r: +q.r || 0 }));
@@ -347,7 +314,6 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">
           <input id="ng-text" type="text" maxlength="60" style="width:100%;box-sizing:border-box;font-size:1rem;">
-          ${sel("ng-tpl", "ng.template", [["name", t("ng.tpl.name")], ["ball", t("ng.tpl.ball")], ["star", t("ng.tpl.star")]])}
           <label class="dlg-row"><span>${t("text.font")}</span><div id="ng-font" style="width:170px;"></div></label>
           <label class="dlg-row" style="cursor:pointer;"><span>${t("text.bold")}</span><input id="ng-bold" type="checkbox" style="width:auto;"></label>
           ${num("ng-h", "ng.height", "1", "3")}
@@ -355,7 +321,7 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
           ${num("ng-sp", "ng.spacing", "0.1", "-20")}
           ${num("ng-thick", "ng.thicken", "0.1")}
           <label class="dlg-row" style="cursor:pointer;" title="${t("ng.scoreTip")}"><span>${t("ng.score")}</span><input id="ng-score" type="checkbox" style="width:auto;"></label>
-          <div class="ng-only-name">
+          <div>
             ${sel("ng-con", "ng.connect", [["none", t("ng.con.none")], ["baseline", t("ng.con.baseline")], ["outline", t("ng.con.outline")]])}
             <div class="ng-only-bar">${num("ng-bar", "ng.bar", "0.5")}</div>
             <div class="ng-only-outline">${num("ng-out", "ng.outline", "0.5")}</div>
@@ -387,7 +353,6 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
   createFontPicker($<HTMLElement>("ng-font"), font, f => { font = f; schedule(); });
   // Werte per value setzen (der Name ist fremder Text – nie ins innerHTML)
   $("ng-text").value = init.text;
-  $<HTMLSelectElement>("ng-tpl").value = init.template;
   $("ng-bold").checked = init.bold;
   $("ng-h").value = String(init.height); $("ng-sp").value = String(init.spacing);
   $("ng-w").value = String(init.width); $("ng-thick").value = String(init.thicken); $("ng-score").checked = init.score;
@@ -405,16 +370,15 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
       text: $("ng-text").value, font, bold: $("ng-bold").checked, height: n("ng-h", DEF.height, 3), spacing: n("ng-sp", 0, -20),
       connect: v("ng-con") as Connect, bar: n("ng-bar", DEF.bar, 0.5), outline: n("ng-out", DEF.outline, 0.3),
       inner: v("ng-inner") as Inner, syms: syms.map(q => ({ ...q })), hanger: v("ng-hang") as Hanger,
-      holeD: n("ng-hd", DEF.holeD, 1), template: v("ng-tpl") as Template,
+      holeD: n("ng-hd", DEF.holeD, 1),
       score: $("ng-score").checked, thicken: Math.min(5, n("ng-thick", 0, 0)), width: n("ng-w", 0, 0), own
     };
   };
   const sync = (o: NameOptions) => {
     const show = (cls: string, on: boolean) => ov.querySelectorAll<HTMLElement>("." + cls).forEach(el => { el.style.display = on ? "" : "none"; });
-    show("ng-only-name", o.template === "name");
     show("ng-only-bar", o.connect === "baseline");
     show("ng-only-outline", o.connect === "outline");
-    show("ng-only-inner", o.template !== "name" || o.connect === "outline");
+    show("ng-only-inner", o.connect === "outline");
     show("ng-only-hole", o.hanger !== "none");
     $<HTMLElement>("ng-symsel").style.display = syms[selSym] ? "" : "none";
     if (syms[selSym]) {
