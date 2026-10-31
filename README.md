@@ -11,27 +11,63 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 
 ## Features
 
-- Drawing and import (SVG, DXF, PDF, PLT, images, 3D models as STL, 3MF and STEP), router toolpaths with a tool library like in Estlcam
-- Laser layers like in LightBurn (engrave/fill, line, cut with lead-in), plasma with kerf compensation, lead-ins,
-  sheet height probing and torch height control (THC)
-- Remnant sheet management: used areas are remembered, parts placed on them are not cut
-- 3D simulation with time, distance and G-code before every job
-- Libraries for router tools, laser layers and plasma cuts – with export/import and full backup;
-  all settings are also saved to a file and survive updates
-- Controllers: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB and Wi-Fi), Marlin, Ruida (CO₂), K40 (M2 Nano)
-- Connect several machines at once (e.g. laser via USB and router via Wi-Fi): switch between them, jobs keep running in
-  the background, “Stop all” stops every machine
-- Spindle, laser test fire, overrides 10–200 %, input indicators for limit switches and probes
-- Camera (USB webcam or IP camera): watch, photo/video, undistorted camera image under the drawing, alignment with 4 laser crosses
-- Network search for machines on Wi-Fi/LAN (FluidNC, grblHAL, MKS DLC32 …)
-- Set up Wi-Fi right from the app – pick nearby networks, special characters in passwords, first setup through the
-  board's own Wi-Fi (incl. MKS DLC32 MAX), custom name per machine
-- Machine settings ($$) explained in plain words, with backup/restore and factory reset – for grblHAL with the
-  descriptions straight from the board
-- Flash boards (ESP32/ESP32-S3 incl. .elf and grblHAL Web Builder .zip, Arduino UNO/Nano with bundled GRBL 1.1h)
-- Wiring diagrams for CNC Shield V3, MKS DLC32 V2.1 and MKS DLC32 MAX – drawn like the real boards, with jumpers / DIP switches
-  for microsteps, motor A as second motor, external drivers (TB6600, DM542); hover a wire to highlight it
-- Update right from the app (“Update now” in the ⓘ window, signed)
+**Design & import**
+- Drawing tools with Bézier curves and node editing, text with 26+ fonts, single-line fonts and all system fonts,
+  dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, nesting (also into offcuts)
+- Shape library, QR codes, serial numbers and variable text, several beds per project (like build plates in a slicer)
+- **Generators:** boxes with finger joints (20 types, with 3D view), jigsaw puzzles, Christmas ornaments, letter
+  toppers, birdhouses, mandalas and one-piece names with symbols
+- Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF and STEP – big files
+  are read in background threads
+- 3D view of the finished parts, node graph for reusable workflows
+
+**Router (CAM)**
+- Tool library like in Estlcam (end mills, ball, V-bits, chamfer, drills, thread mills …), Fusion 360 tool import,
+  material database with cutting data, tool wear compensation, tool coating
+- Outside / inside / on-line, pockets, adaptive clearing, finishing pass, ramp entry, holding tabs, dogbones,
+  drilling, chamfers, facing and spoilboard surfacing, V-carve & inlay, rest machining, thread milling
+  (internal/external), several operations per shape
+- 3D milling from STL models (roughing and finishing), automatic split into cut-outs, holes and pockets,
+  face stock on both sides
+- Tool change with tool length measurement, re-measure during long jobs, probing, height map, drilling cycles
+  G81–G89 on GRBL, slower feed in tight curves
+
+**Laser**
+- Layers like in LightBurn (fill, line, cut, fill + line) with cut order and lead-ins, holding tabs
+- Image engraving with 14 styles, tone curve, auto enhance and before/after preview – adjusted on the graphics card
+- Material view (see the result on wood, slate or acrylic), material presets incl. fibre laser, test grid,
+  your own presets, lower power in corners for lasers without M4
+- Rotary for tumblers and bottles, camera alignment and material detection
+
+**Plasma**
+- Kerf compensation, lead-ins, pierce points, material presets (40 A / 60 A air plasma), sheet height probing,
+  torch height control (THC)
+- Shortest cut order, rapids go around parts already cut, remnant sheet management (used areas are not cut again)
+
+**Simulation**
+- 3D simulation on the graphics card – smooth even with millions of moves – with time, distance, cost calculator
+- G-code editor (also while a job runs), click a toolpath to jump to its line, resume a job from any line
+
+**Machine control**
+- GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB and Wi-Fi), Marlin, Ruida (CO₂), K40 (M2 Nano)
+- Several machines at once (e.g. laser via USB and router via Wi-Fi), jobs keep running in the background,
+  “Stop all” stops every machine
+- Jogging limited to the bed, spindle, laser test fire, overrides 10–200 %, input indicators for limit switches and probes
+- Spindle inverter (VFD) over Modbus RTU/TCP, smart workshop (dust extractor, compressor … switch with the job),
+  the computer stays awake during a job
+- Camera (USB webcam or IP camera): watch, photo/video, camera image under the drawing
+
+**Setup help**
+- Network search for machines on Wi-Fi/LAN, Wi-Fi setup right from the app (incl. the board's own Wi-Fi)
+- Machine settings ($$) explained in plain words, with backup/restore and factory reset
+- Flash boards (ESP32/ESP32-S3 incl. grblHAL Web Builder .zip, Arduino UNO/Nano with GRBL 1.1h)
+- **Wiring diagrams for 10 boards** – Arduino CNC Shield V3, MKS DLC32 V2.1 and MAX, PiBot V4.96 Pro and V5.88 Ultra,
+  6 Pack, Jackpot, BTT SKR Pro, Arduino Mega + RAMPS, Ruida – drawn like the real boards, with external drivers,
+  inductive NPN/PNP sensors, rotary, displays and VFD wiring
+
+**Everything else**
+- Libraries for tools, laser layers and plasma cuts with export/import, full backup and workshop sync between two computers
+- All settings are also saved to a file and survive updates; update right from the app (signed)
 - 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 
 ## Screenshots
@@ -41,8 +77,10 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 | ![3D simulation](docs/screenshots/en/02-simulation.png) <br> **Simulation** – toolpaths in 3D, time and G-code | ![Laser](docs/screenshots/en/03-laser.png) <br> **Laser** – layers: engrave (fill) and cut |
 | ![Plasma](docs/screenshots/en/04-plasma.png) <br> **Plasma** – cuts, pierce points and lead-ins | ![Wiring diagram](docs/screenshots/en/05-wiring.png) <br> **Wiring diagram** – jumpers for microsteps and a second Y motor |
 | ![MKS DLC32 MAX](docs/screenshots/en/06-mks-max.png) <br> **MKS DLC32 MAX** – drawn like the real board | ![External drivers](docs/screenshots/en/07-external-drivers.png) <br> **External drivers** – TB6600 / DM542, hover a wire to highlight it |
+| ![Image engraving](docs/screenshots/en/08-image-engraving.png) <br> **Image engraving** – photos with before/after preview | ![Material view](docs/screenshots/en/09-material-view.png) <br> **Material view** – see the result on wood, slate or acrylic |
+| ![Shape tools](docs/screenshots/en/10-shape-tools.png) <br> **Shape tools** – booleans, dimensions, Bézier curves | ![Several beds](docs/screenshots/en/11-beds.png) <br> **Several beds** – one project, several plates |
 
-Download (Windows version signed via the [SignPath Foundation](https://signpath.org), see [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · What changed: [CHANGELOG.md](CHANGELOG.md) (German)
+Download (Windows version signed via the [SignPath Foundation](https://signpath.org), see [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · What changed: [CHANGELOG.md](CHANGELOG.md)
 
 ## ⚠️ Safety and liability
 

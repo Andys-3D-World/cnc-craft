@@ -11,26 +11,68 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 
 ## Was es kann
 
-- Zeichnen, Import (SVG, DXF, PDF, PLT, Bilder, 3D-Modelle als STL, 3MF und STEP), Fräsbahnen mit Werkzeug-Bibliothek wie in Estlcam
-- Laser-Ebenen wie in LightBurn (Gravieren, Linie, Schneiden mit Freischnitt), Plasma mit Schnittspalt, Anfahrbahn,
-  Blechhöhe abtasten und Höhenregelung (THC)
-- Restplatten-Verwaltung: verbrauchte Fläche wird gemerkt, Teile darauf werden nicht geschnitten
-- 3D-Simulation mit Zeit, Weg und G-Code vor jedem Job
-- Bibliotheken für Fräswerkzeuge, Laser-Ebenen und Plasma-Schnitte – mit Export/Import und Komplett-Sicherung;
-  alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates
-- Steuerungen: GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB und WLAN), Marlin, Ruida (CO₂), K40 (M2 Nano)
-- Mehrere Maschinen gleichzeitig verbinden (z. B. Laser per USB und Fräse per WLAN): auswählen, Jobs laufen im
-  Hintergrund weiter, „Alle stoppen“ für alle
-- Spindel, Laser-Testschuss, Overrides 10–200 %, Eingangs-Lämpchen für Endschalter und Taster
-- Kamera (USB-Webcam oder IP-Kamera): zuschauen, Foto/Video, entzerrtes Kamerabild unter der Zeichnung, Ausrichten mit 4 Laser-Kreuzen
-- Netzwerk-Suche für Maschinen im WLAN/LAN (FluidNC, grblHAL, MKS DLC32 …)
-- WLAN einrichten direkt aus der App – Netze in der Nähe auswählen, Sonderzeichen im Passwort, Erst-Einrichtung über das WLAN des Boards (inkl. MKS DLC32 MAX), eigener Name je Maschine
-- Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung – bei grblHAL mit den
-  Beschreibungen direkt vom Board
-- Board flashen (ESP32/ESP32-S3 inkl. .elf und grblHAL-Web-Builder-.zip, Arduino UNO/Nano mit mitgeliefertem GRBL 1.1h)
-- Anschlusspläne für CNC Shield V3, MKS DLC32 V2.1 und MKS DLC32 MAX – wie die echten Boards gezeichnet, mit Jumpern /
-  DIP-Schaltern für Mikroschritte, Motor A als zweitem Motor, externen Treibern (TB6600, DM542); Maus aufs Kabel hebt es hervor
-- Update direkt aus der App („Jetzt aktualisieren“ im ⓘ-Fenster, signiert)
+**Zeichnen & Import**
+- Zeichenwerkzeuge mit Bézier-Kurven und Knotenbearbeitung, Text mit 26+ Schriften, Einlinien-Schriften und allen
+  Systemschriften, Maße und Bedingungen, Verschmelzen und Ritzen, Muster, Vervielfältigen / „Bett füllen“,
+  Verschachteln (auch in Reststücke)
+- Formen-Bibliothek, QR-Codes, Seriennummern und variabler Text, mehrere Betten pro Projekt (wie Druckplatten im Slicer)
+- **Generatoren:** Boxen mit Fingerzinken (20 Arten, mit 3D-Ansicht), Puzzles, Christbaumschmuck, Buchstaben-Topper,
+  Vogelhäuser, Mandalas und Namen aus einem Stück mit Symbolen
+- Import von SVG, DXF, PDF, PLT und Bildern (Umriss oder Mittellinie nachzeichnen), 3D-Modelle als STL, 3MF und STEP –
+  große Dateien werden im Hintergrund gelesen
+- 3D-Ansicht der fertigen Teile, Node-Graph für wiederverwendbare Abläufe
+
+**Fräse (CAM)**
+- Werkzeug-Bibliothek wie in Estlcam (Schaft-, Kugel-, V-, Fasenfräser, Bohrer, Gewindefräser …), Import von
+  Fusion-360-Werkzeugen, Material-Datenbank mit Schnittdaten, Verschleiß-Ausgleich, Beschichtung
+- Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Dogbones, Bohren, Fasen,
+  Planfräsen und Opferplatte planen, V-Carve & Inlay, Restmaterial, Gewindefräsen (innen/außen), mehrere
+  Bearbeitungen pro Form
+- 3D-Fräsen aus STL-Modellen (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
+  Rohteil beidseitig planen
+- Werkzeugwechsel mit Längenmessung, Nachmessen bei langen Jobs, Antasten, Höhenkarte, Bohrzyklen G81–G89 auf GRBL,
+  langsamer in engen Kurven
+
+**Laser**
+- Ebenen wie in LightBurn (Füllen, Linie, Schneiden, Füllen + Linie) mit Schnittreihenfolge und Freischnitt, Haltestege
+- Bildgravur mit 14 Arten, Gradationskurve, automatischem Verbessern und Vorher/Nachher-Vorschau – auf der Grafikkarte
+  nachbearbeitet
+- Materialansicht (Ergebnis auf Holz, Schiefer oder Acryl sehen), Materialvorlagen inkl. Faserlaser, Testraster,
+  eigene Vorlagen, weniger Leistung in Ecken für Laser ohne M4
+- Rotationsachse für Becher und Flaschen, Kamera-Ausrichtung und Materialerkennung
+
+**Plasma**
+- Schnittspalt-Ausgleich, Anfahrbahnen, Einstichpunkte, Materialvorlagen (40 A / 60 A Luftplasma), Blechhöhe
+  abtasten, Höhenregelung (THC)
+- Kürzeste Schnittreihenfolge, Eilfahrten umfahren fertige Teile, Restplatten-Verwaltung (verbrauchte Fläche wird
+  nicht nochmal geschnitten)
+
+**Simulation**
+- 3D-Simulation auf der Grafikkarte – flüssig auch mit Millionen Bewegungen – mit Zeit, Weg und Kostenrechner
+- G-Code-Editor (auch während der Job läuft), Bahn anklicken springt zur Zeile, Job ab beliebiger Zeile fortsetzen
+
+**Maschinensteuerung**
+- GRBL / grblHAL / FluidNC / Grbl_ESP32 (USB und WLAN), Marlin, Ruida (CO₂), K40 (M2 Nano)
+- Mehrere Maschinen gleichzeitig (z. B. Laser per USB und Fräse per WLAN), Jobs laufen im Hintergrund weiter,
+  „Alle stoppen“ für alle
+- Verfahren nur innerhalb des Betts, Spindel, Laser-Testschuss, Overrides 10–200 %, Eingangs-Lämpchen für
+  Endschalter und Taster
+- Frequenzumrichter (VFD) über Modbus RTU/TCP, smarte Werkstatt (Absaugung, Kompressor … schalten mit dem Job),
+  der Computer bleibt während des Jobs wach
+- Kamera (USB-Webcam oder IP-Kamera): zuschauen, Foto/Video, Kamerabild unter der Zeichnung
+
+**Einrichtungshilfe**
+- Netzwerk-Suche für Maschinen im WLAN/LAN, WLAN einrichten direkt aus der App (auch über das WLAN des Boards)
+- Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung
+- Board flashen (ESP32/ESP32-S3 inkl. grblHAL-Web-Builder-.zip, Arduino UNO/Nano mit GRBL 1.1h)
+- **Anschlusspläne für 10 Boards** – Arduino CNC Shield V3, MKS DLC32 V2.1 und MAX, PiBot V4.96 Pro und V5.88 Ultra,
+  6 Pack, Jackpot, BTT SKR Pro, Arduino Mega + RAMPS, Ruida – wie die echten Boards gezeichnet, mit externen Treibern,
+  induktiven NPN/PNP-Sensoren, Drehachse, Displays und Frequenzumrichter
+
+**Und sonst**
+- Bibliotheken für Werkzeuge, Laser-Ebenen und Plasma-Schnitte mit Export/Import, Komplett-Sicherung und
+  Werkstatt-Sync zwischen zwei Computern
+- Alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates; Update direkt aus der App (signiert)
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 
 ## Bilder
@@ -40,6 +82,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 | ![3D-Simulation](docs/screenshots/02-simulation.png) <br> **Simulation** – Fräsbahnen in 3D, Zeit und G-Code | ![Laser](docs/screenshots/03-laser.png) <br> **Laser** – Ebenen: Gravieren (Fläche) und Schneiden |
 | ![Plasma](docs/screenshots/04-plasma.png) <br> **Plasma** – Schnitte, Einstichpunkte und Anfahrbahnen | ![Anschlussplan](docs/screenshots/05-anschluesse.png) <br> **Anschlussplan** – Jumper für Mikroschritte und zweiten Y-Motor |
 | ![MKS DLC32 MAX](docs/screenshots/06-mks-max.png) <br> **MKS DLC32 MAX** – wie das echte Board | ![Externe Treiber](docs/screenshots/07-extern.png) <br> **Externe Treiber** – TB6600 / DM542, Maus aufs Kabel hebt es hervor |
+| ![Bildgravur](docs/screenshots/08-bildgravur.png) <br> **Bildgravur** – Fotos mit Vorher/Nachher-Vorschau | ![Materialansicht](docs/screenshots/09-materialansicht.png) <br> **Materialansicht** – Ergebnis auf Holz, Schiefer oder Acryl |
+| ![Formen-Werkzeuge](docs/screenshots/10-formen.png) <br> **Formen-Werkzeuge** – Verschmelzen, Maße, Bézier-Kurven | ![Mehrere Betten](docs/screenshots/11-betten.png) <br> **Mehrere Betten** – ein Projekt, mehrere Platten |
 
 Download (Windows-Version signiert über die [SignPath Foundation](https://signpath.org), siehe [Code Signing Policy](#code-signing-policy)): [Releases](https://github.com/Andys-3D-World/cnc-craft/releases) · Was sich geändert hat: [CHANGELOG.md](CHANGELOG.md)
 

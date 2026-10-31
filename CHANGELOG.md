@@ -1,5 +1,12 @@
 # Changelog
 
+## Next version (unreleased)
+
+**Improved**
+- **README (English and German):** the feature list is complete again and grouped by area – design & import with
+  all generators, router CAM, laser, plasma, simulation, machine control, setup help (wiring diagrams for all 10
+  boards) – plus four more screenshots (image engraving, material view, shape tools, several beds).
+
 ## 0.3.4 Beta
 
 **New**
