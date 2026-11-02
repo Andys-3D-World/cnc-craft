@@ -26,12 +26,15 @@ T = {
   feats=[
    ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP)."),
    ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
-   ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill and dimensions that stay attached."),
+   ("🧩", "14 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, ornaments, birth letters, rulers, vent grilles and QR codes."),
+   ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
+   ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill, dimensions that stay attached and a right-click menu on the canvas."),
    ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
-   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket and engrave with a tool library – as simple as in Estlcam."),
+   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, dogbones, drilling and thread milling with a tool library – as simple as in Estlcam."),
+   ("🧊", "3D milling", "Rough and finish 3D models from STL, tool change with tool length measurement, probing and height map."),
    ("🔦", "Laser layers", "Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn."),
    ("🔥", "Plasma cutting", "Kerf compensation, lead-ins, pierce points, sheet height probing and torch height control (THC)."),
-   ("🎬", "3D simulation", "See every move, the time and the G-code before the machine starts."),
+   ("🎬", "3D simulation", "See every move, the time, the cost and the G-code before the machine starts – smooth even with millions of moves. Edit the G-code and resume a job from any line."),
    ("🔌", "Machine control", "GRBL, grblHAL, FluidNC, Grbl_ESP32 via USB or Wi-Fi, Marlin, Ruida (CO₂) and K40. Several machines at once."),
    ("📷", "Camera", "USB or IP camera: watch the job and place your design on the live image of the workpiece."),
    ("📶", "Wi-Fi setup", "Find machines on the network and set up the board's Wi-Fi right from the app."),
@@ -39,8 +42,11 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.3.0", nl="Image engraving with 14 styles and auto enhance, material preview, shape tools, Bézier curves, dimensions, several beds per project and new box types.",
-  nlink="All changes", vid="whatsnew-en.mp4", vpost="en/08-image-engraving",
+  nh="New in 0.3.5", nl="Export your drawing as SVG, DXF, PDF or PLT, a right-click menu on the canvas and many new generators – gears and pulleys, living hinges, rulers &amp; clock faces, wood joints, slot-together shelves, vent grilles and birth letters.",
+  nlink="All changes",
+  gens=[("boxgen", "Boxes"), ("gear", "Gears &amp; pulleys"), ("hinge", "Living hinges"), ("joint", "Wood joints"), ("birth", "Birth letters"),
+        ("namegen", "Names"), ("birdhouse", "Birdhouses"), ("mandala", "Mandalas"), ("ornament", "Ornaments"), ("lettertopper", "Letter toppers"),
+        ("scale", "Rulers &amp; clock faces"), ("vent", "Vent grilles"), ("puzzle", "Puzzles"), ("qrcode", "QR codes")],
   ch="Built for makers", cl="CNC Craft combines what usually needs three programs:",
   cmp=["Design", "CAM", "Machine control", "CNC Craft"],
   sh="Screenshots", sl="Click a picture to enlarge it.",
@@ -89,12 +95,15 @@ T = {
   feats=[
    ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, STEP) laden."),
    ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
-   ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung und Maße, die mitwandern."),
+   ("🧩", "14 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Anhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
+   ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),
+   ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung, Maße, die mitwandern, und ein Rechtsklick-Menü auf der Arbeitsfläche."),
    ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
-   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche und Gravur mit Werkzeug-Bibliothek – so einfach wie in Estlcam."),
+   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Dogbones, Bohren und Gewindefräsen mit Werkzeug-Bibliothek – so einfach wie in Estlcam."),
+   ("🧊", "3D-Fräsen", "3D-Modelle aus STL schruppen und schlichten, Werkzeugwechsel mit Längenmessung, Antasten und Höhenkarte."),
    ("🔦", "Laser-Ebenen", "Füllen, Linie und Schneiden mit eigener Leistung und Geschwindigkeit, Freischnitt – wie Ebenen in LightBurn."),
    ("🔥", "Plasmaschneiden", "Schnittspalt, Anfahrbahnen, Einstichpunkte, Blechhöhe abtasten und Höhenregelung (THC)."),
-   ("🎬", "3D-Simulation", "Jede Bewegung, die Zeit und den G-Code sehen, bevor die Maschine startet."),
+   ("🎬", "3D-Simulation", "Jede Bewegung, Zeit, Kosten und G-Code sehen, bevor die Maschine startet – flüssig auch bei Millionen Bewegungen. G-Code bearbeiten und Jobs ab jeder Zeile fortsetzen."),
    ("🔌", "Maschinensteuerung", "GRBL, grblHAL, FluidNC, Grbl_ESP32 per USB oder WLAN, Marlin, Ruida (CO₂) und K40. Mehrere Maschinen gleichzeitig."),
    ("📷", "Kamera", "USB- oder IP-Kamera: Job beobachten und die Zeichnung auf dem Livebild des Werkstücks platzieren."),
    ("📶", "WLAN einrichten", "Maschinen im Netzwerk finden und das WLAN des Boards direkt aus dem Programm einrichten."),
@@ -102,8 +111,11 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.3.0", nl="Bildgravur mit 14 Gravurtypen und „Automatisch verbessern“, Materialansicht, Form-Werkzeuge, Bézier-Kurven, Bemaßung, mehrere Betten pro Projekt und neue Kisten-Arten.",
-  nlink="Alle Änderungen", vid="whatsnew-de.mp4", vpost="de/08-bildgravur",
+  nh="Neu in 0.3.5", nl="Zeichnung als SVG, DXF, PDF oder PLT exportieren, ein Rechtsklick-Menü auf der Arbeitsfläche und viele neue Generatoren – Zahnräder und Riemenscheiben, Biegescharniere, Lineale &amp; Zifferblätter, Holzverbindungen, Steckregale, Lüftungsgitter und Geburtsbuchstaben.",
+  nlink="Alle Änderungen",
+  gens=[("boxgen", "Kisten"), ("gear", "Zahnräder &amp; Riemenscheiben"), ("hinge", "Biegescharniere"), ("joint", "Holzverbindungen"), ("birth", "Geburtsbuchstaben"),
+        ("namegen", "Namen"), ("birdhouse", "Vogelhäuser"), ("mandala", "Mandalas"), ("ornament", "Weihnachtsanhänger"), ("lettertopper", "Buchstaben-Stecker"),
+        ("scale", "Lineale &amp; Zifferblätter"), ("vent", "Lüftungsgitter"), ("puzzle", "Puzzles"), ("qrcode", "QR-Codes")],
   ch="Für Maker gebaut", cl="CNC Craft vereint, wofür man sonst drei Programme braucht:",
   cmp=["Design", "CAM", "Maschinensteuerung", "CNC Craft"],
   sh="Bilder", sl="Bild anklicken zum Vergrößern.",
@@ -171,6 +183,7 @@ def page(lang):
     legal = LEGAL[lang]["privacy"][0]
     imp = f' · <a href="{LEGAL[lang]["imprint"][0]}">{LEGAL[lang]["imprint"][1]}</a>' if CONTACT["address"] else ""
     foot = "\n".join(f"    <p>{x}</p>".replace("{legal}", legal).replace("{imprint}", imp) for x in t["foot"])
+    gens = "\n".join(f'      <figure class="card"><img src="{b}assets/img/gen/{k}.png" alt="CNC Craft – {h}" width="640" height="420" loading="lazy" decoding="async"><figcaption>{h}</figcaption></figure>' for k, h in t["gens"])
     chips = "".join(f'<span class="chip">{c}</span>' for c in t["chips"])
     first = t["shotlist"][0]
     return f'''<!doctype html>
@@ -225,7 +238,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.2.8</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.3.5</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>
@@ -244,7 +257,9 @@ def page(lang):
   <div class="wrap">
     <h2>{t["nh"]}</h2>
     <p class="lead">{t["nl"]} <a href="{GH}/blob/main/CHANGELOG.md">{t["nlink"]} →</a></p>
-    <video class="hero-shot" style="margin-top:0" src="{b}assets/video/{t["vid"]}" poster="{b}assets/img/{t["vpost"]}-960.webp" data-autoplay muted loop playsinline controls preload="none" width="1280" height="720"><track kind="captions" srclang="{lang}" label="{t["nh"]}" src="{b}assets/video/{t["vid"].replace(".mp4", ".vtt")}"></video>
+    <div class="grid gens">
+{gens}
+    </div>
   </div>
 </section>
 

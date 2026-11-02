@@ -38,7 +38,7 @@ export function renderCamPanel(container: HTMLElement) {
     <div class="strip-sep"></div>
     ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
       ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"],
-      ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
+      ["birth", "birth", "tip.cmd.birth"], ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
       ["shelf", "shelf", "tip.cmd.shelf"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
     ${flyCmds("extras", "extras", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
       ["materialTest", "materialTest", "tip.cmd.materialTest"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"],

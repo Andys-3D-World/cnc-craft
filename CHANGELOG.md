@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.5 Beta
 
 **New**
 - **Export drawing as SVG, DXF, PDF or PLT** (new ⤴ button in the file toolbar, Ctrl+E, or right-click → Export):
@@ -14,6 +14,13 @@
   (router: milling type) and export selection; on the empty canvas – paste, import, select all, export everything,
   show everything. Shortcuts are shown next to the entries, entries that do not fit are greyed out, works with the
   arrow keys, Enter and Escape. A right-click while drawing still finishes the line or cancels as before.
+- **Birth letter generator** (Generators): a big wooden letter with the baby's name, birth date, time, length and
+  weight. Name, date and birth data (with clock, ruler, weight and little-feet symbols) are placed inside the letter
+  automatically, up to three own pictures (PNG, JPG or SVG – e.g. animal line drawings) as large as they fit, and
+  small motifs (hearts, stars, leaves, flowers, butterflies) fill the rest. "Make the letter thicker" turns any font
+  into a chunky letter with round corners. Outline on the cutting layer, name on the fill layer, small texts in
+  single-line font and symbols on the weakest line layer, pictures as image engraving.
+- **Images:** SVG files can now be loaded as pictures (rendered sharp at 1600 px).
 - **Gear generator** (Generators): real involute spur gears to laser or mill – number of teeth, module, pressure
   angle (20° default), backlash and profile shift (with a hint when few teeth would be undercut). Centre hole: none,
   round bore, bore with keyway (width and depth from DIN 6885-1 for 6–110 mm shafts, or your own values) or D-flat
@@ -53,6 +60,8 @@
 - **README (English and German):** the feature list is complete again and grouped by area – design & import with
   all generators, router CAM, laser, plasma, simulation, machine control, setup help (wiring diagrams for all 10
   boards) – plus four more screenshots (image engraving, material view, shape tools, several beds).
+- **Website (English and German):** "New in 0.3.5" with a picture gallery of all 14 generators instead of the old
+  0.3.0 video, new feature cards for generators, export and 3D milling, router CAM and simulation cards updated.
 
 ## 0.3.4 Beta
 

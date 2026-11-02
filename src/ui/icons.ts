@@ -33,6 +33,7 @@ const P: Record<string, string> = {
   puzzle: `<path d="M4 7h4.2a2.3 2.3 0 1 1 4.6 0H17v4.2a2.3 2.3 0 1 1 0 4.6V20h-4.2a2.3 2.3 0 1 0-4.6 0H4z"/>`,
   extras: `<rect x="3" y="8" width="18" height="12" rx="1.5"/><path d="M9 8V5.5h6V8M3 13h18M10.5 13v2h3v-2"/>`,
   letterTopper: `<ellipse cx="12" cy="9" rx="6" ry="7.5"/><path d="M9.6 12.5L12 5.5l2.4 7M10.4 10.3h3.2" stroke-width="1.5"/><path d="M12 16.5V23" stroke-width="1.8"/>`,
+  birth: `<path d="M5 21V3h4.5l2.5 6 2.5-6H19v18h-4V11l-3 6-3-6v10z" stroke-width="1.5"/><path d="M12 19.6c-.9-.7-1.6-1.2-1.6-1.8a.8.8 0 011.6-.2.8.8 0 011.6.2c0 .6-.7 1.1-1.6 1.8z" stroke-width="1"/>`,
   vent: `<rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="M8 7.5l1.7 1v2l-1.7 1-1.7-1v-2zM15.5 7.5l1.7 1v2l-1.7 1-1.7-1v-2zM11.8 13l1.7 1v2l-1.7 1-1.7-1v-2z" stroke-width="1.3"/>`,
   shelf: `<path d="M5 2.5v19M19 2.5v19"/><path d="M3 7h18M3 13h18M3 19h18" stroke-width="1.5"/>`,
   joint: `<path d="M3 6h7v3h-3v3h3v3h-3v3h3v3H3z"/><path d="M21 6h-8v3h3v3h-3v3h3v3h-3v3h8z" stroke-width="1.5"/>`,

@@ -41,11 +41,13 @@ const MAX_CELLS = 12_000_000;
 /** Bild-Datei laden, verkleinern (max. 1600 px), als neue Bild-Form (Breite widthMm, unten links bei x0/y0 mm) */
 export async function createImageShape(name: string, bytes: Uint8Array, widthMm: number, x0: number, y0: number): Promise<any> {
   const ext = name.split(".").pop()?.toLowerCase() || "png";
-  const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "bmp" ? "image/bmp" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/png";
+  const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "bmp" ? "image/bmp" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp"
+    : ext === "svg" ? "image/svg+xml" : "image/png";
   const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
   try {
     const im = await loadImg(url);
-    const k = Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
+    // SVG hat keine feste Pixelgröße – immer auf 1600 px rechnen, damit Linien scharf bleiben
+    const k = ext === "svg" ? 1600 / Math.max(1, im.naturalWidth, im.naturalHeight) : Math.min(1, 1600 / Math.max(im.naturalWidth, im.naturalHeight));
     const pw = Math.max(1, Math.round(im.naturalWidth * k)), ph = Math.max(1, Math.round(im.naturalHeight * k));
     const c = document.createElement("canvas");
     c.width = pw; c.height = ph;
