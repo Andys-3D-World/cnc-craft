@@ -1,0 +1,73 @@
+name: 💡 Feature request
+description: A function that is missing or could be better
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are very welcome! You can write in **English or German** (Deutsch ist auch okay).
+        Please check the [feature list](https://github.com/Andys-3D-World/cnc-craft#features) first – maybe it is already there.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Drawing / design
+        - Import / export
+        - Generators (new generator or more options)
+        - Router CAM
+        - Laser
+        - Plasma
+        - Simulation / G-code
+        - Machine control
+        - Setup help (flash, Wi-Fi, $$, wiring)
+        - Camera
+        - User interface / usability
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: Describe the task or project – what is hard or impossible today?
+      placeholder: "I make … and today I have to …"
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How could CNC Craft help? Sketches, screenshots or examples are great.
+    validations:
+      required: true
+
+  - type: textarea
+    id: elsewhere
+    attributes:
+      label: Is it done well in another program?
+      description: e.g. "LightBurn → Tools → …" or a link to a video. Helps to understand what you mean.
+
+  - type: dropdown
+    id: importance
+    attributes:
+      label: How important is it for you?
+      options:
+        - Nice to have
+        - I would use it often
+        - I cannot use CNC Craft without it
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: test
+    attributes:
+      label: Help
+      options:
+        - label: I can test it on my machine when it is ready.
+        - label: I searched the [existing issues](https://github.com/Andys-3D-World/cnc-craft/issues?q=is%3Aissue) and this idea is new.
+          required: true

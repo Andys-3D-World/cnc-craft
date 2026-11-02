@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: ❓ Question / help with my machine
+    url: https://github.com/Andys-3D-World/cnc-craft/discussions/categories/q-a
+    about: How do I …? Setup questions and help from other users – please ask in Discussions.
+  - name: 🪵 Show your projects
+    url: https://github.com/Andys-3D-World/cnc-craft/discussions/categories/show-and-tell
+    about: Share what you made with CNC Craft.
+  - name: 🔒 Security problem
+    url: https://github.com/Andys-3D-World/cnc-craft/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: 🌐 Website and download
+    url: https://andys-3d-world.github.io/cnc-craft/
+    about: Feature list, screenshots, download and FAQ.

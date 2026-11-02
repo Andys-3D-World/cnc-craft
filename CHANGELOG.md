@@ -1,5 +1,12 @@
 # Changelog
 
+## Next version (unreleased)
+
+**Improved**
+- **GitHub:** issue forms for bug reports (with a "Safety" level for machines that moved unexpectedly or did not
+  stop), feature requests, missing boards/machines and translations; questions and project pictures go to
+  Discussions. New `CONTRIBUTING.md`, `SECURITY.md` (report security problems privately) and a pull request checklist.
+
 ## 0.3.5 Beta
 
 **New**

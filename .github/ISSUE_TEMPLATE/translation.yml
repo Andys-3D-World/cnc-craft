@@ -1,0 +1,50 @@
+name: 🌍 Translation
+description: Wrong, missing or strange text in one of the 7 languages
+title: "[Translation] "
+labels: ["translation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CNC Craft speaks Deutsch, English, Français, Español, Italiano, Nederlands and Polski.
+        Texts live in [`src/i18n/lang/`](https://github.com/Andys-3D-World/cnc-craft/tree/main/src/i18n/lang) – pull requests are welcome too.
+        Want a new language? Use this form as well.
+
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - Deutsch
+        - English
+        - Français
+        - Español
+        - Italiano
+        - Nederlands
+        - Polski
+        - New language
+    validations:
+      required: true
+
+  - type: input
+    id: where
+    attributes:
+      label: Where in the app?
+      placeholder: "e.g. Settings ($$) → $110, or the gear generator dialog"
+    validations:
+      required: true
+
+  - type: textarea
+    id: now
+    attributes:
+      label: Text now
+      description: A screenshot is fine.
+    validations:
+      required: true
+
+  - type: textarea
+    id: better
+    attributes:
+      label: Better text
+    validations:
+      required: true

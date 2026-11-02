@@ -1,0 +1,84 @@
+name: 🔌 Machine / board support
+description: Your board, controller or machine is missing (wiring diagram, flashing, connection)
+title: "[Board] "
+labels: ["board / machine", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        CNC Craft has wiring diagrams for 10 boards and talks to GRBL, grblHAL, FluidNC, Grbl_ESP32, Marlin, Ruida and K40.
+        Tell us what is missing for your setup. You can write in **English or German** (Deutsch ist auch okay).
+
+  - type: input
+    id: board
+    attributes:
+      label: Board / controller
+      description: Exact name and version as printed on the board.
+      placeholder: "e.g. MKS DLC32 V2.1, BTT Octopus, Ruida RDC6445G"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Firmware and version
+      description: "Shown by `$I` (GRBL) or `M115` (Marlin)."
+      placeholder: "e.g. grblHAL 20250101, FluidNC 3.9.1, Marlin 2.1.2"
+
+  - type: dropdown
+    id: machine
+    attributes:
+      label: Machine type
+      multiple: true
+      options:
+        - Diode laser
+        - CO₂ laser
+        - Fibre laser
+        - CNC router
+        - Plasma cutter
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: need
+    attributes:
+      label: What is missing?
+      multiple: true
+      options:
+        - Wiring diagram
+        - Flashing firmware from CNC Craft
+        - Connection does not work
+        - Wi-Fi setup
+        - Special function (rotary, THC, tool changer, VFD …)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What should CNC Craft do, and what happens today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: docs
+    attributes:
+      label: Manual, pinout, photos
+      description: Links to the manufacturer's manual / pinout and clear photos of both sides of the board help a lot.
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output of `$$` and `$I` (if it connects)
+      description: Please remove Wi-Fi passwords.
+      render: text
+
+  - type: checkboxes
+    id: test
+    attributes:
+      label: Help
+      options:
+        - label: I can test it with my board.

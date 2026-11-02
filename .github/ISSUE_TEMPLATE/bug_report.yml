@@ -1,0 +1,136 @@
+name: 🐞 Bug report
+description: Something does not work, crashes or gives wrong G-code
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping to make CNC Craft better! You can write in **English or German** (Deutsch ist auch okay).
+        ⚠️ If the machine moved unexpectedly or something got dangerous, choose "Safety" below – these are fixed first.
+
+  - type: input
+    id: version
+    attributes:
+      label: CNC Craft version
+      description: Click ⓘ at the top right of CNC Craft.
+      placeholder: "0.3.5 Beta"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (Apple chip)
+        - macOS (Intel)
+        - Windows 11
+        - Windows 10
+        - Linux (AppImage)
+        - Linux (.deb / .rpm)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen?
+      options:
+        - Drawing / design
+        - Import (SVG, DXF, PDF, PLT, images, STL, 3MF, STEP)
+        - Export (SVG, DXF, PDF, PLT)
+        - Generators (box, gear, puzzle, name …)
+        - Router CAM / toolpaths
+        - Laser (layers, image engraving)
+        - Plasma
+        - Simulation / G-code editor
+        - Machine control / connection
+        - Flash board / Wi-Fi setup / settings ($$)
+        - Wiring diagrams
+        - Camera
+        - Updates / installation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad is it?
+      options:
+        - Small (looks wrong, typo, inconvenient)
+        - Medium (a feature does not work, but there is a workaround)
+        - Big (crash, data lost, job cannot be done)
+        - Safety (machine moved unexpectedly, did not stop, laser/spindle stayed on)
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: Describe the problem. Screenshots help a lot (drag them into this field).
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What did you click, which file did you load?
+      placeholder: |
+        1. Open the box generator
+        2. Set thickness to 3 mm
+        3. Click "Place on bed"
+        4. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+
+  - type: input
+    id: machine
+    attributes:
+      label: Machine and board (if a machine is involved)
+      description: Machine type, board, firmware and version – e.g. "Diode laser, MKS DLC32 V2.1, Grbl_ESP32 1.0.10".
+      placeholder: "Laser / router / plasma · board · firmware + version"
+
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection (if a machine is involved)
+      options:
+        - No machine involved
+        - USB
+        - Wi-Fi / network
+    validations:
+      required: false
+
+  - type: textarea
+    id: console
+    attributes:
+      label: Console output
+      description: |
+        Copy the last lines from the CONSOLE panel (bottom right). For machine problems also the output of `$$` and `$I`.
+        Please remove Wi-Fi passwords if you see any.
+      render: text
+
+  - type: textarea
+    id: files
+    attributes:
+      label: Files
+      description: If a file causes the problem, attach it here (project file, SVG, DXF … – zip it if GitHub does not accept the type).
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you send
+      options:
+        - label: I searched the [existing issues](https://github.com/Andys-3D-World/cnc-craft/issues?q=is%3Aissue) and this was not reported yet.
+          required: true
+        - label: I use the latest version (or the bug still happens in the latest version).
+          required: false
