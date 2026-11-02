@@ -37,6 +37,7 @@ import { initAboutDialog } from "./ui/aboutDialog";
 import { initSupport } from "./ui/supportTip";
 import { attachPanelResizer, attachConsoleResizer } from "./ui/panelResize";
 import { initUpdater } from "./update/updater";
+import { initProjectSafety } from "./projectSafety";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
 import { setupToolsHandler } from "./toolsHandler";
@@ -237,6 +238,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initCamera(appendToConsole);       // 📷 oben rechts: Kamera-Fenster, Bild auf der Arbeitsfläche, Ausrichten
     if (restored > 0) appendToConsole(t("store.restored", { n: restored }));
     initUpdater(appendToConsole);      // Update-Prüfung über GitHub (aus, solange kein Repository eingetragen ist)
+    initProjectSafety(appendToConsole).catch(e => console.warn(e)); // Schließen: "Speichern?", automatische Sicherung, Wiederherstellen
     initSettingsPage(appendToConsole); // $$-Einstellungen (Reiter "Kalibrieren")
     initFlashPage(appendToConsole);    // Firmware flashen (Reiter "Board flashen")
     initLanguageMenu(document.getElementById("language-menu"), appendToConsole);

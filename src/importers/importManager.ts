@@ -37,6 +37,8 @@ import { getLayers, layersUsedBy, mergeProjectLayers } from "../laserLayers";
 import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
 import { graphForProject, loadProjectGraph } from "../nodes/graphStore";
+import { isDirty, markDirty, markClean, clearRecovery } from "../editor/projectDirty";
+import { askUnsaved } from "../ui/unsavedDialog";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
@@ -53,6 +55,14 @@ let ctx = {
   afterProjectLoad: (() => {}) as () => void
 };
 let lastProjectPath: string | null = null;
+// Nach dem Wiederherstellen: Pfad der ursprünglichen Datei als Vorschlag im Speichern-Dialog
+// (direkt schreiben geht nicht – die Freigabe aus dem Dialog gilt nur bis zum Programmende)
+let suggestedPath: string | null = null;
+
+/** Dateiname des Projekts (für den Fenstertitel), leer wenn noch nie gespeichert */
+export function projectName(): string {
+  return (lastProjectPath || suggestedPath || "").split(/[\\/]/).pop() || "";
+}
 
 export function initImports(state: any, redraw: () => void, log: (t: string) => void, afterProjectLoad: () => void) {
   ctx = { state, redraw, log, afterProjectLoad };
@@ -110,7 +120,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
       res = await openImageTraceDialog(name, bytes);
     }
     else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
-    else if (ext === "cncc") { loadProjectText(decodeText(bytes), name, fullPath); return; }
+    else if (ext === "cncc") { await loadProjectText(decodeText(bytes), name, fullPath); return; }
     else if (ext === "dwg") throw new Error(t("imp.errDwg"));
     else if (ext === "eps") throw new Error(t("imp.errEps"));
     else throw new Error(t("imp.errType", { ext }));
@@ -264,28 +274,63 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
 // PROJEKT SPEICHERN / ÖFFNEN (.cncc)
 // =====================================================================
 
-export async function saveProject(saveAs: boolean) {
+/** Alles, was in eine .cncc-Datei gehört (auch für die automatische Sicherung) */
+export function projectData() {
+  const bed = bedSizeMm();
+  // Alle Betten: Formen hintereinander, `beds` sagt, wie viele zu welchem Bett gehören
+  const beds = bedsForSave(), all = allShapes();
+  return { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: all, tools: toolsUsedBy(all),
+    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed(),
+    nodeGraph: graphForProject() };
+}
+
+/** Automatische Sicherung: Projekt + Pfad der Datei, zu der es gehört */
+export function recoveryText(): string {
+  return JSON.stringify({ ...projectData(), recoveryPath: lastProjectPath || suggestedPath });
+}
+
+/** Speichern – true, wenn es geklappt hat (false: Dialog abgebrochen oder Fehler) */
+export async function saveProject(saveAs: boolean): Promise<boolean> {
   const { log } = ctx;
   let p = saveAs ? null : lastProjectPath;
   if (!p) {
-    const sel = await save({ title: t("proj.saveTitle"), defaultPath: t("proj.defaultName") + ".cncc", filters: [{ name: t("imp.fProject"), extensions: ["cncc"] }] });
-    if (!sel) return;
+    const sel = await save({ title: t("proj.saveTitle"), defaultPath: suggestedPath || t("proj.defaultName") + ".cncc", filters: [{ name: t("imp.fProject"), extensions: ["cncc"] }] });
+    if (!sel) return false;
     // Genau den gewählten Pfad nehmen: nur der ist zum Schreiben freigegeben (kein ".cncc" mehr anhängen –
     // der Dialog setzt die Endung über den Filter selbst)
     p = String(sel);
   }
-  const bed = bedSizeMm();
-  // Alle Betten: Formen hintereinander, `beds` sagt, wie viele zu welchem Bett gehören
-  const beds = bedsForSave(), all = allShapes();
-  const data = { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: all, tools: toolsUsedBy(all),
-    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed(),
-    nodeGraph: graphForProject() };
   try {
-    await writeFile(p, new TextEncoder().encode(JSON.stringify(data)));
+    await writeFile(p, new TextEncoder().encode(JSON.stringify(projectData())));
     lastProjectPath = p;
+    suggestedPath = null;
+    markClean();
+    void clearRecovery();
     log(t("proj.saved", { p }));
+    return true;
   } catch (err) {
     log(t("proj.saveError", { e: String(err) }));
+    return false;
+  }
+}
+
+/** Vor dem Schließen/Öffnen: bei ungespeicherten Änderungen fragen. true = weitermachen */
+export async function guardUnsaved(): Promise<boolean> {
+  if (!isDirty()) return true;
+  const r = await askUnsaved();
+  if (r === "cancel") return false;
+  if (r === "save") return saveProject(false);
+  return true;
+}
+
+/** Projekt aus der automatischen Sicherung (nach Absturz) laden – bleibt "ungespeichert" */
+export async function restoreRecovered(text: string) {
+  let path: string | null = null;
+  try { const d = JSON.parse(text); if (typeof d?.recoveryPath === "string") path = d.recoveryPath; } catch { /* meldet loadProjectText */ }
+  try {
+    await loadProjectText(text, path?.split(/[\\/]/).pop() || t("proj.recovered"), undefined, path);
+  } catch (err) {
+    ctx.log(t("proj.openError", { e: String(err) }));
   }
 }
 
@@ -295,18 +340,18 @@ export async function openProjectWithDialog() {
   const p = pathOf(sel);
   try {
     const bytes = await readFile(p);
-    loadProjectText(decodeText(bytes), String(p).split(/[\\/]/).pop() || "Projekt", p);
+    await loadProjectText(decodeText(bytes), String(p).split(/[\\/]/).pop() || "Projekt", p);
   } catch (err) {
     ctx.log(t("proj.openError", { e: String(err) }));
   }
 }
 
-function loadProjectText(text: string, name: string, fullPath?: string) {
+async function loadProjectText(text: string, name: string, fullPath?: string, recoveredFrom?: string | null) {
   const { log } = ctx;
   let data: any;
   try { data = JSON.parse(text); } catch { throw new Error(t("proj.errBroken")); }
   if (data?.format !== "cnc-craft-project" || !Array.isArray(data.shapes)) throw new Error(t("proj.errInvalid"));
-  if (allShapes().length && !window.confirm(t("proj.confirmReplace"))) return;
+  if (!(await guardUnsaved())) return;
   // Werkzeuge aus dem Projekt übernehmen, falls sie in dieser Bibliothek fehlen
   const addedTools = mergeProjectTools(data.tools, data.shapes);
   if (addedTools) log(t("tool.importedFromProject", { n: addedTools }));
@@ -324,8 +369,11 @@ function loadProjectText(text: string, name: string, fullPath?: string) {
     if (h) { h.value = String(data.bed.h); h.dispatchEvent(new Event("input")); }
   }
   lastProjectPath = fullPath || null;
+  suggestedPath = recoveredFrom || null;
   updateDimensionInputs(null);
   ctx.afterProjectLoad();
   ctx.redraw();
+  if (recoveredFrom !== undefined) markDirty(); // wiederhergestellt: noch nicht gespeichert
+  else { markClean(); void clearRecovery(); }
   log(t("proj.opened", { name, n: data.shapes.length }));
 }

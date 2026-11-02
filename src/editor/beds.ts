@@ -17,6 +17,7 @@
  */
 import { app, bedSizeMm, toWorld } from "./editorState";
 import { takeHistory, putHistory, type HistoryState } from "./history";
+import { markDirty } from "./projectDirty";
 import { t } from "../i18n/i18n";
 import { MM_TO_PIXEL, groupBounds, shapeBounds, translateShape, type Bounds } from "../shapeTransform";
 import { tracePath } from "../render";
@@ -106,6 +107,7 @@ export function switchBed(i: number) {
 export function addBed(): number {
   stash();
   beds.push({ name: "", done: false, shapes: [] });
+  markDirty();
   changed();
   return beds.length - 1;
 }
@@ -117,6 +119,7 @@ export function removeBed(i: number) {
   if (n && !window.confirm(t("bed.confirmDelete", { name: bedName(i), n }))) return;
   removeStockBed(i, beds.length);
   beds.splice(i, 1);
+  markDirty();
   if (i === active) {
     active = Math.min(i, beds.length - 1);
     const st = app();
@@ -147,6 +150,7 @@ export function moveToBed(ids: string[], target: number): number {
   beds[target].hist = null;
   beds[target].done = false;
   putHistory(null);
+  markDirty();
   changed();
   return parts(moving);
 }

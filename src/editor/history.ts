@@ -7,6 +7,7 @@
  * auch für STL-Import, Innen/Außen usw., ohne dass jede Funktion daran denken muss.
  */
 import { app } from "./editorState";
+import { markDirty } from "./projectDirty";
 
 const MAX_STEPS = 100;
 const MAX_CHARS = 60_000_000; // ca. 120 MB Speicher für die gesamte Historie
@@ -33,6 +34,7 @@ export function checkpoint() {
   }
   redoStack.length = 0;
   committed = now;
+  markDirty();
 }
 
 function trim() {
@@ -54,6 +56,7 @@ export function undo(): boolean {
   redoStack.push(committed);
   committed = undoStack.pop()!;
   restore(committed);
+  markDirty();
   return true;
 }
 
@@ -63,6 +66,7 @@ export function redo(): boolean {
   undoStack.push(committed);
   committed = redoStack.pop()!;
   restore(committed);
+  markDirty();
   return true;
 }
 

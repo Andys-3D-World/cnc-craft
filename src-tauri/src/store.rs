@@ -135,6 +135,45 @@ pub fn read_settings(dir: &Path) -> Stored {
     Stored { main, backups }
 }
 
+// =====================================================================
+// WIEDERHERSTELLEN NACH ABSTURZ: ungespeichertes Projekt alle paar Minuten sichern
+// =====================================================================
+
+/// Hier liegt das zuletzt automatisch gesicherte Projekt (wird bei normalem Schließen gelöscht)
+pub const RECOVERY_FILE: &str = "recovery.json";
+/// Projekte mit Bildern können groß werden – aber nicht beliebig
+pub const MAX_RECOVERY_BYTES: u64 = 512 * 1024 * 1024;
+
+pub fn write_recovery(dir: &Path, data: &str) -> io::Result<()> {
+    if data.len() as u64 > MAX_RECOVERY_BYTES {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "project too large"));
+    }
+    if data.trim().is_empty() {
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, "project empty"));
+    }
+    fs::create_dir_all(dir)?;
+    write_atomic(&dir.join(RECOVERY_FILE), data.as_bytes())
+}
+
+/// Gesicherter Stand + Zeitpunkt der Sicherung (Sekunden seit 1970), falls vorhanden
+pub fn read_recovery(dir: &Path) -> Option<(String, u64)> {
+    let p = dir.join(RECOVERY_FILE);
+    let meta = fs::metadata(&p).ok()?;
+    if meta.len() > MAX_RECOVERY_BYTES {
+        return None;
+    }
+    let secs = meta.modified().ok()
+        .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    fs::read_to_string(&p).ok().filter(|s| !s.trim().is_empty()).map(|s| (s, secs))
+}
+
+pub fn clear_recovery(dir: &Path) {
+    let _ = fs::remove_file(dir.join(RECOVERY_FILE));
+    let _ = fs::remove_file(dir.join(RECOVERY_FILE).with_extension("json.tmp"));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,5 +219,22 @@ mod tests {
         let d = tmpdir("empty");
         assert!(write_settings_at(&d, "  ", 0).is_err());
         assert!(!d.join(MAIN_FILE).exists());
+    }
+
+    #[test]
+    fn recovery_write_read_clear() {
+        let d = tmpdir("rec");
+        assert!(read_recovery(&d).is_none());
+        assert!(write_recovery(&d, " ").is_err());
+        write_recovery(&d, "{\"shapes\":[]}").unwrap();
+        write_recovery(&d, "{\"shapes\":[1]}").unwrap();
+        let (data, secs) = read_recovery(&d).unwrap();
+        assert_eq!(data, "{\"shapes\":[1]}");
+        assert!(secs > 0);
+        // Einstellungen bleiben davon unberührt
+        assert!(!d.join(MAIN_FILE).exists());
+        clear_recovery(&d);
+        assert!(read_recovery(&d).is_none());
+        let _ = fs::remove_dir_all(&d);
     }
 }

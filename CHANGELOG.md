@@ -2,6 +2,15 @@
 
 ## Next version (unreleased)
 
+**New**
+- **Ask before closing:** closing the window or quitting (Cmd+Q, Alt+F4) or opening another project with unsaved
+  changes now asks "Save / Don't save / Cancel". The window title shows "●" while there are unsaved changes.
+- **Crash recovery:** while there are unsaved changes, the project is saved automatically every 90 seconds to the
+  app data folder (not next to your file). If CNC Craft crashes or is killed, the next start offers to restore it.
+
+**Fixed**
+- **Quitting with Cmd+Q (macOS)** now also stops a running job safely (laser/spindle off), like closing the window.
+
 **Improved**
 - **GitHub:** issue forms for bug reports (with a "Safety" level for machines that moved unexpectedly or did not
   stop), feature requests, missing boards/machines and translations; questions and project pictures go to

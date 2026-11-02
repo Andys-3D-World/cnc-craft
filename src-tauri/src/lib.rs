@@ -581,6 +581,36 @@ async fn settings_store_write(app: AppHandle, data: String) -> Result<(), String
     store::write_settings(&dir, &data).map_err(|e| e.to_string())
 }
 
+/// Wiederherstellen nach Absturz (store.rs): ungespeichertes Projekt im App-Datenordner sichern
+#[tauri::command]
+async fn recovery_write(app: AppHandle, data: String) -> Result<(), String> {
+    let dir = store_dir(&app)?;
+    // große Projekte (Bilder) nicht im Haupt-Thread schreiben
+    tauri::async_runtime::spawn_blocking(move || store::write_recovery(&dir, &data))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Serialize)]
+struct RecoveryRead {
+    data: String,
+    saved: u64,
+}
+
+/// Gesichertes Projekt vom letzten (abgestürzten) Lauf, falls vorhanden
+#[tauri::command]
+async fn recovery_read(app: AppHandle) -> Result<Option<RecoveryRead>, String> {
+    let dir = store_dir(&app)?;
+    Ok(store::read_recovery(&dir).map(|(data, saved)| RecoveryRead { data, saved }))
+}
+
+#[tauri::command]
+async fn recovery_clear(app: AppHandle) -> Result<(), String> {
+    store::clear_recovery(&store_dir(&app)?);
+    Ok(())
+}
+
 /// Werkstatt-Sync (libsync.rs): eine Bibliothek mit dem gemeinsamen Ordner abgleichen
 #[tauri::command]
 async fn libsync_sync(folder: String, kind: String, local: String, device: String, device_name: String, now: u64) -> Result<libsync::SyncResult, String> {
@@ -802,6 +832,23 @@ pub fn run() {
             workshop::init(Arc::new(move |d: &workshop::Device, on: bool, why: &str, err: Option<String>| {
                 let _ = handle.emit("workshop-action", serde_json::json!({ "id": d.id, "name": d.name, "on": on, "why": why, "error": err }));
             }));
+            // macOS: "Beenden" (Cmd+Q) schließt sonst sofort, ohne die Oberfläche zu fragen.
+            // Darum eigener Menüpunkt: er schließt das Fenster -> Frage "Speichern?" wie beim roten Knopf
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItem, MenuItemKind};
+                let menu = Menu::default(app.handle())?;
+                if let Some(MenuItemKind::Submenu(sub)) = menu.items()?.into_iter().next() {
+                    if let Some(quit) = sub.items()?.pop() { sub.remove(&quit)?; } // Standard-"Beenden" ist der letzte Punkt
+                    sub.append(&MenuItem::with_id(app.handle(), "app-quit", "Quit CNC Craft", true, Some("CmdOrCtrl+Q"))?)?;
+                }
+                app.set_menu(menu)?;
+                app.on_menu_event(|app, ev| {
+                    if ev.id() == "app-quit" {
+                        match app.get_webview_window("main") { Some(w) => { let _ = w.close(); } None => app.exit(0) }
+                    }
+                });
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -835,6 +882,9 @@ pub fn run() {
             app_info,
             settings_store_read,
             settings_store_write,
+            recovery_write,
+            recovery_read,
+            recovery_clear,
             libsync_sync,
             libsync_backup,
             net_scan,
@@ -857,15 +907,23 @@ pub fn run() {
             update::update_install,
             update::update_restart
         ])
-        // Fenster wird geschlossen: laufenden Job vorher sicher anhalten (Laser/Spindel aus)
+        // Fenster wird geschlossen: laufenden Job vorher sicher anhalten (Laser/Spindel aus).
+        // Erst bei "Destroyed": "CloseRequested" kommt auch, wenn man bei "Speichern?" Abbrechen wählt
         .on_window_event(|_window, event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
+            if let tauri::WindowEvent::Destroyed = event {
                 close_all();
                 vfd::stop_blocking(); // Spindel am Umrichter (Modbus) ebenfalls anhalten
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running CNC Craft");
+        .build(tauri::generate_context!())
+        .expect("error while running CNC Craft")
+        // Programm endet auf anderem Weg (z. B. Abmelden am Rechner): trotzdem sicher anhalten
+        .run(|_app, event| {
+            if let tauri::RunEvent::Exit = event {
+                close_all();
+                vfd::stop_blocking();
+            }
+        });
 }
 
 #[cfg(test)]
