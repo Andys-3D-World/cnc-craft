@@ -46,3 +46,27 @@ test("Sterne/Mond: graviert auf der Grundplatte oder ausgeschnitten; ohne Fuß k
 test("gleicher seed = gleiche Schattenbox", () => {
   assert.deepEqual(shadowBox(base).layers, shadowBox(base).layers);
 });
+
+test("Text vorn: steht in der vordersten Schicht (ein Teil), Sterne halten Abstand; hinten: graviert", () => {
+  const word: any = [[[[0, 0], [6, 0], [6, 10], [0, 10], [0, 0]]], [[[8, 0], [14, 0], [14, 10], [8, 10], [8, 0]]], [[[16, 0], [22, 0], [22, 10], [16, 10], [16, 0]]]];
+  for (const shape of BOX_SHAPES) {
+    const plain = shadowBox({ ...base, shape });
+    const front = shadowBox({ ...base, shape, textPos: "front", textLines: 1 }, { area: word, lines: [] });
+    assert.equal(front.layers[0].length, 1, `${shape}: vorderste Schicht nicht aus einem Stück`);
+    assert.equal(front.dropped, 0, `${shape}: Buchstaben fallen weg`);
+    // Material in der vordersten Schicht ist mehr geworden (Buchstaben + Steg), die anderen Schichten unverändert
+    const area = (m: any) => m.reduce((s: number, p: any) => s + p.reduce((t: number, r: any, k: number) => {
+      let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1];
+      return t + (k ? -1 : 1) * Math.abs(a / 2); }, 0), 0);
+    assert.ok(area(front.layers[0]) > area(plain.layers[0]) + 50, `${shape}: kein Text in der vordersten Schicht`);
+    assert.deepEqual(front.layers[1], plain.layers[1]);
+    const back = shadowBox({ ...base, shape, textPos: "back" }, { area: word, lines: [] });
+    assert.ok(area(back.backEngrave) > area(plain.backEngrave), `${shape}: Text hinten fehlt`);
+    assert.deepEqual(back.layers[0], plain.layers[0]);
+  }
+});
+
+test("Text in Einzellinien-Schrift: wird als Linie auf die Grundplatte graviert", () => {
+  const r = shadowBox({ ...base, textPos: "front" }, { area: [], lines: [{ pts: [[0, 0], [10, 10], [20, 0]], closed: false }] });
+  assert.equal(r.backLines.length, 1);
+});

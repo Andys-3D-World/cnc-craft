@@ -1,32 +1,44 @@
 /**
  * SCHATTENBOX / LICHTBOGEN – Fenster (Generatoren): Umriss, Größe, Anzahl Schichten, Landschaft (🎲 neu würfeln),
- * Sterne/Mond, Schleife, Standfuß mit Schlitzen. Vorschau zeigt alle Schichten übereinander wie fertig gebaut.
+ * Sterne/Mond, Schleife, Standfuß mit Schlitzen, Text (vorn stehend oder hinten graviert, mit Schriftwahl).
+ * Vorschau zeigt alle Schichten übereinander wie fertig gebaut.
  * „Aufs Bett“ legt alle Teile nebeneinander (jedes eine Gruppe). Geometrie: shadowBox.ts.
  */
-import type { MultiPolygon } from "polygon-clipping";
+import type { MultiPolygon, Polygon } from "polygon-clipping";
+import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
-import { MM_TO_PIXEL, newId } from "../shapeTransform";
+import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
+import { traceTextWithFont } from "./textTool";
+import { createFontPicker } from "./fontPicker";
+import type { OrnamentText } from "../ornament";
 import { toShapes } from "./shapeOps";
 import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
-import { bounds, union } from "../nameConnect";
+import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
 import { SCENE_KINDS, type SceneKind } from "../landscape";
 import { themeList, type Theme } from "../themes";
 import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
 import { shadowBox, BOX_SHAPES, type BoxShape, type Sky, type ShadowBoxOptions, type ShadowBoxResult } from "../shadowBox";
 
 const KEY = "cnc_craft_shadowbox";
-const DEF: ShadowBoxOptions = { theme: "christmas", shape: "bell", h: 220, layers: 3, frame: 9, scene: "village", seed: 1, sky: "engrave", bow: true, stand: true, t: 3, gap: 6, cable: true };
+type TextPos = "none" | "front" | "back";
+interface Opts extends ShadowBoxOptions { text: string; line2: string; font: string; bold: boolean }
+const DEF: Opts = { text: "", line2: "", font: "Pacifico", bold: false, textPos: "front", theme: "christmas", shape: "bell", h: 220, layers: 3, frame: 9, scene: "village", seed: 1, sky: "engrave", bow: true, stand: true, t: 3, gap: 6, cable: true };
 const SKIES: Sky[] = ["engrave", "cut", "none"];
 const SCENES = SCENE_KINDS.filter(k => k !== "none");
 /** Umrisse und Landschaften eines Themas (Umrisse nur, die es als Schattenbox gibt; sonst alle) */
 const shapesOf = (th: Theme) => { const l = themeList(th, "shapes").filter(s => (BOX_SHAPES as string[]).includes(s)); return l.length ? l : BOX_SHAPES; };
 const scenesOf = (th: Theme) => { const l = themeList(th, "scenes").filter(s => s !== "none"); return l.length ? l : SCENES; };
 
-function load(): ShadowBoxOptions {
+const POSITIONS: TextPos[] = ["front", "back"];
+
+function load(): Opts {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "{}");
-    const o: ShadowBoxOptions = { ...DEF };
+    const o: Opts = { ...DEF };
+    for (const k of ["text", "line2", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
+    if (typeof s.bold === "boolean") o.bold = s.bold;
+    if (POSITIONS.includes(s.textPos)) o.textPos = s.textPos;
     for (const k of ["h", "layers", "frame", "seed", "t", "gap"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     for (const k of ["bow", "stand", "cable"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
     if (BOX_SHAPES.includes(s.shape)) o.shape = s.shape;
@@ -35,6 +47,18 @@ function load(): ShadowBoxOptions {
     if (SKIES.includes(s.sky)) o.sky = s.sky;
     return o;
   } catch { return { ...DEF }; }
+}
+
+/** Text nachzeichnen: geschlossene Konturen als Fläche (Gerade/Ungerade), Einzellinien-Schrift als Linien */
+async function traceText(o: Opts): Promise<OrnamentText> {
+  const text = [o.text, o.line2].map(s => s.trim()).filter(Boolean).join("\n");
+  if (!text) return { area: [], lines: [] };
+  // mehr Zeilenabstand, damit der Steg unter der ersten Zeile nicht an der zweiten klebt
+  const tr = (await traceTextWithFont({ text, font: o.font, heightMm: 10, bold: o.bold, italic: false, align: "center", lineSpacing: 185, letterSpacing: 0 })).traced;
+  const loops = tr.loops.map(l => l.map(p => [p.x, p.y] as XY));
+  if (tr.closed?.some(c => !c)) return { area: [], lines: loops.filter(l => l.length >= 2).map((pts, i) => ({ pts, closed: tr.closed?.[i] !== false })) };
+  const rings: Polygon[] = loops.filter(l => l.length >= 3).map(l => [l]);
+  return { area: !rings.length ? [] : rings.length === 1 ? [rings[0]] : polygonClipping.xor(rings[0], ...rings.slice(1)), lines: [] };
 }
 
 /** Vorschau: Grundplatte hinten, Schichten davor (vorn heller), daneben der Fuß von oben */
@@ -48,9 +72,11 @@ function previewSvg(r: ShadowBoxResult): string {
   const n = r.layers.length;
   const shade = (i: number) => { const k = n > 1 ? 1 - i / (n - 1) : 1; return `rgb(${Math.round(150 + 80 * k)},${Math.round(105 + 85 * k)},${Math.round(60 + 80 * k)})`; };
   const sw = (Math.max(W, H) / 400).toFixed(2);
+  const ln = (l: ScoreLine) => l.pts.map(([x, y], i) => `${i ? "L" : "M"}${tf(x, y)}`).join("") + (l.closed ? "Z" : "");
   return `<svg viewBox="0 0 ${(W + 4).toFixed(1)} ${(H + 4).toFixed(1)}" style="width:100%;max-height:330px;">
     <path d="${d(r.back)}" fill="#2c3550" fill-rule="evenodd" stroke="#1a1f30" stroke-width="${sw}"/>
     <path d="${d(r.backEngrave)}" fill="#f2d98a" fill-rule="evenodd"/>
+    <path d="${r.backLines.map(ln).join("")}" fill="none" stroke="#f2d98a" stroke-width="${sw}"/>
     ${r.layers.map((_, i) => i).reverse().map(i => `<path d="${d(r.layers[i])}" fill="${shade(i)}" fill-rule="evenodd" stroke="#5a3a1c" stroke-width="${sw}"/>`).join("")}
     ${fb ? `<path d="${d(r.foot, fx, all.y0 - fb.y0)}" fill="#c98a4b" fill-rule="evenodd" stroke="#5a3a1c" stroke-width="${sw}"/>` : ""}</svg>`;
 }
@@ -81,6 +107,13 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
           ${sel("sb-scene", "sb.scene", SCENES, "orn.scene.")}
           <button id="sb-dice" class="btn-secondary" type="button" style="width:100%;margin:2px 0 6px;">🎲 ${t("orn.dice")}</button>
           ${sel("sb-sky", "sb.sky", SKIES, "sb.sky.")}
+          <label class="prop-row">${t("sb.text")}<input id="sb-text" type="text" maxlength="40" class="prop-input" style="width:150px;"></label>
+          <label class="prop-row">${t("orn.line2")}<input id="sb-line2" type="text" maxlength="40" class="prop-input" style="width:150px;"></label>
+          <div class="sb-only-text">
+            <label class="prop-row">${t("text.font")}<div id="sb-font" style="width:150px;"></div></label>
+            <label class="prop-row" style="cursor:pointer;"><span>${t("text.bold")}</span><input id="sb-bold" type="checkbox" style="width:auto;"></label>
+            ${sel("sb-tpos", "sb.textPos", POSITIONS, "sb.textPos.")}
+          </div>
           ${chk("sb-bow", "sb.bow", o.bow)}
           ${chk("sb-cable", "sb.cable", o.cable)}
           ${chk("sb-stand", "sb.stand", o.stand)}
@@ -97,6 +130,11 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
   document.body.appendChild(ov);
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => ov.querySelector("#" + id) as E;
   $<HTMLSelectElement>("sb-sky").value = o.sky;
+  // Werte per value setzen (der Text ist fremder Text – nie ins innerHTML)
+  $("sb-text").value = o.text; $("sb-line2").value = o.line2; $("sb-bold").checked = o.bold;
+  $<HTMLSelectElement>("sb-tpos").value = o.textPos === "back" ? "back" : "front";
+  let font = o.font;
+  createFontPicker($<HTMLElement>("sb-font"), font, f => { font = f; schedule(); });
   const applyTheme = (th: Theme, keep: Partial<ShadowBoxOptions> = {}) => {
     fillSelect($<HTMLSelectElement>("sb-shape"), shapesOf(th), "sb.shape.", keep.shape);
     fillSelect($<HTMLSelectElement>("sb-scene"), scenesOf(th), "orn.scene.", keep.scene);
@@ -105,36 +143,43 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
   applyTheme(o.theme || "christmas", o);
   $<HTMLSelectElement>("sb-theme").addEventListener("change", () => applyTheme($<HTMLSelectElement>("sb-theme").value as Theme));
 
-  const read = (): ShadowBoxOptions => {
+  const read = (): Opts => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
     return { theme: $<HTMLSelectElement>("sb-theme").value as Theme, shape: $<HTMLSelectElement>("sb-shape").value as BoxShape, h: n("sb-h", o.h, 60, 1000), layers: Math.round(n("sb-layers", o.layers, 1, 6)),
       frame: n("sb-frame", o.frame, 3, 50), scene: $<HTMLSelectElement>("sb-scene").value as SceneKind, seed: o.seed,
       sky: $<HTMLSelectElement>("sb-sky").value as Sky, bow: $("sb-bow").checked, stand: $("sb-stand").checked,
-      t: n("sb-t", o.t, 1, 20), gap: n("sb-gap", o.gap, 0, 50), cable: $("sb-cable").checked };
+      t: n("sb-t", o.t, 1, 20), gap: n("sb-gap", o.gap, 0, 50), cable: $("sb-cable").checked,
+      text: $("sb-text").value, line2: $("sb-line2").value, font, bold: $("sb-bold").checked,
+      textPos: $<HTMLSelectElement>("sb-tpos").value as TextPos, textLines: [$("sb-text").value, $("sb-line2").value].filter(x => x.trim()).length };
   };
-  let timer = 0;
-  const preview = () => {
-    const p = read();
+  let timer = 0, run = 0;
+  /** Schattenbox mit Text rechnen (Schrift nachzeichnen ist asynchron) */
+  const build = async (p: Opts) => shadowBox(p, await traceText(p));
+  const preview = async () => {
+    const p = read(), my = ++run;
     ov.querySelectorAll<HTMLElement>(".sb-only-stand").forEach(el => { el.style.display = p.stand ? "" : "none"; });
-    const r = shadowBox(p);
+    ov.querySelectorAll<HTMLElement>(".sb-only-text").forEach(el => { el.style.display = (p.text + p.line2).trim() ? "" : "none"; });
+    const r = await build(p);
+    if (my !== run) return; // inzwischen geändert
     $<HTMLElement>("sb-svg").innerHTML = previewSvg(r);
     const bb = bounds(r.back);
-    $<HTMLElement>("sb-info").textContent = t("sb.info", { n: r.layers.length + 1 + (r.foot.length ? 1 : 0), w: (bb.x1 - bb.x0).toFixed(0), h: (bb.y1 - Math.max(bb.y0, 0)).toFixed(0) });
+    $<HTMLElement>("sb-info").textContent = t("sb.info", { n: r.layers.length + 1 + (r.foot.length ? 1 : 0), w: (bb.x1 - bb.x0).toFixed(0), h: (bb.y1 - Math.max(bb.y0, 0)).toFixed(0) })
+      + (r.dropped ? " · " + t("orn.dropped", { n: r.dropped }) : "");
   };
   const schedule = () => { clearTimeout(timer); timer = window.setTimeout(preview, 150); };
   ov.querySelectorAll("input, select").forEach(i => i.addEventListener(i.tagName === "SELECT" || (i as HTMLInputElement).type === "checkbox" ? "change" : "input", schedule));
   $<HTMLElement>("sb-dice").onclick = () => { o.seed = 1 + Math.floor(Math.random() * 99999); schedule(); };
   preview();
 
-  const close = () => { clearTimeout(timer); ov.remove(); };
+  const close = () => { clearTimeout(timer); run++; ov.remove(); };
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   $<HTMLElement>("sb-cancel").onclick = close;
-  $<HTMLElement>("sb-ok").onclick = () => {
+  $<HTMLElement>("sb-ok").onclick = async () => {
     const p = read();
     try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* egal */ }
+    const r = await build(p);
     close();
-    const r = shadowBox(p);
     const { n, over } = place(r);
     log(t("sb.done", { n }));
     if (over) log(t("sb.bigger"));
@@ -147,9 +192,11 @@ function place(r: ShadowBoxResult): { n: number; over: boolean } {
   const st = app(), bed = bedSizeMm(), layers = getLayers();
   const cutL = layers.filter(l => l.mode === "line").sort((a, c) => c.power - a.power)[0];
   const engL = layers.find(l => l.mode === "fill");
+  const markL = layers.filter(l => l.mode === "line").sort((a, c) => a.power - c.power)[0];
   const source = t("sb.title");
-  const parts: { cut: MultiPolygon; eng: MultiPolygon }[] = [...r.layers.map(l => ({ cut: l, eng: [] as MultiPolygon })), { cut: r.back, eng: r.backEngrave }];
-  if (r.foot.length) parts.push({ cut: r.foot, eng: [] });
+  const parts: { cut: MultiPolygon; eng: MultiPolygon; lines: ScoreLine[] }[] = [...r.layers.map(l => ({ cut: l, eng: [] as MultiPolygon, lines: [] as ScoreLine[] })),
+    { cut: r.back, eng: r.backEngrave, lines: r.backLines }];
+  if (r.foot.length) parts.push({ cut: r.foot, eng: [], lines: [] });
   const made: any[] = [];
   let x = 10, y = 10, rowH = 0;
   for (const p of parts) {
@@ -159,6 +206,8 @@ function place(r: ShadowBoxResult): { n: number; over: boolean } {
     const px = (m: MultiPolygon): MultiPolygon => m.map(q => q.map(rg => rg.map(([qx, qy]) => [(qx + dx) * MM_TO_PIXEL, (qy + dy) * MM_TO_PIXEL] as [number, number])));
     made.push(...toShapes(px(p.cut), cutL ? { laserLayerId: cutL.id } : {}).map(s => ({ ...s, groupId, source })));
     made.push(...toShapes(px(p.eng), engL ? { laserLayerId: engL.id } : {}).map(s => ({ ...s, groupId, source, millingMode: "pocket", millingDepth: -0.5 })));
+    for (const l of p.lines) made.push(createPolyline(l.pts.map(([qx, qy]) => ({ x: (qx + dx) * MM_TO_PIXEL, y: (qy + dy) * MM_TO_PIXEL })), l.closed, "on-line",
+      { ...(markL ? { laserLayerId: markL.id } : {}), millingDepth: -0.3, isScore: true, groupId, source }));
     x += w + 8; rowH = Math.max(rowH, h);
   }
   st.shapes = [...st.shapes, ...made];

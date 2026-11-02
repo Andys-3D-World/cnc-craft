@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **Text in the shadow box:** a name or saying (two lines possible, any font) either *standing in front* – the letters
+  stand in the front layer on a thin bar from edge to edge (one bar per line), in the sky above the landscape – or
+  *engraved at the back* on the back plate. The text sits below the moon/sun and the stars keep clear of it; with a
+  single-line font it is engraved as a line. Tests check the front layer stays one piece with the letters in it.
 - **Decorations for every season:** the *Christmas ornament generator* is now the *Decoration ornament* generator,
   and it, the *3D slot ornament* and the *Shadow box* get a **Theme**: Christmas, Easter, Halloween, Spring, Summer,
   Autumn, Love (Valentine's, Mother's Day, wedding) or all. The theme picks matching shapes, decorations, toppers

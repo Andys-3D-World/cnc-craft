@@ -7,6 +7,8 @@
  *    unten, nach hinten kleiner und höher – so entsteht Tiefe. Fenster und Türen sind ausgeschnitten (Licht).
  *  - Grundplatte: voller Umriss, Himmel mit Sternen und Mond (graviert oder ausgeschnitten), optional Schleife oben
  *    und ein Loch fürs LED-Kabel.
+ *  - Text (optional): vorn stehend – die Buchstaben stehen in der vordersten Schicht auf einem Steg von Rand zu Rand
+ *    (je Zeile einer), im Himmel über der Landschaft – oder hinten auf die Grundplatte graviert.
  *  - Standfuß (optional): Platte mit Schlitzen; jede Schicht hat unten zwei Zapfen, die genau hineinpassen.
  *    Ohne Fuß werden die Schichten mit Abstandshaltern aufeinandergeklebt.
  * Umriss aus dem Weihnachtsschmuck (Glocke, Kugel, Bogen, Herz, Tannenbaum). Alles für CNC Craft gezeichnet.
@@ -17,7 +19,8 @@
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { bounds, union, unionMany, grow, type XY } from "./nameConnect.ts";
-import { ornamentBody, motif, type OrnamentShape } from "./ornament.ts";
+import { ornamentBody, motif, fitText, lineBaselines, type OrnamentShape, type OrnamentText } from "./ornament.ts";
+import { inRegion, type ScoreLine } from "./nameConnect.ts";
 import { scene, rng, type SceneKind } from "./landscape.ts";
 import { themeSky, type Theme } from "./themes.ts";
 
@@ -38,6 +41,8 @@ export interface ShadowBoxOptions {
   t: number;          // Materialstärke (mm)
   gap: number;        // Abstand zwischen den Schichten im Fuß (mm)
   cable: boolean;     // Loch fürs LED-Kabel in der Grundplatte
+  textPos?: "none" | "front" | "back"; // Text vorn stehend oder hinten graviert
+  textLines?: number; // Anzahl Textzeilen (für die Stege)
   theme?: Theme;      // Himmel: Weihnachten = Sterne + Mondsichel, Halloween = Fledermäuse + Vollmond, Ostern = Schmetterlinge + Sonne …
 }
 
@@ -49,6 +54,8 @@ export interface ShadowBoxResult {
   tabs: { x: number; w: number }[]; // Zapfen (Mitte x, Breite) – gleich für alle Schichten
   slots: { y: number }[];   // Schlitze im Fuß: Vorderkante je Schicht (inkl. Grundplatte)
   w: number; h: number;     // Größe einer Schicht (ohne Zapfen/Schleife)
+  backLines: ScoreLine[];   // Text in Einzellinien-Schrift (graviert)
+  dropped: number;          // Text vorn: lose Teilchen (z. B. i-Punkte), die wegfallen
 }
 
 const close = (r: XY[]): XY[] => [...r, r[0]];
@@ -69,7 +76,7 @@ function inset(m: MultiPolygon, d: number): MultiPolygon {
 /** Spiel im Schlitz (mm) */
 export const SLOT_CLEAR = 0.15;
 
-export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
+export function shadowBox(o: ShadowBoxOptions, text: OrnamentText = { area: [], lines: [] }): ShadowBoxResult {
   const H = Math.max(60, o.h), n = Math.round(Math.max(1, Math.min(6, o.layers))), fw = Math.max(3, Math.min(o.frame, H / 8));
   const t = Math.max(1, o.t);
   // Umriss aus dem Weihnachtsschmuck (ohne Aufhänger)
@@ -86,6 +93,24 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
   // Zapfen: zwei, symmetrisch
   const tw = Math.max(6, wB * 0.18), tabs = o.stand ? [{ x: -wB * 0.3, w: tw }, { x: wB * 0.3, w: tw }] : [];
   const tabArea = unionMany(tabs.map(tb => rect(tb.x - tb.w / 2, -t, tb.x + tb.w / 2, 0.5)));
+  // Himmel: Mond/Sonne oben rechts (auch für das Textfeld wichtig)
+  const th = themeSky(o.theme || "christmas");
+  const moonR = wh * (th.body === "crescent" ? 0.07 : 0.085), mx = wb.x1 - (wb.x1 - wb.x0) * 0.24, my = wb.y1 - wh * 0.16;
+  // Text: im Himmel über der Landschaft, unter dem Mond, so breit wie das Fenster dort ist
+  const pos = o.textPos || "none";
+  let tx: OrnamentText = { area: [], lines: [] }, textBox: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  if (pos !== "none" && (text.area.length || text.lines.length)) {
+    const y0 = wb.y0 + wh * 0.5, yTop = o.sky === "none" ? wb.y1 - wh * 0.08 : my - moonR - wh * 0.03;
+    let y1 = Math.min(yTop, y0 + wh * 0.3);
+    const half = (y: number) => { let w = 0; while (w < wb.x1 && inRegion(win, w + 0.5, y) && inRegion(win, -w - 0.5, y)) w += 0.5; return w; };
+    // oben zu schmal (z. B. die Kerbe beim Herz): Oberkante nach unten rücken
+    while (y1 > y0 + wh * 0.12 && half(y1) < half(y0) * 0.6) y1 -= wh * 0.02;
+    const hw = Math.min(half(y0), half((y0 + y1) / 2), half(y1)) * 0.86;
+    if (y1 - y0 > wh * 0.05 && hw > 3) {
+      textBox = { x0: -hw, y0, x1: hw, y1 };
+      tx = fitText(text, textBox);
+    }
+  }
   const r = rng(o.seed || 1);
   const layers: MultiPolygon[] = [];
   for (let i = 0; i < n; i++) {
@@ -98,6 +123,20 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
     // falls die Landschaft irgendwo frei schwebt (sehr schmale Formen): nur das größte Teil behalten
     if (layer.length > 1) layer = [layer.reduce((a, p) => (bounds([p]).y1 - bounds([p]).y0 > bounds([a]).y1 - bounds([a]).y0 ? p : a))];
     layers.push(layer);
+  }
+  // Text vorn: Buchstaben im Fenster der vordersten Schicht, je Zeile ein Steg bis in die Mitte des Rahmens
+  let dropped = 0, backLines: ScoreLine[] = [];
+  if (pos === "front" && tx.area.length) {
+    const tb = bounds(tx.area), bar = Math.max(1.5, ((tb.y1 - tb.y0) / Math.max(1, o.textLines || 1)) * 0.09);
+    const reach = inset(outline, fw / 2);
+    const stege = union(lineBaselines(tx.area, o.textLines || 0).map(base => rect(wb.x0 - 1, base - bar * 0.6, wb.x1 + 1, base + bar * 0.4)));
+    let front = unionMany([layers[0], polygonClipping.intersection(tx.area, win), polygonClipping.intersection(stege, reach)]);
+    if (front.length > 1) {
+      const area = (p: MultiPolygon[number]) => { const q = p[0]; let a = 0; for (let i = 0, j = q.length - 1; i < q.length; j = i++) a += q[j][0] * q[i][1] - q[i][0] * q[j][1]; return Math.abs(a); };
+      dropped = front.length - 1;
+      front = [front.reduce((a, p) => (area(p) > area(a) ? p : a))];
+    }
+    layers[0] = front;
   }
   // Grundplatte: voller Umriss, Schleife oben, Himmel, Kabelloch
   let back = unionMany([shape, tabArea]);
@@ -115,8 +154,7 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
   if (o.sky !== "none") {
     // Motive verstreut im oberen Teil des Fensters (je nach Thema), oben rechts Mondsichel, Vollmond oder Sonne
     const parts: MultiPolygon[] = [];
-    const sky = rng((o.seed || 1) * 7 + 3), y0 = wb.y0 + wh * 0.5, th = themeSky(o.theme || "christmas");
-    const moonR = wh * (th.body === "crescent" ? 0.07 : 0.085), mx = wb.x1 - (wb.x1 - wb.x0) * 0.24, my = wb.y1 - wh * 0.16;
+    const sky = rng((o.seed || 1) * 7 + 3), y0 = wb.y0 + wh * 0.5;
     const full = poly(ellipse(mx, my, moonR, moonR));
     parts.push(th.body === "crescent" ? diff(full, poly(ellipse(mx + moonR * 0.45, my + moonR * 0.25, moonR * 0.9, moonR * 0.9)))
       : th.body === "sun" ? union([full, motif("suns", mx, my, moonR * 2.6)]) : full);
@@ -126,12 +164,18 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
       // nur ganz im Fenster und mit Abstand zueinander und zum Mond
       if (polygonClipping.difference(star, inset(win, 2)).length) continue;
       if (Math.hypot(x - mx, y - my) < moonR * (th.body === "sun" ? 1.4 : 1) + s) continue;
+      // nicht in den Text
+      const tb2 = tx.area.length || tx.lines.length ? textBox : null;
+      if (tb2 && x + s > tb2.x0 && x - s < tb2.x1 && y + s > tb2.y0 && y - s < tb2.y1) continue;
       if (parts.slice(1).some(p => { const b = bounds(p); return Math.hypot((b.x0 + b.x1) / 2 - x, (b.y0 + b.y1) / 2 - y) < s * 1.3; })) continue;
       parts.push(star);
     }
     if (o.sky === "cut") back = diff(back, union(parts));
     else backEngrave = union(parts);
   }
+  // Text hinten (oder Einzellinien-Schrift): auf die Grundplatte graviert
+  if (pos === "back" && tx.area.length) backEngrave = union([backEngrave, tx.area]);
+  if (pos !== "none" && tx.lines.length) backLines = tx.lines;
   // Standfuß: Platte von oben, Schlitze für alle Schichten und die Grundplatte (vorn → hinten)
   let foot: MultiPolygon = [];
   const slots: { y: number }[] = [];
@@ -146,5 +190,5 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
     }
     foot = diff(foot, union(cuts));
   }
-  return { layers, back, backEngrave, foot, tabs, slots, w: W, h: H };
+  return { layers, back, backEngrave, foot, tabs, slots, w: W, h: H, backLines, dropped };
 }
