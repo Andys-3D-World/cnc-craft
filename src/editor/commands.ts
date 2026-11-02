@@ -11,6 +11,8 @@
  *  Pfeiltasten          1 mm verschieben (Shift = 10 mm, Alt = 0,1 mm)
  *  V H L R E P A T M    Werkzeuge
  *  Strg+I               Datei importieren (SVG, DXF, PDF, STL, Bild ...)
+ *  Strg+E               Zeichnung exportieren (SVG, DXF, PDF, PLT)
+ *  Rechtsklick          Menü (ui/contextMenu.ts)
  *  Strg+O / Strg+S      Projekt öffnen / speichern (Strg+Shift+S = speichern unter)
  *  F                    Alles zeigen (Zoom auf Bett)
  *  Leertaste halten     Ansicht verschieben
@@ -29,8 +31,9 @@ import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor } from "./tools";
 import {
   MM_TO_PIXEL, Bounds, groupBounds, translateShape, scaleShape, rotateShape, cloneShape, newId,
-  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath
+  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath, convertToPolyline
 } from "../shapeTransform";
+import { openExportMenu, initCanvasMenu } from "../ui/contextMenu";
 import { offsetPolygon } from "../polyOffset";
 import { openBoxDialog } from "./boxGen";
 import { openMandalaDialog } from "./mandalaGen";
@@ -132,6 +135,17 @@ export const commands: Record<string, () => void> = {
     if (n) log(t("edit.ungrouped", { n }));
     done();
   },
+  // Reihenfolge: ganz nach vorne = zuletzt gezeichnet, ganz nach hinten = zuerst
+  toFront: () => reorder(true),
+  toBack: () => reorder(false),
+  // Kreise, Bögen, Linien in Polylinien umwandeln (dann mit Punkte-Bearbeiten änderbar)
+  toPath: () => {
+    const sel = selectedShapes().filter(s => s.type !== "polyline" && s.type !== "image");
+    if (!sel.length) return;
+    sel.forEach(s => convertToPolyline(s));
+    log(t("cm.toPathDone", { n: sel.length }));
+    done();
+  },
 
   splitParts: () => {
     const st = app();
@@ -201,6 +215,7 @@ export const commands: Record<string, () => void> = {
   saveProject: () => { saveProject(false); },
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),
+  exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-cmd="exportVector"]')),
 
   toolSelect: () => setTool("select"),
   toolPan: () => setTool("pan"),
@@ -981,6 +996,21 @@ function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, 
   checkpoint();
 }
 
+/** Ist etwas zum Einfügen da? (Rechtsklick-Menü) */
+export function hasClipboard(): boolean {
+  return clipboard.length > 0;
+}
+
+function reorder(front: boolean) {
+  const st = app();
+  const ids = new Set(st.selectedShapeIds);
+  if (!ids.size) return;
+  const sel = st.shapes.filter((s: any) => ids.has(s.id));
+  const rest = st.shapes.filter((s: any) => !ids.has(s.id));
+  st.shapes = front ? [...rest, ...sel] : [...sel, ...rest];
+  done();
+}
+
 // =====================================================================
 // INITIALISIERUNG: Knöpfe + Tastatur
 // =====================================================================
@@ -989,6 +1019,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
   canvasEl = canvas;
   redrawFn = redraw;
   log = appendToConsole;
+  initCanvasMenu(redraw, appendToConsole);
 
   // „Stege setzen“ im Panel (Fräs-Parameter) schaltet das Werkzeug ein
   document.getElementById("btn-tab-tool")?.addEventListener("click", () => setTool("tab"));
@@ -1037,6 +1068,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     else if (ctrl && key === "u" && e.shiftKey) commands.splitParts();
     else if (ctrl && key === "u") commands.ungroup();
     else if (ctrl && key === "i") commands.importFile();
+    else if (ctrl && key === "e") commands.exportVector();
     else if (ctrl && key === "o") commands.openProject();
     else if (ctrl && key === "s") (e.shiftKey ? commands.saveProjectAs : commands.saveProject)();
     else if (!ctrl && (e.key === "Delete" || e.key === "Backspace")) commands.delete();

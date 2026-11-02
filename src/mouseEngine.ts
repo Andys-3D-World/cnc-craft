@@ -1,8 +1,10 @@
 /**
  * MAUS-ANBINDUNG DES ARBEITSBEREICHS
- * Zoom mit dem Mausrad (zur Mausposition hin), alles andere übernimmt editor/tools.ts.
+ * Zoom mit dem Mausrad (zur Mausposition hin), Rechtsklick-Menü (ui/contextMenu.ts), alles andere übernimmt editor/tools.ts.
  */
-import { initTools, onMouseDown, onMouseMove, onMouseUp, onDoubleClick, updateCursor } from "./editor/tools";
+import { initTools, onMouseDown, onMouseMove, onMouseUp, onDoubleClick, updateCursor, live } from "./editor/tools";
+import { toWorld } from "./editor/editorState";
+import { openCanvasMenu } from "./ui/contextMenu";
 
 export function initMouseEngine(canvas: HTMLCanvasElement, state: any, redraw: () => void) {
   initTools(canvas, redraw);
@@ -58,6 +60,13 @@ export function initMouseEngine(canvas: HTMLCanvasElement, state: any, redraw: (
     onDoubleClick(e, p.x, p.y);
     redraw();
   });
-  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  canvas.addEventListener("contextmenu", (e) => {
+    e.preventDefault();
+    if (!live.menuOk) return;
+    live.menuOk = false;
+    const p = pos(e);
+    const w = toWorld(p.x, p.y);
+    openCanvasMenu(e.clientX, e.clientY, p.x, p.y, w.x, w.y);
+  });
   canvas.addEventListener("mouseenter", () => updateCursor());
 }

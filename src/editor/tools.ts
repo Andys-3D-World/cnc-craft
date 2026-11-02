@@ -67,7 +67,8 @@ export const live = {
   measure: null as { a: Pt; b: Pt } | null,
 
   hover: null as any,
-  label: "" as string            // Info-Text an der Maus (Länge, Größe, Winkel)
+  label: "" as string,           // Info-Text an der Maus (Länge, Größe, Winkel)
+  menuOk: false                  // Rechtsklick ohne laufende Zeichnung: Menü zeigen
 };
 
 let redrawFn: () => void = () => {};
@@ -164,10 +165,12 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
     return;
   }
 
-  // Rechtsklick: Linie fertigstellen bzw. Zeichnen abbrechen
+  // Rechtsklick: Linie fertigstellen bzw. Zeichnen abbrechen – wird gerade nichts gezeichnet: Menü (mouseEngine.ts)
   if (e.button === 2) {
+    const busy = live.mode !== "idle" || live.points.length > 0 || !!live.dragStart || pen.nodes.length > 0 || tool === "dim";
     if (tool === "line" && live.points.length >= 2) finishLine(false);
-    else cancelCurrent();
+    else if (busy) cancelCurrent();
+    else live.menuOk = true;
     redrawFn();
     return;
   }

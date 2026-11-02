@@ -3,6 +3,17 @@
 ## Next version (unreleased)
 
 **New**
+- **Export drawing as SVG, DXF, PDF or PLT** (new ⤴ button in the file toolbar, Ctrl+E, or right-click → Export):
+  the selection – or everything if nothing is selected. SVG in real mm size with one Inkscape layer per laser layer
+  (name and colour), groups kept as groups, circles and arcs stay true curves, pictures embedded. DXF R12 (ASCII, mm)
+  with LINE, ARC, CIRCLE and POLYLINE, one DXF layer per laser layer (router: per milling type) with a matching
+  colour. PDF (one page in drawing size, lines only) and PLT/HPGL for cutting plotters (one pen per layer). DXF, PDF
+  and PLT cannot hold pictures – they are skipped with a note.
+- **Right-click menu on the canvas:** on a shape or selection – cut, copy, paste, duplicate, delete, group/ungroup,
+  bring to front/send to back, rotate/mirror, align, union/subtract/intersect, offset, convert to path, laser layer
+  (router: milling type) and export selection; on the empty canvas – paste, import, select all, export everything,
+  show everything. Shortcuts are shown next to the entries, entries that do not fit are greyed out, works with the
+  arrow keys, Enter and Escape. A right-click while drawing still finishes the line or cancels as before.
 - **Gear generator** (Generators): real involute spur gears to laser or mill – number of teeth, module, pressure
   angle (20° default), backlash and profile shift (with a hint when few teeth would be undercut). Centre hole: none,
   round bore, bore with keyway (width and depth from DIN 6885-1 for 6–110 mm shafts, or your own values) or D-flat

@@ -61,6 +61,7 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("importFile", "import", "tip.cmd.importFile")}
       ${cmd("openProject", "open", "tip.cmd.openProject")}
       ${cmd("saveProject", "save", "tip.cmd.saveProject")}
+      ${cmd("exportVector", "export", "tip.cmd.exportVector")}
     </div>
     <div class="tb-group">
       ${cmd("undo", "undo", "tip.cmd.undo")}

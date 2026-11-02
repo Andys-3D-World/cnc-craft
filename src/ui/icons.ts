@@ -49,6 +49,13 @@ const P: Record<string, string> = {
   open: `<path d="M3 7.5V18a1 1 0 001 1h16a1 1 0 001-1V9a1 1 0 00-1-1h-8l-2-2.5H4a1 1 0 00-1 1z"/>`,
   save: `<path d="M5 4h11l3 3v12a1 1 0 01-1 1H6a1 1 0 01-1-1z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/>`,
   clear: `<path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/><path d="M10 11v6M14 11v6"/>`,
+  export: `<path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 17v3h16v-3"/>`,
+
+  // ---- Rechtsklick-Menü ----
+  cut: `<circle cx="6.5" cy="17.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/><path d="M8.3 15.7L17 3M15.7 15.7L7 3"/>`,
+  toFront: `<rect x="3" y="3" width="11" height="11" rx="1" stroke-dasharray="2.5 2"/><rect x="10" y="10" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".35"/>`,
+  toBack: `<rect x="10" y="10" width="11" height="11" rx="1" stroke-dasharray="2.5 2"/><rect x="3" y="3" width="11" height="11" rx="1" fill="currentColor" fill-opacity=".35"/>`,
+  layers: `<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 12.5l9 5 9-5M3 16.5l9 5 9-5"/>`,
 
   // ---- G-Code ----
   gcode: `<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M10 11.5l-2 2.5 2 2.5M15 11.5l2 2.5-2 2.5"/>`,
