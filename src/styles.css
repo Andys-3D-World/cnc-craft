@@ -1219,6 +1219,17 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
 .about-lic { max-height: 260px; font-family: var(--font-mono); font-size: 0.7rem; user-select: text; }
 #upd-dl { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px; }
 #upd-dl small { font-weight: 400; opacity: 0.85; font-size: 0.7rem; }
+/* Fehler melden – ui/bugReportDialog.ts */
+.bug-box { width: 520px !important; }
+.bug-field { display: flex; flex-direction: column; gap: 3px; font-size: 0.8rem; }
+.bug-field textarea { resize: vertical; font-family: var(--font-ui); }
+.bug-two { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bug-two select { min-width: 0; width: 100%; }
+.bug-section { border-top: 1px solid var(--border-color); padding-top: 8px; display: flex; flex-direction: column; gap: 5px; }
+.bug-sub { font-size: 0.82rem; font-weight: 600; }
+.bug-val { color: var(--text-muted); font-size: 0.74rem; }
+.bug-prev summary { cursor: pointer; font-size: 0.78rem; color: var(--text-muted); }
+.bug-prev pre { max-height: 200px; font-family: var(--font-mono); font-size: 0.7rem; user-select: text; }
 .upd-btns { display: flex; gap: 6px; }
 .upd-btns button { flex: 1; }
 

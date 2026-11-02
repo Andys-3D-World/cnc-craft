@@ -7,6 +7,11 @@
   changes now asks "Save / Don't save / Cancel". The window title shows "●" while there are unsaved changes.
 - **Crash recovery:** while there are unsaved changes, the project is saved automatically every 90 seconds to the
   app data folder (not next to your file). If CNC Craft crashes or is killed, the next start offers to restore it.
+- **Report a bug from inside the app** (ⓘ → "Report a bug"): title, area, severity, what happened, steps and what
+  you expected. Version, system, machine/board/firmware and the last 50 console lines can be sent along (each can be
+  unticked, with a preview). IP and MAC addresses, Wi-Fi names and passwords, host names and user names in file
+  paths are removed automatically. CNC Craft sends nothing itself: it opens the GitHub bug form in your browser with
+  all fields filled in, and you submit it there. "Copy" puts the whole report on the clipboard as a fallback.
 
 **Fixed**
 - **Quitting with Cmd+Q (macOS)** now also stops a running job safely (laser/spindle off), like closing the window.

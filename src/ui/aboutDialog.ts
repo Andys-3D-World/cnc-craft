@@ -18,6 +18,7 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { machine } from "../machine";
+import { openBugReportDialog } from "./bugReportDialog";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -77,6 +78,11 @@ export async function openAboutDialog(log: (s: string) => void) {
           <div class="about-status">🔒 ${esc(t("about.privacy"))}</div>
         ` : `<div class="about-status">${esc(t("upd.disabled"))}</div>`}
       </div>
+      <div class="about-section">
+        <h4>🐞 ${esc(t("bug.aboutTitle"))}</h4>
+        <div class="about-status">${esc(t("bug.aboutText"))}</div>
+        <button id="about-bug" class="btn-secondary">🐞 ${esc(t("bug.title"))}</button>
+      </div>
       <div class="about-section about-support">
         <h4>❤️ ${esc(t("about.support"))}</h4>
         <div class="about-status">${esc(t("about.supportText"))}</div>
@@ -104,6 +110,7 @@ export async function openAboutDialog(log: (s: string) => void) {
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   ov.querySelector<HTMLButtonElement>("#about-close")!.onclick = close;
+  ov.querySelector<HTMLButtonElement>("#about-bug")!.onclick = () => { close(); void openBugReportDialog(log); };
   ov.querySelector<HTMLButtonElement>("#about-kofi")!.onclick = async () => {
     try { await openUrl(SUPPORT_URL); } catch { window.open(SUPPORT_URL, "_blank"); }
   };
