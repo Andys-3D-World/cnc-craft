@@ -2,7 +2,43 @@
 
 ## Next version (unreleased)
 
+**New**
+- **Gear generator** (Generators): real involute spur gears to laser or mill – number of teeth, module, pressure
+  angle (20° default), backlash and profile shift (with a hint when few teeth would be undercut). Centre hole: none,
+  round bore, bore with keyway (width and depth from DIN 6885-1 for 6–110 mm shafts, or your own values) or D-flat
+  for motor shafts; optional lightening holes. Optionally a matching second gear: the preview shows both meshing with
+  the centre distance and ratio, on the bed they are placed side by side. Router mode warns when the cutter is wider
+  than the tooth gaps and points to Dogbones for square keyway corners.
+  Also in the gear generator: **racks** (same module and pressure angle, optionally with a matching pinion shown in
+  mesh), **timing belt pulleys** (GT2, HTD 3M, HTD 5M, T5 – outside diameter from the belt pitch, optional flanges to
+  glue on) and **chain sprockets** for roller chains (ISO 606 sizes 04C … 12B and bicycle chain, roller seats with
+  free roller entry). Pulleys and sprockets get the same bore, keyway, D-flat and lightening hole options.
+- **Living hinge generator** (Generators): cut pattern that lets a flat sheet of plywood or MDF bend – straight cuts,
+  waves or slots, staggered row by row with bridges, always with a solid edge at top and bottom. Set panel size (or
+  pattern only), hinge zone width, spacing, cut length and bridge, or let it suggest values from the material
+  thickness. Shows how tight it bends (inner radius for 90° and 180°) and the total cut length, and warns about too
+  thin strips, too short bridges or a cutter that is too wide in router mode.
+- **Ruler & clock face generator** (Generators): ruler in mm (ticks every 1/5/10 mm, numbers in cm) or inch
+  (1/16"), with optional hanging hole; protractor (half circle, 1°/5°/10° ticks, numbers every 10°, centre cross);
+  clock face (60 minute ticks, 12 hour marks, numbers 1–12, Roman numerals or none, hole for the clock movement).
+  Ticks and numbers go to the weakest line layer to engrave (numbers in single-line font), the outline to the
+  strongest line layer to cut.
+- **Wood joints generator** (Generators): two boards that fit exactly – finger joints for a corner (odd number of
+  sections, dogbones or hidden T-bones in the inside corners) or a flat dovetail to join panels edge to edge (e.g.
+  bigger than the bed; outer corners rounded a bit more than the cutter radius, so no dogbones are needed). The
+  cutter diameter comes from the active tool (0 for the laser), clearance is split between both parts.
+- **Slot-together shelf generator** (Generators): two side panels and 2–10 shelves with cross slots (half the depth
+  each) that plug together without glue or screws. Slot width = material thickness + clearance, dogbones in the slot
+  bottoms for the router, optional arch at the bottom so the shelf stands on two feet. Shows a front view and lays
+  all parts out in rows across the bed width; warns when they do not fit on the bed.
+- **Vent grille generator** (Generators): rectangle (with corner radius) or circle filled with honeycomb, round holes,
+  squares or slots; set hole size, web and an edge without holes. Only whole holes are used and the pattern is
+  centred. Optional plate outline and mounting holes; shows the open area in percent and warns when the cutter is
+  bigger than the holes.
+
 **Improved**
+- **Translations:** 175 texts (settings, GRBL messages, spindle) that were only in English and German are now
+  also in French, Spanish, Italian, Dutch and Polish.
 - **README (English and German):** the feature list is complete again and grouped by area – design & import with
   all generators, router CAM, laser, plasma, simulation, machine control, setup help (wiring diagrams for all 10
   boards) – plus four more screenshots (image engraving, material view, shape tools, several beds).

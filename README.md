@@ -16,7 +16,9 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, nesting (also into offcuts)
 - Shape library, QR codes, serial numbers and variable text, several beds per project (like build plates in a slicer)
 - **Generators:** boxes with finger joints (20 types, with 3D view), jigsaw puzzles, Christmas ornaments, letter
-  toppers, birdhouses, mandalas and one-piece names with symbols
+  toppers, birdhouses, mandalas, one-piece names with symbols, gears (spur gears, racks, belt pulleys, chain
+  sprockets – with bore and keyway), living hinges, rulers and clock faces, wood joints (finger joints, dovetails),
+  slot-together shelves and vent grilles
 - Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF and STEP – big files
   are read in background threads
 - 3D view of the finished parts, node graph for reusable workflows
