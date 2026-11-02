@@ -48,6 +48,8 @@ import { openVentDialog } from "./ventGen";
 import { openBirthLetterDialog } from "./birthLetterGen";
 import { openLetterTopperDialog } from "./letterTopperGen";
 import { openPuzzleDialog } from "./puzzleGen";
+import { openWordTilesDialog } from "./wordTilesGen";
+import { openShadowBoxDialog } from "./shadowBoxGen";
 import { openFacingDialog } from "../ui/facingDialog";
 import { getMachineMode } from "../machineMode";
 import { openMaterialTestDialog } from "./materialTest";
@@ -196,6 +198,8 @@ export const commands: Record<string, () => void> = {
   birth: () => openBirthLetterDialog(log, () => { done(); checkpoint(); }),
   letterTopper: () => openLetterTopperDialog(log, () => { done(); checkpoint(); }),
   puzzle: () => openPuzzleDialog(log, () => { done(); checkpoint(); }),
+  wordTiles: () => openWordTilesDialog(log, () => { done(); checkpoint(); }),
+  shadowBox: () => openShadowBoxDialog(log, () => { done(); checkpoint(); }),
   // Opferplatte planen: ganzes Bett, eine Seite (Nullpunkt links unten, Z auf der Opferplatte)
   surface: () => {
     if (getMachineMode() !== "mill") { log(t("face.spoil.millOnly")); return; }
@@ -1043,7 +1047,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
-    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #mandala-dialog-overlay, #bird-dialog-overlay, #orn-dialog-overlay, #lt-dialog-overlay, #puzzle-dialog-overlay, #face-overlay, #fillet-dialog-overlay, #pattern-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
+    if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #mandala-dialog-overlay, #bird-dialog-overlay, #orn-dialog-overlay, #lt-dialog-overlay, #puzzle-dialog-overlay, #wt-dialog-overlay, #sbox-dialog-overlay, #face-overlay, #fillet-dialog-overlay, #pattern-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");
     if (camTab && !camTab.classList.contains("active")) return;

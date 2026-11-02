@@ -5,20 +5,21 @@
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
-import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
+import { MM_TO_PIXEL, newId, createPolyline, translateShape } from "../shapeTransform";
 import { toShapes } from "./shapeOps";
 import { traceTextWithFont, TracedText } from "./textTool";
 import { createFontPicker } from "./fontPicker";
 import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
+import { SCENE_KINDS, type SceneKind } from "../landscape";
 import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
   type OrnamentHanger, type OrnamentInner, type OrnamentDeco } from "../ornament";
 
 const KEY = "cnc_craft_ornament";
 interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean }
 const DEF: Opts = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
-  text: "Andreas", line2: "", font: "Pacifico", bold: false };
+  vertical: false, layers: 1, scene: "trees", seed: 1, text: "Andreas", line2: "", font: "Pacifico", bold: false };
 const HANGERS: OrnamentHanger[] = ["hole", "ring", "none"];
 const INNERS: OrnamentInner[] = ["engrave", "cut", "band", "score", "layer"];
 
@@ -28,7 +29,10 @@ function load(): Opts {
     const o: Opts = { ...DEF };
     for (const k of ["size", "points", "holeD", "textSize"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     for (const k of ["text", "line2", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
-    for (const k of ["bold", "border"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
+    for (const k of ["bold", "border", "vertical"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
+    if (s.layers === 2) o.layers = 2;
+    if (SCENE_KINDS.includes(s.scene)) o.scene = s.scene;
+    if (Number.isFinite(Number(s.seed)) && Number(s.seed) > 0) o.seed = Number(s.seed);
     if (ORNAMENT_SHAPES.includes(s.shape)) o.shape = s.shape;
     if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
     if (INNERS.includes(s.inner)) o.inner = s.inner;
@@ -41,8 +45,9 @@ function load(): Opts {
 async function traceName(o: Opts): Promise<OrnamentText> {
   const text = [o.text, o.line2].map(s => s.trim()).filter(Boolean).join("\n");
   if (!text) return { area: [], lines: [] };
+  // zwei Schichten: mehr Zeilenabstand, damit der Steg unter der ersten Zeile nicht an der zweiten klebt
   const tr: TracedText = (await traceTextWithFont({ text, font: o.font, heightMm: 10, bold: o.bold, italic: false, align: "center",
-    lineSpacing: 140, letterSpacing: 0 })).traced;
+    lineSpacing: o.layers === 2 ? 185 : 140, letterSpacing: 0 })).traced;
   const loops = tr.loops.map(l => l.map(p => [p.x, p.y] as XY));
   if (tr.closed?.some(c => !c)) return { area: [], lines: loops.filter(l => l.length >= 2).map((pts, i) => ({ pts, closed: tr.closed?.[i] !== false })) };
   const rings: Polygon[] = loops.filter(l => l.length >= 3).map(l => [l]);
@@ -51,14 +56,18 @@ async function traceName(o: Opts): Promise<OrnamentText> {
 }
 
 function previewSvg(r: OrnamentResult): string {
-  const b = bounds(union([r.cut, r.top]));
+  const b = bounds(union([r.cut, r.top, r.back]));
   if (!isFinite(b.x0)) return "";
   const pad = Math.max(b.x1 - b.x0, b.y1 - b.y0) * 0.04 + 1;
   const xy = ([x, y]: XY | [number, number]) => `${(x - b.x0 + pad).toFixed(2)},${(b.y1 - y + pad).toFixed(2)}`;
   const d = (m: MultiPolygon) => m.map(poly => poly.map(rg => rg.map((q, i) => `${i ? "L" : "M"}${xy(q)}`).join("") + "Z").join("")).join("");
   const ln = (l: ScoreLine) => l.pts.map((q, i) => `${i ? "L" : "M"}${xy(q)}`).join("") + (l.closed ? "Z" : "");
   const sw = Math.max(b.x1 - b.x0, b.y1 - b.y0) / 400;
+  // zwei Schichten: Grundplatte (bemalt/gebeizt) mit Gravur hinter dem Rahmen
   return `<svg viewBox="0 0 ${(b.x1 - b.x0 + 2 * pad).toFixed(2)} ${(b.y1 - b.y0 + 2 * pad).toFixed(2)}" style="width:100%;height:260px;">
+    <path d="${d(r.back)}" fill="#7a2e2e" fill-rule="evenodd"/>
+    <path d="${d(r.backEngrave)}" fill="#c9a27a" fill-rule="evenodd"/>
+    <path d="${r.backLines.map(ln).join("")}" fill="none" stroke="#c9a27a" stroke-width="${(sw * 1.4).toFixed(2)}"/>
     <path d="${d(r.cut)}" fill="#c98a4b" fill-rule="evenodd" stroke="#ffd28a" stroke-width="${sw.toFixed(2)}"/>
     <path d="${d(r.engrave)}" fill="#5a3a1c" fill-rule="evenodd"/>
     <path d="${d(r.top)}" fill="#efdcb4" fill-rule="evenodd" stroke="#5a3a1c" stroke-width="${(sw * 1.5).toFixed(2)}"/>
@@ -82,12 +91,18 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">
           ${sel("orn-shape", "orn.shape", ORNAMENT_SHAPES, "orn.shape.")}
+          <label class="dlg-row"><span>${t("orn.layers")}</span><select id="orn-layers" style="width:auto;max-width:190px;"><option value="1">${t("orn.layers.1")}</option><option value="2">${t("orn.layers.2")}</option></select></label>
+          <div class="orn-only-two">
+            ${sel("orn-scene", "orn.scene", SCENE_KINDS, "orn.scene.")}
+            <div class="orn-only-scene"><button id="orn-dice" class="btn-secondary" type="button" style="width:100%;margin:2px 0 6px;">🎲 ${t("orn.dice")}</button></div>
+          </div>
           <div class="orn-only-star">${num("orn-pts", "orn.points", "1", "5", "")}</div>
           ${num("orn-size", "orn.size", "1", "20")}
           <label class="dlg-row"><span>${t("orn.text")}</span><input id="orn-text" type="text" maxlength="40" style="width:170px;"></label>
           <label class="dlg-row"><span>${t("orn.line2")}</span><input id="orn-line2" type="text" maxlength="40" style="width:170px;" placeholder="${t("orn.line2Ph")}"></label>
           <label class="dlg-row"><span>${t("text.font")}</span><div id="orn-font" style="width:170px;"></div></label>
           <label class="dlg-row" style="cursor:pointer;"><span>${t("text.bold")}</span><input id="orn-bold" type="checkbox" style="width:auto;"></label>
+          <label class="dlg-row" style="cursor:pointer;"><span>${t("orn.vertical")}</span><input id="orn-vert" type="checkbox" style="width:auto;"></label>
           ${num("orn-ts", "orn.textSize", "5", "20", "%")}
           ${sel("orn-inner", "orn.inner", INNERS, "orn.inner.")}
           ${sel("orn-hang", "orn.hanger", HANGERS, "orn.hang.")}
@@ -115,6 +130,10 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   $<HTMLSelectElement>("orn-inner").value = init.inner; $<HTMLSelectElement>("orn-hang").value = init.hanger;
   $("orn-hd").value = String(init.holeD); $("orn-border").checked = init.border;
   $<HTMLSelectElement>("orn-deco").value = init.deco;
+  $<HTMLSelectElement>("orn-layers").value = String(init.layers || 1);
+  $<HTMLSelectElement>("orn-scene").value = init.scene || "trees";
+  $("orn-vert").checked = !!init.vertical;
+  let seed = init.seed || 1;
 
   const read = (): Opts => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
@@ -124,7 +143,9 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       text: $("orn-text").value, line2: $("orn-line2").value, font, bold: $("orn-bold").checked,
       textSize: n("orn-ts", 100, 20, 100), inner: v("orn-inner") as OrnamentInner, hanger: v("orn-hang") as OrnamentHanger,
       holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked,
-      deco: v("orn-deco") as OrnamentDeco
+      deco: v("orn-deco") as OrnamentDeco, vertical: $("orn-vert").checked, layers: v("orn-layers") === "2" ? 2 : 1,
+      scene: v("orn-scene") as SceneKind, seed,
+      textLines: [$("orn-text").value, $("orn-line2").value].filter(x => x.trim()).length
     };
   };
 
@@ -133,6 +154,8 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     const o = read(), my = ++run;
     ov.querySelectorAll<HTMLElement>(".orn-only-star").forEach(el => { el.style.display = o.shape === "star" ? "" : "none"; });
     ov.querySelectorAll<HTMLElement>(".orn-only-hole").forEach(el => { el.style.display = o.hanger !== "none" ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>(".orn-only-two").forEach(el => { el.style.display = o.layers === 2 ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>(".orn-only-scene").forEach(el => { el.style.display = o.scene !== "none" ? "" : "none"; });
     const text = await traceName(o);
     if (my !== run) return; // inzwischen neu eingegeben
     const r = ornament(o, text);
@@ -145,6 +168,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   };
   const schedule = () => { clearTimeout(timer); timer = window.setTimeout(update, 160); };
   ov.querySelectorAll("input, select").forEach(i => i.addEventListener(i.tagName === "SELECT" || (i as HTMLInputElement).type === "checkbox" ? "change" : "input", schedule));
+  $<HTMLElement>("orn-dice").onclick = () => { seed = 1 + Math.floor(Math.random() * 99999); schedule(); };
   update();
 
   const close = () => { clearTimeout(timer); run++; ov.remove(); };
@@ -160,7 +184,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
     close();
     placeOrnament(r, o.text.trim() || t("orn.title"));
-    log(t(r.top.length ? "orn.doneLayer" : "orn.done", { w: r.w.toFixed(1), h: r.h.toFixed(1) }));
+    log(t(r.back.length ? "orn.doneTwo" : r.top.length ? "orn.doneLayer" : "orn.done", { w: r.w.toFixed(1), h: r.h.toFixed(1) }));
     done();
   };
   setTimeout(() => { const i = $("orn-text"); i.focus(); i.select(); }, 0);
@@ -169,7 +193,11 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
 /**
  * Anhänger als Gruppe in die Bettmitte: Schnitt (stärkste Linien-Ebene / außen+innen), Gravur (Füll-Ebene / Tasche),
  * Linien (schwächste Linien-Ebene, an der Fräse flach). „Eigenes Teil“: der Name als zweite Gruppe 8 mm darüber.
+ * Zwei Schichten: die Grundplatte als eigene Gruppe rechts neben dem Rahmen.
  */
+/** Form waagerecht verschieben (mm) */
+const moveShape = (s: any, mm: number) => translateShape(s, mm * MM_TO_PIXEL, 0);
+
 function placeOrnament(r: OrnamentResult, name: string) {
   const st = app();
   const bed = bedSizeMm();
@@ -189,6 +217,16 @@ function placeOrnament(r: OrnamentResult, name: string) {
   const lines = r.lines.map(l => createPolyline(l.pts.map(([x, y]) => ({ x: (x + dx) * MM_TO_PIXEL, y: (y + dy) * MM_TO_PIXEL })),
     l.closed, "on-line", { ...(mark ? { laserLayerId: mark.id } : {}), millingDepth: -0.3, isScore: true, groupId, source }));
   const made = [...cut, ...eng, ...top, ...lines];
+  if (r.back.length) {
+    // Grundplatte rechts daneben (8 mm Abstand); das Ganze bleibt mittig
+    const bb = bounds(r.back), sx = bb.x1 - bb.x0 + 8, backId = "ornament-" + newId();
+    for (const s of made) moveShape(s, -sx / 2);
+    const bx = (m: MultiPolygon): MultiPolygon => m.map(p => p.map(rg => rg.map(([x, y]) => [(x + dx + sx / 2) * MM_TO_PIXEL, (y + dy) * MM_TO_PIXEL] as [number, number])));
+    made.push(...toShapes(bx(r.back), cutL ? { laserLayerId: cutL.id } : {}).map(s => ({ ...s, groupId: backId, source })));
+    made.push(...toShapes(bx(r.backEngrave), engL ? { laserLayerId: engL.id } : {}).map(s => ({ ...s, groupId: backId, millingMode: "pocket", millingDepth: -0.5, source })));
+    for (const l of r.backLines) made.push(createPolyline(l.pts.map(([x, y]) => ({ x: (x + dx + sx / 2) * MM_TO_PIXEL, y: (y + dy) * MM_TO_PIXEL })),
+      l.closed, "on-line", { ...(mark ? { laserLayerId: mark.id } : {}), millingDepth: -0.3, isScore: true, groupId: backId, source }));
+  }
   st.shapes = [...st.shapes, ...made];
   st.selectedShapeIds = made.map(s => s.id);
 }

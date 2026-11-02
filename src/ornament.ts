@@ -15,9 +15,10 @@
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { bounds, union, unionMany, grow, inRegion, clipLines, outlineLines, type ScoreLine, type XY } from "./nameConnect.ts";
+import { scene, type SceneKind } from "./landscape.ts";
 
-export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowflake";
-export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake"];
+export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowflake" | "arch";
+export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake", "arch"];
 export type OrnamentHanger = "hole" | "ring" | "none";
 export type OrnamentInner = "engrave" | "cut" | "band" | "score" | "layer";
 export type OrnamentDeco = "none" | "stars" | "flakes" | "trees" | "hearts" | "dots" | "mixed";
@@ -33,6 +34,11 @@ export interface OrnamentOptions {
   textSize: number;   // Schriftgröße in % des Textfelds (20 … 100)
   border: boolean;    // Zierlinie innen am Rand
   deco: OrnamentDeco; // ausgeschnittene Motive um den Namen
+  vertical?: boolean; // Name senkrecht (von unten nach oben zu lesen)
+  layers?: 1 | 2;     // 2 = Rahmen-Schicht vorn + Grundplatte dahinter
+  scene?: SceneKind;  // zwei Schichten: Landschaft unten im Rahmen
+  seed?: number;      // Zufall der Landschaft
+  textLines?: number; // Anzahl Textzeilen (hilft, die Grundlinien zu finden)
 }
 
 /** Schrift, wie sie aus dem Fenster kommt (beliebige Größe/Lage – wird ins Textfeld eingepasst) */
@@ -49,6 +55,8 @@ export interface OrnamentResult {
   lines: ScoreLine[];    // Gravurlinien auf der Form (Zierlinie, Schrift als Linie)
   pieces: number; w: number; h: number;
   dropped: number;       // Name im Band: so viele lose Teilchen fallen weg (z. B. i-Punkte)
+  // zwei Schichten: cut/engrave/lines = Rahmen vorn; die Grundplatte dahinter:
+  back: MultiPolygon; backEngrave: MultiPolygon; backLines: ScoreLine[];
 }
 
 // ---------- kleine Helfer ----------
@@ -142,6 +150,12 @@ function rawShape(o: OrnamentOptions): { body: MultiPolygon; box: Box } {
       }
       return { body: unionMany(parts), box: { x0: -0.36, y0: -0.16, x1: 0.36, y1: 0.16 } };
     }
+    case "arch": {
+      // Anhänger-Schild: unten gerade, oben ein Halbkreis
+      const pts: XY[] = [[-0.36, 0], [0.36, 0]];
+      for (let i = 0; i <= 36; i++) { const a = (i / 36) * Math.PI; pts.push([0.36 * Math.cos(a), 0.64 + 0.36 * Math.sin(a)]); }
+      return { body: poly(pts), box: { x0: -0.29, y0: 0.07, x1: 0.29, y1: 0.66 } };
+    }
     default: {
       // Kugel mit Kappe oben
       const capW = 0.42, capH = 0.24;
@@ -234,6 +248,35 @@ function baselineOf(m: MultiPolygon): number {
   return ys.length ? ys[Math.floor(ys.length / 2)] : 0;
 }
 
+/**
+ * Grundlinien je Textzeile: Teile (Buchstaben bzw. ganze Schreibschrift-Wörter) nach der Höhe ihrer Mitte sortieren;
+ * ein großer Sprung (mehr als 40 % der üblichen Höhe) beginnt eine neue Zeile. Grundlinie einer Zeile = Median der
+ * tiefsten Punkte aller Bögen (lokale Minima der Kontur) – die meisten Buchstaben stehen auf der Grundlinie, nur
+ * wenige Unterlängen (g, y) reichen tiefer.
+ */
+export function lineBaselines(m: MultiPolygon, count = 0): number[] {
+  const items = m.filter(p => p[0]?.length).map(p => {
+    const b = bounds([p]), r = p[0], mins: number[] = [];
+    for (let i = 0; i < r.length; i++) {
+      const y = r[i][1], yp = r[(i - 1 + r.length) % r.length][1], yn = r[(i + 1) % r.length][1];
+      if (y <= yp && y < yn) mins.push(y);
+    }
+    return { c: (b.y0 + b.y1) / 2, h: b.y1 - b.y0, mins: mins.length ? mins : [b.y0] };
+  }).sort((a, b) => b.c - a.c);
+  if (!items.length) return [];
+  const hs = items.map(i => i.h).sort((a, b) => a - b), typical = hs[Math.floor(hs.length / 2)];
+  // Zeilenanzahl bekannt: an den (count − 1) größten Sprüngen trennen
+  let cuts: Set<number>;
+  if (count > 1) cuts = new Set(items.slice(1).map((it, i) => ({ i: i + 1, g: items[i].c - it.c })).sort((a, b) => b.g - a.g).slice(0, count - 1).map(x => x.i));
+  else cuts = new Set(items.slice(1).map((it, i) => (items[i].c - it.c > typical * 0.4 ? i + 1 : -1)).filter(i => i > 0));
+  const lines: number[][] = [[...items[0].mins]];
+  for (let i = 1; i < items.length; i++) {
+    if (cuts.has(i)) lines.push([]);
+    lines[lines.length - 1].push(...items[i].mins);
+  }
+  return lines.map(l => { const b = l.sort((p, q) => p - q); return b[Math.floor(b.length / 2)]; });
+}
+
 const MIXED: OrnamentDeco[] = ["stars", "flakes", "trees", "hearts"];
 
 /** Kleines Motiv zum Ausschneiden, Mitte (cx, cy), passt in einen Kreis mit Ø s */
@@ -279,6 +322,12 @@ function decorate(o: OrnamentOptions, shape: MultiPolygon, keep: Box | null, edg
 
 /** Fertiger Anhänger: Form, Aufhänger, Zierlinie, Verzierung und Name */
 export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
+  if (o.vertical) {
+    // senkrecht: um 90° gegen den Uhrzeigersinn drehen (von unten nach oben zu lesen)
+    const rot = ([x, y]: XY): XY => [-y, x];
+    text = { area: mapArea(text.area, rot), lines: text.lines.map(l => ({ closed: l.closed, pts: l.pts.map(rot) })) };
+  }
+  if (o.layers === 2) return twoLayers(o, text);
   const ob = ornamentBody(o);
   const shape = diff(ob.body, ob.hole);
   const box = { ...ob.textBox };
@@ -328,5 +377,84 @@ export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult
   if (motifs.length) cut = polygonClipping.difference(cut, ...motifs);
   lines = [...clipLines(lines, cut, 0.2), ...clipLines(textLines, cut, 0.2)];
   const all = bounds(union([cut, top]));
-  return { cut, engrave, top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped };
+  return { cut, engrave, top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped, back: [], backEngrave: [], backLines: [] };
+}
+
+/** Breite des Rahmens bei zwei Schichten */
+export const frameWidth = (o: OrnamentOptions) => Math.max(2.5, o.size * 0.06);
+
+/** Fläche um d nach innen (Umgebung wachsen lassen und abziehen) */
+function insetArea(m: MultiPolygon, d: number): MultiPolygon {
+  const b = bounds(m);
+  const around = diff(poly([[b.x0 - 5, b.y0 - 5], [b.x1 + 5, b.y0 - 5], [b.x1 + 5, b.y1 + 5], [b.x0 - 5, b.y1 + 5]]), m);
+  return diff(m, grow(around, d, true));
+}
+
+/**
+ * Zwei Schichten: vorn ein Rahmen (Ring) mit Landschaft unten und dem Namen, der auf einem Steg von Rand zu Rand
+ * steht (ausschneiden/Band) – dahinter die volle Grundplatte zum Bemalen/Beizen. Gravieren/als Linie: der Name kommt
+ * auf die Grundplatte (durchs Fenster zu sehen), ebenso die Verzierung.
+ */
+function twoLayers(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
+  const ob = ornamentBody(o), H = Math.max(10, o.size), fw = frameWidth(o);
+  const back = diff(ob.body, ob.hole);
+  // Fenster: Form um die Rahmenbreite nach innen, mit Abstand zum Aufhänge-Loch
+  let win = insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw);
+  if (ob.holeAt) win = diff(win, disk(ob.holeAt[0], ob.holeAt[1], ob.holeR + holeMargin(ob.holeR) + fw * 0.5));
+  const wb = bounds(win);
+  // Steg und Landschaft reichen bis in die Mitte des Rahmens – nur an der Kante anliegend hielten sie nicht sicher
+  const reach = insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw / 2);
+  // Landschaft unten im Fenster
+  const kind = o.scene || "none";
+  const land = kind === "none" ? [] : scene({ x0: wb.x0 - 1, x1: wb.x1 + 1, bottom: wb.y0 - fw, base: wb.y0 + (wb.y1 - wb.y0) * 0.17, hill: H * 0.035,
+    item: H * 0.17, kind, seed: o.seed || 1, houses: 0.35 }).area;
+  const landIn = land.length ? polygonClipping.intersection(land, reach) : [];
+  // Textfeld: im freien Fenster über der Landschaft – so breit, wie das Fenster in dieser Höhe ist
+  const box = { ...ob.textBox };
+  if (landIn.length) {
+    const m = H * 0.025, y0 = bounds(landIn).y1 + m, room = wb.y1 - m - y0;
+    const y1 = y0 + Math.min(room, Math.max(H * 0.12, room * (o.vertical ? 0.9 : 0.55)));
+    // halbe Breite des Fensters in Höhe y (von der Mitte nach außen abtasten)
+    const half = (y: number) => { let w = 0; while (w < wb.x1 && inRegion(win, w + 0.5, y) && inRegion(win, -w - 0.5, y)) w += 0.5; return w; };
+    const hw = Math.min(half(y0), half((y0 + y1) / 2), half(y1)) * 0.88;
+    if (room > H * 0.06 && hw > 2) { box.x0 = -hw; box.x1 = hw; box.y0 = y0; box.y1 = y1; }
+  } else { box.x0 = Math.max(box.x0, wb.x0 + fw * 0.3); box.x1 = Math.min(box.x1, wb.x1 - fw * 0.3); }
+  const tx = fitText(text, box, o.textSize);
+  const stand = (o.inner === "cut" || o.inner === "band") && !tx.lines.length && tx.area.length;
+  let backEngrave: MultiPolygon = [], backLines: ScoreLine[] = [], top: MultiPolygon = [];
+  const parts: MultiPolygon[] = [diff(back, win), landIn];
+  let keep: Box | null = null;
+  if (tx.area.length || tx.lines.length) {
+    const tb = tx.area.length ? bounds(tx.area) : box;
+    keep = tb;
+    if (stand) {
+      // Name steht auf einem Steg von Rand zu Rand (senkrechter Name: Steg senkrecht in der Mitte)
+      const th = o.vertical ? tb.x1 - tb.x0 : tb.y1 - tb.y0, bar = Math.max(1.2, th * 0.09);
+      const steg: MultiPolygon = o.vertical
+        ? poly([[tb.x1 - bar * 0.4, wb.y0 - 1], [tb.x1 + bar * 0.6, wb.y0 - 1], [tb.x1 + bar * 0.6, wb.y1 + 1], [tb.x1 - bar * 0.4, wb.y1 + 1]])
+        // je Textzeile ein eigener Steg auf ihrer Grundlinie
+        : union(lineBaselines(tx.area, o.textLines || 0).map(base => poly([[wb.x0 - 1, base - bar * 0.6], [wb.x1 + 1, base - bar * 0.6], [wb.x1 + 1, base + bar * 0.4], [wb.x0 - 1, base + bar * 0.4]])));
+      parts.push(union([polygonClipping.intersection(tx.area, win), polygonClipping.intersection(steg, reach)]));
+    } else if (o.inner === "layer") top = tx.area;
+    else if (o.inner === "score" || tx.lines.length) backLines = [...outlineLines(tx.area), ...tx.lines];
+    else backEngrave = tx.area;
+  }
+  let cut = diff(unionMany(parts.filter(m => m.length)), ob.hole);
+  let dropped = 0;
+  if (cut.length > 1) {
+    const big = cut.reduce((a, p) => (ringArea(p[0]) > ringArea(a[0]) ? p : a));
+    dropped = cut.length - 1;
+    cut = [big];
+  }
+  // Verzierung: durchs Fenster sichtbar auf die Grundplatte graviert (nicht unter Rahmen, Landschaft oder Name)
+  if (o.deco !== "none") {
+    const free = diff(win, union([landIn, ...(keep ? [poly([[keep.x0, keep.y0], [keep.x1, keep.y0], [keep.x1, keep.y1], [keep.x0, keep.y1]])] : [])]));
+    const motifs = decorate(o, free, null, decoSize(o).web * 0.5);
+    if (motifs.length) backEngrave = union([backEngrave, ...motifs]);
+  }
+  // Zierlinie: mitten im Ring
+  const lines = o.border ? clipLines(outlineLines(insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw / 2)), cut, 0.2) : [];
+  const all = bounds(union([back, top]));
+  return { cut, engrave: [], top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped,
+    back, backEngrave, backLines: clipLines(backLines, back, 0.2) };
 }

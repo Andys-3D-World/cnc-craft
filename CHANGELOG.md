@@ -3,6 +3,24 @@
 ## Next version (unreleased)
 
 **New**
+- **Word tile ornament** (Generators): names laid into each other like a small crossword on letter tiles with
+  points (English, German or none) – the layout is found automatically (most compact of many tries, 🎲 for another
+  one). `<3` gives a heart tile that can cross too. Three parts to glue: round or square back plate with hanging
+  hole, frame with a wavy footer where family name and year are engraved, and the tiles – cut out separately (guide
+  lines on the back plate show where they go) or engraved directly on the back plate. Tests check that every row of
+  tiles is exactly one of the names, that the tiles fit above the footer without overlapping, and that both plates
+  are one piece.
+- **Shadow box / light arch** (Generators): several layers with a winter landscape one behind the other – hills, fir
+  trees and little houses whose windows and doors are cut out so an LED string behind shines through; big in front,
+  smaller and higher towards the back for depth. Outline arch, bell, bauble, heart or Christmas tree, 1–6 layers,
+  frame width, new landscape with 🎲. Back plate with stars and moon (engraved or cut out), optional bow on top and a
+  hole for the LED cable. Optional stand: a base plate with slots, every layer has two tabs that fit exactly
+  (material thickness and gap between layers adjustable). Tests check that every layer is one piece with a window,
+  all layers line up, and the tabs fit the slots.
+- ***Christmas ornament generator*: two layers, arch shape, vertical name.** *Two layers* makes a frame with the
+  name standing on a thin bar (one bar per text line, so "Merry / Christmas" works) and a landscape at the bottom
+  (hills, fir trees or a village), plus a full back plate to paint or stain – decorations are engraved on the back
+  plate and show through the window. New shape *arch* (tag with a round top) and *Name vertical*.
 - **Ask before closing:** closing the window or quitting (Cmd+Q, Alt+F4) or opening another project with unsaved
   changes now asks "Save / Don't save / Cancel". The window title shows "●" while there are unsaved changes.
 - **Crash recovery:** while there are unsaved changes, the project is saved automatically every 90 seconds to the

@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MultiPolygon } from "polygon-clipping";
-import { ornament, ornamentBody, fitText, holeMargin, decoSize, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions } from "../src/ornament.ts";
+import { ornament, ornamentBody, lineBaselines, fitText, holeMargin, decoSize, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions } from "../src/ornament.ts";
 import { inRegion, bounds } from "../src/nameConnect.ts";
 
 type XY = [number, number];
@@ -152,4 +152,44 @@ test("Motive halten den Steg zum Rand und zueinander", () => {
   const c = holes.map(h => { const b = bounds([[h]]); return [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2, (b.x1 - b.x0) / 2]; });
   for (let i = 0; i < c.length; i++) for (let j = i + 1; j < c.length; j++)
     assert.ok(Math.hypot(c[i][0] - c[j][0], c[i][1] - c[j][1]) - c[i][2] - c[j][2] >= web - 1e-6);
+});
+
+test("zwei Schichten: Rahmen ein Teil mit stehendem Namen und Landschaft, Grundplatte ganz", () => {
+  for (const shape of ORNAMENT_SHAPES) for (const sceneKind of ["none", "hills", "trees", "village"] as const) {
+    const o = { ...base, shape, layers: 2 as const, scene: sceneKind, seed: 3, inner: "band" as const, deco: "stars" as const, border: true };
+    const r = ornament(o, { area: word, lines: [] });
+    assert.equal(r.pieces, 1, `${shape}/${sceneKind}`);
+    assert.equal(r.back.length, 1, `${shape}: Grundplatte`);
+    // Rahmen liegt ganz auf der Grundplatte, hat ein Fenster (Loch) und ist kleiner als die Grundplatte
+    for (const p of r.cut) for (const ring of p) for (const [x, y] of ring) assert.ok(inRegion(r.back, x, y) || r.back[0].slice(1).length > 0, `${shape}: Rahmen ragt über`);
+    assert.ok(r.cut[0].length >= 2, `${shape}/${sceneKind}: kein Fenster`);
+    // gravierte Verzierung auf der Grundplatte, nicht unter dem Rahmen
+    for (const p of r.backEngrave) for (const ring of p) for (const [x, y] of ring) assert.ok(inRegion(r.back, x, y), `${shape}: Gravur außerhalb`);
+  }
+});
+
+test("zwei Schichten, Name graviert: Name auf der Grundplatte, Rahmen ohne Name", () => {
+  const r = ornament({ ...base, layers: 2, scene: "hills", inner: "engrave" }, { area: word, lines: [] });
+  assert.ok(r.backEngrave.length >= 3);
+  assert.equal(r.pieces, 1);
+});
+
+test("Name senkrecht: Schrift wird gedreht (höher als breit)", () => {
+  const r = ornament({ ...base, shape: "arch", vertical: true }, { area: word, lines: [] });
+  const b = bounds(r.engrave);
+  assert.ok(b.y1 - b.y0 > b.x1 - b.x0);
+  const flat = bounds(ornament({ ...base, shape: "arch" }, { area: word, lines: [] }).engrave);
+  assert.ok(b.y1 - b.y0 > flat.x1 - flat.x0, "senkrecht sollte die Schrift größer werden lassen");
+});
+
+test("zwei Zeilen: jede Zeile bekommt ihre Grundlinie, beide Zeilen bleiben im Rahmen", () => {
+  const two: MultiPolygon = [...word, ...word.map(p => p.map(r => r.map(([x, y]) => [x, y - 14] as [number, number])))];
+  const bl = lineBaselines(two).sort((a, b) => a - b);
+  assert.deepEqual(bl, [-14, 0]);
+  // ein kleines Wort tiefer in der ersten Zeile („on“) darf keine eigene Zeile werden, wenn die Anzahl bekannt ist
+  const withOn: MultiPolygon = [...two, ...rect(24, -3, 28, 4)];
+  assert.equal(lineBaselines(withOn, 2).length, 2);
+  const r = ornament({ ...base, layers: 2, scene: "trees", inner: "band", textLines: 2 }, { area: two, lines: [] });
+  assert.equal(r.dropped, 0);
+  assert.equal(r.pieces, 1);
 });
