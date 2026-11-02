@@ -128,11 +128,33 @@ export const generateGcode = (shapes: any, opts: { flat?: boolean } = {}): strin
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
   const skipped = usedAreaShapes(shapes);
   allSkipped = skipped.size > 0 && skipped.size === shapes.length;
-  const g = generateGcodeInner(skipped.size ? shapes.filter((s: any) => !skipped.has(s)) : shapes);
+  const used = skipped.size ? shapes.filter((s: any) => !skipped.has(s)) : shapes;
+  let g = generateGcodeInner(used);
+  if (g && rotary.on && !flatOnly && !isPlasma()) g = rotaryGcode(g, used);
   if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
   else if (g) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
   return g;
 };
+
+/**
+ * Drehachse (Laser und Fräse): Y auf den Umfang umrechnen (Y-Anschluss) oder in eine A-Achse (Grad),
+ * Bögen in Geraden, Vorschub auf der Oberfläche – siehe rotary.ts / rotaryWrap.ts
+ */
+function rotaryGcode(gcode: string, shapes: any[]): string | null {
+  const chk = rotaryCheck();
+  if (chk.block) { lastGcodeWarnings.unshift(chk.block); return null; }
+  if (chk.warn) lastGcodeWarnings.push(chk.warn);
+  const out = outsideBand(shapes, shapeBounds);
+  if (out) lastGcodeWarnings.push(t("rot.outside", { n: out, c: circumference().toFixed(1) }));
+  if (!isLaser()) {
+    // tiefer als bis zur Mitte geht auf dem Zylinder nicht
+    const deep = Math.max(0, ...shapes.map((s: any) => Math.abs(Number(s.millingDepth) || 0)));
+    if (deep >= rotary.diameter / 2) lastGcodeWarnings.push(t("rot.tooDeep", { d: deep, r: rotary.diameter / 2 }));
+  }
+  const r = applyRotary(gcode);
+  if ("error" in r) { lastGcodeWarnings.unshift(r.error); return null; }
+  return r.gcode;
+}
 
 /** Alle Formen auf der verbrauchten Fläche lagen -> nichts zu schneiden */
 let allSkipped = false;
@@ -159,17 +181,6 @@ const generateGcodeInner = (shapes: any): string | null => {
   if (isLaser()) {
     const res = generateLaserGcode(shapes);
     lastGcodeWarnings = res.warnings;
-    // Drehachse: Y auf den Umfang umrechnen (Y-Anschluss) oder in eine A-Achse (Grad)
-    if (rotary.on && res.gcode && !flatOnly) {
-      const chk = rotaryCheck();
-      if (chk.block) { lastGcodeWarnings.unshift(chk.block); return null; }
-      if (chk.warn) lastGcodeWarnings.push(chk.warn);
-      const out = outsideBand(shapes, shapeBounds);
-      if (out) lastGcodeWarnings.push(t("rot.outside", { n: out, c: circumference().toFixed(1) }));
-      const g = applyRotary(res.gcode);
-      if (!g) { lastGcodeWarnings.unshift(t("rot.arcs")); return null; }
-      return g;
-    }
     return res.gcode;
   }
   // Bilder (Bildgravur) gibt es nur beim Laser

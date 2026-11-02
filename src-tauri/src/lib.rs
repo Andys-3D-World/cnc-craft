@@ -809,6 +809,27 @@ async fn cam3d_compute(app: AppHandle, job: cam3d::Job) -> Result<tauri::ipc::Re
     Ok(tauri::ipc::Response::new(bytes))
 }
 
+/// Drehachse rundum: Höhenfeld (Radius der Fräserspitze je Winkel und X-Stelle) als f32-Bytes
+#[tauri::command]
+async fn cam3d_rotary(app: AppHandle, job: cam3d::RotaryJob) -> Result<tauri::ipc::Response, String> {
+    let tris = CAM3D_MODEL.lock().unwrap().clone().ok_or("no model loaded")?;
+    CAM3D_CANCEL.store(false, Ordering::SeqCst);
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        let last = Mutex::new(-1.0f64);
+        let prog = |f: f64, stage: &str| {
+            let mut l = last.lock().unwrap();
+            if f - *l >= 0.01 || f >= 1.0 {
+                *l = f;
+                let _ = app.emit("cam3d-progress", serde_json::json!({ "p": f, "stage": stage }));
+            }
+        };
+        cam3d::rotary_field(&tris, &job, &CAM3D_CANCEL, &prog).map(|v| v.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>())
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
 #[tauri::command]
 fn cam3d_cancel() {
     CAM3D_CANCEL.store(true, Ordering::SeqCst);
@@ -894,6 +915,7 @@ pub fn run() {
             esp_web_command,
             cam3d_load,
             cam3d_compute,
+            cam3d_rotary,
             cam3d_cancel,
             workshop_set_devices,
             workshop_test,

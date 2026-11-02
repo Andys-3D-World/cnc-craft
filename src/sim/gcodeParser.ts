@@ -7,6 +7,7 @@
  * Verstanden wird: G0/G1/G2/G3 (I/J- und R-Schreibweise, auch Helix mit Z), G17, G20/G21, G90/G91,
  * F (Vorschub), M3/M4/M5 (Spindel/Laser/Plasma an/aus, S0 = aus), G4 (Warten, zählt zur Zeit),
  * G38.x (Antasten – wird nicht nachgebildet), Kommentare ( ) und ;
+ * A (Drehachse, Grad): nur gemerkt (a0/a1) – die Anzeige um den Zylinder macht sim/rotarySim.ts
  * Bohrzyklen G73/G74/G81–G85/G89 (G98/G99, R/Z/Q/P bleiben gültig bis G80) – so, wie cycles.rs sie
  * vor dem Senden in G0/G1 umwandelt
  *
@@ -36,6 +37,10 @@ export interface SimProgram {
   bounds: { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number };
   cutMinZ: number;            // tiefste Schnitt-Höhe
   cutMaxZ: number;
+  /** nur wenn der G-Code eine A-Achse hat: Winkel (Grad) am Anfang/Ende jeder Bewegung */
+  a0?: Float32Array; a1?: Float32Array;
+  /** um die Drehachse gewickelt (rotarySim.ts): Achse bei y = 0, z = −R; flat = Maße vor dem Wickeln */
+  rotary?: { R: number; flat: SimProgram["bounds"]; aMin: number; aMax: number; along: "x" | "y" };
 }
 
 export interface ParseOptions {
@@ -51,6 +56,10 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   const x0: number[] = [], y0: number[] = [], z0: number[] = [];
   const x1: number[] = [], y1: number[] = [], z1: number[] = [];
   const type: number[] = [], lineNo: number[] = [], dur: number[] = [];
+  // Drehachse A: nur wenn sie vorkommt (sonst kein Speicher dafür)
+  const hasA = lines.some(l => /(^|[^A-Z])A\s*[-+]?[\d.]/i.test(stripComments(l)));
+  const a0: number[] = [], a1: number[] = [];
+  let a = 0, na = 0;
 
   // Gibt es überhaupt Spindel-Befehle? Sonst ist jede Vorschub-Bewegung ein Schnitt.
   const hasSpindle = lines.some(l => /\bM0?[345]\b/i.test(stripComments(l)));
@@ -68,14 +77,18 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   let cR: number | undefined, cZ: number | undefined, cQ: number | undefined, cP: number | undefined;
 
   const add = (ax: number, ay: number, az: number, bx: number, by: number, bz: number, kind: number, li: number, f: number) => {
-    const len = Math.hypot(bx - ax, by - ay, bz - az);
+    // A zählt wie GRBL als „mm“ mit (Grad) – nur für die Zeit; die Länge bleibt die XYZ-Strecke
+    const da = hasA ? na - a : 0;
+    const geo = Math.hypot(bx - ax, by - ay, bz - az);
+    const len = Math.hypot(geo, da);
     if (len < 1e-9) return;
     x0.push(ax); y0.push(ay); z0.push(az); x1.push(bx); y1.push(by); z1.push(bz);
+    if (hasA) { a0.push(a); a1.push(na); a = na; }
     type.push(kind); lineNo.push(li);
     const rate = kind === MOVE_RAPID ? rapidRate : Math.max(1, f);
     dur.push(len / (rate / 60) + dwell);
     dwell = 0;
-    if (kind === MOVE_RAPID) rapidLength += len; else if (kind === MOVE_CUT) cutLength += len;
+    if (kind === MOVE_RAPID) rapidLength += geo; else if (kind === MOVE_CUT) cutLength += geo;
   };
 
   for (let li = 0; li < lines.length; li++) {
@@ -128,7 +141,8 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
       if (words.Q !== undefined) cQ = Math.abs(words.Q * f);
       if (words.P !== undefined) cP = words.P;
     }
-    const hasXYZ = words.X !== undefined || words.Y !== undefined || words.Z !== undefined;
+    if (hasA) na = words.A === undefined ? a : (absolute ? words.A : a + words.A);
+    const hasXYZ = words.X !== undefined || words.Y !== undefined || words.Z !== undefined || (hasA && na !== a);
     if (!hasXYZ) continue;
     // G53/G28 usw. nicht nachbilden
     if (gs.some(g => g === 28 || g === 30 || g === 53 || g === 92)) continue;
@@ -197,7 +211,9 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
       const step = r > arcTol ? 2 * Math.acos(1 - arcTol / r) : Math.PI / 8;
       const segs = Math.min(720, Math.max(2, Math.ceil(Math.abs(sweep) / step)));
       let px = x, py = y, pz = z;
+      const aS = a, aE = na;
       for (let s = 1; s <= segs; s++) {
+        na = aS + (aE - aS) * (s / segs);
         const tt = s / segs;
         const a = a0 + sweep * tt;
         const qx = s === segs ? nx : cx + r * Math.cos(a);
@@ -238,7 +254,8 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     type: Uint8Array.from(type), line: Uint32Array.from(lineNo),
     t0, dur: Float32Array.from(dur),
     totalTime: t, cutLength, rapidLength,
-    bounds: { minX, minY, minZ, maxX, maxY, maxZ }, cutMinZ, cutMaxZ
+    bounds: { minX, minY, minZ, maxX, maxY, maxZ }, cutMinZ, cutMaxZ,
+    ...(hasA ? { a0: Float32Array.from(a0), a1: Float32Array.from(a1) } : {})
   };
 }
 

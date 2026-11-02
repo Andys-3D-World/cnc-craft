@@ -3,6 +3,34 @@
 ## Next version (unreleased)
 
 **New**
+- **Rotary axis for milling:** the *Rotary* section (tab *Cut*) now also works on the router – engrave,
+  contours, pockets, V-carve and drilling on a round part clamped in a chuck. Draw on the unrolled surface as with
+  the laser (blue band = circumference); Y becomes the A axis in degrees (or Y travel on the Y port). Arcs are split
+  into short lines, Z = 0 is the top of the part with the tool above the axis centre, and a warning appears if the
+  depth reaches the centre. The 3D preview shows the **milling result on the round part** (from the real G-code).
+- **3D models (STL) on the rotary axis:** with the rotary axis switched on, *3D milling* gets a choice
+  *Flat / All around / From several sides*.
+  - **All around** (4th axis simultaneous): the part turns while the tool cuts from above. Roughing in layers from
+    the outside in (lines along the axis, lines that would only cut air are skipped), finishing as lines along the
+    axis or as a spiral all around. A core of chosen diameter always stays; the stock beyond both ends holds the
+    part. Preview: the milling result on the round part. Pick which model axis lies on the rotary axis and the length.
+  - **From several sides** (indexing, 2–12 sides, needs a separate A axis): the model is milled from above like
+    normal 3D milling, side by side; in between the A axis turns at safe height. The round blank above the model
+    is roughed from its real top, and a core around the axis stays and holds the part.
+  - Calculated in the app core like normal 3D milling (about 3 s for 200,000 triangles all around).
+- **Simulation with the rotary axis in 3D:** jobs for the rotary axis are no longer shown flat (unrolled) but
+  wrapped around the round part – the blank is drawn as a wireframe cylinder with its axis, the paths sit where the
+  tool touches the part, coloured by depth below the surface; rapid moves go around at safe height. Works for the
+  current design (rotary switched on) and for loaded G-code with an A axis (also milling from several sides and
+  the laser roller rotary). The info panel shows the diameter and the A range. The G-code reader of the
+  simulation now understands the A axis (rotation counts for the time estimate).
+- **Rotary axis along X or Y, direction of rotation:** new settings in the *Rotary* section (laser and milling):
+  *Rotary axis lies along X / along Y* and *Reverse direction of rotation*. Along Y, Y is along the part and X goes
+  around – the blue band stands upright, the rotary sits on the X connector instead of Y (or on its own A axis,
+  which then turns about Y), and the frame moves along Y. Internally everything is calculated as along X and turned
+  by 90° (a rotation, not a mirror), so G-code, 3D preview, 3D milling from STL (all around / several sides) and
+  the simulation work the same in both layouts. *Reverse* is for a rotary that turns the other way round (text or
+  the part would otherwise come out mirrored). The setup hints adapt (X 0 above the axis centre when along Y).
 - **Text in the shadow box:** a name or saying (two lines possible, any font) either *standing in front* – the letters
   stand in the front layer on a thin bar from edge to edge (one bar per line), in the sky above the landscape – or
   *engraved at the back* on the back plate. The text sits below the moon/sun and the stars keep clear of it; with a
@@ -57,6 +85,9 @@
   all fields filled in, and you submit it there. "Copy" puts the whole report on the clipboard as a fallback.
 
 **Fixed**
+- **Rotary feed rate:** with an A axis the controller reads F as degrees per minute, so rotary jobs ran much
+  slower (or, on the Y port, slightly faster) than set. CNC Craft now sets F for every move so the speed on the
+  surface matches the layer/tool setting.
 - **Quitting with Cmd+Q (macOS)** now also stops a running job safely (laser/spindle off), like closing the window.
 
 **Improved**

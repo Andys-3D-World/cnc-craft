@@ -140,6 +140,8 @@ pub struct Model {
     start: Vec<u32>,
     items: Vec<u32>,
     pub floor: f64,
+    /// Material-Oberkante über dem Modell (Drehachse, mehrere Seiten: rundes Rohteil ragt über das Modell)
+    pub top: f64,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -235,7 +237,7 @@ impl Model {
                 }
             }
         }
-        Model { facets, x0, y0, cell, nx, ny, start, items, floor }
+        Model { facets, x0, y0, cell, nx, ny, start, items, floor, top: 0.0 }
     }
 
     pub fn scratch(&self) -> Scratch {
@@ -743,6 +745,15 @@ pub struct Job {
     pub margin: bool,
     pub rough: Option<ToolOp>,
     pub finish: Option<ToolOp>,
+    /// Material steht so weit über der Modell-Oberkante (mm, Drehachse von mehreren Seiten)
+    #[serde(default)]
+    pub stock_top: f64,
+    /// tiefste erlaubte Höhe (unter der Modell-Oberkante, negativ); fehlt = Modell-Unterkante
+    #[serde(default)]
+    pub floor: Option<f64>,
+    /// Fräsbereich [x0, y0, x1, y1]; fehlt = Lage des Modells
+    #[serde(default)]
+    pub bounds: Option<[f64; 4]>,
 }
 
 /// Eine zusammenhängende Bahn im Vorschub. kind 0 = Schruppen, 1 = Schlichten.
@@ -764,8 +775,10 @@ pub fn compute(src: &[Tri], job: &Job, cancel: &AtomicBool, prog: Progress) -> R
             return Err("invalid model size".into());
         }
     }
-    let model = Model::new(place(src, p), -p.height);
-    let bounds = [p.x0, p.y0, p.x0 + p.size_x, p.y0 + p.size_y];
+    let mut model = Model::new(place(src, p), job.floor.filter(|f| f.is_finite() && *f < 0.0).unwrap_or(-p.height));
+    model.top = if job.stock_top.is_finite() { job.stock_top.max(0.0) } else { 0.0 };
+    let bounds = job.bounds.filter(|b| b.iter().all(|v| v.is_finite()) && b[2] > b[0] && b[3] > b[1])
+        .unwrap_or([p.x0, p.y0, p.x0 + p.size_x, p.y0 + p.size_y]);
     let mut out = Vec::new();
     let both = job.rough.is_some() && job.finish.is_some();
     if let Some(r) = &job.rough {
@@ -793,14 +806,14 @@ fn check(op: &ToolOp) -> Result<(), String> {
     Ok(())
 }
 
-/// Schrupp-Schichten von oben nach unten bis zum Boden (+ Aufmaß)
-fn layers(step: f64, bottom: f64) -> Vec<f64> {
+/// Schrupp-Schichten von der Material-Oberkante (top) nach unten bis zum Boden (+ Aufmaß)
+fn layers(top: f64, step: f64, bottom: f64) -> Vec<f64> {
     let mut zs = Vec::new();
-    if bottom >= -1e-6 {
+    if bottom >= top - 1e-6 {
         return zs;
     }
     let step = step.max(0.05);
-    let mut z = -step;
+    let mut z = top - step;
     while z > bottom + 1e-6 {
         zs.push(z);
         z -= step;
@@ -825,7 +838,7 @@ pub fn rough(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, cancel: &At
     // Aufmaß rundherum: Fräser um a dicker und a höher
     let cg = c.grown(a);
     let d = height_field(m, &g, cg, a, cancel, &|f| prog(f * 0.5, "rough"))?;
-    let zs = layers(op.step_down, m.floor + a);
+    let zs = layers(m.top, op.step_down, m.floor + a);
     let mut sc = m.scratch();
     let mut out = Vec::new();
     for (k, &z) in zs.iter().enumerate() {
@@ -887,7 +900,7 @@ pub fn rough(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, cancel: &At
             })
             .filter(|lp| lp.len() >= 2)
             .collect();
-        let top = if k == 0 { 0.0 } else { zs[k - 1] };
+        let top = if k == 0 { m.top } else { zs[k - 1] };
         out.extend(link(rings, &d, &g, z, top, k as u32));
     }
     Ok(out)
@@ -1039,7 +1052,7 @@ pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Opt
         let ro = rough?;
         let a = ro.allowance.max(0.0);
         let d = m.drop(x, y, ro.cutter().grown(a), &mut sc) + a;
-        Some(layers(ro.step_down, m.floor + a).into_iter().filter(|&z| z >= d - 1e-6).fold(0.0, f64::min))
+        Some(layers(m.top, ro.step_down, m.floor + a).into_iter().filter(|&z| z >= d - 1e-6).fold(m.top, f64::min))
     };
     for (pass, lines) in lines_all {
         let full: Vec<P3> = lines.into_iter().flatten().collect();
@@ -1051,7 +1064,7 @@ pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Opt
         let levels: Vec<f64> = match rough {
             Some(_) => vec![f64::NEG_INFINITY],
             None if op.step_down > 0.0 => {
-                let mut v = layers(op.step_down, zmin);
+                let mut v = layers(m.top, op.step_down, zmin);
                 if let Some(l) = v.last_mut() {
                     *l = f64::NEG_INFINITY;
                 }
@@ -1059,7 +1072,7 @@ pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Opt
             }
             None => vec![f64::NEG_INFINITY],
         };
-        let mut prev_level = 0.0;
+        let mut prev_level = m.top;
         for (li, &lv) in levels.iter().enumerate() {
             let pts: Vec<P3> = full.iter().map(|p| [p[0], p[1], p[2].max(lv)]).collect();
             let pts = thin(&pts, tol);
@@ -1068,6 +1081,80 @@ pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Opt
             prev_level = lv;
         }
     }
+    Ok(out)
+}
+
+// =====================================================================
+// 5. DREHACHSE RUNDUM: Höhenfeld um die X-Achse
+// =====================================================================
+
+/// Rundum-Fräsen (4. Achse gleichzeitig): Das Modell liegt mit seiner Längsachse auf der X-Achse (y = z = 0).
+/// Für jeden Drehwinkel wird das Modell gedreht und der Fräser über (x, 0) von oben abgesenkt.
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct RotaryJob {
+    pub ball: bool,
+    pub diameter: f64,
+    /// Aufmaß (Schruppen): Fräser um so viel dicker und höher
+    #[serde(default)]
+    pub allowance: f64,
+    /// Punkte entlang X: x0 + i · dx, i < nx
+    pub x0: f64,
+    pub dx: f64,
+    pub nx: usize,
+    /// Winkel: 360° / nt · j, j < nt
+    pub nt: usize,
+    /// tiefer als dieser Radius geht der Fräser nie (Kern, der das Teil hält)
+    #[serde(default)]
+    pub core: f64,
+}
+
+/// Radius der Fräserspitze je Winkel und X-Stelle: out[j · nx + i].
+/// Drehung um +X (rechte Hand): der Fräser oben (+Z) berührt bei Winkel A die Stelle (y, z) = (sin A, cos A) · r.
+pub fn rotary_field(src: &[Tri], job: &RotaryJob, cancel: &AtomicBool, prog: Progress) -> Result<Vec<f32>, String> {
+    if !(job.diameter.is_finite() && job.diameter > 0.0 && job.dx.is_finite() && job.dx > 0.0 && job.x0.is_finite()) {
+        return Err("invalid tool settings".into());
+    }
+    if job.nx == 0 || job.nt == 0 || job.nx * job.nt > 8_000_000 {
+        return Err("invalid grid".into());
+    }
+    let a = if job.allowance.is_finite() { job.allowance.max(0.0) } else { 0.0 };
+    let r = (job.diameter / 2.0).max(0.01);
+    let c = if job.ball { Cutter::Ball(r) } else { Cutter::Flat(r) }.grown(a);
+    let reach = c.r() + 1e-9;
+    let core = if job.core.is_finite() { job.core.max(0.0) } else { 0.0 };
+    let done = std::sync::atomic::AtomicUsize::new(0);
+    let rows: Vec<Option<Vec<f32>>> = (0..job.nt)
+        .into_par_iter()
+        .map(|j| {
+            if cancel.load(Ordering::Relaxed) {
+                return None;
+            }
+            let (sn, cs) = (std::f64::consts::TAU * j as f64 / job.nt as f64).sin_cos();
+            // nur Dreiecke, die der Fräser über der Linie y = 0 überhaupt berühren kann
+            let tris: Vec<Tri> = src
+                .iter()
+                .map(|t| t.map(|v| [v[0], v[1] * cs - v[2] * sn, v[1] * sn + v[2] * cs]))
+                .filter(|t| {
+                    let (lo, hi) = (t[0][1].min(t[1][1]).min(t[2][1]), t[0][1].max(t[1][1]).max(t[2][1]));
+                    lo <= reach && hi >= -reach && t.iter().any(|v| v[2] > core)
+                })
+                .collect();
+            let m = Model::new(tris, core);
+            let mut sc = m.scratch();
+            let row = (0..job.nx).map(|i| (m.drop(job.x0 + i as f64 * job.dx, 0.0, c, &mut sc) + a) as f32).collect();
+            let d = done.fetch_add(1, Ordering::Relaxed) + 1;
+            if d % 4 == 0 {
+                prog(d as f64 / job.nt as f64, "rotary");
+            }
+            Some(row)
+        })
+        .collect();
+    let mut out = Vec::with_capacity(job.nx * job.nt);
+    for r in rows {
+        out.extend(r.ok_or(CANCELLED)?);
+    }
+    prog(1.0, "done");
     Ok(out)
 }
 
@@ -1121,6 +1208,80 @@ mod tests {
         let top = [0.0, 0.0, hp];
         let c = [[-a, -a, 0.0], [a, -a, 0.0], [a, a, 0.0], [-a, a, 0.0]];
         (0..4).map(|k| [c[k], c[(k + 1) % 4], top]).collect()
+    }
+
+    /// Zylinder (Radius rc) entlang X von -len bis len
+    fn cylinder(rc: f64, len: f64, n: usize) -> Vec<Tri> {
+        let p = |x: f64, k: usize| {
+            let a = std::f64::consts::TAU * k as f64 / n as f64;
+            [x, rc * a.sin(), rc * a.cos()]
+        };
+        let mut t = Vec::new();
+        for k in 0..n {
+            t.push([p(-len, k), p(len, k), p(len, k + 1)]);
+            t.push([p(-len, k), p(len, k + 1), p(-len, k + 1)]);
+        }
+        t
+    }
+
+    #[test]
+    fn rotary_cylinder_and_direction() {
+        let job = RotaryJob { ball: true, diameter: 4.0, allowance: 0.0, x0: -10.0, dx: 1.0, nx: 21, nt: 36, core: 2.0 };
+        let stop = AtomicBool::new(false);
+        let f = rotary_field(&cylinder(10.0, 30.0, 720), &job, &stop, &|_, _| {}).unwrap();
+        assert_eq!(f.len(), 21 * 36);
+        for v in &f {
+            assert!((*v as f64 - 10.0).abs() < 0.01, "{v}");
+        }
+        // Würfel (Kante 4) bei y = +12: nur um A = 90° sichtbar, sonst bleibt der Fräser auf dem Kern
+        let mut cube = Vec::new();
+        let c = |x: f64, y: f64, z: f64| [x, 12.0 + y, z];
+        for (a, b, cc, d) in [
+            (c(-2., -2., -2.), c(2., -2., -2.), c(2., 2., -2.), c(-2., 2., -2.)),
+            (c(-2., -2., 2.), c(2., -2., 2.), c(2., 2., 2.), c(-2., 2., 2.)),
+            (c(-2., 2., -2.), c(2., 2., -2.), c(2., 2., 2.), c(-2., 2., 2.)),
+            (c(-2., -2., -2.), c(2., -2., -2.), c(2., -2., 2.), c(-2., -2., 2.)),
+        ] {
+            cube.push([a, b, cc]);
+            cube.push([a, cc, d]);
+        }
+        let job = RotaryJob { nx: 1, x0: 0.0, ..job };
+        let f = rotary_field(&cube, &job, &stop, &|_, _| {}).unwrap();
+        assert!((f[9] as f64 - 14.0).abs() < 0.01, "A=90°: {}", f[9]);
+        assert!((f[27] as f64 - 2.0).abs() < 0.01, "A=270°: {}", f[27]);
+        assert!((f[0] as f64 - 2.0).abs() < 0.01, "A=0°: {}", f[0]);
+    }
+
+    #[test]
+    fn stock_above_model_and_floor() {
+        // Rohteil 3 mm über dem Modell, Boden bei -4: Schichten beginnen oben am Rohteil
+        assert_eq!(layers(3.0, 2.0, -4.0), vec![1.0, -1.0, -3.0, -4.0]);
+        assert!(layers(0.0, 1.0, 0.0).is_empty());
+    }
+
+    #[test]
+    fn index_side_stock_top_floor_bounds() {
+        // Halbkugel (Radius 10): Rohteil 4 mm darüber, Boden 6 mm unter der Oberkante, Bereich größer als das Modell
+        let mut j = job(true, true);
+        j.place = Place { x0: -10.0, y0: -10.0, size_x: 20.0, size_y: 20.0, height: 10.0 };
+        j.stock_top = 4.0;
+        j.floor = Some(-6.0);
+        j.bounds = Some([-15.0, -15.0, 15.0, 15.0]);
+        let stop = AtomicBool::new(false);
+        let paths = compute(&hemisphere(10.0, 64, 24), &j, &stop, &|_, _| {}).unwrap();
+        let rough: Vec<&Path> = paths.iter().filter(|p| p.kind == 0).collect();
+        assert!(!rough.is_empty());
+        // erste Schicht oben im Rohteil (4 − 3 = 1 mm über der Modell-Oberkante), Bahn-Oberkante = Rohteil
+        let z0 = rough.iter().map(|p| p.pts[0][2]).fold(f64::NEG_INFINITY, f64::max);
+        assert!((z0 - 1.0).abs() < 1e-6, "{z0}");
+        assert!(rough.iter().any(|p| (p.top - 4.0).abs() < 1e-6));
+        // nie unter den Boden, nie außerhalb des Bereichs (+ Fräserradius)
+        for p in &paths {
+            for q in &p.pts {
+                assert!(q[2] >= -6.0 - 1e-6, "{q:?}");
+                assert!(q[0].abs() <= 15.0 + 3.0 + 1e-6 && q[1].abs() <= 15.0 + 3.0 + 1e-6, "{q:?}");
+            }
+        }
     }
 
     #[test]
@@ -1229,6 +1390,9 @@ mod tests {
             margin: true,
             rough: rough.then(|| ToolOp { ball: false, diameter: 6.0, step_down: 3.0, step_over: 2.5, allowance: 0.5, dir: String::new(), tolerance: 0.01 }),
             finish: finish.then(|| ToolOp { ball: true, diameter: 3.0, step_down: 2.0, step_over: 0.5, allowance: 0.0, dir: "x".into(), tolerance: 0.01 }),
+            stock_top: 0.0,
+            floor: None,
+            bounds: None,
         }
     }
 

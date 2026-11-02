@@ -16,7 +16,7 @@ import { initFlyouts } from "./ui/flyout";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
-import { initMachineMode, isLaser } from "./machineMode";
+import { initMachineMode, isPlasma } from "./machineMode";
 import { rotary } from "./rotary";
 import { initRotaryPanel } from "./ui/rotaryPanel";
 import { initLaserLayers } from "./laserLayers";
@@ -254,7 +254,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       const gcode = generateGcode(state.shapes, { flat: true });
       if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
-      if (rotary.on && isLaser()) appendToConsole(t("rot.simFlat"));
+      if (rotary.on && !isPlasma()) appendToConsole(t("rot.simFlat", { d: rotary.diameter }));
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();
     });

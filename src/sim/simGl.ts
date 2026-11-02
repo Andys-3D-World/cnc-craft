@@ -26,6 +26,8 @@ uniform float u_width;             // Linienbreite in Pixeln
 uniform float u_cap;               // Enden überstehen lassen (1) – nicht bei blassen Bahnen, sonst dunkle Punkte an den Stößen
 uniform float u_kind;              // nur diese Art zeichnen (0 Eilgang, 1 Schnitt, 2 Leerfahrt)
 uniform vec2 u_zRange;             // tiefster / höchster Schnitt
+uniform float u_axisR;             // Drehachse: Radius des Rohteils (Tiefe = Abstand zur Achse − R), 0 = flach
+uniform float u_axisY;             // 1 = Drehachse entlang Y (quer = x), sonst entlang X (quer = y)
 uniform vec3 u_colors[8];
 uniform vec3 u_kindColor;
 out vec4 v_color; out float v_along; out float v_dashed;
@@ -53,7 +55,9 @@ void main() {
   v_dashed = a_type > 0.5 && a_type < 1.5 ? 0.0 : 1.0;
   vec3 c = u_kindColor;
   if (v_dashed < 0.5) {
-    float z = min(a_p0.z, a_p1.z);
+    float z = u_axisR > 0.0
+      ? min(length(vec2(mix(a_p0.y, a_p0.x, u_axisY), a_p0.z + u_axisR)), length(vec2(mix(a_p1.y, a_p1.x, u_axisY), a_p1.z + u_axisR))) - u_axisR
+      : min(a_p0.z, a_p1.z);
     float span = u_zRange.y - u_zRange.x;
     int i = span < 1e-6 ? 2 : clamp(int(floor((u_zRange.y - z) / span * 8.0)), 0, 7);
     c = u_colors[i];
@@ -121,7 +125,7 @@ export class PathRenderer {
       g.linkProgram(p);
       if (!g.getProgramParameter(p, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(p) || "link");
       this.prog = p;
-      for (const n of ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_width", "u_kind", "u_zRange", "u_colors", "u_kindColor", "u_alpha", "u_cap"]) {
+      for (const n of ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_width", "u_kind", "u_zRange", "u_axisR", "u_axisY", "u_colors", "u_kindColor", "u_alpha", "u_cap"]) {
         this.loc[n] = g.getUniformLocation(p, n);
       }
       this.attr = { p0: g.getAttribLocation(p, "a_p0"), p1: g.getAttribLocation(p, "a_p1"), type: g.getAttribLocation(p, "a_type") };
@@ -188,6 +192,8 @@ export class PathRenderer {
       g.uniform4f(L.u_rot, Math.cos(v.yaw), Math.sin(v.yaw), Math.cos(v.pitch), Math.sin(v.pitch));
       g.uniform1f(L.u_scale, v.scale);
       g.uniform2f(L.u_zRange, p.cutMinZ, p.cutMaxZ);
+      g.uniform1f(L.u_axisR, p.rotary ? p.rotary.R : 0);
+      g.uniform1f(L.u_axisY, p.rotary?.along === "y" ? 1 : 0);
       g.uniform3fv(L.u_colors, v.depthColors.flatMap(hex));
 
       // wie beim Canvas: erst die kommenden (blass), dann die gefahrenen (kräftig); je Teil erst Eilgänge, dann Schnitte

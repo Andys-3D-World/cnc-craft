@@ -20,6 +20,9 @@ import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "
 import { machine, setOverride, MACHINE_EVENT } from "../machine";
 import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
+import { wrapSimProgram } from "./rotarySim";
+import { rotary } from "../rotary";
+import { isLaser, isPlasma } from "../machineMode";
 
 type Source = "design" | "job" | "none";
 
@@ -275,7 +278,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   // laufender Job wurde geändert (Live-Bearbeitung): neue Zeilen anzeigen, Kamera und Fortschritt bleiben
   window.addEventListener("cnc-job-patched", (e: any) => {
     if (source !== "job") return;
-    prog = parseGcodeProgram(e.detail.lines);
+    prog = parseSim(e.detail.lines);
     view.replaceProgram(prog);
     if (live || started) { simTime = timeBeforeLine(prog, streamState.currentLine); }
     updateInfo();
@@ -346,11 +349,26 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   requestAnimationFrame(tick);
 }
 
+/**
+ * G-Code einlesen; Drehachse: Bahnen um das runde Teil wickeln (rotarySim.ts) –
+ * G-Code mit A-Achse immer, die Zeichnung (noch nicht umgerechnet) wenn die Drehachse an ist
+ */
+function parseSim(lines: string[], src: Source = source): SimProgram {
+  const p = parseGcodeProgram(lines);
+  const R = rotary.diameter / 2;
+  if (!(R > 0)) return p;
+  // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
+  const o = { along: rotary.along, reverse: rotary.reverse };
+  if (p.a0) return wrapSimProgram(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() ? rotary.rollerDia / rotary.diameter : 1 });
+  if (src === "design" && rotary.on && !isPlasma()) return wrapSimProgram(p, R, "surface", o);
+  return p;
+}
+
 /** Neues Programm anzeigen */
 export function setSimProgram(lines: string[], name: string, src: Source) {
   const b = bedSizeMm();
   view.setBed(b.w, b.h);
-  prog = parseGcodeProgram(lines);
+  prog = parseSim(lines, src);
   source = src;
   label = name;
   simTime = 0;
@@ -512,7 +530,9 @@ function updateInfo() {
   if (!$) return;
   const el = $("sim-info");
   if (!prog) { el.innerHTML = `<div class="sim-muted">${t("sim.noProgram")}</div>`; return; }
-  const b = prog.bounds;
+  // Drehachse: Maße vor dem Wickeln (wie im G-Code), dazu Durchmesser und Drehbereich
+  const rot = prog.rotary;
+  const b = rot ? rot.flat : prog.bounds;
   const row = (k: string, v: string) => `<div><span>${k}</span><b>${v}</b></div>`;
   el.innerHTML =
     row(t("sim.estTime"), fmtTime(prog.totalTime)) +
@@ -521,10 +541,11 @@ function updateInfo() {
     row("X", `${b.minX.toFixed(1)} … ${b.maxX.toFixed(1)} mm`) +
     row("Y", `${b.minY.toFixed(1)} … ${b.maxY.toFixed(1)} mm`) +
     row("Z", `${b.minZ.toFixed(2)} … ${b.maxZ.toFixed(2)} mm`) +
+    (rot ? row("⟳", t("sim.rotaryInfo", { d: (rot.R * 2).toFixed(1), a0: Math.round(rot.aMin), a1: Math.round(rot.aMax) })) : "") +
     row(t("sim.moves"), String(prog.n)) +
     `<div class="sim-muted">${t("sim.estNote")}</div>`;
   const bed = bedSizeMm();
-  if (prog.n && (b.minX < -0.01 || b.minY < -0.01 || b.maxX > bed.w + 0.01 || b.maxY > bed.h + 0.01)) {
+  if (prog.n && !rot && (b.minX < -0.01 || b.minY < -0.01 || b.maxX > bed.w + 0.01 || b.maxY > bed.h + 0.01)) {
     el.innerHTML += `<div class="sim-warn">⚠ ${t("sim.outOfBed")}</div>`;
   }
 }
@@ -632,7 +653,7 @@ function leaveEdit(discard: boolean) {
   const changed = draft !== editBase && (draft.length !== editBase.length || draft.some((l, i) => l !== editBase[i]));
   closeEdit();
   if (discard && changed && prog) {
-    prog = parseGcodeProgram(editBase);
+    prog = parseSim(editBase);
     view.replaceProgram(prog);
     if (source === "job" && streamState.isRunning) simTime = timeBeforeLine(prog, streamState.currentLine);
     updateInfo();
@@ -663,7 +684,7 @@ function setDraft(next: string[], sel: number) {
   draft = next;
   selLine = Math.min(sel, next.length - 1);
   hiLine = selLine;
-  prog = parseGcodeProgram(draft);
+  prog = parseSim(draft);
   view.replaceProgram(prog);
   view.setHighlight(hiLine);
   simTime = Math.min(simTime, prog.totalTime);

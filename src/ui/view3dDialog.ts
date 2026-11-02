@@ -6,7 +6,7 @@
  */
 import { t } from "../i18n/i18n";
 import { Viewer3D } from "../view3d/viewer3d";
-import { partsScene, cylinderScene, carveScene } from "../view3d/scenes";
+import { partsScene, cylinderScene, carveScene, cylinderCarveScene, carveAlongY } from "../view3d/scenes";
 import { carve, CarveResult } from "../view3d/carveSim";
 import { generateGcode, noGcodeMessage, orderToolGroups, lastThreads } from "../cam";
 import { threadMeshes } from "../view3d/threadMesh";
@@ -17,7 +17,7 @@ import { isLaser, isPlasma } from "../machineMode";
 const KEY = "cnc_craft_view3d";
 function state(): any { return (window as any).cncState; }
 
-type Mode = "parts" | "cylinder" | "carve";
+type Mode = "parts" | "cylinder" | "carve" | "cylCarve";
 
 /** zuletzt berechnetes Fräsergebnis (gleicher G-Code -> nicht neu rechnen) */
 let carveCache: { key: string; res: CarveResult | null } | null = null;
@@ -32,10 +32,12 @@ export function openView3D(want: "auto" | Mode = "auto") {
     const deep = Math.max(0, ...shapes.map(s => Math.abs(Number(s.millingDepth) || 0)));
     if (deep > 0) o.thickness = deep;
   }
-  const canCyl = rotary.on && isLaser();
+  const canCyl = rotary.on && !isPlasma();
   const mill = !isLaser() && !isPlasma();
-  const modes: Mode[] = mill ? ["carve", "parts"] : canCyl ? ["parts", "cylinder"] : ["parts"];
-  let mode: Mode = want === "auto" ? (canCyl ? "cylinder" : modes[0]) : modes.includes(want) ? want : modes[0];
+  // Fräse mit Drehachse: Fräsergebnis auf dem runden Teil zuerst
+  const modes: Mode[] = mill ? (canCyl ? ["cylCarve", "cylinder", "carve"] : ["carve", "parts"]) : canCyl ? ["parts", "cylinder"] : ["parts"];
+  let mode: Mode = want === "auto" ? (canCyl ? modes.find(md => md !== "parts")! : modes[0])
+    : want === "cylinder" && mill && canCyl ? "cylCarve" : modes.includes(want) ? want : modes[0];
   // Fräsergebnis: Materialdicke = Tiefe der Durchschnitte (außen/innen), sonst tiefste Stelle + 5 mm
   const autoCarveT = () => {
     const d = (list: any[]) => Math.max(0, ...list.map(s => Math.abs(Number(s.millingDepth) || 0)));
@@ -52,7 +54,7 @@ export function openView3D(want: "auto" | Mode = "auto") {
       <canvas id="v3d-cv" style="width:100%;height:min(520px, calc(100vh - 260px));border-radius:10px;cursor:grab;display:block;"></canvas>
       <div class="v3d-bar">
         ${modes.length > 1 ? `<select id="v3d-mode" class="prop-input" style="width:auto;">${modes.map(md =>
-          `<option value="${md}">${t(md === "parts" ? "v3d.modeParts" : md === "cylinder" ? "v3d.modeCyl" : "v3d.modeCarve")}</option>`).join("")}</select>` : ""}
+          `<option value="${md}">${t(md === "parts" ? "v3d.modeParts" : md === "cylinder" ? "v3d.modeCyl" : md === "cylCarve" ? "v3d.modeCylCarve" : "v3d.modeCarve")}</option>`).join("")}</select>` : ""}
         <label>${t("rot.material")} <select id="v3d-mat" class="prop-input" style="width:auto;">
           ${MATERIALS.map(m => `<option value="${m.id}">${t("mat3d." + m.id)}</option>`).join("")}</select></label>
         <label class="v3d-thickrow">${t("v3d.thick")} <input id="v3d-thick" type="number" min="0.2" step="0.5" class="prop-input" style="width:70px;"></label>
@@ -80,16 +82,17 @@ export function openView3D(want: "auto" | Mode = "auto") {
     const my = ++run;
     const m = MATERIALS.find(x => x.id === o.material) || MATERIALS[0];
     ov.querySelectorAll<HTMLElement>(".v3d-parts").forEach(el => { el.style.display = mode === "parts" ? "" : "none"; });
-    ov.querySelector<HTMLElement>(".v3d-thickrow")!.style.display = mode === "cylinder" ? "none" : "";
+    const carving = mode === "carve" || mode === "cylCarve";
+    ov.querySelector<HTMLElement>(".v3d-thickrow")!.style.display = mode === "cylinder" || mode === "cylCarve" ? "none" : "";
     ov.querySelector<HTMLElement>(".v3d-lift")!.style.display = mode === "parts" && o.sheet ? "" : "none";
     $("v3d-thick").value = String(mode === "carve" ? carveT() : o.thickness);
-    $<HTMLElement>("v3d-hint").textContent = t(mode === "carve" ? "v3d.hintCarve" : "v3d.hint");
+    $<HTMLElement>("v3d-hint").textContent = t(carving ? "v3d.hintCarve" : "v3d.hint");
     if (!viewer.ok) { info.textContent = t("v3d.noGl"); return; }
     if (!shapes.length) { info.textContent = t("v3d.empty"); return; }
     if (mode === "cylinder") {
-      viewer.setMeshes(cylinderScene(shapes, m, rotary.diameter), keepView);
+      viewer.setMeshes(cylinderScene(shapes, m, rotary.diameter, rotary.along), keepView);
       info.textContent = t("rot.info", { c: (Math.PI * rotary.diameter).toFixed(1), d: rotary.diameter }).replace(/ – .*$/, "");
-    } else if (mode === "carve") {
+    } else if (carving) {
       // G-Code wie für die Maschine (ohne Drehachse), Fräser je Abschnitt in derselben Reihenfolge wie im G-Code
       const g = generateGcode(shapes, { flat: true });
       if (!g) { viewer.setMeshes([], keepView); info.textContent = noGcodeMessage(); return; }
@@ -108,6 +111,12 @@ export function openView3D(want: "auto" | Mode = "auto") {
         carveCache = { key, res };
       }
       if (!res) { viewer.setMeshes([], keepView); info.textContent = t("v3d.carveEmpty"); return; }
+      if (mode === "cylCarve") {
+        const r2 = rotary.along === "y" ? carveAlongY(res, Math.PI * rotary.diameter) : res;
+        viewer.setMeshes(cylinderCarveScene(r2, m, rotary.diameter), keepView);
+        info.textContent = t("v3d.carveInfo", { d: (-res.minZ).toFixed(2), c: res.cell.toFixed(2) });
+        return;
+      }
       const T = carveT();
       // Gewindegänge zeigt das Höhenraster nicht – als eigenes Netz dazu (threadMesh.ts)
       const threads = [...lastThreads];

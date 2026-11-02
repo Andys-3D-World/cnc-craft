@@ -16,8 +16,11 @@ import { toolChangeGcode } from "./toolChange";
 const SAFE_Z = 5.0;     // wie cam.ts
 const CLEAR = 1.0;      // so weit über dem Material im Eilgang anfahren, dann eintauchen
 
-/** Bahn im Vorschub: kind 0 = Schruppen, 1 = Schlichten; top = höchstens bis hier steht noch Material */
-export interface Path3D { kind: number; layer: number; top: number; pts: Float32Array }
+/**
+ * Bahn im Vorschub: kind 0 = Schruppen, 1 = Schlichten; top = höchstens bis hier steht noch Material;
+ * a = Drehachse von mehreren Seiten: vorher A auf diesen Winkel (Grad) drehen
+ */
+export interface Path3D { kind: number; layer: number; top: number; pts: Float32Array; a?: number }
 
 export interface Op3D {
   tool: MillingTool;
@@ -35,7 +38,14 @@ export interface Job3D {
   rough: Op3D | null;
   finish: Op3D | null;
   name: string;
+  /** Drehachse (rotary3d.ts): Rohteil höher als das Modell, tiefste Höhe, Fräsbereich */
+  stockTop?: number;
+  floor?: number;
+  bounds?: [number, number, number, number];
 }
+
+/** G-Code-Varianten für die Drehachse: rundum (keine Rampe, am Ende nur X parken) / mehrere Seiten (A zurück auf 0) */
+export interface Gcode3dOpts { rotary?: "wrap" | "index" }
 
 /** Dreiecke (9 Werte je Dreieck) als Binär-STL */
 export function meshToStl(pos: Float32Array): Uint8Array {
@@ -64,9 +74,19 @@ export async function computePaths3d(job: Job3D, onProgress: (f: number, stage: 
   const un = await listen<{ p: number; stage: string }>("cam3d-progress", e => onProgress(e.payload.p, e.payload.stage));
   try {
     const buf = await invoke<ArrayBuffer>("cam3d_compute", {
-      job: { place: job.place, margin: job.margin, rough: op(job.rough), finish: op(job.finish) }
+      job: { place: job.place, margin: job.margin, rough: op(job.rough), finish: op(job.finish), stockTop: job.stockTop ?? 0, floor: job.floor ?? null, bounds: job.bounds ?? null }
     });
     return decodePaths3d(buf);
+  } finally { un(); }
+}
+
+/** Drehachse rundum: Höhenfeld aus dem App-Kern (cam3d.rs → rotary_field), Modell vorher mit loadModel3d laden */
+export async function computeRotaryField(job: { ball: boolean; diameter: number; allowance: number; x0: number; dx: number; nx: number; nt: number; core: number },
+  onProgress: (f: number) => void): Promise<Float32Array> {
+  const un = await listen<{ p: number; stage: string }>("cam3d-progress", e => onProgress(e.payload.p));
+  try {
+    const buf = await invoke<ArrayBuffer>("cam3d_rotary", { job });
+    return new Float32Array(buf.slice(0));
   } finally { un(); }
 }
 
@@ -106,7 +126,7 @@ export function stats3d(paths: Path3D[], job: Job3D): { rough: number; finish: n
 }
 
 /** G-Code für Schruppen + Schlichten */
-export function gcode3d(paths: Path3D[], job: Job3D): string {
+export function gcode3d(paths: Path3D[], job: Job3D, opts: Gcode3dOpts = {}): string {
   const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
   const f3 = (v: number) => v.toFixed(3);
   const ops = ([[job.rough, 0], [job.finish, 1]] as [Op3D | null, number][])
@@ -120,7 +140,7 @@ export function gcode3d(paths: Path3D[], job: Job3D): string {
     ops.forEach(([o], i) => { g += `${c("gc.toolListItem", { i: i + 1, name: o.tool.name, d: o.tool.diameter.toFixed(1) })}\n`; });
   }
   // nur geänderte Achsen schreiben (kürzerer G-Code)
-  let lx = NaN, ly = NaN, lz = NaN;
+  let lx = NaN, ly = NaN, lz = NaN, la = 0;
   const move = (cmd: "G0" | "G1", x: number | null, y: number | null, z: number | null, extra = "") => {
     let s = cmd;
     if (x !== null && f3(x) !== f3(lx)) { s += ` X${f3(x)}`; lx = x; }
@@ -151,10 +171,13 @@ export function gcode3d(paths: Path3D[], job: Job3D): string {
       if (kind === 0 && p.layer !== layer) { layer = p.layer; g += `${c("c3d.gcLayer", { z: P[2].toFixed(2) })}\n`; }
       // hoch, hinfahren, bis knapp über das Material, eintauchen
       move("G0", null, null, SAFE_Z);
+      // mehrere Seiten: oben die Drehachse auf die nächste Seite drehen
+      if (p.a !== undefined && Math.abs(p.a - la) > 1e-6) { la = p.a; g += `G0 A${+p.a.toFixed(4)} ${c("r3d.gcSide", { a: +p.a.toFixed(1) })}\n`; }
       move("G0", P[0], P[1], null);
       const approach = Math.min(SAFE_Z, p.top + CLEAR);
       if (approach < SAFE_Z - 1e-6) move("G0", null, null, approach);
-      const ramp = kind === 0 && (tl.rampAngle ?? 0) > 0 && approach - P[2] > 0.2;
+      // rundum: Bahnen folgen der Oberfläche – die Rampe (gerade schräg nach unten) könnte ins Modell fahren
+      const ramp = kind === 0 && !opts.rotary && (tl.rampAngle ?? 0) > 0 && approach - P[2] > 0.2;
       if (ramp) rampIn(P, approach, Math.min(45, tl.rampAngle!), Math.max(1, tl.diameter), plunge, move);
       else move("G1", null, null, P[2], ` F${plunge}`);
       let first = true;
@@ -165,7 +188,9 @@ export function gcode3d(paths: Path3D[], job: Job3D): string {
     }
     move("G0", null, null, SAFE_Z);
   });
-  g += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
+  // rundum: A nicht zurückdrehen (stünde nach vielen Umdrehungen sonst lange); mehrere Seiten: A wieder auf 0
+  const park = opts.rotary === "wrap" ? "G0 X0" : opts.rotary === "index" ? "G0 X0 Y0 A0" : "G0 X0 Y0";
+  g += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\n${park} ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
   return g;
 }
 

@@ -12,7 +12,7 @@ import { berechne3PunktBogen } from "../arcEngine";
 import { drawBezierOverlay } from "./bezier";
 import { drawDims, drawDimPreview } from "./dims";
 import { drawRotaryBand } from "../rotary";
-import { isLaser } from "../machineMode";
+import { isPlasma } from "../machineMode";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -21,7 +21,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
   ctx.save();
   const tool = currentTool();
   // ---- Drehachse: Band für den abgewickelten Umfang ----
-  if (isLaser()) drawRotaryBand(ctx, toScreen, bedSizeMm().w);
+  if (!isPlasma()) drawRotaryBand(ctx, toScreen, bedSizeMm().w, bedSizeMm().h);
 
   // ---- Hover: Form unter der Maus leicht hervorheben ----
   if (tool === "select" && live.mode === "idle" && live.hover && !app().selectedShapeIds.includes(live.hover.id)) {
