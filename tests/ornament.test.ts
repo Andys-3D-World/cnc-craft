@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { MultiPolygon } from "polygon-clipping";
-import { ornament, ornamentBody, lineBaselines, fitText, holeMargin, decoSize, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions } from "../src/ornament.ts";
+import { ornament, ornamentBody, lineBaselines, ORNAMENT_TOPPERS, fitText, holeMargin, decoSize, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions } from "../src/ornament.ts";
 import { inRegion, bounds } from "../src/nameConnect.ts";
 
 type XY = [number, number];
@@ -192,4 +192,26 @@ test("zwei Zeilen: jede Zeile bekommt ihre Grundlinie, beide Zeilen bleiben im R
   const r = ornament({ ...base, layers: 2, scene: "trees", inner: "band", textLines: 2 }, { area: two, lines: [] });
   assert.equal(r.dropped, 0);
   assert.equal(r.pieces, 1);
+});
+
+test("nur Rahmen (Scherenschnitt): ein Stück mit stehendem Namen, keine Grundplatte", () => {
+  for (const shape of ["ball", "bell", "heart", "arch"] as const) for (const sceneKind of ["trees", "gifts", "village"] as const) {
+    const r = ornament({ ...base, shape, layers: 3, scene: sceneKind, seed: 5, inner: "engrave", deco: "stars" }, { area: word, lines: [] });
+    assert.equal(r.pieces, 1, `${shape}/${sceneKind}`);
+    assert.deepEqual(r.back, []);
+    assert.equal(r.engrave.length, 0, "Name muss stehen, nicht graviert werden");
+    assert.ok(r.cut[0].length >= 2, "kein Fenster");
+  }
+});
+
+test("Aufsätze: Geweih, Schleife, Kappe hängen an der Form, Loch bleibt im Material", () => {
+  for (const topper of ORNAMENT_TOPPERS.filter(t => t !== "none")) for (const shape of ["ball", "star", "heart", "bell"] as const) for (const layers of [1, 3] as const) {
+    const o = { ...base, shape, topper, layers, scene: "trees" as const, inner: "band" as const, deco: "none" as const };
+    const r = ornament(o, { area: word, lines: [] });
+    assert.equal(r.pieces, 1, `${topper}/${shape}/${layers}`);
+    // (beim Herz sitzen Schleife/Kappe in der Kerbe und ragen nicht über die Bögen)
+    if (shape !== "heart" || topper === "antlers") assert.ok(r.h > 80 + 1, `${topper}/${shape}: Aufsatz fehlt`);
+    const ob = ornamentBody(o);
+    assert.ok(ob.holeAt, `${topper}/${shape}: kein Loch`);
+  }
 });

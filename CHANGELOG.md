@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **3D slot ornament** (Generators): two identical parts – one with a slot from the top, one from the bottom –
+  slotted together crosswise make a three-dimensional snowflake, fir tree, star, bauble, bell or heart. Slot width =
+  material thickness + adjustable clearance; cut-out decorations keep their distance to the slot, optional engraved
+  line along the edge, hanging hole (or ring) in the part whose top stays whole. Tests check that both parts are one
+  piece each and the slots meet exactly in the middle.
+- ***Christmas ornament generator*: paper-cut style, toppers and gifts.** *Frame only* gives a one-piece frame with
+  the name standing on its bar and a landscape at the bottom – no back plate. New *Topper* on top of any shape:
+  antlers, bow or cap (the hanging hole stays in the shape). New landscape *Gifts*: presents with ribbon and bow,
+  mixed with fir trees.
 - **Word tile ornament** (Generators): names laid into each other like a small crossword on letter tiles with
   points (English, German or none) – the layout is found automatically (most compact of many tries, 🎲 for another
   one). `<3` gives a heart tile that can cross too. Three parts to glue: round or square back plate with hanging

@@ -21,6 +21,8 @@ export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowf
 export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake", "arch"];
 export type OrnamentHanger = "hole" | "ring" | "none";
 export type OrnamentInner = "engrave" | "cut" | "band" | "score" | "layer";
+export type OrnamentTopper = "none" | "antlers" | "bow" | "cap";
+export const ORNAMENT_TOPPERS: OrnamentTopper[] = ["none", "antlers", "bow", "cap"];
 export type OrnamentDeco = "none" | "stars" | "flakes" | "trees" | "hearts" | "dots" | "mixed";
 export const ORNAMENT_DECOS: OrnamentDeco[] = ["none", "stars", "flakes", "trees", "hearts", "dots", "mixed"];
 
@@ -35,7 +37,8 @@ export interface OrnamentOptions {
   border: boolean;    // Zierlinie innen am Rand
   deco: OrnamentDeco; // ausgeschnittene Motive um den Namen
   vertical?: boolean; // Name senkrecht (von unten nach oben zu lesen)
-  layers?: 1 | 2;     // 2 = Rahmen-Schicht vorn + Grundplatte dahinter
+  layers?: 1 | 2 | 3; // 2 = Rahmen-Schicht vorn + Grundplatte dahinter, 3 = nur der Rahmen (Scherenschnitt)
+  topper?: OrnamentTopper; // Aufsatz oben: Geweih, Schleife, Kappe
   scene?: SceneKind;  // zwei Schichten: Landschaft unten im Rahmen
   seed?: number;      // Zufall der Landschaft
   textLines?: number; // Anzahl Textzeilen (hilft, die Grundlinien zu finden)
@@ -182,6 +185,41 @@ function topAtCenter(m: MultiPolygon): number {
   return best;
 }
 
+/**
+ * Aufsatz oben auf der Form (S = Höhe der Form, top = oberster Punkt in der Mitte):
+ *  - Geweih: zwei geschwungene Stangen mit Enden, links und rechts der Mitte, unten in der Form verankert
+ *  - Schleife: zwei Schlaufen (mit Loch) und ein Knoten
+ *  - Kappe: breite Kappe mit drei kleinen Löchern als Muster
+ */
+export function topperArea(kind: OrnamentTopper, top: number, S: number): MultiPolygon {
+  const P = (x: number, y: number): XY => [x * S, top + y * S];
+  const ell = (cx: number, cy: number, rx: number, ry: number, rot: number, n = 40): XY[] => Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI * 2, x = rx * Math.cos(a), y = ry * Math.sin(a), c = Math.cos(rot), s2 = Math.sin(rot);
+    return [cx + x * c - y * s2, cy + x * s2 + y * c] as XY;
+  });
+  if (kind === "antlers") {
+    const parts: MultiPolygon[] = [], w = S * 0.045;
+    for (const sd of [-1, 1]) {
+      const q = (x: number, y: number) => P(sd * x, y);
+      // Ansatz tief und nah an der Mitte – auch bei spitzen Formen (Stern, Glocke) fest verankert
+      const beam = [q(0.03, -0.1), q(0.1, -0.01), q(0.17, 0.08), q(0.28, 0.19), q(0.38, 0.35)];
+      for (let i = 1; i < beam.length; i++) parts.push(capsule(beam[i - 1], beam[i], w));
+      parts.push(capsule(q(0.17, 0.08), q(0.11, 0.25), w * 0.85), capsule(q(0.28, 0.19), q(0.24, 0.34), w * 0.8), capsule(q(0.28, 0.19), q(0.43, 0.22), w * 0.75));
+    }
+    return unionMany(parts);
+  }
+  if (kind === "bow") {
+    const loops = [-1, 1].map(sd => diff(poly(ell(sd * 0.17 * S, top + 0.07 * S, 0.17 * S, 0.08 * S, sd * 0.3)), poly(ell(sd * 0.17 * S, top + 0.07 * S, 0.1 * S, 0.042 * S, sd * 0.3))));
+    const tails = [-1, 1].map(sd => poly([P(sd * 0.02, 0.04), P(sd * 0.07, 0.04), P(sd * 0.16, -0.12), P(sd * 0.1, -0.13)]));
+    return unionMany([...loops, ...tails, poly(ell(0, top + 0.05 * S, 0.055 * S, 0.06 * S, 0))]);
+  }
+  if (kind === "cap") {
+    const cap = roundRect(-0.17 * S, top - 0.03 * S, 0.17 * S, top + 0.1 * S, 0.03 * S);
+    return diff(cap, union([-0.09, 0, 0.09].map(x => disk(x * S, top + 0.035 * S, 0.018 * S))));
+  }
+  return [];
+}
+
 /** Abstand vom Loch zum Rand */
 export const holeMargin = (r: number) => Math.max(1.5, r * 0.8);
 
@@ -191,6 +229,7 @@ export function ornamentBody(o: OrnamentOptions): OrnamentBody {
   const k = Math.max(10, o.size) / (b.y1 - b.y0), cx = (b.x0 + b.x1) / 2;
   const tf = ([x, y]: XY): XY => [(x - cx) * k, (y - b.y0) * k];
   let body = mapArea(raw.body, tf);
+  if (o.topper && o.topper !== "none") body = unionMany([body, topperArea(o.topper, topAtCenter(body), Math.max(10, o.size))]);
   const box: Box = { x0: (raw.box.x0 - cx) * k, y0: (raw.box.y0 - b.y0) * k, x1: (raw.box.x1 - cx) * k, y1: (raw.box.y1 - b.y0) * k };
   let hole: MultiPolygon = [], holeAt: XY | undefined, holeR = 0;
   const rIn = Math.max(0.5, o.holeD / 2);
@@ -301,7 +340,7 @@ export const decoSize = (o: OrnamentOptions) => ({ s: Math.max(4, o.size * 0.11)
  * Motive im freien Platz verteilen: versetztes Raster, spiegelgleich zur Mitte. Ein Motiv kommt nur dorthin, wo sein
  * Kreis mit Steg ganz in der Form liegt, weg vom Namen (keep) und vom Aufhänge-Loch.
  */
-function decorate(o: OrnamentOptions, shape: MultiPolygon, keep: Box | null, edge: number, hole?: { at: XY; r: number }): MultiPolygon[] {
+export function decorate(o: OrnamentOptions, shape: MultiPolygon, keep: Box | null, edge: number, hole?: { at: XY; r: number }): MultiPolygon[] {
   if (o.deco === "none") return [];
   const { s, web } = decoSize(o), step = s + web, dy = step * 0.87, b = bounds(shape);
   const cy0 = keep ? (keep.y0 + keep.y1) / 2 : (b.y0 + b.y1) / 2;
@@ -327,7 +366,7 @@ export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult
     const rot = ([x, y]: XY): XY => [-y, x];
     text = { area: mapArea(text.area, rot), lines: text.lines.map(l => ({ closed: l.closed, pts: l.pts.map(rot) })) };
   }
-  if (o.layers === 2) return twoLayers(o, text);
+  if (o.layers === 2 || o.layers === 3) return twoLayers(o, text);
   const ob = ornamentBody(o);
   const shape = diff(ob.body, ob.hole);
   const box = { ...ob.textBox };
@@ -384,7 +423,7 @@ export function ornament(o: OrnamentOptions, text: OrnamentText): OrnamentResult
 export const frameWidth = (o: OrnamentOptions) => Math.max(2.5, o.size * 0.06);
 
 /** Fläche um d nach innen (Umgebung wachsen lassen und abziehen) */
-function insetArea(m: MultiPolygon, d: number): MultiPolygon {
+export function insetArea(m: MultiPolygon, d: number): MultiPolygon {
   const b = bounds(m);
   const around = diff(poly([[b.x0 - 5, b.y0 - 5], [b.x1 + 5, b.y0 - 5], [b.x1 + 5, b.y1 + 5], [b.x0 - 5, b.y1 + 5]]), m);
   return diff(m, grow(around, d, true));
@@ -396,14 +435,14 @@ function insetArea(m: MultiPolygon, d: number): MultiPolygon {
  * auf die Grundplatte (durchs Fenster zu sehen), ebenso die Verzierung.
  */
 function twoLayers(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
-  const ob = ornamentBody(o), H = Math.max(10, o.size), fw = frameWidth(o);
+  const ob = ornamentBody(o), H = Math.max(10, o.size), fw = frameWidth(o), frameOnly = o.layers === 3;
   const back = diff(ob.body, ob.hole);
   // Fenster: Form um die Rahmenbreite nach innen, mit Abstand zum Aufhänge-Loch
-  let win = insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw);
+  let win = insetArea(ornamentBody({ ...o, hanger: "none", topper: "none" }).body, fw);
   if (ob.holeAt) win = diff(win, disk(ob.holeAt[0], ob.holeAt[1], ob.holeR + holeMargin(ob.holeR) + fw * 0.5));
   const wb = bounds(win);
   // Steg und Landschaft reichen bis in die Mitte des Rahmens – nur an der Kante anliegend hielten sie nicht sicher
-  const reach = insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw / 2);
+  const reach = insetArea(ornamentBody({ ...o, hanger: "none", topper: "none" }).body, fw / 2);
   // Landschaft unten im Fenster
   const kind = o.scene || "none";
   const land = kind === "none" ? [] : scene({ x0: wb.x0 - 1, x1: wb.x1 + 1, bottom: wb.y0 - fw, base: wb.y0 + (wb.y1 - wb.y0) * 0.17, hill: H * 0.035,
@@ -420,7 +459,8 @@ function twoLayers(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
     if (room > H * 0.06 && hw > 2) { box.x0 = -hw; box.x1 = hw; box.y0 = y0; box.y1 = y1; }
   } else { box.x0 = Math.max(box.x0, wb.x0 + fw * 0.3); box.x1 = Math.min(box.x1, wb.x1 - fw * 0.3); }
   const tx = fitText(text, box, o.textSize);
-  const stand = (o.inner === "cut" || o.inner === "band") && !tx.lines.length && tx.area.length;
+  // nur Rahmen: der Name steht immer auf dem Steg (es gibt keine Grundplatte zum Gravieren)
+  const stand = (frameOnly || o.inner === "cut" || o.inner === "band") && !tx.lines.length && tx.area.length;
   let backEngrave: MultiPolygon = [], backLines: ScoreLine[] = [], top: MultiPolygon = [];
   const parts: MultiPolygon[] = [diff(back, win), landIn];
   let keep: Box | null = null;
@@ -447,14 +487,15 @@ function twoLayers(o: OrnamentOptions, text: OrnamentText): OrnamentResult {
     cut = [big];
   }
   // Verzierung: durchs Fenster sichtbar auf die Grundplatte graviert (nicht unter Rahmen, Landschaft oder Name)
-  if (o.deco !== "none") {
+  if (o.deco !== "none" && !frameOnly) {
     const free = diff(win, union([landIn, ...(keep ? [poly([[keep.x0, keep.y0], [keep.x1, keep.y0], [keep.x1, keep.y1], [keep.x0, keep.y1]])] : [])]));
     const motifs = decorate(o, free, null, decoSize(o).web * 0.5);
     if (motifs.length) backEngrave = union([backEngrave, ...motifs]);
   }
   // Zierlinie: mitten im Ring
-  const lines = o.border ? clipLines(outlineLines(insetArea(ornamentBody({ ...o, hanger: "none" }).body, fw / 2)), cut, 0.2) : [];
+  const lines = o.border ? clipLines(outlineLines(insetArea(ornamentBody({ ...o, hanger: "none", topper: "none" }).body, fw / 2)), cut, 0.2) : [];
   const all = bounds(union([back, top]));
+  if (frameOnly) return { cut, engrave: [], top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped, back: [], backEngrave: [], backLines: [] };
   return { cut, engrave: [], top, lines, pieces: countPieces(cut), w: all.x1 - all.x0, h: all.y1 - all.y0, dropped,
     back, backEngrave, backLines: clipLines(backLines, back, 0.2) };
 }

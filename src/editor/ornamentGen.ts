@@ -13,13 +13,13 @@ import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
 import { SCENE_KINDS, type SceneKind } from "../landscape";
-import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
+import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, ORNAMENT_TOPPERS, type OrnamentTopper, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
   type OrnamentHanger, type OrnamentInner, type OrnamentDeco } from "../ornament";
 
 const KEY = "cnc_craft_ornament";
 interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean }
 const DEF: Opts = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
-  vertical: false, layers: 1, scene: "trees", seed: 1, text: "Andreas", line2: "", font: "Pacifico", bold: false };
+  vertical: false, layers: 1, scene: "trees", seed: 1, topper: "none", text: "Andreas", line2: "", font: "Pacifico", bold: false };
 const HANGERS: OrnamentHanger[] = ["hole", "ring", "none"];
 const INNERS: OrnamentInner[] = ["engrave", "cut", "band", "score", "layer"];
 
@@ -30,7 +30,8 @@ function load(): Opts {
     for (const k of ["size", "points", "holeD", "textSize"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     for (const k of ["text", "line2", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
     for (const k of ["bold", "border", "vertical"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
-    if (s.layers === 2) o.layers = 2;
+    if (s.layers === 2 || s.layers === 3) o.layers = s.layers;
+    if (ORNAMENT_TOPPERS.includes(s.topper)) o.topper = s.topper;
     if (SCENE_KINDS.includes(s.scene)) o.scene = s.scene;
     if (Number.isFinite(Number(s.seed)) && Number(s.seed) > 0) o.seed = Number(s.seed);
     if (ORNAMENT_SHAPES.includes(s.shape)) o.shape = s.shape;
@@ -47,7 +48,7 @@ async function traceName(o: Opts): Promise<OrnamentText> {
   if (!text) return { area: [], lines: [] };
   // zwei Schichten: mehr Zeilenabstand, damit der Steg unter der ersten Zeile nicht an der zweiten klebt
   const tr: TracedText = (await traceTextWithFont({ text, font: o.font, heightMm: 10, bold: o.bold, italic: false, align: "center",
-    lineSpacing: o.layers === 2 ? 185 : 140, letterSpacing: 0 })).traced;
+    lineSpacing: o.layers !== 1 ? 185 : 140, letterSpacing: 0 })).traced;
   const loops = tr.loops.map(l => l.map(p => [p.x, p.y] as XY));
   if (tr.closed?.some(c => !c)) return { area: [], lines: loops.filter(l => l.length >= 2).map((pts, i) => ({ pts, closed: tr.closed?.[i] !== false })) };
   const rings: Polygon[] = loops.filter(l => l.length >= 3).map(l => [l]);
@@ -91,7 +92,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">
           ${sel("orn-shape", "orn.shape", ORNAMENT_SHAPES, "orn.shape.")}
-          <label class="dlg-row"><span>${t("orn.layers")}</span><select id="orn-layers" style="width:auto;max-width:190px;"><option value="1">${t("orn.layers.1")}</option><option value="2">${t("orn.layers.2")}</option></select></label>
+          <label class="dlg-row"><span>${t("orn.layers")}</span><select id="orn-layers" style="width:auto;max-width:190px;"><option value="1">${t("orn.layers.1")}</option><option value="2">${t("orn.layers.2")}</option><option value="3">${t("orn.layers.3")}</option></select></label>
           <div class="orn-only-two">
             ${sel("orn-scene", "orn.scene", SCENE_KINDS, "orn.scene.")}
             <div class="orn-only-scene"><button id="orn-dice" class="btn-secondary" type="button" style="width:100%;margin:2px 0 6px;">🎲 ${t("orn.dice")}</button></div>
@@ -105,6 +106,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
           <label class="dlg-row" style="cursor:pointer;"><span>${t("orn.vertical")}</span><input id="orn-vert" type="checkbox" style="width:auto;"></label>
           ${num("orn-ts", "orn.textSize", "5", "20", "%")}
           ${sel("orn-inner", "orn.inner", INNERS, "orn.inner.")}
+          ${sel("orn-topper", "orn.topper", ORNAMENT_TOPPERS, "orn.topper.")}
           ${sel("orn-hang", "orn.hanger", HANGERS, "orn.hang.")}
           <div class="orn-only-hole">${num("orn-hd", "orn.holeD", "0.5", "1")}</div>
           ${sel("orn-deco", "orn.deco", ORNAMENT_DECOS, "orn.deco.")}
@@ -131,6 +133,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   $("orn-hd").value = String(init.holeD); $("orn-border").checked = init.border;
   $<HTMLSelectElement>("orn-deco").value = init.deco;
   $<HTMLSelectElement>("orn-layers").value = String(init.layers || 1);
+  $<HTMLSelectElement>("orn-topper").value = init.topper || "none";
   $<HTMLSelectElement>("orn-scene").value = init.scene || "trees";
   $("orn-vert").checked = !!init.vertical;
   let seed = init.seed || 1;
@@ -143,7 +146,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       text: $("orn-text").value, line2: $("orn-line2").value, font, bold: $("orn-bold").checked,
       textSize: n("orn-ts", 100, 20, 100), inner: v("orn-inner") as OrnamentInner, hanger: v("orn-hang") as OrnamentHanger,
       holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked,
-      deco: v("orn-deco") as OrnamentDeco, vertical: $("orn-vert").checked, layers: v("orn-layers") === "2" ? 2 : 1,
+      deco: v("orn-deco") as OrnamentDeco, vertical: $("orn-vert").checked, layers: (Number(v("orn-layers")) || 1) as 1 | 2 | 3, topper: v("orn-topper") as OrnamentTopper,
       scene: v("orn-scene") as SceneKind, seed,
       textLines: [$("orn-text").value, $("orn-line2").value].filter(x => x.trim()).length
     };
@@ -154,7 +157,9 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     const o = read(), my = ++run;
     ov.querySelectorAll<HTMLElement>(".orn-only-star").forEach(el => { el.style.display = o.shape === "star" ? "" : "none"; });
     ov.querySelectorAll<HTMLElement>(".orn-only-hole").forEach(el => { el.style.display = o.hanger !== "none" ? "" : "none"; });
-    ov.querySelectorAll<HTMLElement>(".orn-only-two").forEach(el => { el.style.display = o.layers === 2 ? "" : "none"; });
+    ov.querySelectorAll<HTMLElement>(".orn-only-two").forEach(el => { el.style.display = o.layers !== 1 ? "" : "none"; });
+    // nur Rahmen: der Name steht immer auf dem Steg – die Auswahl „Name“ gibt es dann nicht
+    ov.querySelectorAll<HTMLElement>("#orn-inner").forEach(el => { (el.closest(".dlg-row") as HTMLElement).style.display = o.layers === 3 ? "none" : ""; });
     ov.querySelectorAll<HTMLElement>(".orn-only-scene").forEach(el => { el.style.display = o.scene !== "none" ? "" : "none"; });
     const text = await traceName(o);
     if (my !== run) return; // inzwischen neu eingegeben
