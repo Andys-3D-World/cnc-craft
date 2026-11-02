@@ -1,5 +1,6 @@
 /**
- * WEIHNACHTSSCHMUCK-GENERATOR – Fenster (Extras): Form wählen, Name (und zweite Zeile) eingeben, Vorschau mit Größe,
+ * DEKO-ANHÄNGER (früher Weihnachtsschmuck) – Fenster (Generatoren): Thema (Weihnachten, Ostern, Halloween, Jahreszeiten,
+ * Liebe) wählen – es filtert Formen, Verzierungen, Aufsätze und Landschaften –, dann Form wählen, Name (und zweite Zeile) eingeben, Vorschau mit Größe,
  * „Aufs Bett“ legt den Anhänger als Gruppe in die Bettmitte. Die Geometrie entsteht in ornament.ts.
  */
 import type { MultiPolygon, Polygon } from "polygon-clipping";
@@ -13,12 +14,14 @@ import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
 import { SCENE_KINDS, type SceneKind } from "../landscape";
+import { themeList, type Theme } from "../themes";
+import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
 import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, ORNAMENT_TOPPERS, type OrnamentTopper, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
   type OrnamentHanger, type OrnamentInner, type OrnamentDeco } from "../ornament";
 
 const KEY = "cnc_craft_ornament";
-interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean }
-const DEF: Opts = { shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
+interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean; theme: Theme }
+const DEF: Opts = { theme: "christmas", shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
   vertical: false, layers: 1, scene: "trees", seed: 1, topper: "none", text: "Andreas", line2: "", font: "Pacifico", bold: false };
 const HANGERS: OrnamentHanger[] = ["hole", "ring", "none"];
 const INNERS: OrnamentInner[] = ["engrave", "cut", "band", "score", "layer"];
@@ -33,6 +36,7 @@ function load(): Opts {
     if (s.layers === 2 || s.layers === 3) o.layers = s.layers;
     if (ORNAMENT_TOPPERS.includes(s.topper)) o.topper = s.topper;
     if (SCENE_KINDS.includes(s.scene)) o.scene = s.scene;
+    if (isTheme(s.theme)) o.theme = s.theme;
     if (Number.isFinite(Number(s.seed)) && Number(s.seed) > 0) o.seed = Number(s.seed);
     if (ORNAMENT_SHAPES.includes(s.shape)) o.shape = s.shape;
     if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
@@ -91,6 +95,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       <div class="dlg-hint">${t("orn.desc")}</div>
       <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">
+          ${themeSelectHtml("orn-theme", "dlg-row")}
           ${sel("orn-shape", "orn.shape", ORNAMENT_SHAPES, "orn.shape.")}
           <label class="dlg-row"><span>${t("orn.layers")}</span><select id="orn-layers" style="width:auto;max-width:190px;"><option value="1">${t("orn.layers.1")}</option><option value="2">${t("orn.layers.2")}</option><option value="3">${t("orn.layers.3")}</option></select></label>
           <div class="orn-only-two">
@@ -125,16 +130,28 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   let font = init.font;
   createFontPicker($<HTMLElement>("orn-font"), font, f => { font = f; schedule(); });
   // Werte per value setzen (der Name ist fremder Text – nie ins innerHTML)
-  $<HTMLSelectElement>("orn-shape").value = init.shape;
+  // Thema: Listen passend befüllen (gespeicherte Werte bleiben, wenn sie zum Thema gehören)
+  const applyTheme = (th: Theme, keep: Partial<Opts> = {}) => {
+    fillSelect($<HTMLSelectElement>("orn-shape"), themeList(th, "shapes"), "orn.shape.", keep.shape);
+    fillSelect($<HTMLSelectElement>("orn-deco"), ["none", ...themeList(th, "decos")], "orn.deco.", keep.deco);
+    fillSelect($<HTMLSelectElement>("orn-topper"), ["none", ...themeList(th, "toppers")], "orn.topper.", keep.topper);
+    fillSelect($<HTMLSelectElement>("orn-scene"), ["none", ...themeList(th, "scenes")], "orn.scene.", keep.scene);
+  };
+  $<HTMLSelectElement>("orn-theme").value = init.theme;
+  applyTheme(init.theme, init);
+  $<HTMLSelectElement>("orn-theme").addEventListener("change", () => {
+    const th = $<HTMLSelectElement>("orn-theme").value as Theme;
+    // neues Thema: passende Landschaft vorschlagen (die erste des Themas)
+    applyTheme(th, { scene: themeList(th, "scenes")[0] });
+  });
+  $<HTMLSelectElement>("orn-shape").value = $<HTMLSelectElement>("orn-shape").value || init.shape;
   $("orn-pts").value = String(init.points); $("orn-size").value = String(init.size);
   $("orn-text").value = init.text; $("orn-line2").value = init.line2;
   $("orn-bold").checked = init.bold; $("orn-ts").value = String(init.textSize);
   $<HTMLSelectElement>("orn-inner").value = init.inner; $<HTMLSelectElement>("orn-hang").value = init.hanger;
   $("orn-hd").value = String(init.holeD); $("orn-border").checked = init.border;
-  $<HTMLSelectElement>("orn-deco").value = init.deco;
   $<HTMLSelectElement>("orn-layers").value = String(init.layers || 1);
-  $<HTMLSelectElement>("orn-topper").value = init.topper || "none";
-  $<HTMLSelectElement>("orn-scene").value = init.scene || "trees";
+
   $("orn-vert").checked = !!init.vertical;
   let seed = init.seed || 1;
 
@@ -142,7 +159,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
     const v = (id: string) => $<HTMLSelectElement>(id).value;
     return {
-      shape: v("orn-shape") as OrnamentShape, points: Math.round(n("orn-pts", DEF.points, 5, 12)), size: n("orn-size", DEF.size, 20, 1000),
+      theme: v("orn-theme") as Theme, shape: v("orn-shape") as OrnamentShape, points: Math.round(n("orn-pts", DEF.points, 5, 12)), size: n("orn-size", DEF.size, 20, 1000),
       text: $("orn-text").value, line2: $("orn-line2").value, font, bold: $("orn-bold").checked,
       textSize: n("orn-ts", 100, 20, 100), inner: v("orn-inner") as OrnamentInner, hanger: v("orn-hang") as OrnamentHanger,
       holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked,

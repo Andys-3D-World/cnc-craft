@@ -3,7 +3,7 @@
  *
  * Teil A hat einen Schlitz von oben bis zur Mitte, Teil B von unten bis zur Mitte – zusammengesteckt stehen sie im
  * rechten Winkel und ergeben eine räumliche Figur. Schlitzbreite = Materialstärke + Spiel. Das Loch zum Aufhängen
- * sitzt oben in Teil B (dessen Spitze bleibt ganz). Umrisse aus dem Weihnachtsschmuck (Schneeflocke, Tanne, Stern …),
+ * sitzt oben in Teil B (dessen Spitze bleibt ganz). Umrisse aus dem Deko-Anhänger (Schneeflocke, Tanne, Stern, Ei, Kürbis …),
  * Verzierung als ausgeschnittene Motive mit Abstand zum Schlitz, wahlweise eine gravierte Zierlinie am Rand.
  *
  * Nur Geometrie (Tests: `npm test`). Alles in mm, Y nach oben, Mitte bei x = 0.
@@ -11,10 +11,11 @@
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { bounds, clipLines, outlineLines, type ScoreLine } from "./nameConnect.ts";
+import { SEASON_SHAPES, type SeasonShape } from "./seasonShapes.ts";
 import { ornamentBody, decorate, decoSize, insetArea, borderInset, type OrnamentShape, type OrnamentDeco, type OrnamentHanger, type OrnamentOptions } from "./ornament.ts";
 
-export type SlotShape = "snowflake" | "tree" | "star" | "ball" | "bell" | "heart";
-export const SLOT_SHAPES: SlotShape[] = ["snowflake", "tree", "star", "ball", "bell", "heart"];
+export type SlotShape = "snowflake" | "tree" | "star" | "ball" | "bell" | "heart" | SeasonShape;
+export const SLOT_SHAPES: SlotShape[] = ["snowflake", "tree", "star", "ball", "bell", "heart", ...SEASON_SHAPES];
 
 export interface SlotOrnamentOptions {
   shape: SlotShape;

@@ -10,16 +10,23 @@ import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, type ScoreLine } from "../nameConnect";
 import { ORNAMENT_DECOS, type OrnamentDeco, type OrnamentHanger } from "../ornament";
+import { themeList, type Theme } from "../themes";
+import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
 import { slotOrnament, SLOT_SHAPES, type SlotOrnamentOptions, type SlotResult, type SlotShape } from "../slotOrnament";
 
 const KEY = "cnc_craft_slotornament";
-const DEF: SlotOrnamentOptions = { shape: "snowflake", size: 90, points: 6, t: 3, clear: 0.1, hanger: "hole", holeD: 3, deco: "stars", border: true };
+type Opts = SlotOrnamentOptions & { theme: Theme };
+const DEF: Opts = { theme: "christmas", shape: "snowflake", size: 90, points: 6, t: 3, clear: 0.1, hanger: "hole", holeD: 3, deco: "stars", border: true };
 const HANGERS: OrnamentHanger[] = ["hole", "ring"];
 
-function load(): SlotOrnamentOptions {
+/** Formen eines Themas, die sich stecken lassen (sonst alle) */
+const shapesOf = (th: Theme) => { const l = themeList(th, "shapes").filter(s => (SLOT_SHAPES as string[]).includes(s)); return l.length ? l : SLOT_SHAPES; };
+
+function load(): Opts {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "{}");
-    const o: SlotOrnamentOptions = { ...DEF };
+    const o: Opts = { ...DEF };
+    if (isTheme(s.theme)) o.theme = s.theme;
     for (const k of ["size", "points", "t", "clear", "holeD"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (typeof s.border === "boolean") o.border = s.border;
     if (SLOT_SHAPES.includes(s.shape)) o.shape = s.shape;
@@ -58,6 +65,7 @@ export function openSlotOrnamentDialog(log: (s: string) => void, done: () => voi
       <div class="dlg-hint">${t("so.desc")}</div>
       <div class="box-grid">
         <div class="box-fields">
+          ${themeSelectHtml("so-theme", "prop-row")}
           ${sel("so-shape", "orn.shape", SLOT_SHAPES, "orn.shape.")}
           <div class="so-only-star">${num("so-pts", "orn.points", o.points, "1", "5")}</div>
           ${num("so-size", "so.size", o.size, "1", "20")}
@@ -78,11 +86,18 @@ export function openSlotOrnamentDialog(log: (s: string) => void, done: () => voi
     </div>`;
   document.body.appendChild(ov);
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => ov.querySelector("#" + id) as E;
-  $<HTMLSelectElement>("so-shape").value = o.shape; $<HTMLSelectElement>("so-hang").value = o.hanger; $<HTMLSelectElement>("so-deco").value = o.deco;
+  $<HTMLSelectElement>("so-hang").value = o.hanger;
+  const applyTheme = (th: Theme, keep: Partial<Opts> = {}) => {
+    fillSelect($<HTMLSelectElement>("so-shape"), shapesOf(th), "orn.shape.", keep.shape);
+    fillSelect($<HTMLSelectElement>("so-deco"), ["none", ...themeList(th, "decos")], "orn.deco.", keep.deco);
+  };
+  $<HTMLSelectElement>("so-theme").value = o.theme;
+  applyTheme(o.theme, o);
+  $<HTMLSelectElement>("so-theme").addEventListener("change", () => applyTheme($<HTMLSelectElement>("so-theme").value as Theme));
 
-  const read = (): SlotOrnamentOptions => {
+  const read = (): Opts => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
-    return { shape: $<HTMLSelectElement>("so-shape").value as SlotShape, points: Math.round(n("so-pts", o.points, 5, 12)), size: n("so-size", o.size, 20, 1000),
+    return { theme: $<HTMLSelectElement>("so-theme").value as Theme, shape: $<HTMLSelectElement>("so-shape").value as SlotShape, points: Math.round(n("so-pts", o.points, 5, 12)), size: n("so-size", o.size, 20, 1000),
       t: n("so-t", o.t, 0.5, 20), clear: n("so-clear", o.clear, 0, 2), hanger: $<HTMLSelectElement>("so-hang").value as OrnamentHanger,
       holeD: n("so-hd", o.holeD, 1, 20), deco: $<HTMLSelectElement>("so-deco").value as OrnamentDeco, border: $("so-border").checked };
   };

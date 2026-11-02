@@ -1,7 +1,8 @@
 /**
  * LANDSCHAFT als Silhouette – für den Weihnachtsschmuck (zwei Schichten) und die Schattenbox
  *
- * Sanfte Hügel, darauf Tannen (drei Stufen), Häuschen (Satteldach, Schornstein, Fenster und Tür als Löcher,
+ * Sanfte Hügel, darauf Tannen (drei Stufen), Jahreszeiten-Teile (Ostereier und Tulpen, Blumen und Bäume, Palmen,
+ * Herbstbäume und Pilze, Grabsteine, kahle Bäume und Kürbisse mit leuchtendem Gesicht – seasonShapes.ts), Häuschen (Satteldach, Schornstein, Fenster und Tür als Löcher,
  * damit Licht durchscheint) oder Geschenke (Päckchen mit Band als Schlitz und Schleife). Alles für CNC Craft gezeichnet, Zufall mit Startwert – dasselbe seed gibt dieselbe
  * Landschaft. Die Silhouette ist ein zusammenhängendes Stück: Bäume und Häuser stehen im Hügel.
  *
@@ -10,9 +11,20 @@
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { unionMany, type XY } from "./nameConnect.ts";
+import { tulip, flowerItem, eggItem, roundTree, mushroomItem, palm, tombstone, bareTree, jackLantern, type Item } from "./seasonShapes.ts";
 
-export type SceneKind = "none" | "hills" | "trees" | "village" | "gifts";
-export const SCENE_KINDS: SceneKind[] = ["none", "hills", "trees", "village", "gifts"];
+/** Jahreszeiten: welche Teile wie oft (Gewicht), Größe aus o.item, ungefähre Breite für den Abstand */
+type Pick = [number, (x: number, y: number, k: number) => Item, (k: number) => number, number];
+const SEASON_ITEMS: Partial<Record<SceneKind, Pick[]>> = {
+  easter: [[0.4, (x, y, k) => eggItem(x, y, k * 0.36), k => k * 0.4, 0], [0.3, (x, y, k) => tulip(x, y, k * 0.75), k => k * 0.25, 0], [0.3, (x, y, k) => flowerItem(x, y, k * 0.65), k => k * 0.3, 0]],
+  spring: [[0.4, (x, y, k) => tulip(x, y, k * 0.8), k => k * 0.26, 0], [0.35, (x, y, k) => flowerItem(x, y, k * 0.7), k => k * 0.3, 0], [0.25, (x, y, k) => roundTree(x, y, k * 1.1), k => k * 0.85, 0]],
+  summer: [[0.5, (x, y, k) => palm(x, y, k * 1.15), k => k * 0.75, 0], [0.25, (x, y, k) => flowerItem(x, y, k * 0.6), k => k * 0.3, 0], [0.25, (x, y, k) => roundTree(x, y, k), k => k * 0.8, 0]],
+  autumn: [[0.5, (x, y, k) => roundTree(x, y, k * 1.1), k => k * 0.85, 0], [0.3, (x, y, k) => mushroomItem(x, y, k * 0.45), k => k * 0.35, 0], [0.2, (x, y, k) => ({ area: fir(x, y, k), lights: [] }), k => k * 0.5, 0]],
+  halloween: [[0.35, (x, y, k) => tombstone(x, y, k * 0.34), k => k * 0.4, 0], [0.3, (x, y, k) => bareTree(x, y, k * 1.15), k => k * 0.65, 0], [0.35, (x, y, k) => jackLantern(x, y, k * 0.45), k => k * 0.48, 0]],
+};
+
+export type SceneKind = "none" | "hills" | "trees" | "village" | "gifts" | "easter" | "spring" | "summer" | "autumn" | "halloween";
+export const SCENE_KINDS: SceneKind[] = ["none", "hills", "trees", "village", "gifts", "easter", "spring", "summer", "autumn", "halloween"];
 
 export interface SceneOptions {
   x0: number; x1: number;  // Breite der Landschaft
@@ -101,6 +113,20 @@ export function scene(o: SceneOptions): { area: MultiPolygon; lights: MultiPolyg
     // Plätze nebeneinander, mit etwas Zufall; Häuser größer als Bäume
     let x = o.x0 + o.item * (0.2 + r() * 0.4);
     while (x < o.x1 - o.item * 0.3) {
+      const season = SEASON_ITEMS[o.kind];
+      if (season) {
+        // Jahreszeit: Teil nach Gewicht wählen
+        let u = r(), pick = season[0];
+        for (const p of season) { if (u < p[0]) { pick = p; break; } u -= p[0]; }
+        const k = o.item * (0.85 + r() * 0.3), w = pick[2](k);
+        if (x - w / 2 > o.x0 && x + w / 2 < o.x1) {
+          const it = pick[1](x, top(x) - o.item * 0.05, k);
+          parts.push(it.area);
+          lights.push(...it.lights);
+        }
+        x += w * (1.05 + r() * 0.35);
+        continue;
+      }
       const isHouse = o.kind === "village" && r() < (o.houses ?? 0.4);
       const y = top(x) - o.item * 0.05;
       if (o.kind === "gifts" && r() < 0.65) {

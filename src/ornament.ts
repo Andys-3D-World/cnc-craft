@@ -16,15 +16,16 @@ import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { bounds, union, unionMany, grow, inRegion, clipLines, outlineLines, type ScoreLine, type XY } from "./nameConnect.ts";
 import { scene, type SceneKind } from "./landscape.ts";
+import { seasonOutline, seasonMotif, seasonTopper, SEASON_SHAPES, SEASON_MOTIFS, SEASON_TOPPERS, type SeasonShape, type SeasonMotif, type SeasonTopper } from "./seasonShapes.ts";
 
-export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowflake" | "arch";
-export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake", "arch"];
+export type OrnamentShape = "ball" | "star" | "tree" | "bell" | "heart" | "snowflake" | "arch" | SeasonShape;
+export const ORNAMENT_SHAPES: OrnamentShape[] = ["ball", "star", "tree", "bell", "heart", "snowflake", "arch", ...SEASON_SHAPES];
 export type OrnamentHanger = "hole" | "ring" | "none";
 export type OrnamentInner = "engrave" | "cut" | "band" | "score" | "layer";
-export type OrnamentTopper = "none" | "antlers" | "bow" | "cap";
-export const ORNAMENT_TOPPERS: OrnamentTopper[] = ["none", "antlers", "bow", "cap"];
-export type OrnamentDeco = "none" | "stars" | "flakes" | "trees" | "hearts" | "dots" | "mixed";
-export const ORNAMENT_DECOS: OrnamentDeco[] = ["none", "stars", "flakes", "trees", "hearts", "dots", "mixed"];
+export type OrnamentTopper = "none" | "antlers" | "bow" | "cap" | SeasonTopper;
+export const ORNAMENT_TOPPERS: OrnamentTopper[] = ["none", "antlers", "bow", "cap", ...SEASON_TOPPERS];
+export type OrnamentDeco = "none" | "stars" | "flakes" | "trees" | "hearts" | "dots" | "mixed" | SeasonMotif;
+export const ORNAMENT_DECOS: OrnamentDeco[] = ["none", "stars", "flakes", "trees", "hearts", "dots", "mixed", ...SEASON_MOTIFS];
 
 export interface OrnamentOptions {
   shape: OrnamentShape;
@@ -111,7 +112,9 @@ function starPts(cx: number, cy: number, n: number, ro: number, ri: number): XY[
 }
 
 /** Form in Einheiten (beliebige Größe) mit Textfeld – wird danach auf die gewünschte Höhe gebracht */
-function rawShape(o: OrnamentOptions): { body: MultiPolygon; box: Box } {
+function rawShape(o: OrnamentOptions): { body: MultiPolygon; box: Box | null } {
+  // Jahreszeiten-Formen: Textfeld wird gesucht (größtes Rechteck in der Form)
+  if ((SEASON_SHAPES as string[]).includes(o.shape)) return { body: seasonOutline(o.shape as SeasonShape), box: null };
   switch (o.shape) {
     case "star": {
       const n = Math.round(Math.max(5, Math.min(12, o.points || 5)));
@@ -192,6 +195,7 @@ function topAtCenter(m: MultiPolygon): number {
  *  - Kappe: breite Kappe mit drei kleinen Löchern als Muster
  */
 export function topperArea(kind: OrnamentTopper, top: number, S: number): MultiPolygon {
+  if ((SEASON_TOPPERS as string[]).includes(kind)) return seasonTopper(kind as SeasonTopper, top, S);
   const P = (x: number, y: number): XY => [x * S, top + y * S];
   const ell = (cx: number, cy: number, rx: number, ry: number, rot: number, n = 40): XY[] => Array.from({ length: n }, (_, i) => {
     const a = (i / n) * Math.PI * 2, x = rx * Math.cos(a), y = ry * Math.sin(a), c = Math.cos(rot), s2 = Math.sin(rot);
@@ -220,6 +224,32 @@ export function topperArea(kind: OrnamentTopper, top: number, S: number): MultiP
   return [];
 }
 
+/**
+ * Textfeld automatisch: größtes Rechteck (Breite : Höhe = aspect) auf der Mittellinie, das ganz in der Form liegt.
+ * Für jede Höhenlage die größte Größe suchen (Rand und Mitte abtasten), die beste gewinnt.
+ */
+export function autoBox(body: MultiPolygon, aspect = 2.6): Box {
+  const b = bounds(body), H = b.y1 - b.y0;
+  const fits = (cy: number, h: number) => {
+    const w = h * aspect;
+    for (let i = 0; i <= 24; i++) {
+      const fx = -w + (2 * w * i) / 24, fy = cy - h + (2 * h * i) / 24;
+      if (!inRegion(body, fx, cy - h) || !inRegion(body, fx, cy + h) || !inRegion(body, -w, fy) || !inRegion(body, w, fy)) return false;
+    }
+    return inRegion(body, 0, cy);
+  };
+  let best = { cy: (b.y0 + b.y1) / 2, h: 0 };
+  for (let k = 1; k < 24; k++) {
+    const cy = b.y0 + (H * k) / 24;
+    if (!inRegion(body, 0, cy)) continue;
+    let lo = 0, hi = H / 2;
+    for (let it = 0; it < 22; it++) { const m = (lo + hi) / 2; if (fits(cy, m)) lo = m; else hi = m; }
+    if (lo > best.h) best = { cy, h: lo };
+  }
+  const h = best.h * 0.92, w = h * aspect;
+  return { x0: -w, y0: best.cy - h, x1: w, y1: best.cy + h };
+}
+
 /** Abstand vom Loch zum Rand */
 export const holeMargin = (r: number) => Math.max(1.5, r * 0.8);
 
@@ -230,7 +260,8 @@ export function ornamentBody(o: OrnamentOptions): OrnamentBody {
   const tf = ([x, y]: XY): XY => [(x - cx) * k, (y - b.y0) * k];
   let body = mapArea(raw.body, tf);
   if (o.topper && o.topper !== "none") body = unionMany([body, topperArea(o.topper, topAtCenter(body), Math.max(10, o.size))]);
-  const box: Box = { x0: (raw.box.x0 - cx) * k, y0: (raw.box.y0 - b.y0) * k, x1: (raw.box.x1 - cx) * k, y1: (raw.box.y1 - b.y0) * k };
+  const box: Box = raw.box ? { x0: (raw.box.x0 - cx) * k, y0: (raw.box.y0 - b.y0) * k, x1: (raw.box.x1 - cx) * k, y1: (raw.box.y1 - b.y0) * k }
+    : autoBox(mapArea(raw.body, tf));
   let hole: MultiPolygon = [], holeAt: XY | undefined, holeR = 0;
   const rIn = Math.max(0.5, o.holeD / 2);
   if (o.hanger === "hole") {
@@ -241,7 +272,9 @@ export function ornamentBody(o: OrnamentOptions): OrnamentBody {
       for (let y = top - r - m; y > box.y1 + r + 0.5; y -= 0.2) if (diskFits(body, 0, y, r + m)) { holeAt = [0, y]; holeR = r; break; }
     }
     if (holeAt) hole = disk(holeAt[0], holeAt[1], holeR);
-  } else if (o.hanger === "ring") {
+  }
+  // Ring oben – oder als Ersatz, wenn für ein Loch nirgends genug Material ist (z. B. schmaler Schmetterlingskörper)
+  if (o.hanger === "ring" || (o.hanger === "hole" && !holeAt)) {
     // Ring über der Spitze bzw. Kappe; er greift ein Stück in die Form, damit er fest dran ist
     const rOut = rIn + Math.max(1.5, o.size * 0.03), top = topAtCenter(body), cy = top + rOut * 0.25;
     body = union([body, disk(0, cy, rOut)]);
@@ -320,6 +353,8 @@ const MIXED: OrnamentDeco[] = ["stars", "flakes", "trees", "hearts"];
 
 /** Kleines Motiv zum Ausschneiden, Mitte (cx, cy), passt in einen Kreis mit Ø s */
 export function motif(kind: OrnamentDeco, cx: number, cy: number, s: number): MultiPolygon {
+  // nur Außenkonturen: eingeschlossene Lücken (z. B. zwischen Flügel und Körper) fielen sonst als Teilchen heraus
+  if ((SEASON_MOTIFS as string[]).includes(kind)) return mapArea(seasonMotif(kind as SeasonMotif).map(p => [p[0]]), ([x, y]) => [cx + x * s, cy + y * s]);
   const at = (pts: XY[]) => poly(pts.map(([x, y]) => [cx + x * s, cy + y * s] as XY));
   switch (kind) {
     case "stars": return at(starPts(0, 0.03, 5, 0.5, 0.21));

@@ -11,12 +11,17 @@ import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, union } from "../nameConnect";
 import { SCENE_KINDS, type SceneKind } from "../landscape";
+import { themeList, type Theme } from "../themes";
+import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
 import { shadowBox, BOX_SHAPES, type BoxShape, type Sky, type ShadowBoxOptions, type ShadowBoxResult } from "../shadowBox";
 
 const KEY = "cnc_craft_shadowbox";
-const DEF: ShadowBoxOptions = { shape: "bell", h: 220, layers: 3, frame: 9, scene: "village", seed: 1, sky: "engrave", bow: true, stand: true, t: 3, gap: 6, cable: true };
+const DEF: ShadowBoxOptions = { theme: "christmas", shape: "bell", h: 220, layers: 3, frame: 9, scene: "village", seed: 1, sky: "engrave", bow: true, stand: true, t: 3, gap: 6, cable: true };
 const SKIES: Sky[] = ["engrave", "cut", "none"];
 const SCENES = SCENE_KINDS.filter(k => k !== "none");
+/** Umrisse und Landschaften eines Themas (Umrisse nur, die es als Schattenbox gibt; sonst alle) */
+const shapesOf = (th: Theme) => { const l = themeList(th, "shapes").filter(s => (BOX_SHAPES as string[]).includes(s)); return l.length ? l : BOX_SHAPES; };
+const scenesOf = (th: Theme) => { const l = themeList(th, "scenes").filter(s => s !== "none"); return l.length ? l : SCENES; };
 
 function load(): ShadowBoxOptions {
   try {
@@ -26,6 +31,7 @@ function load(): ShadowBoxOptions {
     for (const k of ["bow", "stand", "cable"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
     if (BOX_SHAPES.includes(s.shape)) o.shape = s.shape;
     if (SCENES.includes(s.scene)) o.scene = s.scene;
+    if (isTheme(s.theme)) o.theme = s.theme;
     if (SKIES.includes(s.sky)) o.sky = s.sky;
     return o;
   } catch { return { ...DEF }; }
@@ -67,6 +73,7 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
       <div class="dlg-hint">${t("sb.desc")}</div>
       <div class="box-grid">
         <div class="box-fields">
+          ${themeSelectHtml("sb-theme", "prop-row")}
           ${sel("sb-shape", "sb.shape", BOX_SHAPES, "sb.shape.")}
           ${num("sb-h", "sb.h", o.h, "5", "60")}
           ${num("sb-layers", "sb.layers", o.layers, "1", "1")}
@@ -89,11 +96,18 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
     </div>`;
   document.body.appendChild(ov);
   const $ = <E extends HTMLElement = HTMLInputElement>(id: string) => ov.querySelector("#" + id) as E;
-  $<HTMLSelectElement>("sb-shape").value = o.shape; $<HTMLSelectElement>("sb-scene").value = o.scene; $<HTMLSelectElement>("sb-sky").value = o.sky;
+  $<HTMLSelectElement>("sb-sky").value = o.sky;
+  const applyTheme = (th: Theme, keep: Partial<ShadowBoxOptions> = {}) => {
+    fillSelect($<HTMLSelectElement>("sb-shape"), shapesOf(th), "sb.shape.", keep.shape);
+    fillSelect($<HTMLSelectElement>("sb-scene"), scenesOf(th), "orn.scene.", keep.scene);
+  };
+  $<HTMLSelectElement>("sb-theme").value = o.theme || "christmas";
+  applyTheme(o.theme || "christmas", o);
+  $<HTMLSelectElement>("sb-theme").addEventListener("change", () => applyTheme($<HTMLSelectElement>("sb-theme").value as Theme));
 
   const read = (): ShadowBoxOptions => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
-    return { shape: $<HTMLSelectElement>("sb-shape").value as BoxShape, h: n("sb-h", o.h, 60, 1000), layers: Math.round(n("sb-layers", o.layers, 1, 6)),
+    return { theme: $<HTMLSelectElement>("sb-theme").value as Theme, shape: $<HTMLSelectElement>("sb-shape").value as BoxShape, h: n("sb-h", o.h, 60, 1000), layers: Math.round(n("sb-layers", o.layers, 1, 6)),
       frame: n("sb-frame", o.frame, 3, 50), scene: $<HTMLSelectElement>("sb-scene").value as SceneKind, seed: o.seed,
       sky: $<HTMLSelectElement>("sb-sky").value as Sky, bow: $("sb-bow").checked, stand: $("sb-stand").checked,
       t: n("sb-t", o.t, 1, 20), gap: n("sb-gap", o.gap, 0, 50), cable: $("sb-cable").checked };

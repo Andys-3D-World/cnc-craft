@@ -3,6 +3,18 @@
 ## Next version (unreleased)
 
 **New**
+- **Decorations for every season:** the *Christmas ornament generator* is now the *Decoration ornament* generator,
+  and it, the *3D slot ornament* and the *Shadow box* get a **Theme**: Christmas, Easter, Halloween, Spring, Summer,
+  Autumn, Love (Valentine's, Mother's Day, wedding) or all. The theme picks matching shapes, decorations, toppers
+  and landscapes. New shapes (all drawn for CNC Craft): egg, bunny, pumpkin, ghost, bat, flower, butterfly, sun,
+  shell, maple leaf, acorn, mushroom – the text field is found automatically as the biggest rectangle that fits.
+  New cut-out decorations: eggs, flowers, bats, pumpkins, leaves, suns, butterflies. New toppers: bunny ears, witch
+  hat, cat ears, leaves, flower. New landscapes: Easter (eggs with zigzag band, tulips, flowers), Spring (tulips,
+  flowers, trees), Summer (palms), Autumn (leafy trees, mushrooms with spots), Halloween (gravestones with a cross,
+  bare trees, pumpkins with glowing faces). Shadow box: outlines egg, pumpkin and ghost, and a sky to match the
+  theme (stars and crescent moon, bats and full moon, butterflies and sun …). Shapes too narrow for a hanging hole
+  get a small ring on top instead. Tests check every theme lists only existing parts, every part belongs to a theme,
+  and every theme as a two-layer ornament, shadow box and slot ornament stays one piece per part.
 - **3D slot ornament** (Generators): two identical parts – one with a slot from the top, one from the bottom –
   slotted together crosswise make a three-dimensional snowflake, fir tree, star, bauble, bell or heart. Slot width =
   material thickness + adjustable clearance; cut-out decorations keep their distance to the slot, optional engraved

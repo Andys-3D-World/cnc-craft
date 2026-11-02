@@ -19,9 +19,10 @@ import type { MultiPolygon } from "polygon-clipping";
 import { bounds, union, unionMany, grow, type XY } from "./nameConnect.ts";
 import { ornamentBody, motif, type OrnamentShape } from "./ornament.ts";
 import { scene, rng, type SceneKind } from "./landscape.ts";
+import { themeSky, type Theme } from "./themes.ts";
 
-export type BoxShape = "arch" | "bell" | "ball" | "heart" | "tree";
-export const BOX_SHAPES: BoxShape[] = ["arch", "bell", "ball", "heart", "tree"];
+export type BoxShape = "arch" | "bell" | "ball" | "heart" | "tree" | "egg" | "pumpkin" | "ghost";
+export const BOX_SHAPES: BoxShape[] = ["arch", "bell", "ball", "heart", "tree", "egg", "pumpkin", "ghost"];
 export type Sky = "engrave" | "cut" | "none";
 
 export interface ShadowBoxOptions {
@@ -37,6 +38,7 @@ export interface ShadowBoxOptions {
   t: number;          // Materialstärke (mm)
   gap: number;        // Abstand zwischen den Schichten im Fuß (mm)
   cable: boolean;     // Loch fürs LED-Kabel in der Grundplatte
+  theme?: Theme;      // Himmel: Weihnachten = Sterne + Mondsichel, Halloween = Fledermäuse + Vollmond, Ostern = Schmetterlinge + Sonne …
 }
 
 export interface ShadowBoxResult {
@@ -111,17 +113,19 @@ export function shadowBox(o: ShadowBoxOptions): ShadowBoxResult {
   if (o.cable) back = diff(back, poly(ellipse(0, fw * 1.4 + 6, 3.5, 3.5, 0, 32)));
   let backEngrave: MultiPolygon = [];
   if (o.sky !== "none") {
-    // Sterne verstreut im oberen Teil des Fensters, ein Mond (Sichel) oben rechts
+    // Motive verstreut im oberen Teil des Fensters (je nach Thema), oben rechts Mondsichel, Vollmond oder Sonne
     const parts: MultiPolygon[] = [];
-    const sky = rng((o.seed || 1) * 7 + 3), y0 = wb.y0 + wh * 0.5;
-    const moonR = wh * 0.07, mx = wb.x1 - (wb.x1 - wb.x0) * 0.24, my = wb.y1 - wh * 0.16;
-    parts.push(diff(poly(ellipse(mx, my, moonR, moonR)), poly(ellipse(mx + moonR * 0.45, my + moonR * 0.25, moonR * 0.9, moonR * 0.9))));
+    const sky = rng((o.seed || 1) * 7 + 3), y0 = wb.y0 + wh * 0.5, th = themeSky(o.theme || "christmas");
+    const moonR = wh * (th.body === "crescent" ? 0.07 : 0.085), mx = wb.x1 - (wb.x1 - wb.x0) * 0.24, my = wb.y1 - wh * 0.16;
+    const full = poly(ellipse(mx, my, moonR, moonR));
+    parts.push(th.body === "crescent" ? diff(full, poly(ellipse(mx + moonR * 0.45, my + moonR * 0.25, moonR * 0.9, moonR * 0.9)))
+      : th.body === "sun" ? union([full, motif("suns", mx, my, moonR * 2.6)]) : full);
     for (let i = 0; i < 40 && parts.length < 14; i++) {
       const x = wb.x0 + (wb.x1 - wb.x0) * (0.08 + sky() * 0.84), y = y0 + (wb.y1 - y0) * sky(), s = wh * (0.035 + sky() * 0.035);
-      const star = motif(sky() < 0.3 ? "flakes" : "stars", x, y, s);
+      const star = motif(th.motifs[Math.floor(sky() * th.motifs.length) % th.motifs.length], x, y, s * (th.motifs[0] === "stars" ? 1 : 1.4));
       // nur ganz im Fenster und mit Abstand zueinander und zum Mond
       if (polygonClipping.difference(star, inset(win, 2)).length) continue;
-      if (Math.hypot(x - mx, y - my) < moonR + s) continue;
+      if (Math.hypot(x - mx, y - my) < moonR * (th.body === "sun" ? 1.4 : 1) + s) continue;
       if (parts.slice(1).some(p => { const b = bounds(p); return Math.hypot((b.x0 + b.x1) / 2 - x, (b.y0 + b.y1) / 2 - y) < s * 1.3; })) continue;
       parts.push(star);
     }
