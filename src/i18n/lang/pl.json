@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Ścieżka] {n} otwartych linii/łuków nie jest wierconych – wiercenie wymaga zamkniętych kształtów (wiercony jest środek).",
   "main.confirmClear": "Na pewno usunąć wszystko z obszaru roboczego? (Ctrl+Z cofa)",
   "lang.tip": "Język / Language",
+  "theme.tip": "Przełącz jasny / ciemny",
   "lang.load": "Wczytaj pakiet językowy…",
   "lang.template": "Zapisz szablon tłumaczenia…",
   "lang.loaded": "[Język] Wczytano pakiet językowy: {name}",

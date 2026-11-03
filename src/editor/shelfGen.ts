@@ -78,7 +78,7 @@ export function openShelfDialog(log: (s: string) => void, done: () => void) {
           <label class="dlg-row" style="cursor:pointer;"><span>${t("shelf.feet")}</span><input id="sh-feet" type="checkbox" style="width:auto;"></label>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="sh-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="sh-info" class="dlg-hint"></div><div id="sh-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="sh-info" class="dlg-hint"></div><div id="sh-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="sh-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

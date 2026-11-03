@@ -72,7 +72,7 @@ export function openVentDialog(log: (s: string) => void, done: () => void) {
           <div class="vt-mount">${num("vt-mi", "vent.mountInset", "0.5", "1")}</div>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="vt-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="vt-info" class="dlg-hint"></div><div id="vt-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="vt-info" class="dlg-hint"></div><div id="vt-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="vt-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

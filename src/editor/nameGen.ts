@@ -340,7 +340,7 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
           <div class="ng-only-hole">${num("ng-hd", "ng.holeD", "0.5", "1")}</div>
         </div>
         <div class="box-prev" style="min-height:280px;"><div id="ng-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="ng-info" class="dlg-hint"></div><div id="ng-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="ng-info" class="dlg-hint"></div><div id="ng-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="ng-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

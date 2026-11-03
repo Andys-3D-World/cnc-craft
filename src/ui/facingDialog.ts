@@ -93,7 +93,7 @@ export function openFacingDialog(start: FacingStart, log: (s: string) => void, o
       <div class="dlg-row"><span>${esc(t("c3d.dir"))}</span><select id="face-dir" class="prop-input" style="width:auto;">
         <option value="x">${esc(t("c3d.dirX"))}</option><option value="y">${esc(t("c3d.dirY"))}</option></select></div>
       <div class="dlg-hint" id="face-info"></div>
-      <div class="dlg-hint" id="face-warn" style="color:#ffb454;"></div>
+      <div class="dlg-hint" id="face-warn" style="color:var(--lt-amber, #ffb454);"></div>
       <ol class="dlg-hint" style="margin:6px 0 0 18px;padding:0;">
         ${(start.spoil ? [1, 2, 3] : [1, 2, 3, 4]).map(i => `<li>${esc(t(k("face.step" + i)))}</li>`).join("")}
       </ol>

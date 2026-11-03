@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Korrektur] {n} offene Linie(n)/Bögen werden nicht gebohrt – Bohren braucht geschlossene Formen (gebohrt wird die Mitte).",
   "main.confirmClear": "Wirklich alles im Arbeitsbereich löschen? (Strg+Z macht es rückgängig)",
   "lang.tip": "Sprache / Language",
+  "theme.tip": "Hell / Dunkel umschalten",
   "lang.load": "Sprachpaket laden…",
   "lang.template": "Übersetzungs-Vorlage speichern…",
   "lang.loaded": "[Sprache] Sprachpaket geladen: {name}",

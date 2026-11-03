@@ -219,7 +219,7 @@ export function openBirthLetterDialog(log: (s: string) => void, done: () => void
           ${num("bl-msz", "birth.motifSize", "0.5", "3")}
         </div>
         <div class="box-prev" style="min-height:360px;"><div id="bl-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="bl-info" class="dlg-hint"></div><div id="bl-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="bl-info" class="dlg-hint"></div><div id="bl-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="bl-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

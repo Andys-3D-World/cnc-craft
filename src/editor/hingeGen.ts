@@ -68,7 +68,7 @@ export function openHingeDialog(log: (s: string) => void, done: () => void) {
           <div class="hg-only-slots">${num("hg-sw", "hinge.slotWidth", "0.05", "0.1")}</div>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="hg-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="hg-info" class="dlg-hint"></div><div id="hg-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="hg-info" class="dlg-hint"></div><div id="hg-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="hg-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

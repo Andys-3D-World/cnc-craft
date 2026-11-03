@@ -118,7 +118,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
           <label class="dlg-row" style="cursor:pointer;"><span>${t("orn.border")}</span><input id="orn-border" type="checkbox" style="width:auto;"></label>
         </div>
         <div class="box-prev" style="min-height:280px;"><div id="orn-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="orn-info" class="dlg-hint"></div><div id="orn-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="orn-info" class="dlg-hint"></div><div id="orn-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="orn-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

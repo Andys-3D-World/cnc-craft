@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Parcours] {n} ligne(s)/arcs ouverts ne sont pas percés – le perçage demande des formes fermées (le centre est percé).",
   "main.confirmClear": "Vraiment tout supprimer dans la zone de travail ? (Ctrl+Z annule)",
   "lang.tip": "Langue / Language",
+  "theme.tip": "Basculer clair / sombre",
   "lang.load": "Charger un pack de langue…",
   "lang.template": "Enregistrer un modèle de traduction…",
   "lang.loaded": "[Langue] Pack de langue chargé : {name}",

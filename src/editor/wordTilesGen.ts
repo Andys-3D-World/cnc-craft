@@ -143,7 +143,7 @@ export function openWordTilesDialog(log: (s: string) => void, done: () => void) 
           <button id="wt-dice" class="btn-secondary" type="button" style="width:100%;margin-top:6px;">🎲 ${t("wt.dice")}</button>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="wt-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="wt-info" class="dlg-hint"></div><div id="wt-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="wt-info" class="dlg-hint"></div><div id="wt-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-hint">${t("wt.hint")}</div>
       <div class="dlg-buttons">

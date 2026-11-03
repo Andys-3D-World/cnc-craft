@@ -53,7 +53,7 @@ export function openQrDialog(log: (s: string) => void, done: () => void, edit?: 
               ${(["L", "M", "Q", "H"] as QrEcc[]).map(e => `<option value="${e}">${t("qr.ecc." + e)}</option>`).join("")}
             </select></label>
           <div id="qr-info" class="dlg-hint"></div>
-          <div id="qr-warn" class="dlg-hint" style="color:#ffb454;"></div>
+          <div id="qr-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div>
         </div>
         <div class="box-prev"><svg id="qr-svg" viewBox="0 0 10 10" style="background:#fff;"></svg></div>
       </div>

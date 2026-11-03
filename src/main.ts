@@ -1,3 +1,4 @@
+import { initThemeButton } from "./theme";
 import { initConnection } from "./connection";
 import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
@@ -242,6 +243,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initSettingsPage(appendToConsole); // $$-Einstellungen (Reiter "Kalibrieren")
     initFlashPage(appendToConsole);    // Firmware flashen (Reiter "Board flashen")
     initLanguageMenu(document.getElementById("language-menu"), appendToConsole);
+    initThemeButton(document.getElementById("theme-btn")); // ☀️/🌙 oben rechts: hell / dunkel
 
     // ---- Simulation ----
     initSimulation(document.getElementById("tab-sim"), appendToConsole);

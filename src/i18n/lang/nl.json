@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Baan] {n} open lijn(en)/bogen worden niet geboord – boren heeft gesloten vormen nodig (het midden wordt geboord).",
   "main.confirmClear": "Echt alles in het werkgebied verwijderen? (Ctrl+Z maakt het ongedaan)",
   "lang.tip": "Taal / Language",
+  "theme.tip": "Licht / donker wisselen",
   "lang.load": "Taalpakket laden…",
   "lang.template": "Vertaalsjabloon opslaan…",
   "lang.loaded": "[Taal] Taalpakket geladen: {name}",

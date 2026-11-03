@@ -164,7 +164,7 @@ export function renderRightPanel(container: HTMLElement) {
             <div class="dro">
               <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
               <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
-              <div style="color: #ffc043;">Z <span id="pos-z">0.00</span></div>
+              <div style="color: var(--lt-amber, #ffc043);">Z <span id="pos-z">0.00</span></div>
             </div>
             <div id="job-progress-track" style="height: 8px; border-radius: 4px; overflow: hidden;">
               <div id="job-progress-bar" style="height: 100%; width: 0%; transition: width 0.2s;"></div>

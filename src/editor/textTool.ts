@@ -320,7 +320,7 @@ function showDialog(initial: TextParams, onOk: (p: TextParams, t: TracedText) =>
       .txt-row { display: flex; gap: 10px; align-items: center; }
       .txt-check { display: flex; gap: 5px; align-items: center; font-size: 0.85rem; cursor: pointer; }
       #txt-preview { width: 100%; height: auto; background: #121216; border: 1px solid var(--border-color, #35353f); border-radius: 8px; }
-      .txt-warn { font-size: 0.78rem; color: #ffb454; background: rgba(255,180,84,0.08); border: 1px solid rgba(255,180,84,0.35);
+      .txt-warn { font-size: 0.78rem; color:var(--lt-amber, #ffb454); background: rgba(255,180,84,0.08); border: 1px solid rgba(255,180,84,0.35);
         border-radius: 6px; padding: 6px 8px; }
       .txt-info { font-size: 0.78rem; color: var(--text-muted, #8d8d9c); font-family: monospace; min-height: 1em; }
       .txt-btn-cancel { flex: 1; padding: 9px; border-radius: 6px; border: 1px solid var(--border-color, #35353f); background: transparent;

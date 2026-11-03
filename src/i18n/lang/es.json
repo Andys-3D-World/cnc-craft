@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Trayectoria] {n} línea(s)/arcos abiertos no se taladran – taladrar necesita formas cerradas (se taladra el centro).",
   "main.confirmClear": "¿Borrar realmente todo el área de trabajo? (Ctrl+Z lo deshace)",
   "lang.tip": "Idioma / Language",
+  "theme.tip": "Cambiar claro / oscuro",
   "lang.load": "Cargar paquete de idioma…",
   "lang.template": "Guardar plantilla de traducción…",
   "lang.loaded": "[Idioma] Paquete de idioma cargado: {name}",

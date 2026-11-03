@@ -143,7 +143,7 @@ export function openMaterialTestDialog(log: (s: string) => void, done: () => voi
     <div class="dlg-box" role="dialog" style="width:600px;">
       <h3>🧪 ${t("mt.title")}</h3>
       <div class="dlg-hint">${t("mt.desc")}</div>
-      ${isLaser() ? "" : `<div class="dlg-hint" style="color:#ffb454;">${t("mt.notLaser")}</div>`}
+      ${isLaser() ? "" : `<div class="dlg-hint" style="color:var(--lt-amber, #ffb454);">${t("mt.notLaser")}</div>`}
       <div class="box-grid">
         <div class="box-fields">
           <label class="dlg-row"><span>${t("mt.mode")}</span>

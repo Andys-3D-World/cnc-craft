@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Percorso] {n} linee/archi aperti non vengono forati – forare richiede forme chiuse (si fora il centro).",
   "main.confirmClear": "Eliminare davvero tutto nell'area di lavoro? (Ctrl+Z annulla)",
   "lang.tip": "Lingua / Language",
+  "theme.tip": "Cambia chiaro / scuro",
   "lang.load": "Carica pacchetto lingua…",
   "lang.template": "Salva modello di traduzione…",
   "lang.loaded": "[Lingua] Pacchetto lingua caricato: {name}",

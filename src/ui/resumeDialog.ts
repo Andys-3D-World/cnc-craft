@@ -35,7 +35,7 @@ export function openResumeDialog(log: (s: string) => void, startLine?: number) {
       <label class="dlg-row" id="res-mark-row"><span>${t("res.mark")}</span>
         <select id="res-mark" style="max-width:300px;"><option value="">–</option></select></label>
       ${near > 0 ? `<button id="res-near" class="btn-secondary btn-compact" type="button">↶ ${t("res.near", { n: near + 1 })}</button>` : ""}
-      <div class="dlg-hint" id="res-warn" style="color:#ffb454;"></div>
+      <div class="dlg-hint" id="res-warn" style="color:var(--lt-amber, #ffb454);"></div>
       <div class="dlg-hint">${t("res.preTitle")}</div>
       <pre id="res-pre" style="font-size:0.72rem;max-height:170px;overflow:auto;margin:0;padding:6px 8px;border-radius:6px;background:var(--bg-input,#191920);white-space:pre-wrap;"></pre>
       <div class="dlg-hint">${t("res.hint")}</div>

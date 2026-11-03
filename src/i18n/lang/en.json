@@ -831,6 +831,7 @@
   "mode.drillOpen": "[Path] {n} open line(s)/arcs are not drilled – drilling needs closed shapes (the centre is drilled).",
   "main.confirmClear": "Really delete everything in the work area? (Ctrl+Z undoes it)",
   "lang.tip": "Language / Sprache",
+  "theme.tip": "Switch light / dark",
   "lang.load": "Load language pack…",
   "lang.template": "Save translation template…",
   "lang.loaded": "[Language] Language pack loaded: {name}",

@@ -167,7 +167,7 @@ function showStlDialog(
       .stl-dlg-info { font-size: 0.8rem; line-height: 1.5; }
       .stl-dlg-check { display: flex; gap: 6px; align-items: center; font-size: 0.8rem; margin-top: 8px; }
       .stl-dlg-warn { margin-top: 10px; padding: 8px 10px; border-radius: 6px; font-size: 0.8rem;
-        background: rgba(255, 77, 77, 0.12); border: 1px solid rgba(255, 77, 77, 0.5); color: #ffb3b3; }
+        background: rgba(255, 77, 77, 0.12); border: 1px solid rgba(255, 77, 77, 0.5); color: var(--lt-red, #ffb3b3); }
       .stl-btn-cancel { flex: 1; padding: 9px; border-radius: 6px; border: 1px solid var(--border-color, #35353f);
         background: transparent; color: var(--text-muted, #9a9aae); cursor: pointer; }
       .stl-btn-ok { flex: 2; padding: 9px; border-radius: 6px; border: none; font-weight: 700; cursor: pointer;
@@ -223,7 +223,7 @@ function showStlDialog(
     info.innerHTML = slice.loops.length === 0
       ? t("stl.noContour")
       : `<b style="color:#3aa0ff">${slice.outerCount}</b> ${t("stl.outer")}, ` +
-        `<b style="color:#ffc107">${slice.holeCount}</b> ${t("stl.holesCount")}` +
+        `<b style="color:var(--lt-amber, #ffc107)">${slice.holeCount}</b> ${t("stl.holesCount")}` +
         (slice.openCount ? `, <b style="color:#ff4d4d">${slice.openCount}</b> ${t("stl.open")}` : "") +
         `<br>${t("stl.size")}: ${((slice.maxU - slice.minU) * f).toFixed(2)} × ${((slice.maxV - slice.minV) * f).toFixed(2)} mm`;
 

@@ -16,6 +16,7 @@
  * beds = [{ name, done, n }] – n Formen je Bett in dieser Reihenfolge.
  */
 import { app, bedSizeMm, toWorld } from "./editorState";
+import { isLight } from "../theme";
 import { takeHistory, putHistory, type HistoryState } from "./history";
 import { markDirty } from "./projectDirty";
 import { t } from "../i18n/i18n";
@@ -317,12 +318,13 @@ export function drawOtherBeds(ctx: CanvasRenderingContext2D) {
     const label = `${beds[i].done ? "✓ " : ""}${bedName(i)} · ${t("bed.parts", { n: parts(shapes) })}`;
     if (i !== active) {
       if (x1 < 0 || x0 > ctx.canvas.width || y1 < 0 || y0 > ctx.canvas.height) continue;
-      ctx.fillStyle = "#121217";
+      const light = isLight();
+      ctx.fillStyle = light ? "#f2f2f6" : "#121217";
       ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-      ctx.strokeStyle = beds[i].done ? "rgba(52,209,123,0.55)" : "rgba(255,255,255,0.18)";
+      ctx.strokeStyle = beds[i].done ? "rgba(52,209,123,0.55)" : light ? "rgba(0,0,0,0.18)" : "rgba(255,255,255,0.18)";
       ctx.lineWidth = 1.2;
       ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
-      ctx.strokeStyle = beds[i].done ? "rgba(52,209,123,0.45)" : "rgba(160,170,190,0.55)";
+      ctx.strokeStyle = beds[i].done ? "rgba(52,209,123,0.45)" : light ? "rgba(90,96,110,0.55)" : "rgba(160,170,190,0.55)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (const s of shapes) tracePath(ctx, s, sx, sy, scale);

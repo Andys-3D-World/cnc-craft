@@ -83,7 +83,7 @@ export function openJointDialog(log: (s: string) => void, done: () => void) {
           </div>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="jt-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="jt-info" class="dlg-hint"></div><div id="jt-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="jt-info" class="dlg-hint"></div><div id="jt-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="jt-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

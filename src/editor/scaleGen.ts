@@ -82,7 +82,7 @@ export function openScaleDialog(log: (s: string) => void, done: () => void) {
           ${num("sc-th", "scale.textH", "0.5", "1")}
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="sc-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="sc-info" class="dlg-hint"></div><div id="sc-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="sc-info" class="dlg-hint"></div><div id="sc-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="sc-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

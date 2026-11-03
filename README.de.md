@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.3.6 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.3.7 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -88,6 +88,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Werkstatt-Sync zwischen zwei Computern
 - Alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates; Update direkt aus der App (signiert)
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
+- Dunkler und heller Modus (☀️ / 🌙 oben rechts)
 
 ## Bilder
 

@@ -110,7 +110,7 @@ export function openLetterTopperDialog(log: (s: string) => void, done: () => voi
           <div class="lt-only-hole">${num("lt-hd", "lt.holeD", "0.5", "1")}</div>
         </div>
         <div class="box-prev" style="min-height:280px;"><div id="lt-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="lt-info" class="dlg-hint"></div><div id="lt-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="lt-info" class="dlg-hint"></div><div id="lt-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="lt-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

@@ -187,7 +187,7 @@ export function openGearDialog(log: (s: string) => void, done: () => void) {
           </div>
         </div>
         <div class="box-prev" style="min-height:300px;"><div id="gr-svg" style="flex:1;display:flex;align-items:center;"></div>
-          <div id="gr-info" class="dlg-hint"></div><div id="gr-warn" class="dlg-hint" style="color:#ffb454;"></div></div>
+          <div id="gr-info" class="dlg-hint"></div><div id="gr-warn" class="dlg-hint" style="color:var(--lt-amber, #ffb454);"></div></div>
       </div>
       <div class="dlg-buttons">
         <button id="gr-cancel" class="btn-secondary">${t("dlg.cancel")}</button>

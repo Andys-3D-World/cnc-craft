@@ -8,6 +8,7 @@
  * PLASMA-Modus: Streifen = Schnittspalt in Schnitt-Farbe, Punkt = Einstich, Pfeil = Schneidrichtung
  * Material-Platte: rot schraffiert = schon verbraucht; roter Schein = Form liegt darauf (stock.ts)
  */
+import { canvasColors, isLight } from "./theme";
 import { arcGeometry, shapeBounds } from "./shapeTransform";
 import { options } from "./editor/editorState";
 import { drawToolBands, drawToolBadges, drawLaserTabs } from "./toolView";
@@ -25,6 +26,11 @@ export const liveMachinePos = { x: 0, y: 0, z: 0 };
 const MM_TO_PIXEL = 2;
 
 export function modeColor(mode: string | undefined): string {
+  if (isLight()) {   // heller Grund: kräftigere Farben statt Neon
+    if (mode === "inside") return "#d08a00";
+    if (mode === "on-line") return "#00a383";
+    if (mode === "drill") return "#3c9a00";
+  }
   if (mode === "inside") return "#ffc107";
   if (mode === "outside") return "#1e90ff";
   if (mode === "on-line") return "#00ffcc";
@@ -55,12 +61,13 @@ export function drawEverything(
   const sy = (y: number) => (bedHPx - y) * scale + offsetY;
 
   // 1. Hintergrund
-  ctx.fillStyle = "#101014";
+  const tc = canvasColors();
+  ctx.fillStyle = tc.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // 2. Bett
   const bx0 = sx(0), by0 = sy(bedHPx), bx1 = sx(bedW * MM_TO_PIXEL), by1 = sy(0);
-  ctx.fillStyle = "#16161c";
+  ctx.fillStyle = tc.bed;
   ctx.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
   // Materialansicht: Oberfläche + Brandfarben statt Raster und Bahn-Farben
   const mat = materialView();
@@ -101,8 +108,8 @@ export function drawEverything(
     }
     ctx.stroke();
   };
-  drawGrid(minor, "rgba(255,255,255,0.035)");
-  drawGrid(major, "rgba(255,255,255,0.09)");
+  drawGrid(minor, tc.gridMinor);
+  drawGrid(major, tc.gridMajor);
   ctx.restore();
 
   // 4. Bett-Rand + Nullpunkt
@@ -111,7 +118,7 @@ export function drawEverything(
   ctx.strokeRect(bx0, by0, bx1 - bx0, by1 - by0);
 
   // 5. Lineal-Beschriftung (unten und links am Bett)
-  ctx.fillStyle = "#6d6d7c";
+  ctx.fillStyle = tc.label;
   ctx.font = "10px monospace";
   ctx.textAlign = "center";
   for (let mm = Math.ceil(visX0 / major) * major; mm <= visX1 + 1e-9; mm += major) {
@@ -155,7 +162,7 @@ export function drawEverything(
   for (const shape of shapes) {
     if (!inView(shape, view)) continue;
     const isSel = selected.has(shape.id);
-    ctx.strokeStyle = isSel ? "#34d17b" : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
+    ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
     ctx.lineWidth = isSel ? 2.2 : 1.5;
     ctx.beginPath();
     tracePath(ctx, shape, sx, sy, scale);

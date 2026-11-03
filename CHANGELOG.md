@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.7 Beta
+
+0.3.6 was not published as a release (the macOS builds could not run), so 0.3.7 also brings everything from 0.3.6 below.
+
+**New**
+- **Light mode:** the new ☀️ / 🌙 button at the top right switches between dark and light. The choice is kept.
+  The design area, panels and dialogs turn light; path colours become stronger so they stay easy to see on white.
+  Simulation, 3D view and previews keep their dark background.
+
+**Fixed**
+- **Linux: black window or garbled text** on some systems (e.g. Debian, CachyOS, NVIDIA graphics). WebKitGTK's
+  DMA-BUF renderer is now turned off at start, unless the variable `WEBKIT_DISABLE_DMABUF_RENDERER` is already set. Dropdowns no
+  longer show up as empty white boxes with a light GTK theme.
+
 ## 0.3.6 Beta
 
 **New**
