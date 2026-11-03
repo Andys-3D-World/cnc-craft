@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app, so you no longer switch between three programs. Runs on macOS, Windows and Linux.
 
-**Status: 0.3.5 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.3.6 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -15,7 +15,9 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - Drawing tools with Bézier curves and node editing, text with 26+ fonts, single-line fonts and all system fonts,
   dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, nesting (also into offcuts)
 - Shape library, QR codes, serial numbers and variable text, several beds per project (like build plates in a slicer)
-- **Generators:** boxes with finger joints (20 types, with 3D view), jigsaw puzzles, Christmas ornaments, letter
+- **Generators:** boxes with finger joints (20 types, with 3D view), jigsaw puzzles, decoration ornaments for every
+  season (Christmas, Easter, Halloween, spring, summer, autumn, love – also with two layers and a landscape), 3D slot
+  ornaments, word tile ornaments, shadow boxes / light arches with LED cut-outs and stand, letter
   toppers, birth letters (name, date and birth data with own pictures), birdhouses, mandalas, one-piece names with
   symbols, gears (spur gears, racks, belt pulleys, chain sprockets – with bore and keyway), living hinges, rulers and
   clock faces, wood joints (finger joints, dovetails), slot-together shelves and vent grilles
@@ -31,13 +33,16 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   (internal/external), several operations per shape
 - 3D milling from STL models (roughing and finishing), automatic split into cut-outs, holes and pockets,
   face stock on both sides
+- **Rotary axis for milling** (along X or Y): engrave, contours, pockets, V-carve and drilling on round parts;
+  3D models all around (4th axis simultaneous) or from several sides (indexing)
 - Tool change with tool length measurement, re-measure during long jobs, probing, height map, drilling cycles
   G81–G89 on GRBL, slower feed in tight curves
 
 **Laser**
 - Layers like in LightBurn (fill, line, cut, fill + line) with cut order and lead-ins, holding tabs
 - Image engraving with 14 styles, tone curve, auto enhance and before/after preview – adjusted on the graphics card
-- Material view (see the result on wood, slate or acrylic), material presets incl. fibre laser, test grid,
+- Material view with 29 materials (wood, plywood, MDF, acrylic, laminate, raw and anodized aluminium, brass, steel,
+  stainless, slate …), material presets incl. fibre laser, test grid,
   your own presets, lower power in corners for lasers without M4
 - Rotary for tumblers and bottles, camera alignment and material detection
 
@@ -48,6 +53,9 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 
 **Simulation**
 - 3D simulation on the graphics card – smooth even with millions of moves – with time, distance, cost calculator
+- **Live material removal:** watch the stock being milled away with cutter, collet and spindle, laser burn marks
+  and cuts, plasma kerf – also on the rotary axis, where the part turns; works live during the real job too
+- Collision warnings: rapid moves into material, shank or collet touching the stock – with the G-code line
 - G-code editor (also while a job runs), click a toolpath to jump to its line, resume a job from any line
 
 **Machine control**
@@ -68,6 +76,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   inductive NPN/PNP sensors, rotary, displays and VFD wiring
 
 **Everything else**
+- Ask to save before closing, autosave and crash recovery, report a bug from inside the app
 - Libraries for tools, laser layers and plasma cuts with export/import, full backup and workshop sync between two computers
 - All settings are also saved to a file and survive updates; update right from the app (signed)
 - 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski

@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.3.5 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.3.6 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -16,7 +16,9 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Systemschriften, Maße und Bedingungen, Verschmelzen und Ritzen, Muster, Vervielfältigen / „Bett füllen“,
   Verschachteln (auch in Reststücke)
 - Formen-Bibliothek, QR-Codes, Seriennummern und variabler Text, mehrere Betten pro Projekt (wie Druckplatten im Slicer)
-- **Generatoren:** Boxen mit Fingerzinken (20 Arten, mit 3D-Ansicht), Puzzles, Christbaumschmuck, Buchstaben-Topper,
+- **Generatoren:** Boxen mit Fingerzinken (20 Arten, mit 3D-Ansicht), Puzzles, Deko-Anhänger für jede Jahreszeit
+  (Weihnachten, Ostern, Halloween, Frühling, Sommer, Herbst, Liebe – auch zweilagig mit Landschaft),
+  3D-Steckanhänger, Wort-Kachel-Anhänger, Schattenboxen / Lichterbögen mit LED-Ausschnitten und Ständer, Buchstaben-Topper,
   Geburtsbuchstaben (Name, Datum und Geburtsdaten mit eigenen Bildern), Vogelhäuser, Mandalas, Namen aus einem Stück
   mit Symbolen, Zahnräder (Stirnräder, Zahnstangen, Riemenscheiben, Kettenräder – mit Bohrung und Passfedernut),
   Flex-Scharniere, Lineale und Zifferblätter, Holzverbindungen (Fingerzinken, Schwalbenschwanz), Steckregale und
@@ -33,6 +35,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Bearbeitungen pro Form
 - 3D-Fräsen aus STL-Modellen (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
   Rohteil beidseitig planen
+- **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;
+  3D-Modelle rundherum (4. Achse simultan) oder von mehreren Seiten (Indexieren)
 - Werkzeugwechsel mit Längenmessung, Nachmessen bei langen Jobs, Antasten, Höhenkarte, Bohrzyklen G81–G89 auf GRBL,
   langsamer in engen Kurven
 
@@ -40,7 +44,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Ebenen wie in LightBurn (Füllen, Linie, Schneiden, Füllen + Linie) mit Schnittreihenfolge und Freischnitt, Haltestege
 - Bildgravur mit 14 Arten, Gradationskurve, automatischem Verbessern und Vorher/Nachher-Vorschau – auf der Grafikkarte
   nachbearbeitet
-- Materialansicht (Ergebnis auf Holz, Schiefer oder Acryl sehen), Materialvorlagen inkl. Faserlaser, Testraster,
+- Materialansicht mit 29 Materialien (Holz, Sperrholz, MDF, Acryl, Gravurlaminat, Alu roh und eloxiert, Messing,
+  Stahl, Edelstahl, Schiefer …), Materialvorlagen inkl. Faserlaser, Testraster,
   eigene Vorlagen, weniger Leistung in Ecken für Laser ohne M4
 - Rotationsachse für Becher und Flaschen, Kamera-Ausrichtung und Materialerkennung
 
@@ -52,6 +57,10 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 
 **Simulation**
 - 3D-Simulation auf der Grafikkarte – flüssig auch mit Millionen Bewegungen – mit Zeit, Weg und Kostenrechner
+- **Materialabtrag live:** sehen, wie das Material weggefräst wird – mit Fräser, Spannmutter und Spindel –,
+  Brandspuren und Schnitte vom Laser, Schnittspalt vom Plasma; auch auf der Drehachse, wo sich das Teil dreht;
+  läuft auch live beim echten Job mit
+- Kollisions-Warnungen: Eilgang ins Material, Schaft oder Spannmutter am Material – mit G-Code-Zeile
 - G-Code-Editor (auch während der Job läuft), Bahn anklicken springt zur Zeile, Job ab beliebiger Zeile fortsetzen
 
 **Maschinensteuerung**
@@ -73,6 +82,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   induktiven NPN/PNP-Sensoren, Drehachse, Displays und Frequenzumrichter
 
 **Und sonst**
+- Nachfragen vor dem Schließen, automatisches Sichern und Wiederherstellen nach Absturz, Fehler direkt aus dem
+  Programm melden
 - Bibliotheken für Werkzeuge, Laser-Ebenen und Plasma-Schnitte mit Export/Import, Komplett-Sicherung und
   Werkstatt-Sync zwischen zwei Computern
 - Alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates; Update direkt aus der App (signiert)

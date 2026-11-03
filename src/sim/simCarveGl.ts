@@ -98,7 +98,7 @@ void main() {
 
 const STOCK_FS = `#version 300 es
 precision highp float; precision highp int;
-uniform sampler2D u_tex;    // Oberfläche des Materials (materialView.ts, Kachel = 200 mm)
+uniform sampler2D u_tex;    // Oberfläche des Materials (materialView.ts)
 uniform vec3 u_base; uniform vec3 u_core; uniform vec3 u_burn; uniform vec3 u_layers;
 uniform float u_ply;        // Sperrholz: Lagendicke (mm), 0 = keins
 uniform float u_darken;     // gefräste Stellen nach Tiefe dunkler (Holz 1, Metall wenig)
@@ -110,7 +110,8 @@ out vec4 o;
 const vec3 LIGHT = normalize(vec3(-0.45, -0.6, 0.75));
 void main() {
   bool top = v_side < 0.5;
-  vec3 t = texture(u_tex, v_xy / 200.0).rgb;
+  // Kachel = 200 mm; in 3D feiner (80 mm) und ruhiger, sonst wirken die Jahresringe wie Wellen
+  vec3 t = mix(u_base, texture(u_tex, v_xy / 80.0).rgb, 0.65);
   vec3 grain = (t + 0.03) / (u_base + 0.03);                         // Muster der Oberfläche (um 1)
   bool cut = !top || (u_kind == 0 && v_z < -0.004);
   vec3 c = cut ? u_core * grain : t;
@@ -128,7 +129,7 @@ void main() {
     // durchgeschnitten (Schwelle halbiert: dünne Schnitte sind sonst zwischen den Zellen-Ecken gestrichelt)
     if (v_d >= u_cut * 0.5) discard;
     if (u_plasma > 0.5) c = mix(c, vec3(0.36, 0.27, 0.42), clamp(v_d / 0.6, 0.0, 1.0) * 0.75);   // Anlauffarbe
-    else c = mix(c, u_burn, 1.0 - exp(-2.5 * v_d));                  // Brandspur
+    else c = mix(c, u_burn, 1.0 - exp(-6.0 * v_d));                  // Brandspur
   }
   if (!top) c *= 0.92;
   vec3 n = normalize(v_n);

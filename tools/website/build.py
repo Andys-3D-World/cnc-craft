@@ -26,15 +26,17 @@ T = {
   feats=[
    ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP)."),
    ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
-   ("🧩", "14 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, ornaments, birth letters, rulers, vent grilles and QR codes."),
+   ("🧩", "17 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles and QR codes."),
    ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
    ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill, dimensions that stay attached and a right-click menu on the canvas."),
    ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
    ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, dogbones, drilling and thread milling with a tool library – as simple as in Estlcam."),
    ("🧊", "3D milling", "Rough and finish 3D models from STL, tool change with tool length measurement, probing and height map."),
+   ("🌀", "Rotary axis", "Laser and router on round parts: engrave tumblers, mill contours and pockets around a cylinder, or a 3D model all around or from several sides."),
    ("🔦", "Laser layers", "Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn."),
    ("🔥", "Plasma cutting", "Kerf compensation, lead-ins, pierce points, sheet height probing and torch height control (THC)."),
-   ("🎬", "3D simulation", "See every move, the time, the cost and the G-code before the machine starts – smooth even with millions of moves. Edit the G-code and resume a job from any line."),
+   ("🎬", "3D simulation", "Watch the material being milled away with cutter and spindle, laser burn marks and cuts, plasma kerf – also on the rotary axis. Collision warnings, time, cost and G-code editor, smooth even with millions of moves."),
+   ("🪵", "29 materials", "See your job on birch, oak, plywood, MDF, acrylic, raw or anodized aluminium, brass, stainless steel, slate and more – milled anodized aluminium turns bare silver, just like in real life."),
    ("🔌", "Machine control", "GRBL, grblHAL, FluidNC, Grbl_ESP32 via USB or Wi-Fi, Marlin, Ruida (CO₂) and K40. Several machines at once."),
    ("📷", "Camera", "USB or IP camera: watch the job and place your design on the live image of the workpiece."),
    ("📶", "Wi-Fi setup", "Find machines on the network and set up the board's Wi-Fi right from the app."),
@@ -42,10 +44,15 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.3.5", nl="Export your drawing as SVG, DXF, PDF or PLT, a right-click menu on the canvas and many new generators – gears and pulleys, living hinges, rulers &amp; clock faces, wood joints, slot-together shelves, vent grilles and birth letters.",
+  nh="New in 0.3.6", nl="The simulation now shows the material being milled away live – with cutter, collet and spindle, laser burn marks and plasma kerf, also on the rotary axis – plus collision warnings, 29 materials, milling on the rotary axis, new generators for every season and a bug report right from the app.",
+  news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
+        ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
+        ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
+  gall="All 17 generators",
   nlink="All changes",
   gens=[("boxgen", "Boxes"), ("gear", "Gears &amp; pulleys"), ("hinge", "Living hinges"), ("joint", "Wood joints"), ("birth", "Birth letters"),
-        ("namegen", "Names"), ("birdhouse", "Birdhouses"), ("mandala", "Mandalas"), ("ornament", "Ornaments"), ("lettertopper", "Letter toppers"),
+        ("namegen", "Names"), ("birdhouse", "Birdhouses"), ("mandala", "Mandalas"), ("ornament", "Decoration ornaments"), ("wordtiles", "Word tiles"),
+        ("shadowbox", "Shadow boxes"), ("slotornament", "3D slot ornaments"), ("lettertopper", "Letter toppers"),
         ("scale", "Rulers &amp; clock faces"), ("vent", "Vent grilles"), ("puzzle", "Puzzles"), ("qrcode", "QR codes")],
   ch="Built for makers", cl="CNC Craft combines what usually needs three programs:",
   cmp=["Design", "CAM", "Machine control", "CNC Craft"],
@@ -95,15 +102,17 @@ T = {
   feats=[
    ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, STEP) laden."),
    ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
-   ("🧩", "14 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Anhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
+   ("🧩", "17 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
    ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),
    ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung, Maße, die mitwandern, und ein Rechtsklick-Menü auf der Arbeitsfläche."),
    ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
    ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Dogbones, Bohren und Gewindefräsen mit Werkzeug-Bibliothek – so einfach wie in Estlcam."),
    ("🧊", "3D-Fräsen", "3D-Modelle aus STL schruppen und schlichten, Werkzeugwechsel mit Längenmessung, Antasten und Höhenkarte."),
+   ("🌀", "Drehachse", "Laser und Fräse auf runden Teilen: Becher gravieren, Konturen und Taschen rund um einen Zylinder fräsen oder ein 3D-Modell rundherum bzw. von mehreren Seiten."),
    ("🔦", "Laser-Ebenen", "Füllen, Linie und Schneiden mit eigener Leistung und Geschwindigkeit, Freischnitt – wie Ebenen in LightBurn."),
    ("🔥", "Plasmaschneiden", "Schnittspalt, Anfahrbahnen, Einstichpunkte, Blechhöhe abtasten und Höhenregelung (THC)."),
-   ("🎬", "3D-Simulation", "Jede Bewegung, Zeit, Kosten und G-Code sehen, bevor die Maschine startet – flüssig auch bei Millionen Bewegungen. G-Code bearbeiten und Jobs ab jeder Zeile fortsetzen."),
+   ("🎬", "3D-Simulation", "Zusehen, wie das Material weggefräst wird – mit Fräser und Spindel –, Brandspuren und Schnitte vom Laser, Schnittspalt vom Plasma, auch auf der Drehachse. Kollisions-Warnungen, Zeit, Kosten und G-Code-Editor, flüssig auch bei Millionen Bewegungen."),
+   ("🪵", "29 Materialien", "Den Job auf Birke, Eiche, Sperrholz, MDF, Acryl, rohem oder eloxiertem Alu, Messing, Edelstahl, Schiefer und mehr sehen – gefrästes eloxiertes Alu wird blank silbern, wie in echt."),
    ("🔌", "Maschinensteuerung", "GRBL, grblHAL, FluidNC, Grbl_ESP32 per USB oder WLAN, Marlin, Ruida (CO₂) und K40. Mehrere Maschinen gleichzeitig."),
    ("📷", "Kamera", "USB- oder IP-Kamera: Job beobachten und die Zeichnung auf dem Livebild des Werkstücks platzieren."),
    ("📶", "WLAN einrichten", "Maschinen im Netzwerk finden und das WLAN des Boards direkt aus dem Programm einrichten."),
@@ -111,10 +120,15 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.3.5", nl="Zeichnung als SVG, DXF, PDF oder PLT exportieren, ein Rechtsklick-Menü auf der Arbeitsfläche und viele neue Generatoren – Zahnräder und Riemenscheiben, Biegescharniere, Lineale &amp; Zifferblätter, Holzverbindungen, Steckregale, Lüftungsgitter und Geburtsbuchstaben.",
+  nh="Neu in 0.3.6", nl="Die Simulation zeigt jetzt live, wie das Material abgetragen wird – mit Fräser, Spannmutter und Spindel, Brandspuren vom Laser und Schnittspalt vom Plasma, auch auf der Drehachse –, dazu Kollisions-Warnungen, 29 Materialien, Fräsen mit der Drehachse, neue Generatoren für jede Jahreszeit und Fehler direkt aus dem Programm melden.",
+  news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
+        ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
+        ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
+  gall="Alle 17 Generatoren",
   nlink="Alle Änderungen",
   gens=[("boxgen", "Kisten"), ("gear", "Zahnräder &amp; Riemenscheiben"), ("hinge", "Biegescharniere"), ("joint", "Holzverbindungen"), ("birth", "Geburtsbuchstaben"),
-        ("namegen", "Namen"), ("birdhouse", "Vogelhäuser"), ("mandala", "Mandalas"), ("ornament", "Weihnachtsanhänger"), ("lettertopper", "Buchstaben-Stecker"),
+        ("namegen", "Namen"), ("birdhouse", "Vogelhäuser"), ("mandala", "Mandalas"), ("ornament", "Deko-Anhänger"), ("wordtiles", "Wort-Kacheln"),
+        ("shadowbox", "Schattenboxen"), ("slotornament", "3D-Steckanhänger"), ("lettertopper", "Buchstaben-Stecker"),
         ("scale", "Lineale &amp; Zifferblätter"), ("vent", "Lüftungsgitter"), ("puzzle", "Puzzles"), ("qrcode", "QR-Codes")],
   ch="Für Maker gebaut", cl="CNC Craft vereint, wofür man sonst drei Programme braucht:",
   cmp=["Design", "CAM", "Maschinensteuerung", "CNC Craft"],
@@ -184,6 +198,7 @@ def page(lang):
     imp = f' · <a href="{LEGAL[lang]["imprint"][0]}">{LEGAL[lang]["imprint"][1]}</a>' if CONTACT["address"] else ""
     foot = "\n".join(f"    <p>{x}</p>".replace("{legal}", legal).replace("{imprint}", imp) for x in t["foot"])
     gens = "\n".join(f'      <figure class="card"><img src="{b}assets/img/gen/{k}.png" alt="CNC Craft – {h}" width="640" height="420" loading="lazy" decoding="async"><figcaption>{h}</figcaption></figure>' for k, h in t["gens"])
+    news = "\n".join(f'      <figure class="card"><img src="{b}assets/img/{f}" alt="CNC Craft – {h}" width="640" height="420" loading="lazy" decoding="async"><figcaption>{h}</figcaption></figure>' for f, h in t["news"])
     chips = "".join(f'<span class="chip">{c}</span>' for c in t["chips"])
     first = t["shotlist"][0]
     return f'''<!doctype html>
@@ -238,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.3.5</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.3.6</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>
@@ -257,6 +272,10 @@ def page(lang):
   <div class="wrap">
     <h2>{t["nh"]}</h2>
     <p class="lead">{t["nl"]} <a href="{GH}/blob/main/CHANGELOG.md">{t["nlink"]} →</a></p>
+    <div class="grid news">
+{news}
+    </div>
+    <h3 class="gall">{t["gall"]}</h3>
     <div class="grid gens">
 {gens}
     </div>

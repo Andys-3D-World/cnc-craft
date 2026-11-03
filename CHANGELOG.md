@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.6 Beta
 
 **New**
 - **More materials and a better look:** the material view (toolbar 🪵, 3D view, 3D milling, simulation) now has
@@ -115,6 +115,9 @@
 - **Quitting with Cmd+Q (macOS)** now also stops a running job safely (laser/spindle off), like closing the window.
 
 **Improved**
+- **README and website:** feature lists updated (material simulation, rotary milling, 29 materials, new
+  generators, crash recovery, bug report), "New in 0.3.6" on the website with pictures of the material simulation
+  and the three new generators, gallery of all 17 generators.
 - **GitHub:** issue forms for bug reports (with a "Safety" level for machines that moved unexpectedly or did not
   stop), feature requests, missing boards/machines and translations; questions and project pictures go to
   Discussions. New `CONTRIBUTING.md`, `SECURITY.md` (report security problems privately) and a pull request checklist.
