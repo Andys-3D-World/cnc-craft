@@ -16,9 +16,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest      # Apple Silicon (M1/M2/M3 …)
+          # Beide Mac-Versionen auf Intel-Mac-Rechnern bauen: die Apple-Silicon-Rechner von GitHub
+          # waren oft überlastet (Job wurde nach Warten abgebrochen). Xcode baut auch für Apple Silicon.
+          - platform: macos-15-intel    # baut für Apple Silicon (M1/M2/M3 …)
             args: --target aarch64-apple-darwin
-          - platform: macos-latest      # Intel-Mac
+          - platform: macos-15-intel    # Intel-Mac
             args: --target x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ""
@@ -35,7 +37,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ startsWith(matrix.platform, 'macos') && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
 
       - uses: swatinem/rust-cache@v2
         with:

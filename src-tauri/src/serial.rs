@@ -37,6 +37,12 @@ pub fn chip_name(vid: u16, pid: u16) -> &'static str {
     }
 }
 
+/// Linux meldet immer /dev/ttyS0 … ttyS31 (alte serielle Schnittstellen auf der Hauptplatine, meist gar nicht
+/// vorhanden). CNC-Boards hängen an ttyUSB*/ttyACM* – die ttyS-Einträge nur zeigen, wenn es eine echte Karte ist.
+fn hide_on_linux(name: &str, real: bool) -> bool {
+    cfg!(target_os = "linux") && !real && name.starts_with("/dev/ttyS")
+}
+
 pub fn list_ports() -> Vec<PortEntry> {
     let ports = match serialport::available_ports() {
         Ok(p) => p,
@@ -48,6 +54,7 @@ pub fn list_ports() -> Vec<PortEntry> {
         if cfg!(target_os = "macos") && p.port_name.starts_with("/dev/tty.") { continue; }
         let lname = p.port_name.to_lowercase();
         if lname.contains("bluetooth") || lname.contains("debug-console") { continue; }
+        if hide_on_linux(&p.port_name, matches!(p.port_type, SerialPortType::UsbPort(_) | SerialPortType::PciPort)) { continue; }
         let mut e = PortEntry { name: p.port_name.clone(), vid: None, pid: None, chip: String::new(), product: String::new(), manufacturer: String::new() };
         if let SerialPortType::UsbPort(u) = &p.port_type {
             e.vid = Some(u.vid);
@@ -214,4 +221,18 @@ pub fn open_ruida(name: &str) -> Result<RuidaSerial, String> {
     let _ = port.write_data_terminal_ready(true);
     let _ = port.write_request_to_send(true);
     Ok(RuidaSerial(port, name.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn linux_hides_onboard_ttys() {
+        let hide = hide_on_linux("/dev/ttyS4", false);
+        assert_eq!(hide, cfg!(target_os = "linux"));
+        assert!(!hide_on_linux("/dev/ttyS0", true));   // echte PCI-Karte bleibt
+        assert!(!hide_on_linux("/dev/ttyUSB0", false));
+        assert!(!hide_on_linux("/dev/ttyACM0", false));
+    }
 }

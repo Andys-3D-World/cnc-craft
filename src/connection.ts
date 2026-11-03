@@ -85,9 +85,10 @@ export function initConnection(appendToConsole: (text: string) => void) {
     }
     const show = netCapable() && portSelect.value === NET;
     ipInput.style.display = show ? "" : "none";
-    // Netzwerk-Suche gibt es für GRBL über Netzwerk (Ruida spricht UDP mit eigenem Protokoll)
+    // Netzwerk-Suche gibt es für GRBL über Netzwerk (Ruida spricht UDP mit eigenem Protokoll).
+    // Immer sichtbar, auch wenn ein USB-Port gewählt ist – ein Klick schaltet auf „Netzwerk“ um
     const findBtn = $("net-find-btn");
-    if (findBtn) findBtn.style.display = show && !isRuidaMachine() ? "" : "none";
+    if (findBtn) findBtn.style.display = netCapable() && !isRuidaMachine() ? "" : "none";
     if (!(show && !isRuidaMachine())) hideFind();
     if (!isRuidaMachine() && !isK40Machine()) baudSelect.style.display = show ? "none" : "";
   };
@@ -121,6 +122,10 @@ export function initConnection(appendToConsole: (text: string) => void) {
   let finding = false;
   const findDevices = async () => {
     if (!findList || finding || machine.connected) return;
+    if (portSelect.value !== NET && [...portSelect.options].some(o => o.value === NET)) {
+      portSelect.value = NET;
+      portSelect.dispatchEvent(new Event("change")); // Adressfeld zeigen
+    }
     finding = true;
     const btn = $("net-find-btn") as HTMLButtonElement | null;
     if (btn) btn.disabled = true;

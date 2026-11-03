@@ -13,6 +13,12 @@
 - **Linux: black window or garbled text** on some systems (e.g. Debian, CachyOS, NVIDIA graphics). WebKitGTK's
   DMA-BUF renderer is now turned off at start, unless the variable `WEBKIT_DISABLE_DMABUF_RENDERER` is already set. Dropdowns no
   longer show up as empty white boxes with a light GTK theme.
+- **Linux: far too many ports in the list** – the onboard serial ports `/dev/ttyS0 … ttyS31` that every Linux PC
+  reports are hidden now (real serial cards and all USB boards stay).
+
+**Improved**
+- **📡 network search is always visible** next to the port list for GRBL machines; clicking it switches to
+  *Network* by itself (before, the button only showed up after choosing *Network* first).
 
 ## 0.3.6 Beta
 
