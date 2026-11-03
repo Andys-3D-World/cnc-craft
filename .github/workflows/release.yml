@@ -80,7 +80,7 @@ jobs:
             macOS: .dmg öffnen und CNC Craft in „Programme“ ziehen. Beim ersten Start meldet macOS „nicht verifiziert“:
             Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“.
             Windows: …-setup.exe ausführen (SmartScreen: „Weitere Informationen“ → „Trotzdem ausführen“).
-            Linux: .AppImage ausführbar machen und starten, oder .deb installieren. Für serielle Ports: Benutzer in Gruppe „dialout“.
+            Linux: .AppImage ausführbar machen und starten, oder .deb installieren. Anleitung (ins Menü eintragen, serielle Ports): README → „Installieren“. Serielle Ports: Gruppe „dialout“ (Arch/CachyOS: „uucp“).
           releaseDraft: true
           prerelease: true
           args: ${{ matrix.args }}

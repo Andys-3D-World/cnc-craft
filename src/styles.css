@@ -1776,3 +1776,27 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 :root[data-theme="light"] .own-box { border-color: rgba(0,0,0,0.12); }
 :root[data-theme="light"] .net-find-txt b .net-host { color: var(--text-main); }
 :root[data-theme="light"] .m-state-off { background: #e2e4ea; }
+
+/* Linux (WebKitGTK): Auswahllisten selbst zeichnen statt GTK (sonst grauer Kasten, Text oben/unten abgeschnitten) */
+html.os-linux select {
+  -webkit-appearance: none; appearance: none;
+  background-color: var(--bg-input);
+  color: var(--text-main);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%238d8d9c'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 7px center !important;
+  background-size: 10px 6px !important;
+  padding-top: 0 !important; padding-bottom: 0 !important;
+  padding-right: 22px !important;
+  line-height: normal;
+}
+html.os-linux select option { background: var(--bg-panel); color: var(--text-main); }
+
+/* Linux: eigene Schriften mitliefern. Ohne "Inter"/"Segoe UI" nimmt Linux oft eine Schrift nur in "Regular" –
+   fette Texte werden dann künstlich verdickt und sehen verschmiert aus. Open Sans / Roboto Mono haben alle Stärken. */
+@font-face { font-family: "CNC UI"; src: url("/fonts/opensans/OpenSans-Variable.ttf") format("truetype"); font-weight: 300 800; font-display: swap; }
+@font-face { font-family: "CNC Mono"; src: url("/fonts/robotomono/RobotoMono-Variable.ttf") format("truetype"); font-weight: 100 700; font-display: swap; }
+html.os-linux {
+  --font-ui: "CNC UI", "Noto Sans", sans-serif;
+  --font-mono: "CNC Mono", "Noto Sans Mono", monospace;
+}

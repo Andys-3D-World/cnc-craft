@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app, so you no longer switch between three programs. Runs on macOS, Windows and Linux.
 
-**Status: 0.3.7 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.3.8 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -81,6 +81,53 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - All settings are also saved to a file and survive updates; update right from the app (signed)
 - 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
 - Dark and light mode (☀️ / 🌙 at the top right)
+
+## Installation
+
+Download the file for your system from the [latest release](https://github.com/Andys-3D-World/cnc-craft/releases/latest).
+
+- **macOS:** open the `.dmg` and drag CNC Craft into *Applications*. On the first start macOS says “not verified”:
+  System Settings → Privacy & Security → “Open Anyway”.
+- **Windows:** run `…_x64-setup.exe` (SmartScreen: “More info” → “Run anyway”).
+- **Linux:** see below.
+
+### Linux
+
+**AppImage (every distribution, recommended):** one file, updates itself from the app (ⓘ → “Update now”).
+Open a terminal (`Ctrl + Alt + T`) and run these lines – they move the file out of *Downloads*, add CNC Craft
+to the app menu and give it an icon:
+
+```bash
+mkdir -p ~/Applications ~/.local/share/applications ~/.local/share/icons
+mv ~/Downloads/CNC.Craft_*_amd64.AppImage ~/Applications/CNC-Craft.AppImage
+chmod +x ~/Applications/CNC-Craft.AppImage
+curl -L -o ~/.local/share/icons/cnc-craft.png https://raw.githubusercontent.com/Andys-3D-World/cnc-craft/main/src-tauri/icons/128x128.png
+cat > ~/.local/share/applications/cnc-craft.desktop <<EOT
+[Desktop Entry]
+Type=Application
+Name=CNC Craft
+Comment=Laser, CNC router and plasma – design, CAM and machine control
+Exec=$HOME/Applications/CNC-Craft.AppImage
+Icon=$HOME/.local/share/icons/cnc-craft.png
+Categories=Graphics;Engineering;
+Terminal=false
+EOT
+```
+
+CNC Craft is now in the app menu (KDE, GNOME …). If the AppImage does not start, install FUSE 2
+(Debian/Ubuntu: `sudo apt install libfuse2`, Arch/CachyOS: `sudo pacman -S fuse2`).
+To remove it: delete `~/Applications/CNC-Craft.AppImage` and `~/.local/share/applications/cnc-craft.desktop`.
+
+**Debian / Ubuntu / Mint (.deb):** `sudo apt install ~/Downloads/CNC.Craft_*_amd64.deb`
+**Fedora (.rpm):** `sudo dnf install ~/Downloads/CNC.Craft-*.x86_64.rpm` · **openSUSE:** `sudo zypper install ~/Downloads/CNC.Craft-*.x86_64.rpm`
+For a new version, download the new file and install it the same way.
+
+**USB connection (serial port):** your user must be allowed to use serial ports – once, then log out and in again:
+
+```bash
+sudo usermod -aG dialout $USER     # Debian, Ubuntu, Mint, Fedora
+sudo usermod -aG uucp $USER        # Arch, CachyOS, Manjaro
+```
 
 ## Screenshots
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.8 Beta
+
+**New**
+- **Install guide** in the README (English and German): macOS, Windows and Linux – on Linux the AppImage goes
+  into the app menu with an icon, plus .deb/.rpm and the serial port group (`dialout`, on Arch/CachyOS `uucp`).
+
+**Fixed**
+- **Linux: dropdowns** are drawn by CNC Craft itself – before, GTK drew them as grey boxes with the text cut off
+  at the top and bottom (seen on CachyOS / KDE).
+- **Linux: smeared, too bold text** – CNC Craft now brings its own interface fonts on Linux (Open Sans and
+  Roboto Mono, already in the app). Before, Linux often fell back to a font with only a regular weight and drew
+  bold text by thickening it.
+
 ## 0.3.7 Beta
 
 0.3.6 was not published as a release (the macOS builds could not run), so 0.3.7 also brings everything from 0.3.6 below.

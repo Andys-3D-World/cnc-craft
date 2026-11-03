@@ -18,6 +18,8 @@ let current: Theme = read();
 function apply() {
   document.documentElement.dataset.theme = current;
 }
+// Linux (WebKitGTK): Auswahllisten zeichnet sonst GTK selbst – grau und mit abgeschnittenem Text (styles.css: html.os-linux)
+if (/Linux/.test(navigator.userAgent) && !/Android/.test(navigator.userAgent)) document.documentElement.classList.add("os-linux");
 apply();
 
 export function currentTheme(): Theme { return current; }
