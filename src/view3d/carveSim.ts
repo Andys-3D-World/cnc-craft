@@ -9,8 +9,8 @@
  * Welcher Fräser gerade arbeitet, ergibt sich aus den Werkzeugwechseln (M0/M1/M6) im G-Code.
  * Nur Anzeige – rechnet in Stücken, damit die Oberfläche flüssig bleibt.
  */
-import { parseGcodeProgram } from "../sim/gcodeParser";
-import type { ToolGeom } from "../toolGraphics";
+import { parseGcodeProgram } from "../sim/gcodeParser.ts";
+import type { ToolGeom } from "../toolGraphics.ts";
 
 export interface CarveResult {
   nx: number; ny: number;      // Zellen
@@ -23,7 +23,7 @@ export interface CarveResult {
 
 const MAX_CELLS = 1_200_000;
 
-interface Kernel { di: Int32Array; dj: Int32Array; dz: Float32Array; dist: Float32Array; R: number }
+export interface Kernel { di: Int32Array; dj: Int32Array; dz: Float32Array; dist: Float32Array; R: number }
 
 /** Höhe der Schneide über der Spitze im Abstand r von der Mitte (Infinity = außerhalb) */
 export function profile(tool: ToolGeom | null): (r: number) => number {
@@ -42,7 +42,7 @@ export function profile(tool: ToolGeom | null): (r: number) => number {
   return r => (r > R ? Infinity : 0);
 }
 
-function kernel(tool: ToolGeom | null, c: number): Kernel {
+export function kernel(tool: ToolGeom | null, c: number): Kernel {
   const R = Math.max(0.05, (tool?.diameter ?? 3) / 2);
   const f = profile(tool);
   const n = Math.ceil(R / c);

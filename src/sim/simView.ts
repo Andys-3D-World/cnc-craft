@@ -7,10 +7,15 @@
  *         Leerfahrten grau. Bereits gefahrene Bahnen kräftig, noch kommende blass.
  * Die Bahnen zeichnet die Grafikkarte (simGl.ts) – flüssig auch bei Millionen Bewegungen. Geht WebGL2 nicht,
  * zeichnet das Canvas sie wie früher selbst.
+ * „Material zeigen“: statt der Bahnen das Rohteil, wie es bis hierher abgetragen ist (simCarve.ts), mit Fräser,
+ * Spannmutter und Spindel (simCarveGl.ts). Das Raster rechnet in jedem Bild ein paar Millisekunden weiter.
  */
 import { SimProgram, MOVE_CUT, MOVE_RAPID } from "./gcodeParser";
 import { PathRenderer } from "./simGl";
 import { radialDepth } from "./rotarySim";
+import type { LiveCarve } from "./simCarve";
+import { MATERIALS, type Material } from "../materialView";
+import { MaterialRenderer } from "./simCarveGl";
 
 export type ViewPreset = "top" | "iso" | "front";
 
@@ -48,6 +53,15 @@ export class SimView {
   /** Bahnen auf der Grafikkarte zeichnen (false = immer mit dem Canvas, z. B. zum Vergleichen) */
   useGpu = true;
   private gpu = new PathRenderer();
+  private matGpu = new MaterialRenderer();
+  /** Materialabtrag (null = keiner, z. B. Laser, Drehachse) */
+  material: LiveCarve | null = null;
+  /** Material statt Bahnen zeigen */
+  showMaterial = false;
+  /** Aussehen des Rohteils (materialView.ts) */
+  materialLook: Material = MATERIALS[0];
+  /** Material zeichnen geht nicht (kein WebGL2) – dann wieder Bahnen */
+  materialFailed = false;
   /** wie lange das Zeichnen dauert (ms, geglättet) – danach richtet sich die Bildrate im Live-Betrieb */
   drawMs = 0;
   onChange: () => void = () => {};
@@ -59,6 +73,10 @@ export class SimView {
     this.ctx = canvas.getContext("2d")!;
     this.bindMouse();
     const loop = () => {
+      // Materialabtrag ein Stück weiterrechnen (höchstens ~8 ms je Bild)
+      const m = this.material;
+      if (m && this.showMaterial && m.busy && m.advance(8)) this.dirty = true;
+      else if (m && this.showMaterial && m.busy) this.dirty = true;
       if (this.dirty) {
         this.dirty = false;
         const t0 = performance.now();
@@ -80,11 +98,25 @@ export class SimView {
     this.fit();
   }
 
-  setProgress(i: number, _frac: number, x: number, y: number, z: number) {
+  setProgress(i: number, frac: number, x: number, y: number, z: number) {
     this.curIdx = i;
+    this.frac = frac;
     this.tool = { x, y, z };
+    this.syncMaterial();
     this.invalidate();
   }
+  private frac = 0;
+
+  /** Materialabtrag bis zur aktuellen Stelle (noch nicht gestartet / live ohne Stelle: alles bzw. nichts) */
+  syncMaterial() {
+    const m = this.material, p = this.prog;
+    if (!m || !p) return;
+    if (this.curIdx < 0) m.setTarget(this.live ? 0 : p.n, 0);
+    else m.setTarget(this.curIdx, this.frac);
+  }
+
+  /** Material gerade sichtbar? */
+  get materialOn(): boolean { return this.showMaterial && !!this.material && !this.materialFailed; }
 
   /** Zeile hervorheben (ihre Bahnen kräftig gelb) */
   setHighlight(line: number) {
@@ -182,9 +214,17 @@ export class SimView {
       ? { ...b0, minX: Math.min(b0.minX, -R), maxX: Math.max(b0.maxX, R), minZ: Math.min(b0.minZ, -2 * R) }
       : { ...b0, minY: Math.min(b0.minY, -R), maxY: Math.max(b0.maxY, R), minZ: Math.min(b0.minZ, -2 * R) }) : b0;
     const pad = b ? Math.max(5, 0.05 * Math.max(b.maxX - b.minX, b.maxY - b.minY)) : 0;
-    const minX = b ? b.minX - pad : 0, maxX = b ? b.maxX + pad : this.bedW;
-    const minY = b ? b.minY - pad : 0, maxY = b ? b.maxY + pad : this.bedH;
-    const minZ = b ? Math.min(0, b.minZ) : 0, maxZ = b ? Math.max(0, b.maxZ) : 0;
+    let minX = b ? b.minX - pad : 0, maxX = b ? b.maxX + pad : this.bedW;
+    let minY = b ? b.minY - pad : 0, maxY = b ? b.maxY + pad : this.bedH;
+    let minZ = b ? Math.min(0, b.minZ) : 0;
+    const maxZ = b ? Math.max(0, b.maxZ) : 0;
+    // Material: das ganze Rohteil ins Bild
+    const m = this.material;
+    if (b && m && this.showMaterial && !m.cyl) {
+      minX = Math.min(minX, m.x0); maxX = Math.max(maxX, m.x0 + m.nx * m.cell);
+      minY = Math.min(minY, m.y0); maxY = Math.max(maxY, m.y0 + m.ny * m.cell);
+      minZ = Math.min(minZ, -m.T);
+    }
     this.center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2, z: (minZ + maxZ) / 2 };
     // Ausdehnung in der aktuellen Blickrichtung grob abschätzen
     let sxMin = Infinity, sxMax = -Infinity, syMin = Infinity, syMax = -Infinity;
@@ -267,8 +307,8 @@ export class SimView {
     const { PX, PY } = this.projection();
 
     const rp = this.prog?.rotary;
-    // ---- Drehachse: rundes Rohteil als Drahtgitter statt Bett ----
-    if (rp && this.prog) {
+    // ---- Drehachse: rundes Rohteil als Drahtgitter statt Bett (beim Material zeigt die Grafikkarte das Teil) ----
+    if (rp && this.prog && !(this.materialOn && this.material?.cyl)) {
       const b = this.prog.bounds;
       this.drawCylinder(rp.R, rp.along === "y" ? b.minY : b.minX, rp.along === "y" ? b.maxY : b.maxX, rp.along === "y");
     }
@@ -314,14 +354,15 @@ export class SimView {
       return Math.max(0, Math.min(DEPTH_COLORS.length - 1, Math.floor(t * DEPTH_COLORS.length)));
     };
     const cur = this.curIdx < 0 ? (this.live ? -1 : p.n) : this.curIdx;
-    const gpuImg = this.useGpu ? this.gpu.render(p, {
+    const mat = this.materialOn ? this.drawMaterial() : false;
+    const gpuImg = mat ? null : this.useGpu ? this.gpu.render(p, {
       W, H, originX: W / 2 + this.panX, originY: H / 2 + this.panY, center: this.center,
       yaw: this.yaw, pitch: this.pitch, scale: s, cur, started: this.curIdx >= 0, showRapids: this.showRapids,
       depthColors: DEPTH_COLORS, rapidColor: RAPID_COLOR, travelColor: TRAVEL_COLOR
     }) : null;
     if (gpuImg) ctx.drawImage(gpuImg, 0, 0);
     const drawSet = (done: boolean) => {
-      if (gpuImg) return;
+      if (gpuImg || mat) return;
       const from = done ? 0 : Math.max(0, cur);
       const to = done ? Math.min(p.n, cur) : p.n;
       if (to <= from) return;
@@ -365,7 +406,7 @@ export class SimView {
     drawSet(true);
 
     // Aktuelle (halb gefahrene) Bewegung
-    if (this.curIdx >= 0 && this.curIdx < p.n) {
+    if (!mat && this.curIdx >= 0 && this.curIdx < p.n) {
       const i = this.curIdx;
       ctx.strokeStyle = p.type[i] === MOVE_CUT ? "#ffffff" : RAPID_COLOR;
       ctx.lineWidth = 2;
@@ -376,7 +417,8 @@ export class SimView {
     }
 
     // Hervorgehobene Zeile (angeklickt in der Bahn oder in der G-Code-Liste)
-    if (this.hiLine >= 0) {
+    // (nicht beim drehenden Teil der Drehachse – die Bahn liegt dort nicht still)
+    if (this.hiLine >= 0 && !(mat && this.material?.cyl)) {
       let lo = 0, hi = p.n;
       while (lo < hi) { const mid = (lo + hi) >> 1; if (p.line[mid] < this.hiLine) lo = mid + 1; else hi = mid; }
       if (lo < p.n && p.line[lo] === this.hiLine) {
@@ -396,8 +438,8 @@ export class SimView {
       }
     }
 
-    // ---- Werkzeug ----
-    if (this.curIdx >= 0) {
+    // ---- Werkzeug ---- (beim Material zeichnet es die Grafikkarte)
+    if (!mat && this.curIdx >= 0) {
       const t = this.tool;
       const len = Math.max(8, 25 / Math.max(0.2, s)) ;
       const tx = PX(t.x, t.y), ty = PY(t.x, t.y, t.z), hx = PX(t.x, t.y), hy = PY(t.x, t.y, t.z + len);
@@ -415,6 +457,24 @@ export class SimView {
         ctx.setLineDash([]);
       }
     }
+  }
+
+  /** Rohteil mit Fräser über die Grafikkarte; false = geht nicht (dann Bahnen wie bisher) */
+  private drawMaterial(): boolean {
+    const m = this.material!;
+    const W = this.canvas.width, H = this.canvas.height;
+    const at = Math.max(0, Math.min(m.program.n - 1, this.curIdx));
+    const img = this.matGpu.render(m, {
+      W, H, originX: W / 2 + this.panX, originY: H / 2 + this.panY, center: this.center,
+      yaw: this.yaw, pitch: this.pitch, scale: this.scale, look: this.materialLook,
+      tool: this.curIdx >= 0 ? {
+        ...this.tool, kind: m.kind, geom: m.toolOf(at), holder: m.holderOf(at),
+        on: this.curIdx < m.program.n && m.program.type[this.curIdx] === MOVE_CUT
+      } : null
+    });
+    if (!img) { this.materialFailed = true; this.onChange(); return false; }
+    this.ctx.drawImage(img, 0, 0);
+    return true;
   }
 
   private gridStep(): number {

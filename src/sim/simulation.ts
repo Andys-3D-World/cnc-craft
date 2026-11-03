@@ -9,12 +9,17 @@
  *
  * Bahn anklicken = passende G-Code-Zeile springt ins Bild und leuchtet; Zeile anklicken = ihre Bahn leuchtet.
  *
+ * MATERIAL (Fräse): statt der Bahnen das Rohteil, das beim Abspielen (und live beim echten Job) abgetragen wird –
+ * mit Fräser, Spannmutter und Spindel (simCarve.ts, simCarveGl.ts). Fräser je Abschnitt aus den Kommentaren des
+ * G-Codes (Name aus der Werkzeug-Bibliothek, sonst „D=…“), Rohteil-Größe aus der Rohteil-Verwaltung (stock.ts).
+ * Eilgang ins Material oder Halter am Material -> Warnung mit Zeile.
+ *
  * G-CODE BEARBEITEN (✏️): Zeilen ändern (Doppelklick/Enter), löschen (Entf), einfügen (M0, F …),
  * Rückgängig (Strg+Z). „Übernehmen“ macht den Text zum Job. Läuft der Job schon, darf nur geändert werden,
  * was die Maschine noch nicht bekommen hat (Sicherheitsabstand, siehe liveEditFloor) – mit Rückfrage.
  */
 import { t, T, tip } from "../i18n/i18n";
-import { SimProgram, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
+import { SimProgram, MOVE_CUT, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
 import { machine, setOverride, MACHINE_EVENT } from "../machine";
@@ -22,7 +27,15 @@ import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
 import { wrapSimProgram } from "./rotarySim";
 import { rotary } from "../rotary";
-import { isLaser, isPlasma } from "../machineMode";
+import { isLaser, isPlasma, MODE_CHANGED } from "../machineMode";
+import { LiveCarve, toolSections, type WarnKind, type CarveKind } from "./simCarve";
+import { activeLayer, laserSettings } from "../laserLayers";
+import { activeCut } from "../plasmaCuts";
+import { getStock } from "../stock";
+import { getTools, activeTool } from "../toolLibrary";
+import { materialView, materialById } from "../materialView";
+import { ascii as gcAscii, allBuiltinTexts } from "../i18n/i18n";
+import type { ToolGeom } from "../toolGraphics";
 
 type Source = "design" | "job" | "none";
 
@@ -69,6 +82,14 @@ let edRow = -1;             // Zeile mit offenem Eingabefeld
 let edInput: HTMLInputElement | null = null;
 let rerendering = false;
 
+// Material
+const KEY_MATERIAL = "cnc_craft_sim_material";
+let showMaterial = true;
+try { showMaterial = localStorage.getItem(KEY_MATERIAL) !== "0"; } catch { /* egal */ }
+let thickOverride = 0;      // Materialdicke von Hand (0 = tiefster Schnitt)
+let carveShown = -1;        // zuletzt angezeigter Stand der Warnungen
+let glWarned = false;       // „braucht WebGL2“ nur einmal melden
+
 export function initSimulation(container: HTMLElement | null, appendToConsole: (s: string) => void) {
   if (!container) return;
   log = appendToConsole;
@@ -85,11 +106,19 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
             <button class="sim-btn" id="sim-fit" ${tip("sim.fitTip")}>⛶</button>
           </div>
           <label class="sim-check"><input type="checkbox" id="sim-rapids" checked> ${T("sim.showRapids")}</label>
+          <div class="sim-seg" id="sim-mat-seg">
+            <button class="sim-btn" id="sim-mat-on" ${tip("sim.materialTip")}>🪵 ${T("sim.material")}</button>
+            <button class="sim-btn" id="sim-mat-off" ${tip("sim.pathsOnlyTip")}>〰 ${T("sim.pathsOnly")}</button>
+          </div>
+          <label class="sim-check" id="sim-thick-row" ${tip("sim.thickTip")}>${T("sim.thick")}
+            <input type="number" id="sim-thick" class="sim-thick" min="0.2" max="160" step="0.5"> mm</label>
         </div>
         <div class="sim-canvas-holder">
           <canvas id="sim-canvas"></canvas>
           <div class="sim-live" id="sim-live" style="display:none">● LIVE</div>
-          <div class="sim-legend">
+          <div class="sim-carve-busy" id="sim-carve-busy" style="display:none"></div>
+          <div class="sim-legend sim-legend-mat" id="sim-legend-mat" style="display:none"></div>
+          <div class="sim-legend" id="sim-legend-paths">
             <span><i style="background:#7ff3ff"></i><i style="background:#3b8cff"></i><i style="background:#c03ce0"></i> ${T("sim.legendCut")}</span>
             <span><i class="dash" style="border-color:#ff9a3c"></i> ${T("sim.legendRapid")}</span>
             <span><i class="dash" style="border-color:#9aa0b4"></i> ${T("sim.legendTravel")}</span>
@@ -112,6 +141,10 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
         <div class="sim-box">
           <h4>${T("sim.info")}</h4>
           <div class="sim-info" id="sim-info"></div>
+        </div>
+        <div class="sim-box sim-warn-box" id="sim-warn-box" style="display:none">
+          <h4>⚠ ${T("sim.warnTitle")} <span id="sim-warn-n"></span></h4>
+          <div class="sim-warn-list" id="sim-warn-list"></div>
         </div>
         <div class="sim-box">
           <h4>${T("sim.job")}</h4>
@@ -192,6 +225,39 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     b.addEventListener("click", () => view.setView(b.dataset.view as ViewPreset)));
   $("sim-fit").addEventListener("click", () => view.fit());
   $<HTMLInputElement>("sim-rapids").addEventListener("change", e => { view.showRapids = (e.target as HTMLInputElement).checked; view.invalidate(); });
+  const setMaterial = (on: boolean) => {
+    showMaterial = on;
+    try { localStorage.setItem(KEY_MATERIAL, on ? "1" : "0"); } catch { /* egal */ }
+    view.showMaterial = on;
+    view.syncMaterial();
+    view.invalidate();
+    updateCarveUI(true);
+  };
+  $("sim-mat-on").addEventListener("click", () => setMaterial(true));
+  $("sim-mat-off").addEventListener("click", () => setMaterial(false));
+  $<HTMLInputElement>("sim-thick").addEventListener("change", e => {
+    const v = parseFloat((e.target as HTMLInputElement).value);
+    thickOverride = v > 0 ? Math.min(160, v) : 0;
+    rebuildCarve();
+  });
+  view.showMaterial = showMaterial;
+  view.onChange = () => updateCarveUI(true);
+  // Warnung angeklickt -> Zeile zeigen, Simulation dorthin
+  $("sim-warn-list").addEventListener("click", e => {
+    const row = (e.target as HTMLElement).closest("[data-wline]") as HTMLElement | null;
+    if (!row || !prog) return;
+    const line = parseInt(row.dataset.wline!, 10);
+    selectLine(line);
+    if (!live) { const i = firstMoveOfLine(prog, line); playing = false; seek(i < prog.n ? moveEnd(i) : prog.totalTime); }
+    scrollCodeTo(line, true);
+  });
+  // Rohteil, Material-Farbe, Werkzeuge oder Maschinenart geändert -> neu rechnen
+  window.addEventListener("cnc-stock-changed", () => rebuildCarve());
+  // anderes Material in der Werkzeugleiste: nur das Aussehen tauschen
+  document.addEventListener("change", e => { if ((e.target as HTMLElement)?.id === "opt-material") { setLook(); view.invalidate(); } });
+  window.addEventListener(MODE_CHANGED, () => rebuildCarve());
+  window.addEventListener("cnc-laser-layers-changed", () => { if (isLaser()) rebuildCarve(); });
+  window.addEventListener("cnc-plasma-changed", () => { if (isPlasma()) rebuildCarve(); });
   $("sim-play").addEventListener("click", togglePlay);
   $("sim-start").addEventListener("click", () => { seek(0); });
   $("sim-end").addEventListener("click", () => { if (prog) seek(prog.totalTime); });
@@ -280,6 +346,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     if (source !== "job") return;
     prog = parseSim(e.detail.lines);
     view.replaceProgram(prog);
+    rebuildCarve();
     if (live || started) { simTime = timeBeforeLine(prog, streamState.currentLine); }
     updateInfo();
     applyTime(false);
@@ -337,7 +404,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     }
   });
 
-  window.addEventListener("cnc-language-changed", () => { updateInfo(); updateUI(); updateJobState(); updateEditUI(); });
+  window.addEventListener("cnc-language-changed", () => { updateInfo(); updateUI(); updateJobState(); updateEditUI(); updateCarveUI(true); });
   window.addEventListener("cnc-redraw", () => { const b = bedSizeMm(); view.setBed(b.w, b.h); });
 
   const b = bedSizeMm();
@@ -346,6 +413,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   updateUI();
   updateJobState();
   updateEditUI();
+  updateCarveUI(true);
   requestAnimationFrame(tick);
 }
 
@@ -380,6 +448,8 @@ export function setSimProgram(lines: string[], name: string, src: Source) {
   liveIdx = 0;
   liveAt = 0;
   view.setHighlight(-1);
+  thickOverride = 0;
+  rebuildCarve(false);
   if (keepViewOnce) view.replaceProgram(prog); else view.setProgram(prog);
   keepViewOnce = false;
   view.setProgress(-1, 0, 0, 0, 0);
@@ -413,6 +483,7 @@ function seek(time: number) {
 }
 
 function tick(now: number) {
+  updateCarveUI();
   if (playing && prog) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     simTime += dt * speed;
@@ -561,6 +632,146 @@ function updateJobState() {
   else el.textContent = t("sim.jobNone");
 }
 
+// ---------------- Material ----------------
+
+/**
+ * Fräser je Abschnitt (zwischen Werkzeugwechseln) aus den Kommentaren: CNC Craft schreibt den Namen aus der
+ * Werkzeug-Bibliothek hinein; andere CAM-Programme oft „D=6.35“. Ohne Angabe: der vorige bzw. das Standard-Werkzeug.
+ */
+function carveTools(lines: string[]): (ToolGeom | null)[] {
+  const sect = toolSections(lines);
+  const count = sect[lines.length] + 1;
+  const lib = getTools().map(tl => ({ tl, n: gcAscii(tl.name).toLowerCase().trim() })).filter(x => x.n.length >= 3)
+    .sort((a, b) => b.n.length - a.n.length);
+  // „Werkzeug: …, Durchmesser 6.0 mm“ (cam.ts) – in jeder eingebauten Sprache
+  const dia = ["gc.tool", "gc.toolChange"].flatMap(k => allBuiltinTexts(k)).map(s =>
+    new RegExp(gcAscii(s).toLowerCase().replace(/[.*+?^$()|[\]\\]/g, "\\$&").replace(/\{d\}/g, "(\\d+(?:\\.\\d+)?)").replace(/\{\w+\}/g, ".*?")));
+  const out: (ToolGeom | null)[] = new Array(count).fill(undefined);
+  for (let i = 0; i < lines.length; i++) {
+    // der Werkzeugwechsel nennt schon den nächsten Fräser
+    const k = sect[i + 1] > sect[i] ? sect[i + 1] : sect[i];
+    if (out[k] !== undefined) continue;
+    const m = lines[i].match(/\(([^)]*)\)|;(.*)$/);
+    if (!m) continue;
+    const txt = (m[1] ?? m[2] ?? "").toLowerCase();
+    const hit = lib.find(x => txt.includes(x.n));
+    if (hit) { out[k] = hit.tl; continue; }
+    const d = txt.match(/\bd\s*=\s*(\d+(?:\.\d+)?)/) || dia.map(r => txt.match(r)).find(Boolean);
+    if (d && parseFloat(d[1]) > 0) {
+      const dia = parseFloat(d[1]);
+      const type = /ball/.test(txt) ? "ball" : /chamfer|v-?bit|engrav|spot/.test(txt) ? "vbit" : /drill/.test(txt) ? "drill" : "endmill";
+      out[k] = { type, diameter: dia, shankDia: dia, fluteLen: Math.max(3, dia * 3), length: Math.max(38, dia * 8), flutes: 2, helix: "up", angle: type === "drill" ? 118 : 90, tipDia: 0, cornerR: 0 };
+    }
+  }
+  const def = activeTool || getTools()[0] || null;
+  for (let k = 0; k < count; k++) if (out[k] === undefined) out[k] = k > 0 ? out[k - 1] : def;
+  return out;
+}
+
+/**
+ * Materialdicke ohne Angabe: Fährt der Fräser auf der tiefsten Ebene nur schmale Bahnen (Ausschneiden), ist das die
+ * Unterseite – Durchschnitte bleiben offen. Räumt er dort eine Fläche aus (Tasche) oder erreicht sie nur schräg
+ * (3D-Fläche), bleibt etwas Boden darunter, damit keine falschen Löcher entstehen.
+ */
+function autoThickness(p: SimProgram, dia: number): number {
+  const deep = -p.cutMinZ;
+  let len = 0, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, flat = 0, sloped = 0;
+  for (let i = 0; i < p.n; i++) {
+    if (p.type[i] !== MOVE_CUT) continue;
+    const l = Math.hypot(p.x1[i] - p.x0[i], p.y1[i] - p.y0[i]);
+    if (Math.abs(p.z1[i] - p.z0[i]) > 0.01) sloped += l; else flat += l;
+    if (Math.abs(p.z0[i] - p.cutMinZ) > 0.01 || Math.abs(p.z1[i] - p.cutMinZ) > 0.01) continue;
+    len += l;
+    x0 = Math.min(x0, p.x0[i], p.x1[i]); x1 = Math.max(x1, p.x0[i], p.x1[i]);
+    y0 = Math.min(y0, p.y0[i], p.y1[i]); y1 = Math.max(y1, p.y0[i], p.y1[i]);
+  }
+  // Anteil der Fläche, den die Bahnen auf der tiefsten Ebene überstreichen
+  const area = (x1 - x0 + dia) * (y1 - y0 + dia);
+  // meist schräge Bahnen = 3D-Fläche
+  const through = sloped < flat && len >= 4 * dia && (len * dia) / area < 0.6;
+  const t = through ? deep : deep + Math.max(1, deep * 0.2);
+  return Math.max(1, Math.round(t * 100) / 100);
+}
+
+/** Materialabtrag für das aktuelle Programm neu aufsetzen (Fräse, Laser, Plasma – auch um die Drehachse) */
+function rebuildCarve(sync = true) {
+  if (!view) return;
+  let c: LiveCarve | null = null;
+  const kind: CarveKind = isLaser() ? "laser" : isPlasma() ? "plasma" : "mill";
+  if (prog) {
+    const st = getStock();
+    let tools: (ToolGeom | null)[] = [], auto: number;
+    if (kind === "mill") {
+      tools = carveTools(prog.lines);
+      auto = prog.rotary ? prog.rotary.R : autoThickness(prog, Math.max(0.1, ...tools.map(x => x?.diameter || 3)));
+    } else if (kind === "laser") auto = activeLayer?.thickness || 3;
+    else auto = activeCut?.thickness || 2;
+    c = LiveCarve.create(prog, {
+      kind, tools, thickness: thickOverride || auto, stock: { w: st.w, h: st.h },
+      sMax: laserSettings.sMax, kerf: activeCut?.kerf || 1.5
+    });
+    const inp = $<HTMLInputElement>("sim-thick");
+    inp.placeholder = String(auto);
+    if (!thickOverride) inp.value = "";
+  }
+  view.material = c;
+  view.materialFailed = false;
+  setLook();
+  carveShown = -1;
+  if (sync) view.syncMaterial();
+  view.invalidate();
+  updateCarveUI(true);
+}
+
+/** Aussehen: gewählte Material-Ansicht, sonst Birke (Laser/Fräse) bzw. Stahlblech (Plasma) */
+function setLook() {
+  const m = materialView();
+  view.materialLook = isPlasma()
+    ? (m && m.group === "metal" ? m : materialById("steel")!)
+    : m ?? materialById("birch")!;
+}
+
+const WARN_KEYS: Record<WarnKind, string> = {
+  rapid: "sim.warn.rapid", spindleOff: "sim.warn.spindleOff", shank: "sim.warn.shank", holder: "sim.warn.holder"
+};
+
+/** Knöpfe, Fortschritt und Warnungen des Materials (jedes Bild – baut nur bei Änderungen neu) */
+function updateCarveUI(force = false) {
+  if (!$ || !view) return;
+  const c = view.material;
+  const can = !!c && !view.materialFailed;
+  const on = can && view.showMaterial;
+  if (force) {
+    $("sim-mat-seg").style.display = can ? "flex" : "none";
+    $("sim-thick-row").style.display = on && !(c!.cyl && c!.kind === "mill") ? "flex" : "none";
+    $("sim-mat-on").classList.toggle("active", on);
+    $("sim-mat-off").classList.toggle("active", can && !on);
+    $("sim-legend-paths").style.display = on ? "none" : "flex";
+    const lm = $("sim-legend-mat");
+    lm.style.display = on ? "flex" : "none";
+    if (c) lm.textContent = (c.kind === "plasma" ? "▦ " : "🪵 ") + (c.cyl
+      ? t("sim.stockCyl", { d: (c.cyl.R * 2).toFixed(1), l: (c.nx * c.cell).toFixed(0) })
+      : t("sim.stockSize", { w: (c.nx * c.cell).toFixed(0), h: (c.ny * c.cell).toFixed(0), t: c.T.toFixed(1) }));
+    if (view.materialFailed && view.showMaterial && !glWarned) { glWarned = true; log(t("sim.noGlMaterial")); }
+  }
+  const busy = $("sim-carve-busy");
+  const showBusy = on && c!.busy && c!.progress < 0.995;
+  busy.style.display = showBusy ? "block" : "none";
+  if (showBusy) busy.textContent = t("sim.carving", { p: Math.round(c!.progress * 100) });
+  // Warnungen
+  const ver = on ? c!.warnVersion : -2;
+  if (!force && ver === carveShown) return;
+  carveShown = ver;
+  const box = $("sim-warn-box");
+  const list = on ? c!.warnings : [];
+  box.style.display = list.length ? "flex" : "none";
+  if (!list.length) return;
+  $("sim-warn-n").textContent = String(list.length);
+  $("sim-warn-list").innerHTML = list.slice(0, 200).map(w =>
+    `<div class="sim-warn-row" data-wline="${w.line}"><b>${t("sim.warnLine", { n: w.line + 1 })}</b> ${t(WARN_KEYS[w.kind])}</div>`).join("")
+    + (list.length > 200 ? `<div class="sim-muted">… +${list.length - 200}</div>` : "");
+}
+
 // ---------------- G-Code-Liste ----------------
 
 let listLine = -1;
@@ -655,6 +866,7 @@ function leaveEdit(discard: boolean) {
   if (discard && changed && prog) {
     prog = parseSim(editBase);
     view.replaceProgram(prog);
+    rebuildCarve();
     if (source === "job" && streamState.isRunning) simTime = timeBeforeLine(prog, streamState.currentLine);
     updateInfo();
     applyTime(false);
@@ -686,6 +898,7 @@ function setDraft(next: string[], sel: number) {
   hiLine = selLine;
   prog = parseSim(draft);
   view.replaceProgram(prog);
+  rebuildCarve();
   view.setHighlight(hiLine);
   simTime = Math.min(simTime, prog.totalTime);
   updateInfo();

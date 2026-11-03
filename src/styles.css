@@ -648,6 +648,15 @@ input:not([type]) {
 .sim-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .sim-play { min-width: 44px; background: var(--accent-color); border-color: var(--accent-color); color: #fff; font-size: 0.95rem; }
 .sim-check { display: flex; align-items: center; gap: 5px; font-size: 0.78rem; color: var(--text-muted); cursor: pointer; }
+.sim-seg .sim-btn.active { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+.sim-check .sim-thick { width: 62px; height: 24px; padding: 1px 4px; }
+.sim-carve-busy { position: absolute; top: 10px; right: 12px; padding: 3px 9px; border-radius: 12px; background: rgba(14,14,18,0.8); border: 1px solid var(--border-color); color: var(--text-muted); font: 600 0.72rem var(--font-mono); pointer-events: none; }
+.sim-warn-box { max-height: 160px; flex-shrink: 0; }
+.sim-warn-box h4 { color: var(--color-warning); }
+.sim-warn-list { overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
+.sim-warn-row { font-size: 0.74rem; color: var(--text-muted); cursor: pointer; padding: 2px 4px; border-radius: 3px; line-height: 1.3; }
+.sim-warn-row:hover { background: rgba(255,255,255,0.05); }
+.sim-warn-row b { font-family: var(--font-mono); color: var(--color-warning); font-weight: 600; margin-right: 4px; }
 .sim-controls input[type="range"] { flex: 1; min-width: 120px; accent-color: var(--accent-color); }
 .sim-controls select { height: 28px; padding: 2px 6px; }
 .sim-time { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-main); min-width: 110px; text-align: right; }

@@ -10,7 +10,7 @@ import { partsScene, cylinderScene, carveScene, cylinderCarveScene, carveAlongY 
 import { carve, CarveResult } from "../view3d/carveSim";
 import { generateGcode, noGcodeMessage, orderToolGroups, lastThreads } from "../cam";
 import { threadMeshes } from "../view3d/threadMesh";
-import { MATERIALS, materialView } from "../materialView";
+import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { rotary } from "../rotary";
 import { isLaser, isPlasma } from "../machineMode";
 
@@ -56,7 +56,7 @@ export function openView3D(want: "auto" | Mode = "auto") {
         ${modes.length > 1 ? `<select id="v3d-mode" class="prop-input" style="width:auto;">${modes.map(md =>
           `<option value="${md}">${t(md === "parts" ? "v3d.modeParts" : md === "cylinder" ? "v3d.modeCyl" : md === "cylCarve" ? "v3d.modeCylCarve" : "v3d.modeCarve")}</option>`).join("")}</select>` : ""}
         <label>${t("rot.material")} <select id="v3d-mat" class="prop-input" style="width:auto;">
-          ${MATERIALS.map(m => `<option value="${m.id}">${t("mat3d." + m.id)}</option>`).join("")}</select></label>
+          ${materialOptionsHtml(t)}</select></label>
         <label class="v3d-thickrow">${t("v3d.thick")} <input id="v3d-thick" type="number" min="0.2" step="0.5" class="prop-input" style="width:70px;"></label>
         <label class="eng-ck v3d-parts"><input type="checkbox" id="v3d-sheet"> ${t("v3d.sheet")}</label>
         <label class="v3d-parts v3d-lift">${t("v3d.lift")} <input id="v3d-lift" type="range" min="0" max="60" step="1" style="width:110px;"></label>

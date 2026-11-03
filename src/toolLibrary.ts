@@ -101,7 +101,10 @@ const BUILTIN_MATERIALS: Material[] = [
   { id: "pcb", vc: 200, fzK: 0.008, fzMax: 0.05, ap: 0.3 },
   { id: "alu", vc: 250, fzK: 0.006, fzMax: 0.06, ap: 0.2 },
   { id: "brass", vc: 150, fzK: 0.005, fzMax: 0.05, ap: 0.15 },
-  { id: "steel", vc: 80, fzK: 0.003, fzMax: 0.04, ap: 0.1 }
+  { id: "steel", vc: 80, fzK: 0.003, fzMax: 0.04, ap: 0.1 },
+  { id: "copper", vc: 150, fzK: 0.005, fzMax: 0.05, ap: 0.15 },
+  { id: "stainless", vc: 50, fzK: 0.0025, fzMax: 0.03, ap: 0.08 },
+  { id: "composite", vc: 200, fzK: 0.008, fzMax: 0.08, ap: 0.3 }
 ];
 const KEY_MATERIALS = "cnc_craft_materials";
 

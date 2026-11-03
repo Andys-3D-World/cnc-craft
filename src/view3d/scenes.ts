@@ -11,7 +11,7 @@ import polygonClipping, { MultiPolygon, Polygon } from "polygon-clipping";
 import earcut from "earcut";
 import { Mesh } from "./viewer3d";
 import { MM_TO_PIXEL, groupBounds, shapeToPaths } from "../shapeTransform";
-import { Material, drawMaterialBed, drawMaterialShapes } from "../materialView";
+import { Material, drawMaterialBed, drawMaterialShapes, isWoody } from "../materialView";
 import { isLaser, isPlasma } from "../machineMode";
 import { layerForShape } from "../laserLayers";
 import { circumference } from "../rotary";
@@ -26,6 +26,18 @@ function isCut(s: any): boolean {
   if (isPlasma()) return true;
   if (isLaser()) { const l = layerForShape(s); return !!l && l.mode !== "fill" && l.power >= 70; }
   return s.millingMode === "outside" || s.millingMode === "inside";
+}
+
+/**
+ * Gefräste Stelle im Bild: dunkler nach Tiefe (d = 0…1); Materialien mit anderer Farbe darunter (eloxiertes Alu,
+ * Laminat, Platine) zeigen schon nach einem Hauch die Kernfarbe
+ */
+function shadeCut(px: Uint8ClampedArray, o: number, d: number, m: Material) {
+  const s = 1 - (m.core ? 0.25 : 0.5) * Math.min(1, d);
+  if (m.core) {
+    const k = Math.min(1, d * 8);
+    for (let ch = 0; ch < 3; ch++) px[o + ch] = (px[o + ch] * (1 - k) + m.core[ch] * k) * s;
+  } else { px[o] *= s; px[o + 1] *= s; px[o + 2] *= s; }
 }
 
 /** Oberfläche (Material + Gravur) für den Bereich b (mm) als Bild */
@@ -92,14 +104,14 @@ export function partsScene(shapes: any[], m: Material, o: PartsOptions): { meshe
   }
   const parts: MultiPolygon = rings.length ? (rings.length === 1 ? [rings[0]] : polygonClipping.xor(rings[0], ...rings.slice(1))) : [];
   const T = Math.max(0.2, o.thickness);
-  const laserBurn = isLaser() && ["wood", "leather", "card"].includes(m.kind);
-  const edge: RGB = laserBurn ? col(m.burn, 0.85) : col(m.base, 0.78);
+  const laserBurn = isLaser() && isWoody(m);
+  const edge: RGB = laserBurn ? col(m.burn, 0.85) : col(m.core ?? m.base, 0.78);
   const bottom = col(m.base, 0.8);
   const rect: MultiPolygon = [[[[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]]]];
   const meshes: Mesh[] = [];
   if (!parts.length) {
     // nichts wird ausgeschnitten: nur die Platte mit der Gravur
-    meshes.push(...extrude(rect, 0, T, { tex, b }, col(m.base, 0.78), bottom, [0, 0, 0]));
+    meshes.push(...extrude(rect, 0, T, { tex, b }, col(m.core ?? m.base, 0.78), bottom, [0, 0, 0]));
     return { meshes, parts: 0 };
   }
   meshes.push(...extrude(parts, 0, T, { tex, b }, edge, bottom, [0, 0, o.sheet ? o.lift : 0]));
@@ -155,7 +167,7 @@ export function cylinderScene(shapes: any[], m: Material, diameter: number, alon
     const quad: [number, number, number, number][] = [[0, t0, 0, v0], [lenMm, t0, 1, v0], [lenMm, t1, 1, v1], [0, t0, 0, v0], [lenMm, t1, 1, v1], [0, t1, 0, v1]];
     for (const [x, th, u, v] of quad) { side.pos.push(...P(x, th)); side.nrm.push(...Nn(th)); side.uv!.push(u, v); }
   }
-  const caps: Mesh = { pos: [], nrm: [], color: col(m.base, 0.88) };
+  const caps: Mesh = { pos: [], nrm: [], color: col(m.core ?? m.base, 0.88) };
   for (const [x, nx] of [[0, -1], [lenMm, 1]] as const) for (let j = 0; j < N; j++) {
     const t0 = (j / N) * Math.PI * 2, t1 = ((j + 1) / N) * Math.PI * 2;
     caps.pos.push(x, 0, 0, ...P(x, t0), ...P(x, t1));
@@ -203,14 +215,13 @@ export function carveScene(r: CarveResult, m: Material, thickness: number): Mesh
   for (let py = 0; py < tex.height; py++) for (let px = 0; px < tex.width; px++) {
     const d = -at(Math.floor(px / k), ny - 1 - Math.floor(py / k)) / deep;
     if (d <= 0.001) continue;
-    const s = 1 - 0.5 * Math.min(1, d), o = (py * tex.width + px) * 4;
-    img.data[o] *= s; img.data[o + 1] *= s; img.data[o + 2] *= s;
+    shadeCut(img.data, (py * tex.width + px) * 4, d, m);
   }
   ctx.putImageData(img, 0, 0);
 
   const top: Mesh = { pos: [], nrm: [], uv: [], tex };
   const bottom: Mesh = { pos: [], nrm: [], color: col(m.base, 0.75) };
-  const side: Mesh = { pos: [], nrm: [], color: col(m.base, 0.8) };
+  const side: Mesh = { pos: [], nrm: [], color: col(m.core ?? m.base, 0.8) };
   const nrm = (i: number, j: number) => {
     const dx = (at(i + 1, j) - at(i - 1, j)) / (2 * cs), dy = (at(i, j + 1) - at(i, j - 1)) / (2 * cs);
     const l = Math.hypot(dx, dy, 1);
@@ -291,8 +302,7 @@ export function cylinderCarveScene(r: CarveResult, m: Material, diameter: number
   for (let py = 0; py < tex.height; py++) for (let px = 0; px < tex.width; px++) {
     const d = -at(Math.floor(px / k), NT - 1 - Math.floor(py / k)) / deep;
     if (d <= 0.001) continue;
-    const s = 1 - 0.5 * Math.min(1, d), o = (py * tex.width + px) * 4;
-    img.data[o] *= s; img.data[o + 1] *= s; img.data[o + 2] *= s;
+    shadeCut(img.data, (py * tex.width + px) * 4, d, m);
   }
   ctx.putImageData(img, 0, 0);
 
@@ -315,7 +325,7 @@ export function cylinderCarveScene(r: CarveResult, m: Material, diameter: number
     vtx(i, j); vtx(i + 1, j); vtx(i + 1, j + 1); vtx(i, j); vtx(i + 1, j + 1); vtx(i, j + 1);
   }
   // Stirnseiten (am Rand wird nicht gefräst)
-  const caps: Mesh = { pos: [], nrm: [], color: col(m.base, 0.88) };
+  const caps: Mesh = { pos: [], nrm: [], color: col(m.core ?? m.base, 0.88) };
   for (const [i, nx] of [[0, -1], [NX - 1, 1]] as const) for (let j = 0; j < NT; j++) {
     caps.pos.push(X(i), 0, 0, ...P(i, j), ...P(i, j + 1));
     for (let q = 0; q < 3; q++) caps.nrm.push(nx, 0, 0);

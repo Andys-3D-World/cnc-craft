@@ -14,7 +14,7 @@ import { t } from "../i18n/i18n";
 import { Viewer3D, Mesh } from "../view3d/viewer3d";
 import { carve } from "../view3d/carveSim";
 import { carveScene } from "../view3d/scenes";
-import { MATERIALS, materialView } from "../materialView";
+import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { getTools, MillingTool } from "../toolLibrary";
 import { loadGcodeFromText } from "../machineStream";
 import { openFacingDialog } from "./facingDialog";
@@ -132,7 +132,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
         <div class="c3d-view">
           <canvas id="c3d-cv"></canvas>
           <div class="c3d-bar">
-            <select id="c3d-mat" class="prop-input" style="width:auto;">${MATERIALS.map(m => `<option value="${m.id}">${t("mat3d." + m.id)}</option>`).join("")}</select>
+            <select id="c3d-mat" class="prop-input" style="width:auto;">${materialOptionsHtml(t)}</select>
             <span class="dlg-hint" id="c3d-info"></span>
           </div>
           <div id="c3d-warn" class="mat-beta" style="display:none;"></div>

@@ -3,6 +3,30 @@
 ## Next version (unreleased)
 
 **New**
+- **More materials and a better look:** the material view (toolbar 🪵, 3D view, 3D milling, simulation) now has
+  29 materials in groups – wood (birch, beech, oak, walnut, plywood, MDF, cork), plastic (acrylic black/white/
+  clear/red, engraving laminate, POM, HDPE, PVC foam board, XPS), metal (aluminium raw, E6/EV1 silver anodized,
+  E6/C4 brown anodized, black anodized, brass, copper, steel, stainless steel) and other (PCB, leather, slate,
+  granite, cardboard). New surfaces: brushed metal, matt anodized, MDF, cork, granite, foam. Milled areas show what
+  is underneath: anodized aluminium turns bare silver, engraving laminate shows its second colour, PCB shows FR4,
+  plywood shows its layers. The simulation uses the real surface image and gives metal and acrylic a shine.
+- **Cutting data:** copper, stainless steel and fibre composite (GRP/CFRP) added to the material database.
+- **Material removal live in the simulation (router):** the *Simulation* tab can now show the stock being milled
+  away while the G-code plays – with the real cutter shape (end mill, ball, bull nose, V-bit, drill), shank,
+  collet nut and spindle at the current position. Works with play, pause, step and jumping back and forth
+  (snapshots), and live during the real job. Drawn on the graphics card, smooth even with large jobs. The stock size
+  comes from the stock settings, the thickness is found automatically (cut-throughs stay open) or can be typed in.
+  The cutter per section is read from the G-code comments (tool library name, or `D=…`).
+  Toggle *Material* / *Only paths* in the toolbar.
+  - **Laser:** burn marks on the material, darker with more energy (power ÷ speed), and cuts that go through once
+    there is enough energy for the material thickness (from the laser layer) – with laser head and beam.
+  - **Plasma:** the kerf (from the plasma cut settings) goes through the sheet, with heat tint next to it – with
+    torch and arc.
+  - **Rotary axis:** milling and laser work are shown on the round part. Like on the machine, the part turns while
+    the cutter / laser head stays on top.
+- **Collision warnings in the simulation:** a rapid move (G0) or a move with the spindle off that goes into
+  material, a shank touching material above the cutting edge, or the collet nut touching the stock is listed with
+  its G-code line – click it to jump there.
 - **Rotary axis for milling:** the *Rotary* section (tab *Cut*) now also works on the router – engrave,
   contours, pockets, V-carve and drilling on a round part clamped in a chuck. Draw on the unrolled surface as with
   the laser (blue band = circumference); Y becomes the A axis in degrees (or Y travel on the Y port). Arcs are split
