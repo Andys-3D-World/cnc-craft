@@ -1,6 +1,7 @@
 /**
  * BOX-GENERATOR – Fenster: Maße eingeben, Vorschau, Platten aufs Bett legen. Die Geometrie entsteht in box.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
@@ -16,7 +17,7 @@ const DEF: BoxOptions = { w: 100, d: 80, h: 50, inner: false, t: 3, finger: 9, l
 
 function loadBox(): BoxOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: any = { ...DEF };
     for (const k of ["w", "d", "h", "t", "finger", "kerf", "nx", "ny", "overhang", "shelves", "radius", "sides"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     for (const k of ["inner", "lid"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
@@ -162,7 +163,7 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
   $<HTMLElement>("box-ok").onclick = () => {
     const b = read();
     if (!valid(b)) return;
-    try { localStorage.setItem(KEY, JSON.stringify(b)); } catch { /* egal */ }
+    saveSettings(KEY, b);
     close();
     const ps = boxPanels(b);
     const bed = bedSizeMm();

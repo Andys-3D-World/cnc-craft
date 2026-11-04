@@ -223,7 +223,7 @@ export function patternFill(sel: any[], o: PatternOptions): OpResult {
     if (allIn) {
       // ganze Kopie: neue IDs, alle Teile einer Kopie in eine Gruppe
       const gid = "pat-" + newId();
-      for (const m of motif) { const k = cloneShape(m); k.id = newId(); k.groupId = gid; translateShape(k, dx, dy); add.push(k); }
+      for (const m of motif) { const k = cloneShape(m); k.id = newId(); k.groupId = gid; delete k.gen; translateShape(k, dx, dy); add.push(k); }
     } else if (o.clip && anyIn && motifRegion) {
       // am Rand: geschlossene Teile mit der Fläche schneiden
       const moved: MultiPolygon = motifRegion.map(poly => poly.map(rg => rg.map(([x, y]) => [x + dx, y + dy] as [number, number])));
@@ -356,7 +356,7 @@ export function tileShapes(sel: any[], w: number, h: number): { tiles: Tile[]; e
     const ub = groupBounds(u);
     if (!ub) continue;
     const whole = tiles.find(tl => ub.minX >= tl.x0 - 1e-6 && ub.maxX <= tl.x1 + 1e-6 && ub.minY >= tl.y0 - 1e-6 && ub.maxY <= tl.y1 + 1e-6);
-    if (whole) { const gid = u.length > 1 ? newId() : undefined; whole.shapes.push(...u.map(s => ({ ...cloneShape(s), ...(gid ? { groupId: gid } : {}) }))); continue; }
+    if (whole) { const gid = u.length > 1 ? newId() : undefined; whole.shapes.push(...u.map(s => { const c = { ...cloneShape(s), ...(gid ? { groupId: gid } : {}) }; delete c.gen; return c; })); continue; }
     const reg = region(u);
     const like = u[0];
     const extra: Record<string, any> = {};

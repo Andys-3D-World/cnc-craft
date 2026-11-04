@@ -3,6 +3,7 @@
  * Vorschau zeigt das Regal von vorne und alle Teile so, wie sie aufs Bett kommen (Reihen in Bettbreite).
  * Geometrie: shelf.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId } from "../shapeTransform";
@@ -21,7 +22,7 @@ const NUMS = ["width", "height", "depth", "shelves", "thickness", "bottom", "top
 
 function load(): ShelfOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: ShelfOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (RELIEFS.includes(s.relief)) o.relief = s.relief;
@@ -128,7 +129,7 @@ export function openShelfDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeShelf(r);
     log(t("shelf.done", { n: r.parts.length }));

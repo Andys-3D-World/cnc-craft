@@ -1,5 +1,22 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Edit generated parts again:** right-click a part made by a generator and choose *Edit with generator*. The same
+  dialog opens with the values used last time; on OK the new parts replace the old ones at the same position, and one
+  undo brings the old state back. Cancel changes nothing. Works for boxes, birdhouses, ornaments (both kinds), names,
+  gears, hinges, scales, joints, shelves, dividers, vents, birth letters, letter toppers, puzzles, word tiles, shadow
+  boxes, mandalas and material tests, also after saving and reopening a project (projects from older versions keep
+  working, their parts just don't have the entry). If the whole set was rotated, the new parts are rotated too. Milling
+  mode, depth, tool, laser layer, plasma cut and tabs set by hand are kept. Before parts changed by hand (points moved,
+  scaled, deleted, moved on their own, ungrouped) are overwritten, a message lists what will be lost. Copies count as
+  their own set. QR codes get the same menu entry for their existing edit dialog.
+
+**Security**
+- QR code and material test dialogs now check stored values before showing them, so a manipulated project file or
+  settings file can't place markup in these dialogs.
+
 ## 0.4.0 Beta
 
 **New**

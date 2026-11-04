@@ -3,6 +3,7 @@
  * Plättchen einzeln (zum Aufkleben, mit Hilfslinien) oder direkt graviert. „Aufs Bett“ legt Grundplatte, Rahmen und
  * Plättchen nebeneinander. Die Geometrie entsteht in wordTiles.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -19,19 +20,20 @@ import { parseWords, bestLayout, layoutWords, roomAspect, wordTileOrnament, tile
 
 const KEY = "cnc_craft_wordtiles";
 type Pts = "de" | "en" | "none";
-interface Opts extends WordTileOptions { words: string; line1: string; line2: string; tileFont: string; footFont: string; points: Pts; separate: boolean }
+interface Opts extends WordTileOptions { words: string; line1: string; line2: string; tileFont: string; footFont: string; points: Pts; separate: boolean; seed?: number }
 const DEF: Opts = { shape: "round", d: 90, frame: 4, footer: 30, holeD: 4, words: "<3 Don\n<3 Riley\nElesha", line1: "The Carrs", line2: "2026",
   tileFont: "Open Sans", footFont: "Great Vibes", points: "en", separate: true };
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["d", "frame", "footer", "holeD"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     for (const k of ["words", "line1", "line2", "tileFont", "footFont"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 300);
     if (s.shape === "round" || s.shape === "rect") o.shape = s.shape;
     if (s.points === "de" || s.points === "en" || s.points === "none") o.points = s.points;
     if (typeof s.separate === "boolean") o.separate = s.separate;
+    if (Number.isFinite(Number(s.seed)) && Number(s.seed) >= 0) o.seed = Number(s.seed);
     return o;
   } catch { return { ...DEF }; }
 }
@@ -111,7 +113,7 @@ function previewSvg(bt: Built, o: Opts): string {
 
 export function openWordTilesDialog(log: (s: string) => void, done: () => void) {
   const init = load();
-  let seed = 0;
+  let seed = init.seed || 0; // gewürfelte Anordnung bleibt beim Bearbeiten erhalten
   document.getElementById("wt-dialog-overlay")?.remove();
   const ov = document.createElement("div");
   ov.id = "wt-dialog-overlay";
@@ -199,7 +201,7 @@ export function openWordTilesDialog(log: (s: string) => void, done: () => void) 
     clearTimeout(timer);
     await update();
     if (!last || !last.bt.r.tiles.length) return;
-    try { localStorage.setItem(KEY, JSON.stringify(last.o)); } catch { /* egal */ }
+    saveSettings(KEY, { ...last.o, seed });
     close();
     const n = place(last.bt, last.o);
     log(t(last.o.separate ? "wt.done" : "wt.doneEng", { n }));

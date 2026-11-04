@@ -3,6 +3,7 @@
  * Rahmen, Rand und Halterung wählen, Vorschau aller Stecker, „Aufs Bett“ legt sie in Reihen aufs Bett (jeder eine Gruppe).
  * Die Geometrie entsteht in letterTopper.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -25,7 +26,7 @@ const GAP = 5; // Abstand der Stecker auf dem Bett (mm)
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["w", "h", "ring", "stickW", "stickL", "holeD", "thicken"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     for (const k of ["text", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 80);
@@ -174,7 +175,7 @@ export function openLetterTopperDialog(log: (s: string) => void, done: () => voi
     clearTimeout(timer);
     await update();
     if (!last || !last.list.length) return;
-    try { localStorage.setItem(KEY, JSON.stringify(last.o)); } catch { /* egal */ }
+    saveSettings(KEY, last.o);
     close();
     placeToppers(last.list, last.chars);
     log(t("lt.done", { n: last.list.length }));

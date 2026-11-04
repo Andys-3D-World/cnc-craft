@@ -3,6 +3,7 @@
  * Befestigungslöcher. „Aufs Bett“ legt Löcher und Umriss als eine Gruppe in die Bettmitte (stärkste Linien-Ebene).
  * Geometrie: vent.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
 import { getLayers } from "../laserLayers";
@@ -18,7 +19,7 @@ const NUMS = ["width", "height", "radius", "margin", "size", "web", "slotLength"
 
 function load(): VentOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: VentOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (VENT_SHAPES.includes(s.shape)) o.shape = s.shape;
@@ -128,7 +129,7 @@ export function openVentDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeVent(r);
     log(t("vent.done", { n: r.holes.length }));

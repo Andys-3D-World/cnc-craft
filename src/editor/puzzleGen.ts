@@ -4,6 +4,7 @@
  * genau darüber; sonst in die Bettmitte. „Nur im Puzzle gravieren“ setzt den Umriss als Bildmaske (wie Bild → Maske).
  * Die Linien kommen auf die stärkste Linien-Ebene (Schnitt), das Bild auf die Gravier-Ebene. Geometrie: puzzle.ts.
  */
+import { editImages, forgetSettings, loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { selectedShapes, selectionBounds } from "./selection";
@@ -19,7 +20,7 @@ const DEF: Opts = { w: 200, h: 150, cols: 8, rows: 6, shape: "rect", tab: 100, j
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["w", "h", "cols", "rows", "tab", "jitter", "seed"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (PUZZLE_SHAPES.includes(s.shape)) o.shape = s.shape;
@@ -41,7 +42,7 @@ export function openPuzzleDialog(log: (s: string) => void, done: () => void) {
   // genau ein Bild in der Auswahl: das bekommt die Maske
   const selImgs = shapes.filter((q: any) => q.type === "image"), selImg = selImgs.length === 1 ? selImgs[0] : null;
   // im Fenster geladenes Bild (Name, Daten, Seitenverhältnis, Vorschau)
-  let loaded: { name: string; bytes: Uint8Array; ratio: number; src: string } | null = null;
+  let loaded: { name: string; bytes: Uint8Array; ratio: number; src: string } | null = editImages()[0] ?? null; // beim Bearbeiten: Bild des alten Laufs
   if (sel && o.over) { o.w = Math.round(sel.w * 10) / 10; o.h = Math.round(sel.h * 10) / 10; }
 
   document.getElementById("puzzle-dialog-overlay")?.remove();
@@ -140,6 +141,7 @@ export function openPuzzleDialog(log: (s: string) => void, done: () => void) {
       preview();
     } catch { log(t("pz.loadFail")); }
   };
+  if (loaded) { $<HTMLElement>("pz-loaded").textContent = "📷 " + loaded.name; $<HTMLElement>("pz-loaded").style.display = ""; }
   $<HTMLElement>("pz-dice").onclick = () => { o.seed = 1 + Math.floor(Math.random() * 99999); preview(); };
   preview();
 
@@ -151,7 +153,7 @@ export function openPuzzleDialog(log: (s: string) => void, done: () => void) {
     const p = read();
     if (p.over && sel) { p.w = sel.w; p.h = sel.h; }
     if (loaded) p.h = p.w * loaded.ratio;
-    try { localStorage.setItem(KEY, JSON.stringify({ ...p, w: p.over && sel ? o.w : p.w, h: p.over && sel ? o.h : p.h })); } catch { /* egal */ }
+    saveSettings(KEY, { ...p, w: p.over && sel ? o.w : p.w, h: p.over && sel ? o.h : p.h });
     close();
     const r = puzzle(p);
     const bed = bedSizeMm();
@@ -163,6 +165,7 @@ export function openPuzzleDialog(log: (s: string) => void, done: () => void) {
     const made: any[] = [createPolyline(toW(r.outline), true, "on-line", extra), ...r.lines.map(l => createPolyline(toW(l.pts), false, "on-line", extra))];
     // Bild: das geladene kommt mit aufs Bett (Gravier-Ebene); Maske = Puzzle-Umriss, damit nur im Puzzle graviert wird
     let pic: any = p.over ? selImg : null;
+    if (pic) forgetSettings(); // die Maske hängt an einem Bild außerhalb des Puzzles: später nicht bearbeitbar
     if (loaded) {
       pic = await createImageShape(loaded.name, loaded.bytes, p.w, x0, y0);
       const engL = getLayers().find(l => l.mode === "fill");

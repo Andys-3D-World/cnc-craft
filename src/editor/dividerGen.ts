@@ -2,6 +2,7 @@
  * FACHTEILER – Fenster (Generatoren): Kistenmaße, Fächer, Material, Spiel, Laser/Fräse.
  * Vorschau zeigt den Einsatz von oben und alle Teile so, wie sie aufs Bett kommen. Geometrie: divider.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId } from "../shapeTransform";
@@ -22,7 +23,7 @@ const NUMS = ["width", "depth", "height", "wall", "thickness", "cols", "rows", "
 
 function load(): DividerOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: DividerOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (typeof s.outside === "boolean") o.outside = s.outside;
@@ -206,7 +207,7 @@ export function openDividerDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || r.errors.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeParts(r, o);
     log(t("div.done", { n: r.parts.length }));

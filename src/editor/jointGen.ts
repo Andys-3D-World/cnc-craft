@@ -3,6 +3,7 @@
  * Fräser-Ø kommt vom aktiven Werkzeug (Fräse) bzw. 0 (Laser). Vorschau zeigt beide Teile ineinander, „Aufs Bett“ legt
  * sie mit 10 mm Abstand nebeneinander (je eine Gruppe). Geometrie: joints.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId } from "../shapeTransform";
@@ -20,7 +21,7 @@ const NUMS = ["width", "thickness", "count", "lengthA", "lengthB", "clearance", 
 
 function load(): JointOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: JointOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (JOINT_KINDS.includes(s.kind)) o.kind = s.kind;
@@ -134,7 +135,7 @@ export function openJointDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || !r.a.length || !r.b.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeJoint(r, t("joint.kind." + o.kind));
     log(t("joint.done", { what: t("joint.kind." + o.kind) }));

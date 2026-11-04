@@ -6,6 +6,7 @@
  *   Datum, Daten, Symbole, Motive → schwächste Linien-Ebene (Einzellinien)   Bilder → Füll-Ebene (Bild gravieren)
  * Fremder Text (Name, Daten, Dateinamen) kommt nie ins innerHTML – nur als Geometrie bzw. textContent.
  */
+import { editImages, loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -34,7 +35,7 @@ const NUMS = ["height", "margin", "bold", "nameSize", "infoSize", "motifCount", 
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of STR) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
@@ -177,7 +178,7 @@ function previewSvg(b: Built): string {
 export function openBirthLetterDialog(log: (s: string) => void, done: () => void) {
   const init = load();
   if (!init.date) { const n = new Date(); init.date = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`; }
-  const pics: Pic[] = [];
+  const pics: Pic[] = editImages().slice(0, 3); // beim Bearbeiten: die Bilder des alten Laufs
   document.getElementById("birth-dialog-overlay")?.remove();
   const ov = document.createElement("div");
   ov.id = "birth-dialog-overlay";
@@ -302,7 +303,7 @@ export function openBirthLetterDialog(log: (s: string) => void, done: () => void
     const b = last;
     if (!b) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     await placeBirth(b, o.name.trim() || t("birth.title"));
     log(t("birth.done", { w: f(b.w), h: f(b.h) }));

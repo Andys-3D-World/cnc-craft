@@ -5,6 +5,7 @@
  * Fehlerkorrektur). Doppelklick auf den Code öffnet ihn wieder. Platzhalter wie {n} im Text werden
  * erst bei „Seriennummern“ (serial.ts) ersetzt.
  */
+import { matchDefaults } from "./genRun";
 import { app } from "./editorState";
 import { createPolyline, groupBounds, newId, MM_TO_PIXEL } from "../shapeTransform";
 import { encodeQr, qrOutlines, QrEcc } from "./qrcode";
@@ -15,8 +16,15 @@ export interface QrData { text: string; size: number; ecc: QrEcc }
 const KEY = "cnc_craft_qr";
 const DEF: QrData = { text: "https://github.com/Andys-3D-World/cnc-craft", size: 30, ecc: "M" };
 
+/** Werte können aus einer fremden Projektdatei stammen */
+function clean(raw: any): QrData {
+  const o: QrData = { ...DEF, ...matchDefaults(DEF, raw) };
+  if (!(["L", "M", "Q", "H"] as QrEcc[]).includes(o.ecc)) o.ecc = DEF.ecc;
+  return o;
+}
+
 function load(): QrData {
-  try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { return { ...DEF }; }
+  try { return clean(JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { return { ...DEF }; }
 }
 
 /** Formen des QR-Codes, linke untere Ecke bei (x0, y0) in Welt-Pixeln. null = Text zu lang. */
@@ -34,7 +42,7 @@ export function qrShapes(d: QrData, x0: number, y0: number, extra: Record<string
 export function openQrDialog(log: (s: string) => void, done: () => void, edit?: any) {
   const st = app();
   const members = edit ? st.shapes.filter((s: any) => s.groupId && s.groupId === edit.groupId && s.qrData) : [];
-  const init: QrData = edit?.qrData ? { ...DEF, ...edit.qrData } : load();
+  const init: QrData = edit?.qrData ? clean(edit.qrData) : load();
   document.getElementById("qr-dialog-overlay")?.remove();
   const ov = document.createElement("div");
   ov.id = "qr-dialog-overlay";

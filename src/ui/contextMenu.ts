@@ -14,6 +14,7 @@ import { icon } from "./icons";
 import { app } from "../editor/editorState";
 import { hitTest, clickSelect, selectedShapes, insideSelectionBox } from "../editor/selection";
 import { commands, hasClipboard } from "../editor/commands";
+import { runInSelection } from "../editor/genEdit";
 import { checkpoint } from "../editor/history";
 import { getLayers } from "../laserLayers";
 import { isLaser, isPlasma } from "../machineMode";
@@ -193,7 +194,10 @@ function shapeMenu(): MenuEntry[] {
   const units = new Set(sel.map(s => s.groupId || s.id)).size;
   const grouped = sel.some(s => s.groupId);
   const convertible = sel.some(s => s.type !== "polyline" && s.type !== "image");
+  const genEdit: MenuEntry[] = runInSelection(sel) || sel.some(s => s.qrData)
+    ? [{ label: t("gen.edit"), ico: "node", run: cmd("editGenerator") }, "sep"] : [];
   return [
+    ...genEdit,
     { label: t("cm.cut"), ico: "cut", key: ctrl("X"), run: cmd("cut") },
     { label: t("cm.copy"), ico: "copy", key: ctrl("C"), run: cmd("copy") },
     { label: t("cm.paste"), ico: "paste", key: ctrl("V"), run: cmd("paste"), disabled: !hasClipboard() },

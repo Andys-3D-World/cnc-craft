@@ -3,6 +3,7 @@
  * Vorschau (Platten oder 3D), Platten aufs Bett. Die Geometrie entsteht in birdhouse.ts.
  * Jede Art merkt sich ihre eigenen Werte – beim Umschalten kommen die zuletzt benutzten wieder.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
@@ -39,7 +40,7 @@ function clean(s: any, kind: BirdKind): BirdhouseOptions {
 }
 function load(): Store {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     // ältere Version: ein einzelner Nistkasten ohne „kind“
     if (!s.nest && !s.ornament) return { kind: "nest", nest: clean(s, "nest"), ornament: clean(null, "ornament") };
     return { kind: KINDS.includes(s.kind) ? s.kind : "nest", nest: clean(s.nest, "nest"), ornament: clean(s.ornament, "ornament") };
@@ -199,7 +200,7 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
     const b = read();
     if (birdProblem(b)) return;
     store[kind] = b; store.kind = kind;
-    try { localStorage.setItem(KEY, JSON.stringify(store)); } catch { /* egal */ }
+    saveSettings(KEY, store);
     close();
     const ps = birdhousePanels(b);
     const bed = bedSizeMm();

@@ -4,6 +4,7 @@
  * Vorschau zeigt alle Schichten übereinander wie fertig gebaut.
  * „Aufs Bett“ legt alle Teile nebeneinander (jedes eine Gruppe). Geometrie: shadowBox.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -34,7 +35,7 @@ const POSITIONS: TextPos[] = ["front", "back"];
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["text", "line2", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
     if (typeof s.bold === "boolean") o.bold = s.bold;
@@ -177,7 +178,7 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
   $<HTMLElement>("sb-cancel").onclick = close;
   $<HTMLElement>("sb-ok").onclick = async () => {
     const p = read();
-    try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* egal */ }
+    saveSettings(KEY, p);
     const r = await build(p);
     close();
     const { n, over } = place(r);

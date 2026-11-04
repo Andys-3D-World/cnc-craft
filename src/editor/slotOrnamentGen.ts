@@ -2,6 +2,7 @@
  * 3D-STECKANHÄNGER – Fenster (Generatoren): Form, Größe, Materialstärke (Schlitz), Verzierung, Zierlinie.
  * Vorschau beider Teile; „Aufs Bett“ legt sie nebeneinander (jedes eine Gruppe). Geometrie: slotOrnament.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
@@ -24,7 +25,7 @@ const shapesOf = (th: Theme) => { const l = themeList(th, "shapes").filter(s => 
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     if (isTheme(s.theme)) o.theme = s.theme;
     for (const k of ["size", "points", "t", "clear", "holeD"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
@@ -120,7 +121,7 @@ export function openSlotOrnamentDialog(log: (s: string) => void, done: () => voi
   $<HTMLElement>("so-cancel").onclick = close;
   $<HTMLElement>("so-ok").onclick = () => {
     const p = read();
-    try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { /* egal */ }
+    saveSettings(KEY, p);
     close();
     place(slotOrnament(p));
     log(t("so.done"));

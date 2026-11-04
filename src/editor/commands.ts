@@ -35,31 +35,13 @@ import {
 } from "../shapeTransform";
 import { openExportMenu, initCanvasMenu } from "../ui/contextMenu";
 import { offsetPolygon } from "../polyOffset";
-import { openBoxDialog } from "./boxGen";
-import { openMandalaDialog } from "./mandalaGen";
-import { openBirdhouseDialog } from "./birdhouseGen";
-import { openOrnamentDialog } from "./ornamentGen";
-import { openGearDialog } from "./gearGen";
-import { openHingeDialog } from "./hingeGen";
-import { openScaleDialog } from "./scaleGen";
-import { openJointDialog } from "./jointGen";
-import { openShelfDialog } from "./shelfGen";
-import { openDividerDialog } from "./dividerGen";
-import { openVentDialog } from "./ventGen";
-import { openBirthLetterDialog } from "./birthLetterGen";
-import { openLetterTopperDialog } from "./letterTopperGen";
-import { openPuzzleDialog } from "./puzzleGen";
-import { openWordTilesDialog } from "./wordTilesGen";
-import { openShadowBoxDialog } from "./shadowBoxGen";
-import { openSlotOrnamentDialog } from "./slotOrnamentGen";
 import { openFacingDialog } from "../ui/facingDialog";
 import { getMachineMode } from "../machineMode";
-import { openMaterialTestDialog } from "./materialTest";
+import { editRun, openGenerator, runInSelection } from "./genEdit";
 import { openQrDialog } from "./qrTool";
 import { openSerialDialog } from "./serial";
 import { openThicknessDialog } from "./thickness";
 import { openDogboneDialog } from "./dogbone";
-import { openNameGenerator } from "./nameGen";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
@@ -187,31 +169,37 @@ export const commands: Record<string, () => void> = {
   weldScore: () => weldScore(),
   centerFix: () => centerFix(),
   nest: () => openNestDialog(),
-  boxgen: () => openBoxDialog(log, () => { done(); checkpoint(); }),
-  mandala: () => openMandalaDialog(log, () => { done(); checkpoint(); }),
-  birdhouse: () => openBirdhouseDialog(log, () => { done(); checkpoint(); }),
-  ornament: () => openOrnamentDialog(log, () => { done(); checkpoint(); }),
-  gear: () => openGearDialog(log, () => { done(); checkpoint(); }),
-  hinge: () => openHingeDialog(log, () => { done(); checkpoint(); }),
-  scale: () => openScaleDialog(log, () => { done(); checkpoint(); }),
-  joint: () => openJointDialog(log, () => { done(); checkpoint(); }),
-  shelf: () => openShelfDialog(log, () => { done(); checkpoint(); }),
-  divider: () => openDividerDialog(log, () => { done(); checkpoint(); }),
-  vent: () => openVentDialog(log, () => { done(); checkpoint(); }),
-  birth: () => openBirthLetterDialog(log, () => { done(); checkpoint(); }),
-  letterTopper: () => openLetterTopperDialog(log, () => { done(); checkpoint(); }),
-  puzzle: () => openPuzzleDialog(log, () => { done(); checkpoint(); }),
-  wordTiles: () => openWordTilesDialog(log, () => { done(); checkpoint(); }),
-  shadowBox: () => openShadowBoxDialog(log, () => { done(); checkpoint(); }),
-  slotOrnament: () => openSlotOrnamentDialog(log, () => { done(); checkpoint(); }),
+  boxgen: () => openGenerator("box", log, () => { done(); checkpoint(); }),
+  mandala: () => openGenerator("mandala", log, () => { done(); checkpoint(); }),
+  birdhouse: () => openGenerator("birdhouse", log, () => { done(); checkpoint(); }),
+  ornament: () => openGenerator("ornament", log, () => { done(); checkpoint(); }),
+  gear: () => openGenerator("gear", log, () => { done(); checkpoint(); }),
+  hinge: () => openGenerator("hinge", log, () => { done(); checkpoint(); }),
+  scale: () => openGenerator("scale", log, () => { done(); checkpoint(); }),
+  joint: () => openGenerator("joint", log, () => { done(); checkpoint(); }),
+  shelf: () => openGenerator("shelf", log, () => { done(); checkpoint(); }),
+  divider: () => openGenerator("divider", log, () => { done(); checkpoint(); }),
+  vent: () => openGenerator("vent", log, () => { done(); checkpoint(); }),
+  birth: () => openGenerator("birth", log, () => { done(); checkpoint(); }),
+  letterTopper: () => openGenerator("letterTopper", log, () => { done(); checkpoint(); }),
+  puzzle: () => openGenerator("puzzle", log, () => { done(); checkpoint(); }),
+  wordTiles: () => openGenerator("wordTiles", log, () => { done(); checkpoint(); }),
+  shadowBox: () => openGenerator("shadowBox", log, () => { done(); checkpoint(); }),
+  slotOrnament: () => openGenerator("slotOrnament", log, () => { done(); checkpoint(); }),
   // Opferplatte planen: ganzes Bett, eine Seite (Nullpunkt links unten, Z auf der Opferplatte)
   surface: () => {
     if (getMachineMode() !== "mill") { log(t("face.spoil.millOnly")); return; }
     const b = bedSizeMm(); openFacingDialog({ x0: 0, y0: 0, w: b.w, h: b.h, thick: 0, height: 0, spoil: true, bed: b }, log); },
   shapeLib: () => openShapeLibrary(log),
-  nameGen: () => openNameGenerator(log, () => { done(); checkpoint(); }),
-  materialTest: () => openMaterialTestDialog(log, () => { done(); checkpoint(); }),
+  nameGen: () => openGenerator("name", log, () => { done(); checkpoint(); }),
+  materialTest: () => openGenerator("materialTest", log, () => { done(); checkpoint(); }),
   qrCode: () => openQrDialog(log, () => { done(); checkpoint(); }),
+  // Rechtsklick: Teile aus einem Generator nochmal mit dessen Fenster bearbeiten (QR-Code hat sein eigenes Bearbeiten)
+  editGenerator: () => {
+    const sel = selectedShapes(), run = runInSelection(sel), qr = sel.find(s => s.qrData);
+    if (run) editRun(run, log, () => { done(); checkpoint(); });
+    else if (qr) openQrDialog(log, () => { done(); checkpoint(); }, qr);
+  },
   serial: () => openSerialDialog(log, () => { done(); checkpoint(); }),
   thickness: () => openThicknessDialog(log, () => { done(); checkpoint(); }),
   dogbone: () => openDogboneDialog(log, () => { done(); checkpoint(); }),
@@ -240,11 +228,15 @@ export const commands: Record<string, () => void> = {
 
 /** Kopien mit neuen IDs und eigenen Gruppen, um offsetPx nach rechts unten versetzt */
 function makeCopies(source: any[], offsetPx: number): any[] {
-  const groupMap = new Map<string, string>();
+  const groupMap = new Map<string, string>(), genMap = new Map<string, string>();
   return source.map(s => {
     const c = cloneShape(s);
     c.id = newId();
     delete c.ngOut; // Kopie gehört nicht mehr zum Ergebnis des Knotengraphen
+    if (c.gen) { // Kopie eines Generator-Laufs = eigener Lauf
+      if (!genMap.has(c.gen.id)) genMap.set(c.gen.id, newId());
+      c.gen.id = genMap.get(c.gen.id);
+    }
     if (c.groupId) {
       if (!groupMap.has(c.groupId)) groupMap.set(c.groupId, "grp-" + newId());
       c.groupId = groupMap.get(c.groupId);

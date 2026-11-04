@@ -61,6 +61,8 @@ export function openInlayDialog(state: any, redraw: () => void, log: (s: string)
     const plugs = sel.map((s: any) => {
       const c = cloneShape(s);
       c.id = newId();
+      delete c.gen; // Stecker ist kein Generator-Teil
+
       if (c.type === "circle") c.x = 2 * mid - c.x + shift;
       else { c.points = mirrorX(c.points, mid).map((p: any) => ({ ...p, x: p.x + shift })); updatePolylineBounds(c); }
       c.millingMode = "vplug"; c.vStart = start; c.millingDepth = -(start + v.depth);

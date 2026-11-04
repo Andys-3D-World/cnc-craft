@@ -6,6 +6,7 @@
  * Erleichterungslöcher. Vorschau zeigt Paare im Eingriff, „Aufs Bett“ legt die Teile nebeneinander (je eine Gruppe).
  * Geometrie: gear.ts (Stirnrad, Bohrung) und drives.ts (Zahnstange, Riemenscheibe, Kettenrad).
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId } from "../shapeTransform";
@@ -29,7 +30,7 @@ const NUMS = ["teeth", "module", "pressureAngle", "backlash", "shift", "boreD", 
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k]))) o[k] = Number(s[k]);
     for (const k of ["keyAuto", "pair", "flanges"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
@@ -263,7 +264,7 @@ export function openGearDialog(log: (s: string) => void, done: () => void) {
     const b = last;
     if (!b || !b.parts[0]?.area.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeParts(b.parts);
     log(t("gear.placed", { n: b.parts.length, what: t("gear.kind." + o.kind) }));

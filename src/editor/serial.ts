@@ -124,6 +124,7 @@ async function makeCopies(sel: any[], o: SerialOptions, csv: Csv | null, n: numb
     for (const s of u.others) {
       const c = cloneShape(s);
       c.id = newId();
+      delete c.gen; // Kopie ist kein Generator-Lauf mehr
       if (c.groupId) c.groupId = gid(c.groupId);
       made.push(c);
     }

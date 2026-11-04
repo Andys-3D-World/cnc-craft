@@ -3,6 +3,7 @@
  * Liebe) wählen – es filtert Formen, Verzierungen, Aufsätze und Landschaften –, dann Form wählen, Name (und zweite Zeile) eingeben, Vorschau mit Größe,
  * „Aufs Bett“ legt den Anhänger als Gruppe in die Bettmitte. Die Geometrie entsteht in ornament.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -28,7 +29,7 @@ const INNERS: OrnamentInner[] = ["engrave", "cut", "band", "score", "layer"];
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["size", "points", "holeD", "textSize"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     for (const k of ["text", "line2", "font"] as const) if (typeof s[k] === "string") o[k] = s[k].slice(0, 60);
@@ -203,7 +204,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || !r.cut.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeOrnament(r, o.text.trim() || t("orn.title"));
     log(t(r.back.length ? "orn.doneTwo" : r.top.length ? "orn.doneLayer" : "orn.done", { w: r.w.toFixed(1), h: r.h.toFixed(1) }));

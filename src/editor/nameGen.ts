@@ -14,6 +14,7 @@
  * Die Vorschau zeigt, ob alles ein Teil ist (sonst Warnung mit der Anzahl). Rechnung in mm mit polygon-clipping,
  * „Aufs Bett“ legt das Ergebnis als Gruppe in die Bettmitte.
  */
+import { loadSettings, matchDefaults, saveSettings } from "./genRun";
 import polygonClipping, { MultiPolygon, Polygon, Ring } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, Pt, newId, makeRectPoints, makeEllipsePoints, createPolyline } from "../shapeTransform";
@@ -259,7 +260,7 @@ function svgRings(text: string): XY[][] {
 
 function load(): NameOptions {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const raw = JSON.parse(loadSettings(KEY) || "{}");
     // ältere Fassung: ein Symbol vorn und eins hinten
     if (!Array.isArray(raw.syms) && (raw.front !== undefined || raw.back !== undefined)) {
       raw.syms = [];
@@ -268,7 +269,8 @@ function load(): NameOptions {
     }
     // ältere Fassung: Vorlagen Kugel/Stern (jetzt im Weihnachtsschmuck-Generator) → normaler Schriftzug
     delete raw.template;
-    const o = { ...DEF, ...raw };
+    const o = { ...DEF, ...matchDefaults(DEF, raw) };
+    o.own = o.own.filter((r: any) => Array.isArray(r)).map((r: any[]) => r.filter(q => Array.isArray(q) && Number.isFinite(q[0]) && Number.isFinite(q[1])));
     o.syms = (Array.isArray(o.syms) ? o.syms : []).filter((q: any) => q && typeof q.id === "string")
       .map((q: any) => ({ id: q.id, a: q.a ? 1 : 0, x: +q.x || 0, y: +q.y || 0, s: +q.s || 1, r: +q.r || 0 }));
     return o;
@@ -474,7 +476,7 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || !r.cut.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeName(r, o);
     log(t(r.top.length ? "ng.doneLayer" : "ng.done", { w: r.w.toFixed(1), h: r.h.toFixed(1) }));

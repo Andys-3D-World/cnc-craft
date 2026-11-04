@@ -4,6 +4,7 @@
  * Umriss + Löcher auf der stärksten Linien-Ebene (schneiden), Striche + Zahlen auf der schwächsten (gravieren).
  * Geometrie: scales.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
 import { traceSingleLine } from "./singleLine";
@@ -18,7 +19,7 @@ const NUMS = ["length", "width", "holeD", "radius", "diameter", "centerHole", "t
 
 function load(): ScaleOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: ScaleOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     if (SCALE_KINDS.includes(s.kind)) o.kind = s.kind;
@@ -132,7 +133,7 @@ export function openScaleDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     await placeScale(r, t("scale.kind." + o.kind));
     log(t("scale.done", { what: t("scale.kind." + o.kind), w: f(r.w), h: f(r.h) }));

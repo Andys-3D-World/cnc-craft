@@ -2,6 +2,7 @@
  * FLEX-SCHARNIER – Fenster (Generatoren): Muster, Platte, Scharnier-Zone, Abstand/Schnitt/Steg, Vorschlag aus der
  * Materialdicke. „Aufs Bett“ legt Platte und Schnitte als eine Gruppe in die Bettmitte. Geometrie: livingHinge.ts.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
 import { getLayers } from "../laserLayers";
@@ -17,7 +18,7 @@ const NUMS = ["width", "height", "length", "spacing", "cut", "bridge", "amplitud
 
 function load(): HingeOptions {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: HingeOptions = { ...DEF };
     for (const k of NUMS) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     if (typeof s.panel === "boolean") o.panel = s.panel;
@@ -132,7 +133,7 @@ export function openHingeDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || !r.lines.length) return;
     const o = read();
-    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ }
+    saveSettings(KEY, o);
     close();
     placeHinge(r, o);
     log(t("hinge.done", { n: r.lines.length, w: f(o.width), h: f(o.height) }));

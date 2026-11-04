@@ -13,7 +13,7 @@
  * Gemeinsame Felder: id, millingMode ("outside" | "inside" | "on-line" | "pocket"),
  *   millingDepth, groupId (Formen mit gleicher groupId gehören zusammen)
  */
-import { berechne3PunktBogen } from "./arcEngine";
+import { berechne3PunktBogen } from "./arcEngine.ts";
 
 export const MM_TO_PIXEL = 2;
 

@@ -6,6 +6,7 @@
  * shape.laserOverride (siehe laserLayers.effectiveLayer) – so entstehen keine Dutzend neuen Ebenen.
  * Beschriftet wird mit der Einzellinien-Schrift (singleLine.ts) auf einer eigenen, schwachen Ebene.
  */
+import { loadSettings, matchDefaults, saveSettings } from "./genRun";
 import { app } from "./editorState";
 import { createPolyline, newId, MM_TO_PIXEL, Pt } from "../shapeTransform";
 import { getLayers, addLayer, updateLayer, LaserLayer, LaserMode } from "../laserLayers";
@@ -40,7 +41,7 @@ const DEF: MaterialTestOptions = {
 };
 
 function load(): MaterialTestOptions {
-  try { return { ...DEF, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { return { ...DEF }; }
+  try { return { ...DEF, ...matchDefaults(DEF, JSON.parse(loadSettings(KEY) || "{}")) }; } catch { return { ...DEF }; }
 }
 
 /** Werte einer Stufe i von n zwischen a und b (gleichmäßig) */
@@ -249,7 +250,7 @@ export function openMaterialTestDialog(log: (s: string) => void, done: () => voi
   $<HTMLElement>("mt-ok").onclick = async () => {
     const m = read();
     if (!valid(m)) return;
-    try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* egal */ }
+    saveSettings(KEY, m);
     close();
     try {
       const n = await insertTest(m);

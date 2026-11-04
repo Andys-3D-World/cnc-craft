@@ -430,6 +430,7 @@ export async function splitImage(s: any, cutsU: number[], cutsV: number[]): Prom
     const piece = { ...JSON.parse(JSON.stringify(s)), id: newId(), points: [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)],
       img: { ...JSON.parse(JSON.stringify({ ...img, src: "" })), src, pw, ph, ...(mask ? { mask } : {}) } };
     delete piece.groupId;
+    delete piece.gen;
     updatePolylineBounds(piece);
     out.push(piece);
   }

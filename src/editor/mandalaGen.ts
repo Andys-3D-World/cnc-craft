@@ -3,6 +3,7 @@
  * Die Geometrie entsteht in mandala.ts. Ergebnis: Außenkontur („außen“) + Muster als Löcher („innen“) oder als
  * Gravur („Mitte“), alles in einer Gruppe – zum Lasern oder Fräsen.
  */
+import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
@@ -17,7 +18,7 @@ const DEF: Opts = { d: 150, n: 12, rings: 4, web: 2, edge: "petals", center: "fl
 
 function load(): Opts {
   try {
-    const s = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: Opts = { ...DEF };
     for (const k of ["d", "n", "rings", "web", "seed"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) > 0) o[k] = Number(s[k]);
     if (EDGES.includes(s.edge)) o.edge = s.edge;
@@ -97,7 +98,7 @@ export function openMandalaDialog(log: (s: string) => void, done: () => void) {
   $<HTMLElement>("mand-cancel").onclick = close;
   $<HTMLElement>("mand-ok").onclick = () => {
     const m = read();
-    try { localStorage.setItem(KEY, JSON.stringify(m)); } catch { /* egal */ }
+    saveSettings(KEY, m);
     close();
     const res = mandala(m);
     // links unten aufs Bett (10 mm Rand) wie beim Box-Generator; größer als das Bett: Hinweis

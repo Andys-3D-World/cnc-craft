@@ -27,6 +27,7 @@ export function fresh(list: any[]): any[] {
   return list.map(s => {
     const c = s.type === "image" ? cloneImage(s) : cloneShape(s);
     c.id = newId();
+    delete c.gen; // Kopie ist kein Generator-Lauf mehr
     if (c.groupId) {
       if (!gmap.has(c.groupId)) gmap.set(c.groupId, "grp-" + newId());
       c.groupId = gmap.get(c.groupId);
