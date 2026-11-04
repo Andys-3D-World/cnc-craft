@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.3.9", nl="Coordinate systems G54–G59, your own macro buttons, gamepad control, climb or conventional milling per operation, lead-in and lead-out for milled contours, arc fitting against stuttering on round shapes, and the rotary axis for square, polygon and cone stock. Vector export now writes real circles and arcs instead of thousands of points. Zero points always go to the active coordinate system.",
+  nh="New in 0.4.0", nl="New box divider generator: slotted inserts that split a box or drawer into compartments, cut with laser or router. Choose the number of compartments or your own sizes, take the size from your last box, and add an outer frame and base if you like.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.3.9", nl="Koordinatensysteme G54–G59, eigene Makro-Knöpfe, Gamepad-Steuerung, Gleichlauf oder Gegenlauf je Bearbeitung, An- und Wegfahren beim Konturfräsen, Arc Fitting gegen Stottern bei runden Formen und die Drehachse für eckiges, vieleckiges und kegeliges Material. Der Vektor-Export schreibt jetzt echte Kreise und Bögen statt tausender Punkte. Nullpunkte landen immer im aktiven Koordinatensystem.",
+  nh="Neu in 0.4.0", nl="Neuer Fachteiler-Generator: gesteckte Einsätze, die eine Kiste oder Schublade in Fächer teilen, geschnitten mit Laser oder Fräse. Wähle die Anzahl der Fächer oder eigene Größen, übernimm die Maße deiner letzten Box und nimm auf Wunsch einen Außenrahmen und Boden dazu.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.3.9</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.0</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

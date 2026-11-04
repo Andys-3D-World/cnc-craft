@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.4.0 Beta
 
 **New**
 - **Box dividers** (generators): slotted egg-crate inserts that split a box or drawer into compartments. Enter inside or
