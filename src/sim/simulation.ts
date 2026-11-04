@@ -27,6 +27,7 @@ import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
 import { wrapSimProgram } from "./rotarySim";
 import { rotary } from "../rotary";
+import { refRadius } from "../rotaryStock";
 import { isLaser, isPlasma, MODE_CHANGED } from "../machineMode";
 import { LiveCarve, toolSections, type WarnKind, type CarveKind } from "./simCarve";
 import { activeLayer, laserSettings } from "../laserLayers";
@@ -423,11 +424,11 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
  */
 function parseSim(lines: string[], src: Source = source): SimProgram {
   const p = parseGcodeProgram(lines);
-  const R = rotary.diameter / 2;
+  const R = refRadius(rotary);
   if (!(R > 0)) return p;
   // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
-  const o = { along: rotary.along, reverse: rotary.reverse };
-  if (p.a0) return wrapSimProgram(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() ? rotary.rollerDia / rotary.diameter : 1 });
+  const o = { along: rotary.along, reverse: rotary.reverse, stock: rotary };
+  if (p.a0) return wrapSimProgram(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() && rotary.shape === "round" ? rotary.rollerDia / rotary.diameter : 1 });
   if (src === "design" && rotary.on && !isPlasma()) return wrapSimProgram(p, R, "surface", o);
   return p;
 }
@@ -612,7 +613,7 @@ function updateInfo() {
     row("X", `${b.minX.toFixed(1)} … ${b.maxX.toFixed(1)} mm`) +
     row("Y", `${b.minY.toFixed(1)} … ${b.maxY.toFixed(1)} mm`) +
     row("Z", `${b.minZ.toFixed(2)} … ${b.maxZ.toFixed(2)} mm`) +
-    (rot ? row("⟳", t("sim.rotaryInfo", { d: (rot.R * 2).toFixed(1), a0: Math.round(rot.aMin), a1: Math.round(rot.aMax) })) : "") +
+    (rot ? row("⟳", (rot.stock.shape === "round" ? `Ø ${(rot.R * 2).toFixed(1)} mm` : t("rot.shape." + rot.stock.shape)) + " · " + t("sim.rotaryInfo", { a0: Math.round(rot.aMin), a1: Math.round(rot.aMax) })) : "") +
     row(t("sim.moves"), String(prog.n)) +
     `<div class="sim-muted">${t("sim.estNote")}</div>`;
   const bed = bedSizeMm();
@@ -750,7 +751,8 @@ function updateCarveUI(force = false) {
     const lm = $("sim-legend-mat");
     lm.style.display = on ? "flex" : "none";
     if (c) lm.textContent = (c.kind === "plasma" ? "▦ " : "🪵 ") + (c.cyl
-      ? t("sim.stockCyl", { d: (c.cyl.R * 2).toFixed(1), l: (c.nx * c.cell).toFixed(0) })
+      ? c.cyl.stock.shape === "round" ? t("sim.stockCyl", { d: (c.cyl.R * 2).toFixed(1), l: (c.nx * c.cell).toFixed(0) })
+        : t("sim.stockBody", { name: t("rot.shape." + c.cyl.stock.shape), l: (c.nx * c.cell).toFixed(0) })
       : t("sim.stockSize", { w: (c.nx * c.cell).toFixed(0), h: (c.ny * c.cell).toFixed(0), t: c.T.toFixed(1) }));
     if (view.materialFailed && view.showMaterial && !glWarned) { glWarned = true; log(t("sim.noGlMaterial")); }
   }

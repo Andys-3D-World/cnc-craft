@@ -22,10 +22,16 @@
  * Drehachse: Das Raster ist die abgewickelte Oberfläche (entlang der Achse × rundherum, schließt sich rundum).
  * Die gewickelten Bahnen (rotarySim.ts, Stücke ≤ 2°) werden dafür zurückgerechnet: Winkel × R und Abstand zur
  * Achse − R. Gezeigt wird es wieder um den Zylinder (simCarveGl.ts).
+ * Andere Rohteile: Das Raster ist genauso die Abwicklung, jede Zelle zählt die Tiefe unter der echten Oberfläche
+ * (Bahnen im Raster-System aus rotarySim.ts). Eckig: Der Fräser wirkt nur auf der Fläche, auf der er gerade steht –
+ * über die Kante hinaus ist Luft (dass er die Nachbarfläche an der Ecke anschneiden kann, ist nicht nachgebildet).
+ * Kegel: Rundherum sind die Zellen am dünnen Ende schmaler (Fräser dort über mehr Zeilen), und entlang der Achse
+ * steigt die Oberfläche unter dem waagerechten Fräser an.
  */
 import { kernel, profile, type Kernel } from "../view3d/carveSim.ts";
 import { MOVE_CUT, MOVE_RAPID, type SimProgram } from "./gcodeParser.ts";
 import type { ToolGeom } from "../toolGraphics.ts";
+import { type RotaryStock, faces, isPrism, perimeter, cornerRadius, coneRadius } from "../rotaryStock.ts";
 
 const MAX_CELLS = 1_000_000;
 const MAX_SIDE = 4096;           // Textur-Größe, die jede Grafikkarte kann
@@ -108,7 +114,7 @@ export class LiveCarve {
   warnVersion = 0;
   readonly kind: CarveKind;
   /** um die Drehachse: Raster = abgewickelte Oberfläche (y = Winkel × R ab −πR), Radius R */
-  readonly cyl: { R: number; alongY: boolean } | null;
+  readonly cyl: { R: number; alongY: boolean; stock: RotaryStock } | null;
   /** Laser: ab dieser Dosis durchgeschnitten */
   readonly cutDose: number;
 
@@ -125,6 +131,11 @@ export class LiveCarve {
   private readonly discs = new Map<number, Kernel>();
   private readonly holders = new Map<ToolGeom | null, ToolHolder>();
   private readonly warned = new Set<string>();
+  // Eckig: Fläche je Bewegung, Zeilen je Fläche, gerade gültige Zeilen · Kegel
+  private readonly faceOf: Int16Array | null;
+  private faceRows: [number, number][] = [];
+  private jLo = 0; private jHi = Infinity;
+  private cone: RotaryStock | null = null;
   private at: Pos = { i: 0, u: 0 };
   private target: Pos = { i: 0, u: 0 };
   private snaps: { i: number; d: Int16Array }[] = [];
@@ -152,7 +163,12 @@ export class LiveCarve {
     const margin = Math.max(4, 0.06 * Math.max(x1 - x0, y1 - y0));
     let a = { x0: x0 - margin, y0: y0 - margin, x1: x1 + margin, y1: y1 + margin };
     // Drehachse: rundherum ganz, entlang der Achse nur um die Bahnen
-    if (g.cyl) a = { x0: a.x0, x1: a.x1, y0: -Math.PI * g.cyl.R, y1: Math.PI * g.cyl.R };
+    if (g.cyl) {
+      const st = g.cyl.stock, P = perimeter(st);
+      a = isPrism(st) ? { x0: a.x0, x1: a.x1, y0: 0, y1: P } : { x0: a.x0, x1: a.x1, y0: -P / 2, y1: P / 2 };
+      // Kegel: ganz zeigen
+      if (st.shape === "cone") { a.x0 = Math.min(a.x0, 0); a.x1 = Math.max(a.x1, st.coneLen); }
+    }
     // Rohteil-Platte: kleine Platte ganz zeigen, große nur um die Bahnen (Ränder der Platte bleiben echte Kanten)
     const s = g.cyl ? null : o.stock;
     if (s && s.w > 0 && s.h > 0) {
@@ -179,7 +195,10 @@ export class LiveCarve {
     this.nx = Math.max(2, Math.ceil(w / c)); this.ny = Math.max(2, g.cyl ? Math.round(hh / c) : Math.ceil(hh / c));
     this.x0 = a.x0; this.y0 = a.y0;
     // Fräsen um die Achse: tiefer als bis zur Achse geht nicht
-    this.T = g.cyl && kind === "mill" ? g.cyl.R : Math.max(0.2, Math.min(160, o.thickness));
+    this.T = g.cyl && kind === "mill" ? cornerRadius(g.cyl.stock) : Math.max(0.2, Math.min(160, o.thickness));
+    this.faceOf = g.face;
+    if (g.face && g.cyl) this.faceRows = faces(g.cyl.stock).map(f => [Math.floor(f.start / this.cell), Math.ceil(f.end / this.cell)]);
+    if (g.cyl?.stock.shape === "cone") this.cone = g.cyl.stock;
     this.cutDose = 0.5 * Math.max(0.2, o.thickness);
     this.pow = kind === "laser" ? linePower(p.lines, o.sMax ?? 1000) : null;
     this.touched = kind === "mill" ? null : new Int32Array(this.nx * this.ny).fill(-1);
@@ -189,6 +208,13 @@ export class LiveCarve {
   }
 
   get program(): SimProgram { return this.p; }
+
+  /** nicht rund: Winkel des Teils an der aktuellen Stelle (rad) – oben liegt gerade diese Stelle */
+  get spinNow(): number | null {
+    const th = this.p.rotary?.theta;
+    if (!th || !th.length) return null;
+    return th[Math.max(0, Math.min(th.length - 1, this.target.i))];
+  }
 
   /** Fräser der Bewegung m */
   toolOf(m: number): ToolGeom | null {
@@ -266,7 +292,7 @@ export class LiveCarve {
     const ax = this.X0[m], ay = this.Y0[m], az = this.Z0[m];
     const dx = this.X1[m] - ax, dy = this.Y1[m] - ay, dz = this.Z1[m] - az;
     const za = az + dz * ua, zb = az + dz * ub;
-    if (Math.min(za, zb) >= 0 || ub <= ua) return false;
+    if (Math.min(za, zb) >= (this.cone ? 50 : 0) || ub <= ua) return false;
     const tl = this.toolOf(m);
     let K = this.kernels.get(tl);
     if (!K) { K = kernel(tl, this.cell); this.kernels.set(tl, K); }
@@ -280,11 +306,17 @@ export class LiveCarve {
     const n = Math.max(1, Math.ceil(len / step));
     const hd = this.holderOf(m);
     const kind = p.type[m];
+    if (this.faceOf) {
+      const fk = this.faceOf[m];
+      if (fk < 0) return false;   // Teil dreht gerade (Werkzeug über der Ecke)
+      [this.jLo, this.jHi] = this.faceRows[fk];
+    }
     let removed = 0, shank = false, holder = false;
     for (let s = 0; s <= n; s++) {
       const u = ua + ((ub - ua) * s) / n, z = az + dz * u;
-      if (z >= 0) continue;
       const x = ax + dx * u, y = ay + dy * u;
+      // Kegel: Die Oberfläche steigt unter dem waagerechten Fräser an – er kann auch mit Spitze „darüber“ anstoßen
+      if (z >= (this.cone ? Math.abs(this.cone.d1 - this.cone.d0) / 2 / this.cone.coneLen * K.R : 0)) continue;
       removed = Math.max(removed, this.stamp(K, x, y, z, reach));
       // Schaft über der Schneide / Spannzange unter der Oberkante: liegt dort noch Material an?
       if (!shank && z + hd.fluteLen < -TOUCH && hd.shankR > reach && this.touches(hd.shankR, x, y, z + hd.fluteLen)) shank = true;
@@ -308,13 +340,35 @@ export class LiveCarve {
     if (ci + r < 0 || ci - r >= nx || (!wrap && (cj + r < 0 || cj - r >= ny))) return 0;
     const { di, dj, dz, dist } = K;
     const floor = -this.T - 1;
+    const { jLo, jHi, cone } = this;
     let most = 0;
+    if (cone) {
+      // Rundherum: am dünnen Ende sind die Zellen schmaler → Fräser über mehr Zeilen; entlang: Oberfläche steigt an
+      const rr = coneRadius(cone, x), kY = (perimeter(cone) / (2 * Math.PI)) / rr;
+      const inside = x > 0 && x < cone.coneLen;
+      const slope = inside ? (cone.d1 - cone.d0) / 2 / cone.coneLen : 0;
+      for (let q = 0; q < di.length; q++) {
+        if (dist[q] > reach) break;
+        const i = ci + di[q];
+        if (i < 0 || i >= nx) continue;
+        const v = Math.max(floor, z + dz[q] - slope * di[q] * c);
+        const ja = Math.ceil((dj[q] - 0.5) * kY), jb = Math.ceil((dj[q] + 0.5) * kY) - 1;
+        for (let jj = ja; jj <= jb; jj++) {
+          const j = ((cj + jj) % ny + ny) % ny, id = j * nx + i;
+          const d = h[id] - v;
+          if (d > 0) { h[id] = v; if (d > most) most = d; }
+        }
+      }
+      if (most > 0) this.markDirty(ci, cj, Math.ceil(r * kY));
+      return most;
+    }
     for (let q = 0; q < di.length; q++) {
       if (dist[q] > reach) break;
       const i = ci + di[q];
       let j = cj + dj[q];
       if (wrap) j = j < 0 ? j + ny : j >= ny ? j - ny : j;
       if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
+      if (j < jLo || j >= jHi) continue;
       const v = Math.max(floor, z + dz[q]), id = j * nx + i;
       const d = h[id] - v;
       if (d > 0) { h[id] = v; if (d > most) most = d; }
@@ -400,6 +454,7 @@ export class LiveCarve {
       let j = cj + D.dj[q];
       if (this.cyl) j = j < 0 ? j + ny : j >= ny ? j - ny : j;
       if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
+      if (j < this.jLo || j >= this.jHi) continue;
       if (h[j * nx + i] > lim) return true;
     }
     return false;
@@ -432,7 +487,8 @@ export class LiveCarve {
 interface RasterMoves {
   X0: ArrayLike<number>; Y0: ArrayLike<number>; Z0: ArrayLike<number>;
   X1: ArrayLike<number>; Y1: ArrayLike<number>; Z1: ArrayLike<number>;
-  cyl: { R: number; alongY: boolean } | null;
+  cyl: { R: number; alongY: boolean; stock: RotaryStock } | null;
+  face: Int16Array | null;
 }
 
 /**
@@ -441,7 +497,12 @@ interface RasterMoves {
  */
 function rasterMoves(p: SimProgram): RasterMoves {
   const rot = p.rotary;
-  if (!rot) return { X0: p.x0, Y0: p.y0, Z0: p.z0, X1: p.x1, Y1: p.y1, Z1: p.z1, cyl: null };
+  if (!rot) return { X0: p.x0, Y0: p.y0, Z0: p.z0, X1: p.x1, Y1: p.y1, Z1: p.z1, cyl: null, face: null };
+  // Nicht rund: schon fertig im Raster-System
+  if (rot.raster) {
+    const q = rot.raster;
+    return { X0: q.x0, Y0: q.y0, Z0: q.z0, X1: q.x1, Y1: q.y1, Z1: q.z1, cyl: { R: rot.R, alongY: rot.along === "y", stock: rot.stock }, face: q.face };
+  }
   const R = rot.R, ay = rot.along === "y", n = p.n;
   const X0 = new Float32Array(n), Y0 = new Float32Array(n), Z0 = new Float32Array(n);
   const X1 = new Float32Array(n), Y1 = new Float32Array(n), Z1 = new Float32Array(n);
@@ -459,7 +520,7 @@ function rasterMoves(p: SimProgram): RasterMoves {
       } else { X0[m] = along; Y0[m] = v; Z0[m] = d; }
     }
   }
-  return { X0, Y0, Z0, X1, Y1, Z1, cyl: { R, alongY: ay } };
+  return { X0, Y0, Z0, X1, Y1, Z1, cyl: { R, alongY: ay, stock: rot.stock }, face: null };
 }
 
 /** Laserleistung je Zeile (S modal, 0…1); ohne S-Befehle überall 1 */

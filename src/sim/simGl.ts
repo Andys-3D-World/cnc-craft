@@ -16,7 +16,7 @@ type GL = WebGL2RenderingContext;
 
 const VS = `#version 300 es
 precision highp float;
-in vec3 a_p0; in vec3 a_p1; in float a_type;
+in vec3 a_p0; in vec3 a_p1; in float a_type; in float a_depth;
 uniform vec2 u_size;               // Canvas in Pixeln
 uniform vec2 u_origin;             // Bildschirm-Mitte + Verschiebung
 uniform vec3 u_center;             // Drehmitte (mm)
@@ -26,8 +26,6 @@ uniform float u_width;             // Linienbreite in Pixeln
 uniform float u_cap;               // Enden überstehen lassen (1) – nicht bei blassen Bahnen, sonst dunkle Punkte an den Stößen
 uniform float u_kind;              // nur diese Art zeichnen (0 Eilgang, 1 Schnitt, 2 Leerfahrt)
 uniform vec2 u_zRange;             // tiefster / höchster Schnitt
-uniform float u_axisR;             // Drehachse: Radius des Rohteils (Tiefe = Abstand zur Achse − R), 0 = flach
-uniform float u_axisY;             // 1 = Drehachse entlang Y (quer = x), sonst entlang X (quer = y)
 uniform vec3 u_colors[8];
 uniform vec3 u_kindColor;
 out vec4 v_color; out float v_along; out float v_dashed;
@@ -55,9 +53,7 @@ void main() {
   v_dashed = a_type > 0.5 && a_type < 1.5 ? 0.0 : 1.0;
   vec3 c = u_kindColor;
   if (v_dashed < 0.5) {
-    float z = u_axisR > 0.0
-      ? min(length(vec2(mix(a_p0.y, a_p0.x, u_axisY), a_p0.z + u_axisR)), length(vec2(mix(a_p1.y, a_p1.x, u_axisY), a_p1.z + u_axisR))) - u_axisR
-      : min(a_p0.z, a_p1.z);
+    float z = a_depth;
     float span = u_zRange.y - u_zRange.x;
     int i = span < 1e-6 ? 2 : clamp(int(floor((u_zRange.y - z) / span * 8.0)), 0, 7);
     c = u_colors[i];
@@ -102,7 +98,7 @@ export class PathRenderer {
   private loadedN = 0;
   private broken = false;
   private loc: Record<string, WebGLUniformLocation | null> = {};
-  private attr = { p0: -1, p1: -1, type: -1 };
+  private attr = { p0: -1, p1: -1, type: -1, depth: -1 };
 
   constructor() {
     this.canvas = document.createElement("canvas");
@@ -125,10 +121,10 @@ export class PathRenderer {
       g.linkProgram(p);
       if (!g.getProgramParameter(p, g.LINK_STATUS)) throw new Error(g.getProgramInfoLog(p) || "link");
       this.prog = p;
-      for (const n of ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_width", "u_kind", "u_zRange", "u_axisR", "u_axisY", "u_colors", "u_kindColor", "u_alpha", "u_cap"]) {
+      for (const n of ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_width", "u_kind", "u_zRange", "u_colors", "u_kindColor", "u_alpha", "u_cap"]) {
         this.loc[n] = g.getUniformLocation(p, n);
       }
-      this.attr = { p0: g.getAttribLocation(p, "a_p0"), p1: g.getAttribLocation(p, "a_p1"), type: g.getAttribLocation(p, "a_type") };
+      this.attr = { p0: g.getAttribLocation(p, "a_p0"), p1: g.getAttribLocation(p, "a_p1"), type: g.getAttribLocation(p, "a_type"), depth: g.getAttribLocation(p, "a_depth") };
       this.canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); this.gl = null; this.loaded = null; this.broken = true; });
       this.gl = g;
       return g;
@@ -138,15 +134,16 @@ export class PathRenderer {
     }
   }
 
-  /** Bewegungen hochladen (nur wenn sich das Programm geändert hat): je Bewegung 7 Zahlen */
+  /** Bewegungen hochladen (nur wenn sich das Programm geändert hat): je Bewegung 8 Zahlen (mit Tiefe für die Farbe) */
   private upload(g: GL, p: SimProgram) {
     if (this.loaded === p && this.loadedN === p.n) return;
-    const n = p.n, data = new Float32Array(n * 7);
+    const n = p.n, data = new Float32Array(n * 8), dep = p.rotary?.depth;
     for (let i = 0; i < n; i++) {
-      const o = i * 7;
+      const o = i * 8;
       data[o] = p.x0[i]; data[o + 1] = p.y0[i]; data[o + 2] = p.z0[i];
       data[o + 3] = p.x1[i]; data[o + 4] = p.y1[i]; data[o + 5] = p.z1[i];
       data[o + 6] = p.type[i];
+      data[o + 7] = dep ? dep[i] : Math.min(p.z0[i], p.z1[i]);
     }
     if (!this.buf) this.buf = g.createBuffer();
     if (!this.vao) this.vao = g.createVertexArray();
@@ -158,7 +155,7 @@ export class PathRenderer {
 
   /** Zeiger auf die Bewegungen ab „from“ setzen (WebGL2 kann nicht ab einer bestimmten Instanz zeichnen) */
   private pointAt(g: GL, from: number) {
-    const stride = 7 * 4, off = from * stride;
+    const stride = 8 * 4, off = from * stride;
     g.bindBuffer(g.ARRAY_BUFFER, this.buf);
     g.enableVertexAttribArray(this.attr.p0);
     g.vertexAttribPointer(this.attr.p0, 3, g.FLOAT, false, stride, off);
@@ -169,6 +166,9 @@ export class PathRenderer {
     g.enableVertexAttribArray(this.attr.type);
     g.vertexAttribPointer(this.attr.type, 1, g.FLOAT, false, stride, off + 24);
     g.vertexAttribDivisor(this.attr.type, 1);
+    g.enableVertexAttribArray(this.attr.depth);
+    g.vertexAttribPointer(this.attr.depth, 1, g.FLOAT, false, stride, off + 28);
+    g.vertexAttribDivisor(this.attr.depth, 1);
   }
 
   /** Bahnen zeichnen; Ergebnis-Canvas (durchsichtiger Hintergrund) oder null = WebGL geht nicht */
@@ -192,8 +192,6 @@ export class PathRenderer {
       g.uniform4f(L.u_rot, Math.cos(v.yaw), Math.sin(v.yaw), Math.cos(v.pitch), Math.sin(v.pitch));
       g.uniform1f(L.u_scale, v.scale);
       g.uniform2f(L.u_zRange, p.cutMinZ, p.cutMaxZ);
-      g.uniform1f(L.u_axisR, p.rotary ? p.rotary.R : 0);
-      g.uniform1f(L.u_axisY, p.rotary?.along === "y" ? 1 : 0);
       g.uniform3fv(L.u_colors, v.depthColors.flatMap(hex));
 
       // wie beim Canvas: erst die kommenden (blass), dann die gefahrenen (kräftig); je Teil erst Eilgänge, dann Schnitte

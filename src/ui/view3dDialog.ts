@@ -32,7 +32,9 @@ export function openView3D(want: "auto" | Mode = "auto") {
     const deep = Math.max(0, ...shapes.map(s => Math.abs(Number(s.millingDepth) || 0)));
     if (deep > 0) o.thickness = deep;
   }
-  const canCyl = rotary.on && !isPlasma();
+  // Die Vorschau auf dem Teil kennt nur runde Rohteile – bei anderen Formen abgewickelt zeigen (mit Hinweis)
+  const canCyl = rotary.on && !isPlasma() && rotary.shape === "round";
+  const flatNote = rotary.on && !isPlasma() && rotary.shape !== "round" ? " " + t("rot.previewFlat", { name: t("rot.shape." + rotary.shape) }) : "";
   const mill = !isLaser() && !isPlasma();
   // Fräse mit Drehachse: Fräsergebnis auf dem runden Teil zuerst
   const modes: Mode[] = mill ? (canCyl ? ["cylCarve", "cylinder", "carve"] : ["carve", "parts"]) : canCyl ? ["parts", "cylinder"] : ["parts"];
@@ -86,7 +88,7 @@ export function openView3D(want: "auto" | Mode = "auto") {
     ov.querySelector<HTMLElement>(".v3d-thickrow")!.style.display = mode === "cylinder" || mode === "cylCarve" ? "none" : "";
     ov.querySelector<HTMLElement>(".v3d-lift")!.style.display = mode === "parts" && o.sheet ? "" : "none";
     $("v3d-thick").value = String(mode === "carve" ? carveT() : o.thickness);
-    $<HTMLElement>("v3d-hint").textContent = t(carving ? "v3d.hintCarve" : "v3d.hint");
+    $<HTMLElement>("v3d-hint").textContent = t(carving ? "v3d.hintCarve" : "v3d.hint") + flatNote;
     if (!viewer.ok) { info.textContent = t("v3d.noGl"); return; }
     if (!shapes.length) { info.textContent = t("v3d.empty"); return; }
     if (mode === "cylinder") {

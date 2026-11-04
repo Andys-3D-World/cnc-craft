@@ -12,7 +12,7 @@
  */
 import { SimProgram, MOVE_CUT, MOVE_RAPID } from "./gcodeParser";
 import { PathRenderer } from "./simGl";
-import { radialDepth } from "./rotarySim";
+import { sectionAt, cornerRadius, isPrism, type RotaryStock } from "../rotaryStock";
 import type { LiveCarve } from "./simCarve";
 import { MATERIALS, type Material } from "../materialView";
 import { MaterialRenderer } from "./simCarveGl";
@@ -152,7 +152,7 @@ export class SimView {
   }
 
   /** Rohteil der Drehachse: Ringe an den Enden und alle 20 mm, Längslinien alle 30°, Achse gestrichelt */
-  private drawCylinder(R: number, xa: number, xb: number, alongY = false) {
+  private drawCylinder(R: number, stock: RotaryStock, xa: number, xb: number, alongY = false) {
     const ctx = this.ctx;
     const proj = this.projection();
     // Achse entlang Y: gleiche Zeichnung mit getauschten Rollen (a = entlang, q = quer)
@@ -160,20 +160,23 @@ export class SimView {
     const PY = (a: number, q: number, z: number) => alongY ? proj.PY(q, a, z) : proj.PY(a, q, z);
     const pad = Math.max(2, 0.03 * (xb - xa));
     const x0 = xa - pad, x1 = xb + pad;
-    const pt = (x: number, t: number) => { const y = R * Math.sin(t), z = R * Math.cos(t) - R; return [PX(x, y), PY(x, y, z)]; };
+    const pt = (x: number, q: [number, number]) => { const z = q[1] - R; return [PX(x, q[0]), PY(x, q[0], z)]; };
     ctx.save();
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(210, 180, 140, 0.22)";
     ctx.beginPath();
     const rings = [x0, x1];
     for (let x = Math.ceil(x0 / 20) * 20; x < x1; x += 20) if (x > x0 + 1 && x < x1 - 1) rings.push(x);
-    for (const x of rings) for (let k = 0; k <= 72; k++) {
-      const [u, v] = pt(x, (k / 72) * 2 * Math.PI);
-      if (k === 0) ctx.moveTo(u, v); else ctx.lineTo(u, v);
+    for (const x of rings) {
+      const sec = sectionAt(stock, x);
+      sec.forEach((q, k) => { const [u, v] = pt(x, q); if (k === 0) ctx.moveTo(u, v); else ctx.lineTo(u, v); });
+      const [u, v] = pt(x, sec[0]);
+      ctx.lineTo(u, v);
     }
-    for (let k = 0; k < 12; k++) {
-      const t = (k / 12) * 2 * Math.PI;
-      const [u0, v0] = pt(x0, t), [u1, v1] = pt(x1, t);
+    // Längslinien: an jeder Ecke, beim runden Teil/Kegel alle 30°
+    const s0 = sectionAt(stock, x0), s1 = sectionAt(stock, x1), every = isPrism(stock) ? 1 : 6;
+    for (let k = 0; k < s0.length; k += every) {
+      const [u0, v0] = pt(x0, s0[k]), [u1, v1] = pt(x1, s1[k]);
       ctx.moveTo(u0, v0); ctx.lineTo(u1, v1);
     }
     ctx.stroke();
@@ -210,9 +213,16 @@ export class SimView {
     // Drehachse: das ganze runde Teil einpassen, nicht nur die Bahnen
     const R = this.prog?.rotary?.R;
     const ay = this.prog?.rotary?.along === "y";
+    const C = this.prog?.rotary ? cornerRadius(this.prog.rotary.stock) : 0; // bis zur äußersten Ecke
     const b = b0 && R ? (ay
-      ? { ...b0, minX: Math.min(b0.minX, -R), maxX: Math.max(b0.maxX, R), minZ: Math.min(b0.minZ, -2 * R) }
-      : { ...b0, minY: Math.min(b0.minY, -R), maxY: Math.max(b0.maxY, R), minZ: Math.min(b0.minZ, -2 * R) }) : b0;
+      ? { ...b0, minX: Math.min(b0.minX, -C), maxX: Math.max(b0.maxX, C), minZ: Math.min(b0.minZ, -R - C), maxZ: Math.max(b0.maxZ, C - R) }
+      : { ...b0, minY: Math.min(b0.minY, -C), maxY: Math.max(b0.maxY, C), minZ: Math.min(b0.minZ, -R - C), maxZ: Math.max(b0.maxZ, C - R) }) : b0;
+    // Kegel: die ganze Länge ins Bild
+    const st = this.prog?.rotary?.stock;
+    if (b && st?.shape === "cone") {
+      if (ay) { b.minY = Math.min(b.minY, 0); b.maxY = Math.max(b.maxY, st.coneLen); }
+      else { b.minX = Math.min(b.minX, 0); b.maxX = Math.max(b.maxX, st.coneLen); }
+    }
     const pad = b ? Math.max(5, 0.05 * Math.max(b.maxX - b.minX, b.maxY - b.minY)) : 0;
     let minX = b ? b.minX - pad : 0, maxX = b ? b.maxX + pad : this.bedW;
     let minY = b ? b.minY - pad : 0, maxY = b ? b.maxY + pad : this.bedH;
@@ -310,7 +320,9 @@ export class SimView {
     // ---- Drehachse: rundes Rohteil als Drahtgitter statt Bett (beim Material zeigt die Grafikkarte das Teil) ----
     if (rp && this.prog && !(this.materialOn && this.material?.cyl)) {
       const b = this.prog.bounds;
-      this.drawCylinder(rp.R, rp.along === "y" ? b.minY : b.minX, rp.along === "y" ? b.maxY : b.maxX, rp.along === "y");
+      // Kegel: ganz zeichnen, nicht nur um die Bahnen
+      const ext = rp.stock.shape === "cone" ? rp.stock.coneLen : 0;
+      this.drawCylinder(rp.R, rp.stock, Math.min(rp.along === "y" ? b.minY : b.minX, ext ? 0 : Infinity), Math.max(rp.along === "y" ? b.maxY : b.maxX, ext), rp.along === "y");
     }
     // ---- Bett mit Raster ----
     ctx.lineWidth = 1;
@@ -343,11 +355,7 @@ export class SimView {
     // ---- Bahnen, sortiert nach Stil ----
     const zLo = p.cutMinZ, zHi = p.cutMaxZ;
     // Drehachse: Tiefe = Abstand zur Achse − R (nicht die Höhe im Bild)
-    const depthOf = (i: number) => rp
-      ? rp.along === "y"
-        ? Math.min(radialDepth(p.x0[i], p.z0[i], rp.R), radialDepth(p.x1[i], p.z1[i], rp.R))
-        : Math.min(radialDepth(p.y0[i], p.z0[i], rp.R), radialDepth(p.y1[i], p.z1[i], rp.R))
-      : Math.min(p.z0[i], p.z1[i]);
+    const depthOf = (i: number) => rp ? rp.depth[i] : Math.min(p.z0[i], p.z1[i]);
     const bucketOf = (z: number) => {
       if (zHi - zLo < 1e-6) return 2;
       const t = (zHi - z) / (zHi - zLo);

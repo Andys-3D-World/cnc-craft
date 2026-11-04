@@ -3,6 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parseGcodeProgram } from "../src/sim/gcodeParser.ts";
 import { wrapSimProgram, radialDepth } from "../src/sim/rotarySim.ts";
+import { refRadius } from "../src/rotaryStock.ts";
 
 const near = (a: number, b: number, e = 1e-3) => assert.ok(Math.abs(a - b) < e, `${a} ≠ ${b}`);
 
@@ -78,4 +79,39 @@ test("Drehrichtung umkehren: A −90 umgekehrt = A 90 normal", () => {
   const a = wrapSimProgram(parseGcodeProgram(["G0 X0 Y0 Z0 A0", "G1 A90 F600"]), 10, "a");
   const b = wrapSimProgram(parseGcodeProgram(["G0 X0 Y0 Z0 A0", "G1 A-90 F600"]), 10, "a", { reverse: true });
   near(a.y1[a.n - 1], b.y1[b.n - 1]); near(a.z1[a.n - 1], b.z1[b.n - 1]);
+});
+
+// ---- Rohteil-Formen: fertiger G-Code → Lage am Teil, Tiefe unter der echten Oberfläche ----
+const rect = { shape: "rect", diameter: 0, width: 20, height: 40, sides: 6, flats: 30, d0: 40, d1: 20, coneLen: 100 } as const;
+
+test("Eckig: Punkt auf Fläche 2 (A 90) liegt auf der Seite, Tiefe zählt ab der Fläche", () => {
+  const R = refRadius(rect); // Fläche 1: 20 über der Achse
+  // Fläche 2 ist 10 über der Achse → Z −10 berührt sie, Z −11 ist 1 mm tief
+  const p = parseGcodeProgram(["G0 X0 Y0 Z25 A0", "G0 A90", "G1 X5 Y2 Z-11 F100"]);
+  const w = wrapSimProgram(p, R, "a", { stock: rect });
+  const e = w.n - 1;
+  near(w.y1[e], 9);             // Abstand Achse 9 Richtung +Y
+  near(w.z1[e], -R - 2);        // Quer 2 → unter Achsmitte (Rotation), z um −R versetzt
+  near(w.rotary!.depth[e], -1, 0.05);
+});
+
+test("Kegel: Zeichnung und fertiger G-Code liegen auf derselben Stelle, Tiefe an der Schräge", () => {
+  const cone = { ...rect, shape: "cone" as const };
+  const R = refRadius(cone); // 20
+  const yc = Math.PI * 40 / 2;
+  const d = wrapSimProgram(parseGcodeProgram([`G0 X100 Y${yc + 10} Z-1`]), R, "surface", { stock: cone });
+  const lastD = d.n - 1;
+  // am Ende: Radius 10, 10 mm neben der Mitte = 1 rad; Schneide 1 mm tief → Radius 9
+  near(Math.hypot(d.y1[lastD], d.z1[lastD] + R), 9, 0.01);
+  near(Math.atan2(d.y1[lastD], d.z1[lastD] + R), 1, 0.01);
+  near(d.rotary!.depth[lastD], -1, 0.01);
+  // fertiger G-Code: A = 1 rad in Grad, Z = −1 + (10 − 20)
+  const g = wrapSimProgram(parseGcodeProgram(["G0 X0 Y0 Z25 A0", `G1 X100 Z-11 A${180 / Math.PI} F100`]), R, "a", { stock: cone });
+  const e = g.n - 1;
+  near(g.y1[e], d.y1[lastD], 0.01); near(g.z1[e], d.z1[lastD], 0.01);
+});
+
+test("Runde Teile: Tiefe wie bisher", () => {
+  const w = wrapSimProgram(parseGcodeProgram(["G0 X0 Y0 Z-2", "G1 A250 F600"]), 20, "a");
+  for (let i = 0; i < w.n; i++) near(w.rotary!.depth[i], -2);
 });

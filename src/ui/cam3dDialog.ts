@@ -199,6 +199,8 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   const warnings = (): string[] => {
     const w: string[] = [];
     if (rot() !== "flat") {
+      // Rundum und mehrere Seiten rechnen mit einem runden Rohling
+      if (rotary.shape !== "round") return [t("r3d.needRound", { name: t("rot.shape." + rotary.shape) })];
       const R = rotary.diameter / 2;
       if (rotaryMesh().maxR > R + 1e-6) w.push(t("r3d.warnBig", { d: (rotaryMesh().maxR * 2).toFixed(1), s: rotary.diameter }));
       if (o.rcore / 2 >= R) w.push(t("r3d.warnCore"));
@@ -392,7 +394,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     const my = ++run;
     try {
       if (rot() !== "flat") {
-        const w = warnings().filter(x => x === t("r3d.needA") || x === t("r3d.warnCore") || x === rotaryCheck().block);
+        const w = warnings().filter(x => rotary.shape !== "round" || x === t("r3d.needA") || x === t("r3d.warnCore") || x === rotaryCheck().block);
         if (w.length) { running = false; buttons(); showWarn(); return; }
         const r = rot() === "wrap" ? await computeWrap(j, my) : await computeIndex(j, my);
         if (!r || closed || my !== run) return;

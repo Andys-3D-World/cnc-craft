@@ -40,7 +40,18 @@ export interface SimProgram {
   /** nur wenn der G-Code eine A-Achse hat: Winkel (Grad) am Anfang/Ende jeder Bewegung */
   a0?: Float32Array; a1?: Float32Array;
   /** um die Drehachse gewickelt (rotarySim.ts): Achse bei y = 0, z = −R; flat = Maße vor dem Wickeln */
-  rotary?: { R: number; flat: SimProgram["bounds"]; aMin: number; aMax: number; along: "x" | "y" };
+  rotary?: {
+    R: number; flat: SimProgram["bounds"]; aMin: number; aMax: number; along: "x" | "y";
+    stock: import("../rotaryStock").RotaryStock;
+    depth: Float32Array;    // Tiefe je Bewegung unter der Oberfläche (für die Farben)
+    /** nicht rund: Teil-Winkel je Bewegung (rad) und die Bewegungen im Raster des Materialabtrags (simCarve.ts) */
+    theta?: Float32Array;
+    raster?: {
+      x0: Float32Array; y0: Float32Array; z0: Float32Array;
+      x1: Float32Array; y1: Float32Array; z1: Float32Array;
+      face: Int16Array | null;   // Eckig: Fläche je Bewegung, −1 = beim Drehen
+    };
+  };
 }
 
 export interface ParseOptions {

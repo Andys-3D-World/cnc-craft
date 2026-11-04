@@ -19,6 +19,7 @@ import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
 import { initMachineMode, isPlasma } from "./machineMode";
 import { rotary } from "./rotary";
+import { isPrism } from "./rotaryStock";
 import { initRotaryPanel } from "./ui/rotaryPanel";
 import { initLaserLayers } from "./laserLayers";
 import { initLaserPanel, refreshLaserPanel } from "./ui/laserPanel";
@@ -255,10 +256,12 @@ window.addEventListener("DOMContentLoaded", async () => {
     attachPanelResizer(document.querySelector<HTMLElement>("#tab-sim .sim-layout"), document.querySelector<HTMLElement>("#tab-sim .sim-side"), "sim");
     const openSimTab = () => (document.querySelector('.tab-navigation [data-tab="tab-sim"]') as HTMLElement | null)?.click();
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
-      const gcode = generateGcode(state.shapes, { flat: true });
+      // Eckig/Vieleck: die Simulation braucht den echten G-Code mit den Drehungen auf die Flächen
+      const prism = rotary.on && !isPlasma() && isPrism(rotary);
+      const gcode = generateGcode(state.shapes, { flat: !prism });
       if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
-      if (rotary.on && !isPlasma()) appendToConsole(t("rot.simFlat", { d: rotary.diameter }));
+      if (rotary.on && !isPlasma()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();
     });

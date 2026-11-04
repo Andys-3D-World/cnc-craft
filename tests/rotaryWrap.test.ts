@@ -119,3 +119,89 @@ test("intern → Maschine → intern ist wieder dasselbe", () => {
   const src = ["G2 X1 Y-2 I3 J4 (Y9 X8)", "G0 X-5.5"];
   assert.deepEqual(axesToInternal(axesToMachine(src)), src);
 });
+
+// ---- Rohteil-Formen ----
+const stock = { shape: "rect", diameter: 0, width: 20, height: 40, sides: 6, flats: 30, d0: 40, d1: 20, coneLen: 100 } as const;
+const PR: WrapOptions = { axis: "a", driveDia: 1, partDia: 1, mmPerRot: 1, depthFeed: true, stock: { ...stock } };
+const job = (u: number) => ["G21", "G90", "G0 Z5", `G0 X10 Y${u}`, "G0 Z1", "G1 Z-1 F300", `G1 X20 Y${u} F800`, "G0 Z5"];
+
+test("Eckig: A nur in sicherer Höhe über der Ecke, Y = Abstand zur Flächenmitte, Z gleicht die Flächen aus", () => {
+  // Fläche 1: 20 breit, Abstand Achse 20; Fläche 2: 40 breit, Abstand Achse 10; Ecke √(10²+20²) ≈ 22,36
+  const out = ok([...job(10), ...job(40), "G0 X0 Y0"], PR);
+  const safe = Math.hypot(10, 20) - 20 + 5;
+  out.forEach((l, i) => { if (/^G0 A/.test(l)) assert.ok(Math.abs(num(out[i - 1], "Z")! - safe) < 0.01, out.join("\n")); });
+  assert.deepEqual(out.filter(l => /^G0 A/.test(l)).map(l => num(l, "A")), [0, 90, 0]);
+  // Fläche 1 Mitte bei 10 → Y0; Tiefe −1 bleibt
+  assert.ok(out.includes("G1 X20 Y0 F800"));
+  assert.ok(out.includes("G1 Z-1 F300"));
+  // Fläche 2 Mitte bei 40 → Y0; 10 mm näher an der Achse → Z −11
+  const i2 = out.findIndex(l => /^G0 A90/.test(l));
+  assert.ok(out.slice(i2).includes("G1 Z-11 F300"), out.join("\n"));
+  // Bögen und Vorschub bleiben
+  const arc = ok(["G0 Z5", "G0 X10 Y5", "G1 Z-1 F100", "G2 X20 Y5 I5 J0"], PR);
+  assert.equal(arc[arc.length - 1], "G2 X20 Y-5 I5 J0");
+});
+
+test("Eckig: Kein Fahren durchs Material beim Drehen, auch nicht beim Rücksprung", () => {
+  const out = ok([...job(50), ...job(70), ...job(10)], PR);
+  let z = 0;
+  for (const l of out) {
+    const zz = num(l, "Z"); if (zz !== undefined) z = zz;
+    if (/^G0 A/.test(l)) assert.ok(z >= Math.hypot(10, 20) - 20 + 5 - 1e-6, l);
+  }
+});
+
+test("Eckig: Schnitt über die Kante wird abgelehnt, kleiner Überstand nicht", () => {
+  const r = wrapGcode(["G0 Z5", "G0 X0 Y5", "G1 Z-1 F100", "G1 Y45"], PR);
+  assert.deepEqual(r, { ok: false, error: "crossing", line: 3 });
+  assert.ok(wrapGcode(["G0 Z5", "G0 X0 Y5", "G1 Z-1 F100", "G1 Y23"], PR).ok);
+  assert.ok(wrapGcode(["G0 Z5", "G0 X0 Y-3", "G1 Z-1 F100", "G1 Y23"], PR).ok);
+});
+
+test("Eckig: Achse entlang Y – X ist quer, Y bleibt, Vieleck mit Schlüsselweite", () => {
+  const hex = { ...stock, shape: "poly" as const };
+  // Sechskant SW 30: Fläche ≈ 17,32 breit
+  const w = 30 * Math.tan(Math.PI / 6);
+  const out = ok(["G0 Z5", `G0 X${w * 1.5} Y50`, "G1 Z-1 F100"], { ...PR, stock: hex, along: "y" });
+  assert.deepEqual(out.filter(l => /^G0 A/.test(l)).map(l => num(l, "A")), [0, -60]);
+  assert.ok(out.includes("G0 X0 Y50"), out.join("\n"));
+  // gleiche Flächen: kein Z-Ausgleich
+  assert.ok(out.includes("G1 Z-1 F100"));
+});
+
+test("Drehrichtung umkehren beim Vieleck", () => {
+  const out = ok(job(40), { ...PR, reverse: true });
+  assert.deepEqual(out.filter(l => /^G0 A/.test(l)).map(l => num(l, "A")), [0, -90]);
+});
+
+test("Kegel: Winkel am örtlichen Durchmesser, Z folgt der Schräge, Mitte des Bands bei A 0", () => {
+  const cone = { ...stock, shape: "cone" as const };
+  const o: WrapOptions = { axis: "a", driveDia: 1, partDia: 1, mmPerRot: 1, depthFeed: false, stock: cone };
+  const yc = Math.PI * 40 / 2;
+  // X 0: Radius 20, X 100: Radius 10; 10 mm neben der Mitte
+  const atStart = ok([`G0 X0 Y${yc + 10} Z0`], o)[0];
+  const atEnd = ok([`G0 X100 Y${yc + 10} Z0`], o)[0];
+  assert.ok(Math.abs(num(atStart, "A")! - (10 / 20) * 180 / Math.PI) < 0.01, atStart);
+  assert.ok(Math.abs(num(atEnd, "A")! - (10 / 10) * 180 / Math.PI) < 0.01, atEnd);
+  assert.equal(num(atStart, "Z"), 0);
+  assert.equal(num(atEnd, "Z"), -10);
+  // Tiefe kommt dazu
+  assert.equal(num(ok([`G0 X100 Y${yc} Z-2`], o)[0], "Z"), -12);
+  // Fahrt entlang der Achse neben der Mitte wird geteilt, A ändert sich unterwegs
+  const line = ok([`G0 X0 Y${yc + 10} Z-1`, "G1 X100 F600"], o);
+  assert.ok(line.length > 50);
+  assert.ok(num(line[line.length - 1], "A")! > num(line[1], "A")!);
+});
+
+test("Kegel: Achse entlang Y und Y-Anschluss", () => {
+  const cone = { ...stock, shape: "cone" as const };
+  const yc = Math.PI * 40 / 2;
+  const o: WrapOptions = { axis: "a", driveDia: 1, partDia: 1, mmPerRot: 1, depthFeed: false, stock: cone, along: "y" };
+  const l = ok([`G0 X${yc + 10} Y100 Z0`], o)[0];
+  assert.equal(num(l, "Y"), 100);
+  assert.equal(num(l, "Z"), -10);
+  // Zeichnung +X neben der Mitte: wie beim Zylinder entlang Y = negatives A
+  assert.ok(num(l, "A")! < 0, l);
+  const p = ok([`G0 X0 Y${yc + 10 * 2 * Math.PI * 0 + (Math.PI * 40) / 2} Z0`], { ...o, along: "x", axis: "y", mmPerRot: 100 })[0];
+  assert.ok(num(p, "Y")! > 0, p);
+});

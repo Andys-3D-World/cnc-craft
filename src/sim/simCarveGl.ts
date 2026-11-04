@@ -10,7 +10,8 @@
  * Spannmutter und Spindel halb durchsichtig, damit man von oben noch sieht, wo gefräst wird.
  * Laser: flache Platte, Brandspur nach Dosis, Schnitte offen; Laserkopf mit Strahl (wenn an).
  * Plasma: Blech mit Schnittspalt und Anlauffarbe; Brenner mit Lichtbogen.
- * Drehachse: dieselben Zellen um den Zylinder gelegt (Ecke = Winkel × R, Höhe = Radius), die Enden als Scheiben.
+ * Drehachse: dieselben Zellen um den Körper gelegt (rund/Kegel: Ecke = Winkel × R, Höhe = Radius; eckig: Flächen
+ * nebeneinander, Höhe = senkrecht zur Fläche), die Enden als Scheiben.
  * Wie an der Maschine dreht sich das Teil: die Stelle, an der gerade gearbeitet wird, liegt oben, das Werkzeug
  * steht senkrecht darüber.
  * Gleiche Kamera wie simGl.ts (Drehung, Neigung, Maßstab), dazu ein Tiefenpuffer.
@@ -18,6 +19,7 @@
 import { PLASMA_CUT, type LiveCarve, type ToolHolder } from "./simCarve";
 import { materialTile, isWoody, type Material } from "../materialView";
 import { profile } from "../view3d/carveSim";
+import { faces, perimeter } from "../rotaryStock";
 import type { ToolGeom } from "../toolGraphics";
 
 type GL = WebGL2RenderingContext;
@@ -47,6 +49,10 @@ uniform int u_side;         // 0 = Oberfläche, 1..4 = Wand unten/oben/links/rec
 uniform int u_kind;         // 0 = Höhe (Fräse), 1 = Dosis (Laser/Plasma, Oberfläche bleibt bei 0)
 uniform vec2 u_cyl;         // Radius (0 = flach), 1 = Achse entlang Y
 uniform float u_spin;       // Drehachse: so weit ist das Teil gedreht (rad)
+uniform int u_body;         // 1 = rund/Kegel, 2 = eckig
+uniform vec4 u_rev;         // r0, r1, Länge, Radius für den Winkel
+uniform vec4 u_face[12];    // Anfang, Ende, Abstand zur Achse, Winkel (rad)
+uniform int u_nf; uniform float u_per;
 ${CAM}
 out vec3 v_n; out float v_z; out float v_d; out vec2 v_xy; out float v_side;
 float V(int i, int j) {
@@ -58,8 +64,21 @@ float H(int i, int j) { return u_kind == 0 ? max(V(i, j), -u_T) : 0.0; }
 vec3 P(float fi, float fj, float z) {
   float u = u_grid.x + (fi + 0.5) * u_grid.z, v = u_grid.y + (fj + 0.5) * u_grid.z;
   if (u_cyl.x <= 0.0) return vec3(u, v, z);
-  float R = u_cyl.x, r = max(0.0, R + z), a = v / R - u_spin;
-  float py = r * sin(a), pz = r * cos(a) - R;
+  vec2 q = vec2(0.0);       // quer, Höhe über der Achse (am Teil, ungedreht)
+  if (z > -1e5) {
+    if (u_body == 2) {
+      float w = mod(v, u_per);
+      vec4 f = u_face[0];
+      for (int k = 0; k < u_nf; k++) { f = u_face[k]; if (w < f.y) break; }
+      float t = w - (f.x + f.y) * 0.5, rr = max(0.0, f.z + z), c = cos(f.w), s = sin(f.w);
+      q = vec2((t * c + rr * s) * (u_cyl.y > 0.5 ? -1.0 : 1.0), -t * s + rr * c);
+    } else {
+      float r = mix(u_rev.x, u_rev.y, clamp(u / u_rev.z, 0.0, 1.0)), a = v / u_rev.w, rr = max(0.0, r + z);
+      q = rr * vec2(sin(a), cos(a));
+    }
+  }
+  float cs = cos(u_spin), sn = sin(u_spin);
+  float py = q.x * cs - q.y * sn, pz = q.x * sn + q.y * cs - u_cyl.x;
   return u_cyl.y > 0.5 ? vec3(-py, u, pz) : vec3(u, py, pz);
 }
 vec3 PC(int i, int j) { return P(float(i), float(j), H(i, j)); }
@@ -76,10 +95,12 @@ void main() {
     z = H(i, j); d = V(i, j);
     p = P(float(i), float(j), z);
     n = normalize(cross(PC(i + 1, j) - PC(i - 1, j), PC(i, j + 1) - PC(i, j - 1)));
+    // eckig, Achse entlang Y: das Band läuft andersherum – sonst zeigte die Normale nach innen
+    if (u_body == 2 && u_cyl.y > 0.5) n = -n;
   } else if (cyl) {
     // Enden: Fächer von der Achse zum Rand
     i = u_side == 3 ? 0 : u_n.x - 1; j = q + a;
-    z = b == 1 ? H(i, j) : -u_cyl.x;
+    z = b == 1 ? H(i, j) : -1e6;
     p = P(float(i), float(j), z);
     vec3 ax = u_cyl.y > 0.5 ? vec3(0, 1, 0) : vec3(1, 0, 0);
     n = u_side == 3 ? -ax : ax;
@@ -297,7 +318,7 @@ export class MaterialRenderer {
       this.stockProg = link(STOCK_VS, STOCK_FS);
       this.meshProg = link(MESH_VS, MESH_FS);
       const cam = ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_dscale"];
-      for (const n of [...cam, "u_h", "u_n", "u_grid", "u_T", "u_side", "u_kind", "u_cyl", "u_burn", "u_cut", "u_plasma", "u_cylR", "u_spin",
+      for (const n of [...cam, "u_h", "u_n", "u_grid", "u_T", "u_side", "u_kind", "u_cyl", "u_body", "u_rev", "u_face", "u_nf", "u_per", "u_burn", "u_cut", "u_plasma", "u_cylR", "u_spin",
         "u_tex", "u_base", "u_core", "u_layers", "u_ply", "u_darken", "u_gloss", "u_view"]) this.sloc[n] = g.getUniformLocation(this.stockProg, n);
       for (const n of [...cam, "u_at", "u_zmap", "u_turn"]) this.mloc[n] = g.getUniformLocation(this.meshProg, n);
       this.vao = g.createVertexArray();
@@ -413,9 +434,25 @@ export class MaterialRenderer {
       g.uniform1f(L.u_plasma, c.kind === "plasma" ? 1 : 0);
       g.uniform2f(L.u_cyl, c.cyl ? c.cyl.R : 0, c.cyl?.alongY ? 1 : 0);
       g.uniform1f(L.u_cylR, c.cyl ? c.cyl.R : 0);
+      if (c.cyl) {
+        const st = c.cyl.stock, fs = faces(st);
+        g.uniform1i(L.u_body, fs.length ? 2 : 1);
+        g.uniform1f(L.u_per, perimeter(st));
+        if (st.shape === "cone") g.uniform4f(L.u_rev, st.d0 / 2, st.d1 / 2, st.coneLen, perimeter(st) / (2 * Math.PI));
+        else g.uniform4f(L.u_rev, c.cyl.R, c.cyl.R, 1, c.cyl.R);
+        g.uniform1i(L.u_nf, fs.length);
+        if (fs.length) g.uniform4fv(L.u_face, fs.flatMap(f => [f.start, f.end, f.apothem, (f.angle * Math.PI) / 180]));
+      }
       // Drehachse: Teil so drehen, dass die Arbeitsstelle oben liegt; Werkzeug dann senkrecht darüber
       let tool = v.tool, spin = 0;
-      if (c.cyl && tool) {
+      const sp0 = c.spinNow;
+      if (c.cyl && tool && sp0 !== null) {
+        // Nicht rund: Der Winkel kommt aus dem Programm; Werkzeug vom Teil zurück auf die Maschine drehen
+        const q = c.cyl.alongY ? -tool.x : tool.y, zr = tool.z + c.cyl.R, along = c.cyl.alongY ? tool.y : tool.x;
+        spin = sp0;
+        const cs = Math.cos(spin), sn = Math.sin(spin), my = q * cs - zr * sn, mz = q * sn + zr * cs;
+        tool = { ...tool, x: c.cyl.alongY ? -my : along, y: c.cyl.alongY ? along : my, z: mz - c.cyl.R };
+      } else if (c.cyl && tool) {
         const q = c.cyl.alongY ? -tool.x : tool.y, zr = tool.z + c.cyl.R;
         spin = Math.atan2(q, zr);
         const d = Math.hypot(q, zr) - c.cyl.R, along = c.cyl.alongY ? tool.y : tool.x;

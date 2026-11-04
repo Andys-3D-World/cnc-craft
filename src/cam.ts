@@ -15,7 +15,8 @@ import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
-import { rotary, applyRotary, outsideBand, circumference, rotaryCheck } from "./rotary";
+import { rotary, applyRotary, outsideBand, circumference, rotaryCheck, stockShapeWarnings } from "./rotary";
+import { minRadius } from "./rotaryStock";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
 import { adaptFeed, feedAdapt } from "./feedAdapt";
 import { threadPath, ThreadInfo } from "./threadMill";
@@ -146,10 +147,11 @@ function rotaryGcode(gcode: string, shapes: any[]): string | null {
   if (chk.warn) lastGcodeWarnings.push(chk.warn);
   const out = outsideBand(shapes, shapeBounds);
   if (out) lastGcodeWarnings.push(t("rot.outside", { n: out, c: circumference().toFixed(1) }));
+  lastGcodeWarnings.push(...stockShapeWarnings(shapes, shapeBounds));
   if (!isLaser()) {
     // tiefer als bis zur Mitte geht auf dem Zylinder nicht
     const deep = Math.max(0, ...shapes.map((s: any) => Math.abs(Number(s.millingDepth) || 0)));
-    if (deep >= rotary.diameter / 2) lastGcodeWarnings.push(t("rot.tooDeep", { d: deep, r: rotary.diameter / 2 }));
+    if (deep >= minRadius(rotary)) lastGcodeWarnings.push(t("rot.tooDeep", { d: deep, r: +minRadius(rotary).toFixed(2) }));
   }
   const r = applyRotary(gcode);
   if ("error" in r) { lastGcodeWarnings.unshift(r.error); return null; }

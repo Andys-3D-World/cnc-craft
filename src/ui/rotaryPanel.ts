@@ -8,6 +8,7 @@
  */
 import { t, T, tip } from "../i18n/i18n";
 import { rotary, setRotary, circumference, rotaryCheck, ROTARY_CHANGED } from "../rotary";
+import { isPrism, type StockShape } from "../rotaryStock";
 import { MACHINE_EVENT } from "../machine";
 import { openView3D } from "./view3dDialog";
 
@@ -24,7 +25,17 @@ export function rotarySectionHtml(): string {
             <select id="rot-axis" class="prop-input" style="width:auto;"><option value="y" id="rot-axis-port">${T("rot.axis.y")}</option><option value="a">${T("rot.axis.a")}</option></select></label>
           <label class="prop-row only-laser">${T("rot.kind")}
             <select id="rot-kind" class="prop-input" style="width:auto;"><option value="roller">${T("rot.kind.roller")}</option><option value="chuck">${T("rot.kind.chuck")}</option></select></label>
-          <div class="prop-row" ${tip("rot.diaTip")}>${T("rot.dia")}<input type="number" id="rot-dia" min="1" step="0.5" class="prop-input"></div>
+          <label class="prop-row" ${tip("rot.shapeTip")}>${T("rot.shape")}
+            <select id="rot-shape" class="prop-input" style="width:auto;">
+              ${["round", "rect", "poly", "cone"].map(v => `<option value="${v}">${T("rot.shape." + v)}</option>`).join("")}</select></label>
+          <div class="prop-row rot-only-round" ${tip("rot.diaTip")}>${T("rot.dia")}<input type="number" id="rot-dia" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-rect">${T("rot.width")}<input type="number" id="rot-w" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-rect">${T("rot.height")}<input type="number" id="rot-h" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-poly">${T("rot.sides")}<input type="number" id="rot-sides" min="3" max="12" step="1" class="prop-input"></div>
+          <div class="prop-row rot-only-poly" ${tip("rot.flatsTip")}>${T("rot.flats")}<input type="number" id="rot-flats" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-cone">${T("rot.d0")}<input type="number" id="rot-d0" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-cone">${T("rot.d1")}<input type="number" id="rot-d1" min="1" step="0.5" class="prop-input"></div>
+          <div class="prop-row rot-only-cone">${T("rot.coneLen")}<input type="number" id="rot-len" min="1" step="1" class="prop-input"></div>
           <div class="prop-row only-laser" id="rot-roller-row" ${tip("rot.rollerTip")}>${T("rot.roller")}<input type="number" id="rot-roller" min="1" step="0.1" class="prop-input"></div>
           <div class="prop-row" id="rot-mpr-row" ${tip("rot.mprTip")}><span id="rot-mpr-label">${T("rot.mpr")}</span><input type="number" id="rot-mpr" min="0.1" step="0.1" class="prop-input"></div>
           <label class="prop-row" style="cursor:pointer;" ${tip("rot.reverseTip")}><span>${T("rot.reverse")}</span><input type="checkbox" id="rot-reverse" style="width:auto;"></label>
@@ -33,6 +44,7 @@ export function rotarySectionHtml(): string {
           <button id="rot-preview" class="btn-secondary btn-compact">🧊 ${T("rot.preview")}</button>
           <div class="tool-scope only-laser" id="rot-hint">${T("rot.hint")}</div>
           <div class="tool-scope only-mill" id="rot-millhint">${T("rot.millHint")}</div>
+          <div class="tool-scope" id="rot-shapehint"></div>
         </div>
       </div>
     </div>`;
@@ -57,12 +69,23 @@ export function initRotaryPanel(redraw: () => void) {
     const h1 = $("rot-hint"), h2 = $("rot-millhint");
     if (h1) h1.textContent = t(rotary.along === "y" ? "rot.hint.y" : "rot.hint");
     if (h2) h2.textContent = t(rotary.along === "y" ? "rot.millHint.y" : "rot.millHint");
+    set("rot-shape", rotary.shape); set("rot-w", String(rotary.width)); set("rot-h", String(rotary.height));
+    set("rot-sides", String(rotary.sides)); set("rot-flats", String(rotary.flats));
+    set("rot-d0", String(rotary.d0)); set("rot-d1", String(rotary.d1)); set("rot-len", String(rotary.coneLen));
+    for (const v of ["round", "rect", "poly", "cone"]) document.querySelectorAll<HTMLElement>(".rot-only-" + v).forEach(e => { e.style.display = rotary.shape === v ? "" : "none"; });
+    const sh = $("rot-shapehint");
+    if (sh) {
+      const b = rotary.along === "y" ? "X" : "Y";
+      sh.style.display = rotary.shape === "round" ? "none" : "";
+      sh.textContent = rotary.shape === "round" ? "" : t(isPrism(rotary) ? "rot.hint.prism" : "rot.hint.cone", { b, a: rotary.along === "y" ? "Y" : "X" });
+    }
     set("rot-dia", String(rotary.diameter)); set("rot-roller", String(rotary.rollerDia)); set("rot-mpr", String(rotary.mmPerRot));
     const rr = $("rot-roller-row"), mr = $("rot-mpr-row");
-    if (rr) rr.style.display = rotary.kind === "roller" ? "" : "none";
+    if (rr) rr.style.display = rotary.kind === "roller" && rotary.shape === "round" ? "" : "none";
     if (mr) mr.style.display = rotary.axis === "y" ? "" : "none";
     const info = $("rot-info");
-    if (info) info.textContent = t("rot.info", { c: circumference().toFixed(1), d: rotary.diameter });
+    if (info) info.textContent = rotary.shape === "round" ? t("rot.info", { c: circumference().toFixed(1), d: rotary.diameter })
+      : t("rot.info2", { name: t("rot.shape." + rotary.shape), c: circumference().toFixed(1) });
     // passt das zur verbundenen Steuerung? (ohne Verbindung: Hinweis, wofür die A-Achse geht)
     const ck = $("rot-check");
     if (ck) {
@@ -78,7 +101,9 @@ export function initRotaryPanel(redraw: () => void) {
   $("rot-along")?.addEventListener("change", e => setRotary({ along: (e.target as HTMLSelectElement).value === "y" ? "y" : "x" }));
   $("rot-reverse")?.addEventListener("change", e => setRotary({ reverse: (e.target as HTMLInputElement).checked }));
   $("rot-kind")?.addEventListener("change", e => setRotary({ kind: (e.target as HTMLSelectElement).value === "chuck" ? "chuck" : "roller" }));
-  for (const [id, key] of [["rot-dia", "diameter"], ["rot-roller", "rollerDia"], ["rot-mpr", "mmPerRot"]] as const) {
+  $("rot-shape")?.addEventListener("change", e => setRotary({ shape: (e.target as HTMLSelectElement).value as StockShape }));
+  for (const [id, key] of [["rot-dia", "diameter"], ["rot-roller", "rollerDia"], ["rot-mpr", "mmPerRot"], ["rot-w", "width"], ["rot-h", "height"],
+    ["rot-sides", "sides"], ["rot-flats", "flats"], ["rot-d0", "d0"], ["rot-d1", "d1"], ["rot-len", "coneLen"]] as const) {
     $(id)?.addEventListener("change", () => { const v = num(id); if (v > 0) setRotary({ [key]: v }); else sync(); });
   }
   $("rot-preview")?.addEventListener("click", () => openRotaryPreview());

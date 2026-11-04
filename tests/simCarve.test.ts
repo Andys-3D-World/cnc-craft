@@ -98,3 +98,42 @@ test("rotary: grid is the unrolled surface and wraps around", async () => {
   for (const v of [-40, -10, 0, 10, 40]) assert.ok(heightAt(c, 10, v) < -0.9, `v ${v}: ${heightAt(c, 10, v)}`);
   assert.equal(heightAt(c, 20, 0), 0);
 });
+
+// ---- Andere Rohteile ----
+test("eckig: Abtrag liegt auf der richtigen Fläche, nicht über die Kante hinaus", async () => {
+  const { wrapSimProgram } = await import("../src/sim/rotarySim.ts");
+  const stock = { shape: "rect", diameter: 0, width: 20, height: 40, sides: 6, flats: 30, d0: 40, d1: 20, coneLen: 100 } as const;
+  // Fläche 2 (A 90): im Band 20 … 60, Mitte 40; 10 näher an der Achse → Z −11 = 1 mm tief; Y 25 = weit über die Kante
+  const flat = parseGcodeProgram(["G21 G90", "M3 S10000", "G0 Z25 A0", "G0 A90", "G0 X10 Y0 Z-5", "G1 Z-11 F300", "G1 X30 F1000", "G1 Y25", "G0 Z25"]);
+  const p = wrapSimProgram(flat, 20, "a", { stock });
+  const c = LiveCarve.create(p, { tools: [mill(3)], thickness: 5 })!;
+  assert.ok(c.cyl);
+  assert.ok(Math.abs(c.ny * c.cell - 120) < 1e-6);
+  c.setTarget(p.n, 0);
+  run(c);
+  assert.ok(Math.abs(heightAt(c, 20, 40) + 1) < 0.05, String(heightAt(c, 20, 40)));
+  // Fläche 1 (0 … 20) und Fläche 3 (60 … 80) bleiben unberührt, auch wo die Bahn über die Kante läuft
+  assert.equal(heightAt(c, 20, 10), 0);
+  assert.equal(heightAt(c, 30, 62), 0);
+  assert.ok(heightAt(c, 30, 58) < -0.9);
+  assert.equal(c.warnings.length, 0);
+});
+
+test("Kegel: Tiefe unter der Schräge, Bahn am dünnen Ende so breit wie der Fräser", async () => {
+  const { wrapSimProgram } = await import("../src/sim/rotarySim.ts");
+  const stock = { shape: "cone", diameter: 0, width: 20, height: 40, sides: 6, flats: 30, d0: 40, d1: 20, coneLen: 100 } as const;
+  const yc = Math.PI * 20;
+  // Zeichnung: entlang der Achse auf der Mittellinie, 1 mm tief
+  const flat = parseGcodeProgram(["G21 G90", "M3 S10000", `G0 X10 Y${yc} Z2`, "G1 Z-1 F300", "G1 X90 F1000", "G0 Z5"]);
+  const p = wrapSimProgram(flat, 20, "surface", { stock });
+  const c = LiveCarve.create(p, { tools: [mill(4)], thickness: 5 })!;
+  c.setTarget(p.n, 0);
+  run(c);
+  // waagerechter Fräser auf der Schräge (10 %): an der hohen Seite bis Radius × 0,1 = 0,2 mm tiefer
+  for (const x of [20, 80]) { const h = heightAt(c, x, 0); assert.ok(h < -0.95 && h > -1.25, `${x}: ${h}`); }
+  // Zeile = Winkel × 20: bei x = 80 (Radius 12) entsprechen 1,5 mm am Teil 1,5 × 20/12 = 2,5 mm im Raster
+  assert.ok(heightAt(c, 80, 2.3) < -0.5, String(heightAt(c, 80, 2.3)));
+  assert.equal(heightAt(c, 80, 3.6), 0);
+  assert.equal(heightAt(c, 20, 3.0), 0);
+  assert.ok(c.nx * c.cell >= 100);
+});

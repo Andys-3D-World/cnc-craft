@@ -3,6 +3,17 @@
 ## Next version (unreleased)
 
 **New**
+- **Rotary axis for other stock shapes:** new *Stock shape* setting in the Rotary section (laser and milling): round,
+  square/rectangular, polygon (across flats) or cone (diameter at start and end, length).
+  - **Square and polygon:** the faces lie side by side in the blue band with their A angle. Each face is worked flat:
+    the A axis turns to the face, then normal X/Y/Z moves with Z measured from the face (arcs stay arcs, feed unchanged;
+    faces of different height are compensated). Before every turn Z rises above the highest corner. A cut that runs
+    over an edge is refused. Chuck and own A axis only – rollers and the Y/X connector are refused with a clear message.
+  - **Cone:** the band follows the diameter, the wrap uses the local diameter and Z follows the slope. Chuck only.
+  - The simulation draws the real stock shape and colours by depth below the real surface, and the live material
+    removal works on the real body: flat faces with sharp corners, cone with the slope (the tool only acts on the face
+    it stands on; cutting into the neighbouring face at a corner is not simulated). The 3D preview on the part and 3D
+    milling from STL still need round stock: they say so instead of showing a wrong result.
 - **Gamepad control** (Xbox, PlayStation, generic; machine tab → *Gamepad*, off by default): left stick drives X/Y,
   right stick drives Z (or assign buttons), speed follows the stick, with an adjustable dead zone and four speed
   steps on the D-pad. The machine moves only while the dead-man button (default LB/L1) is held, and stops at once on
