@@ -39,7 +39,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
       ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"],
       ["birth", "birth", "tip.cmd.birth"], ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
-      ["shelf", "shelf", "tip.cmd.shelf"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
+      ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
     ${flyCmds("extras", "extras", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
       ["materialTest", "materialTest", "tip.cmd.materialTest"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"],
       ["stlExport", "stlExport", "tip.cmd.stlExport"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}

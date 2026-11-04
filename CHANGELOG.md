@@ -1,5 +1,16 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Box dividers** (generators): slotted egg-crate inserts that split a box or drawer into compartments. Enter inside or
+  outside sizes (or take them from the last box generator box), material, number of compartments or own compartment
+  sizes such as `40; 60; *`, slot clearance, kerf or cutter diameter, and an optional lower divider height. All slots go
+  to half height, so all top edges end flush. Optional outer frame with half-lap corners and a base plate. Live preview
+  from above and of all parts; parts are placed side by side on the bed and labelled. For the router, slot corners get
+  dogbones or T-bones. Clear messages for too many compartments, a slot wider than the part, a cutter wider than the
+  slots and more.
+
 ## 0.3.9 Beta
 
 **New**

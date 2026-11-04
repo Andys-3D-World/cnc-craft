@@ -44,6 +44,7 @@ import { openHingeDialog } from "./hingeGen";
 import { openScaleDialog } from "./scaleGen";
 import { openJointDialog } from "./jointGen";
 import { openShelfDialog } from "./shelfGen";
+import { openDividerDialog } from "./dividerGen";
 import { openVentDialog } from "./ventGen";
 import { openBirthLetterDialog } from "./birthLetterGen";
 import { openLetterTopperDialog } from "./letterTopperGen";
@@ -195,6 +196,7 @@ export const commands: Record<string, () => void> = {
   scale: () => openScaleDialog(log, () => { done(); checkpoint(); }),
   joint: () => openJointDialog(log, () => { done(); checkpoint(); }),
   shelf: () => openShelfDialog(log, () => { done(); checkpoint(); }),
+  divider: () => openDividerDialog(log, () => { done(); checkpoint(); }),
   vent: () => openVentDialog(log, () => { done(); checkpoint(); }),
   birth: () => openBirthLetterDialog(log, () => { done(); checkpoint(); }),
   letterTopper: () => openLetterTopperDialog(log, () => { done(); checkpoint(); }),
