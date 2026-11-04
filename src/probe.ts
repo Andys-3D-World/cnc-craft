@@ -139,6 +139,8 @@ export const startGuard = () => {
   guard.timer = window.setInterval(() => { if (guard.on && machine.connected) realtime(RT.status).catch(() => undefined); }, 100);
 };
 export const stopGuard = () => { guard.on = false; guard.probing = false; clearInterval(guard.timer); };
+/** Läuft gerade ein Antast-Ablauf? (Gamepad: dann nicht dazwischenfahren) */
+export const probeRunning = () => guard.on;
 
 /** frischen Statusbericht abwarten (nach „?“), höchstens 400 ms */
 export const freshStatus = () => new Promise<void>(res => {

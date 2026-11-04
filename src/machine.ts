@@ -316,12 +316,16 @@ async function activate(id: string, s: MachineState, mode: MachineMode | null, f
 /** Darf gerade nicht gewechselt werden? (Werkzeugwechsel läuft – Befehle gingen sonst an die andere Maschine) */
 let switchGuard: () => boolean = () => false;
 export function setSwitchGuard(fn: () => boolean) { switchGuard = fn; }
+/** Läuft vor jedem Wechsel, solange Befehle noch an die bisherige Maschine gehen (Gamepad: laufende Fahrt abbrechen) */
+let beforeSwitch: () => Promise<void> = async () => {};
+export function setBeforeSwitch(fn: () => Promise<void>) { beforeSwitch = fn; }
 
 export async function selectMachine(id: string): Promise<void> {
   if (id === activeId) return;
   if (switchGuard()) { log(t("tc.noSwitch")); return; }
   const o = others.get(id);
   if (!o) return;
+  await beforeSwitch();
   others.delete(id);
   parkActive();
   await activate(o.id, o.state, o.mode, o);
@@ -331,6 +335,7 @@ export async function selectMachine(id: string): Promise<void> {
 export async function newMachineSlot(): Promise<void> {
   if (!machine.connected) return; // der ausgewählte Platz ist schon frei
   if (switchGuard()) { log(t("tc.noSwitch")); return; }
+  await beforeSwitch();
   parkActive();
   let n = idCounter;
   do n++; while (others.has("m" + n));

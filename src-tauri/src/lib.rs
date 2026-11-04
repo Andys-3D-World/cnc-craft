@@ -31,6 +31,7 @@ mod elfimg;
 mod flash;
 mod fonts;
 mod fwzip;
+mod gamepad;
 mod grbl;
 mod k40;
 mod libsync;
@@ -423,6 +424,12 @@ async fn machine_send(line: String) -> Result<u64, String> {
 #[tauri::command]
 async fn machine_realtime(code: u8) -> Result<(), String> {
     current()?.realtime(code)
+}
+
+/// Zustand des ersten Gamepads (gamepad.rs, Abfrage aus src/gamepad.ts)
+#[tauri::command]
+async fn gamepad_read() -> Option<gamepad::PadSnapshot> {
+    gamepad::read()
 }
 
 #[tauri::command]
@@ -873,6 +880,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            gamepad_read,
             list_ports,
             keep_awake,
             machine_connect,

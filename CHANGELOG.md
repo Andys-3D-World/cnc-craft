@@ -1,5 +1,17 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Gamepad control** (Xbox, PlayStation, generic; machine tab → *Gamepad*, off by default): left stick drives X/Y,
+  right stick drives Z (or assign buttons), speed follows the stick, with an adjustable dead zone and four speed
+  steps on the D-pad. The machine moves only while the dead-man button (default LB/L1) is held, and stops at once on
+  release (GRBL jogging with short steps, then jog cancel 0x85). Nothing moves during a job or tool change, on alarm,
+  while a dialog is open, or when the window loses focus; losing the gamepad or the connection also stops it. The bed
+  limit of the jog buttons applies. Buttons for zero point, homing, start/pause/resume and stop can be assigned; a job
+  only starts after a confirmation on screen. Live view of the pressed buttons and sticks. GRBL machines only for driving.
+  Controllers are read natively (gilrs), because the window on macOS may not report them.
+
 ## 0.3.8 Beta
 
 **New**

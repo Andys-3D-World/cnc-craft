@@ -1094,6 +1094,20 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
 #pin-test.pin-test-on { border-color: #ffb020; color: var(--lt-amber, #ffcf70); }
 .pr-sub { font-size: 0.74rem; font-weight: 700; color: var(--text-muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
 .pr-more { font-size: 0.78rem; }
+/* Gamepad (gamepadPanel.ts) */
+.gp-status { font-size: 0.75rem; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--border-color); color: var(--text-muted); }
+.gp-status.gp-ready { color: var(--text-main); border-color: var(--accent-color); }
+.gp-status.gp-driving { color: #fff; background: var(--accent-color); border-color: var(--accent-color); }
+.gp-buttons { display: flex; flex-wrap: wrap; gap: 3px; }
+.gp-led { min-width: 20px; padding: 1px 3px; text-align: center; font-size: 0.65rem; font-family: var(--font-mono); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-muted); }
+.gp-led.gp-on { color: #fff; background: var(--accent-color); border-color: var(--accent-color); }
+.gp-axes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px 8px; }
+.gp-axis { display: flex; align-items: center; gap: 4px; font-size: 0.65rem; font-family: var(--font-mono); color: var(--text-muted); }
+.gp-axis-bar { position: relative; flex: 1; height: 6px; border-radius: 3px; background: var(--border-color); overflow: hidden; }
+.gp-axis-fill { position: absolute; top: 0; bottom: 0; background: var(--accent-color); }
+.gp-head { font-size: 0.72rem; font-weight: 600; margin-top: 4px; }
+.prop-row select.gp-select { width: 130px; font-size: 0.75rem; height: 24px; }
+
 /* Werkstatt (workshopPanel.ts) */
 .ws-list { display: flex; flex-direction: column; gap: 8px; }
 .ws-dev { display: flex; flex-direction: column; gap: 5px; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; }

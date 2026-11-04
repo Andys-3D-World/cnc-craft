@@ -21,6 +21,7 @@ import { spindlePanelHtml } from "./spindlePanel";
 import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
 import { workshopPanelHtml } from "./workshopPanel";
+import { gamepadPanelHtml } from "./gamepadPanel";
 import { vfdPanelHtml } from "./vfdPanel";
 import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
@@ -278,6 +279,8 @@ export function renderRightPanel(container: HTMLElement) {
         ${probePanelHtml()}
 
         ${workshopPanelHtml()}
+
+        ${gamepadPanelHtml()}
 
       </div>
     </div>
