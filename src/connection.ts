@@ -13,6 +13,8 @@
  * Ohne Maschine läuft alles im Demo-Modus (Position wird nur angezeigt).
  */
 import { state } from "./main";
+import { zeroCommand } from "./wcs";
+import { noteManualLine } from "./wcsSync";
 import { liveMachinePos } from "./render";
 import { handleJogClick } from "./jogSimulator";
 import { clampJog } from "./jogLimit";
@@ -527,8 +529,8 @@ export function initConnection(appendToConsole: (text: string) => void) {
   $("m-unlock")?.addEventListener("click", guard(() => releaseMachine()));
   $("m-home")?.addEventListener("click", guard(() => send("$H")));
   $("m-reset")?.addEventListener("click", guard(async () => { appendToConsole("> Ctrl-X (Reset)"); await realtime(RT.reset); }));
-  $("m-zero-xy")?.addEventListener("click", guard(() => send("G10 L20 P1 X0 Y0")));
-  $("m-zero-z")?.addEventListener("click", guard(() => send("G10 L20 P1 Z0")));
+  $("m-zero-xy")?.addEventListener("click", guard(() => send(zeroCommand("XY"))));
+  $("m-zero-z")?.addEventListener("click", guard(() => send(zeroCommand("Z"))));
   $("m-goto-zero")?.addEventListener("click", guard(async () => {
     // erst Z hoch (falls Z unter 5 mm steht), dann XY auf 0
     if (machine.status.wpos[2] < 5) await send("G21 G90 G0 Z5");
@@ -621,7 +623,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
     if (!machine.connected) { appendToConsole(`> ${cmd}`); appendToConsole(t("m.demoCmd")); return; }
     // Echtzeit-Kürzel in der Konsole
     if (cmd === "?" || cmd === "!" || cmd === "~") { appendToConsole(`> ${cmd}`); await realtime(cmd.charCodeAt(0)); return; }
-    try { await send(cmd); } catch (e) { appendToConsole(`${t("log.error")} ${t("m.why." + String(e)) !== "m.why." + String(e) ? t("m.why." + String(e)) : String(e)}`); }
+    try { await send(cmd); noteManualLine(cmd); } catch (e) { appendToConsole(`${t("log.error")} ${t("m.why." + String(e)) !== "m.why." + String(e) ? t("m.why." + String(e)) : String(e)}`); }
   };
   $("send-cmd-btn")?.addEventListener("click", sendCommand);
   cmdInput?.addEventListener("keypress", (e: KeyboardEvent) => { if (e.key === "Enter") sendCommand(); });

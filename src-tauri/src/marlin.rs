@@ -670,6 +670,8 @@ mod tests {
         assert_eq!(translate_manual("$H").unwrap(), vec!["G28"]);
         assert_eq!(translate_manual("$J=G21 G91 X10 F3000").unwrap(), vec!["G21", "G91", "G0 X10 F3000", "G90"]);
         assert_eq!(translate_manual("G10 L20 P1 X0 Y0").unwrap(), vec!["G92 X0 Y0"]);
+        assert_eq!(translate_manual("G10 L20 P0 X0 Y0").unwrap(), vec!["G92 X0 Y0"]);
+        assert_eq!(translate_manual("G10 L20 P0 Z1.500").unwrap(), vec!["G92 Z1.500"]);
         assert_eq!(translate_manual("$$").unwrap(), vec!["M503"]);
         assert!(translate_manual("$130=300").is_err());
         assert_eq!(translate_manual("G21 G90 G0 X0 Y0").unwrap(), vec!["G21 G90 G0 X0 Y0"]);

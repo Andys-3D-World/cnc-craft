@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.3.8", nl="Better on Linux: readable dropdowns, clean fonts, only real ports in the list and an install guide. New light mode (☀️ / 🌙 at the top right) and a fix for black or garbled windows on Linux. The simulation now shows the material being milled away live – with cutter, collet and spindle, laser burn marks and plasma kerf, also on the rotary axis – plus collision warnings, 29 materials, milling on the rotary axis, new generators for every season and a bug report right from the app.",
+  nh="New in 0.3.9", nl="Coordinate systems G54–G59, your own macro buttons, gamepad control, climb or conventional milling per operation, lead-in and lead-out for milled contours, arc fitting against stuttering on round shapes, and the rotary axis for square, polygon and cone stock. Vector export now writes real circles and arcs instead of thousands of points. Zero points always go to the active coordinate system.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.3.8", nl="Besser unter Linux: lesbare Auswahllisten, saubere Schrift, nur echte Ports in der Liste und eine Installationsanleitung. Neuer heller Modus (☀️ / 🌙 oben rechts) und eine Korrektur für schwarze oder verschmierte Fenster unter Linux. Die Simulation zeigt jetzt live, wie das Material abgetragen wird – mit Fräser, Spannmutter und Spindel, Brandspuren vom Laser und Schnittspalt vom Plasma, auch auf der Drehachse –, dazu Kollisions-Warnungen, 29 Materialien, Fräsen mit der Drehachse, neue Generatoren für jede Jahreszeit und Fehler direkt aus dem Programm melden.",
+  nh="Neu in 0.3.9", nl="Koordinatensysteme G54–G59, eigene Makro-Knöpfe, Gamepad-Steuerung, Gleichlauf oder Gegenlauf je Bearbeitung, An- und Wegfahren beim Konturfräsen, Arc Fitting gegen Stottern bei runden Formen und die Drehachse für eckiges, vieleckiges und kegeliges Material. Der Vektor-Export schreibt jetzt echte Kreise und Bögen statt tausender Punkte. Nullpunkte landen immer im aktiven Koordinatensystem.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.3.8</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.3.9</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

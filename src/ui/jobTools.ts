@@ -11,7 +11,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n/i18n";
 import { machine, canCommand, sendAndWait, exportRd } from "../machine";
 import { streamState } from "../machineStream";
-import { generateGcode, lastGcodeWarnings, noGcodeMessage } from "../cam";
+import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "../cam";
 import { state } from "../main";
 import { rotary } from "../rotary";
 import { isPlasma } from "../machineMode";
@@ -100,7 +100,10 @@ export async function runFrame(log: (s: string) => void) {
 export async function saveRdFile(log: (s: string) => void) {
   const job = currentLines();
   if (!job) { log(noGcodeMessage()); return; }
-  if (!streamState.loadedLines.length) lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
+  if (!streamState.loadedLines.length) {
+    lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
+    lastGcodeNotes.forEach(n => log(n));
+  }
   try {
     const path = await save({ title: t("rd.save"), defaultPath: "cnc-craft.rd", filters: [{ name: "Ruida (.rd)", extensions: ["rd"] }] });
     if (!path) return;

@@ -8,6 +8,8 @@
  * Werte werden übernommen, sobald du Enter drückst oder das Feld verlässt.
  */
 import { MM_TO_PIXEL, groupBounds, translateShape, scaleShape, rotateShape } from "./shapeTransform";
+import { cleanMillDir } from "./millDir";
+import { leadOptions, LEAD_MIN, LEAD_MAX, LEAD_DEFAULT_LEN } from "./millLead";
 import { autoFractions } from "./tabs";
 
 function getState(): any {
@@ -103,6 +105,32 @@ export function setupUiInputs(redraw: () => void) {
     redraw();
   };
 
+  // Fräsrichtung je Form (leer = Standard, wie bisher)
+  document.getElementById("dim-mill-dir")?.addEventListener("change", e => {
+    const state = getState();
+    if (!state) return;
+    const v = cleanMillDir((e.target as HTMLSelectElement).value);
+    selected(state).forEach(s => { if (v) s.millDir = v; else delete s.millDir; });
+    redraw();
+  });
+
+  // An-/Wegfahren je Form (beides aus = keine Angaben an der Form, alles wie bisher)
+  ["dim-lead-in", "dim-lead-out", "dim-lead-type", "dim-lead-len"].forEach(id => document.getElementById(id)?.addEventListener("change", () => {
+    const state = getState();
+    if (!state) return;
+    const on = (i: string) => (document.getElementById(i) as HTMLInputElement | null)?.checked === true;
+    const type = (document.getElementById("dim-lead-type") as HTMLSelectElement | null)?.value === "line" ? "line" : "arc";
+    const n = parseFloat((document.getElementById("dim-lead-len") as HTMLInputElement | null)?.value || "");
+    const len = Number.isFinite(n) && n > 0 ? Math.max(LEAD_MIN, Math.min(LEAD_MAX, n)) : LEAD_DEFAULT_LEN;
+    selected(state).forEach(s => {
+      if (on("dim-lead-in")) s.leadIn = true; else delete s.leadIn;
+      if (on("dim-lead-out")) s.leadOut = true; else delete s.leadOut;
+      if (s.leadIn || s.leadOut) { s.leadType = type; s.leadLen = len; } else { delete s.leadType; delete s.leadLen; }
+    });
+    updateDimensionInputs(null);
+    redraw();
+  }));
+
   [dimX, dimY, dimW, dimH, dimAngle, dimDepth, dimFinish, ...tabInputs].forEach(input => {
     if (!input) return;
     input.addEventListener("change", () => apply(input));
@@ -141,6 +169,17 @@ export function updateDimensionInputs(_shape: any) {
   }
   const fin = document.getElementById("dim-finish") as HTMLInputElement | null;
   if (fin && shapes[0]) fin.value = String(Number(shapes[0].finishAllow) > 0 ? shapes[0].finishAllow : 0);
+  const md = document.getElementById("dim-mill-dir") as HTMLSelectElement | null;
+  if (md && shapes[0]) md.value = cleanMillDir(shapes[0].millDir);
+  if (shapes[0]) {
+    const lo = leadOptions(shapes[0]);
+    const box = (id: string, v: boolean) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el) el.checked = v; };
+    box("dim-lead-in", !!lo?.in); box("dim-lead-out", !!lo?.out);
+    if (lo) {
+      (document.getElementById("dim-lead-type") as HTMLSelectElement).value = lo.type;
+      (document.getElementById("dim-lead-len") as HTMLInputElement).value = String(lo.len);
+    }
+  }
   // Haltestege der ersten Form zeigen (ohne eigene Werte: keine Stege, Länge/Höhe bleiben stehen)
   const s0 = shapes[0];
   const set = (id: string, v: any) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && typeof v === "number") el.value = String(v); };

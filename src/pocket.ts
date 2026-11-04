@@ -8,8 +8,9 @@
  * Inseln (Formen innerhalb der Tasche, z. B. Text) bleiben stehen: um sie herum wird nur gefräst.
  * Alles in mm. Der Fräsermittelpunkt bleibt immer mindestens den Werkzeugradius von Wand und Inseln weg.
  */
-import { offsetPolygon, pointInPoly, P } from "./polyOffset";
-import { adaptivePaths } from "./adaptive";
+import { offsetPolygon, pointInPoly, type P } from "./polyOffset.ts";
+import { orientLoop, type MillDir } from "./millDir.ts";
+import { adaptivePaths } from "./adaptive.ts";
 
 /** helix: schraubenförmig um (x, y) mit Radius r eintauchen statt senkrecht (nur „Adaptiv“) */
 export interface PocketPath { pts: P[]; closed: boolean; helix?: { x: number; y: number; r: number } }
@@ -80,9 +81,9 @@ function mid(p: P[]): P {
  * @returns Bahnen in Fräs-Reihenfolge; tooBig = Werkzeug passt nicht in die Tasche
  */
 /** Nur die Wand-Bahnen (Wand + Inseln, Fräsermittelpunkt im Abstand r) – für den Schlichtgang */
-export function pocketWallPaths(outer: P[], islands: P[][], r: number): PocketPath[] {
-  const wall = offsetPolygon(outer, -r, 0.01);
-  const isl = islands.flatMap(i => offsetPolygon(i, r, 0.01));
+export function pocketWallPaths(outer: P[], islands: P[][], r: number, dir: MillDir = ""): PocketPath[] {
+  const wall = offsetPolygon(outer, -r, 0.01).map(l => orientLoop(l, "inside", dir));
+  const isl = islands.flatMap(i => offsetPolygon(i, r, 0.01)).map(l => orientLoop(l, "outside", dir));
   const inWall = (p: P) => wall.some(w => pointInPoly(p.x, p.y, w));
   const inIsl = (p: P, skip?: P[]) => isl.some(i => i !== skip && pointInPoly(p.x, p.y, i));
   return [
@@ -91,10 +92,11 @@ export function pocketWallPaths(outer: P[], islands: P[][], r: number): PocketPa
   ];
 }
 
-export function pocketPaths(outer: P[], islands: P[][], r: number, step: number, strategy: PocketStrategy): { paths: PocketPath[]; tooBig: boolean } {
-  const wall = offsetPolygon(outer, -r, 0.01);              // Grenze für den Fräsermittelpunkt
+export function pocketPaths(outer: P[], islands: P[][], r: number, step: number, strategy: PocketStrategy, dir: MillDir = ""): { paths: PocketPath[]; tooBig: boolean } {
+  // Wand: Fräser innen; Insel: Fräser außen herum (millDir.ts). Ohne Vorgabe bleibt alles, wie es ist
+  const wall = offsetPolygon(outer, -r, 0.01).map(l => orientLoop(l, "inside", dir)); // Grenze für den Fräsermittelpunkt
   if (!wall.length) return { paths: [], tooBig: true };
-  const isl = islands.flatMap(i => offsetPolygon(i, r, 0.01)); // Inseln + Werkzeugradius
+  const isl = islands.flatMap(i => offsetPolygon(i, r, 0.01)).map(l => orientLoop(l, "outside", dir)); // Inseln + Werkzeugradius
   const edges = edgesOf([...wall, ...isl]);
   const inWall = (p: P) => wall.some(w => pointInPoly(p.x, p.y, w));
   const inIsl = (p: P, skip?: P[]) => isl.some(i => i !== skip && pointInPoly(p.x, p.y, i));
@@ -114,7 +116,7 @@ export function pocketPaths(outer: P[], islands: P[][], r: number, step: number,
     const levels: PocketPath[][] = [];
     for (let k = 1; k < 2000; k++) {
       const d = r + k * step;
-      const rings = [...offsetPolygon(outer, -d, 0.01), ...islands.flatMap(i => offsetPolygon(i, d, 0.01))];
+      const rings = [...offsetPolygon(outer, -d, 0.01).map(l => orientLoop(l, "inside", dir)), ...islands.flatMap(i => offsetPolygon(i, d, 0.01)).map(l => orientLoop(l, "outside", dir))];
       const kept = rings.flatMap(g => clip(g, true, edges, allowed));
       if (!kept.length) break;
       levels.push(kept);

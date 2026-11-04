@@ -824,6 +824,21 @@ body.mode-plasma #cam-mode-pocket { display: none !important; }   /* Tasche gibt
 .m-mpos { font-family: var(--font-mono); }
 .m-btn-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
 .m-btn-grid button { padding: 5px 2px; font-size: 0.72rem; white-space: nowrap; }
+#choice-dialog-overlay .dlg-hint { white-space: pre-wrap; }
+.macro-btn { overflow: hidden; text-overflow: ellipsis; }
+#macro-empty { margin-bottom: 2px; }
+#macro-edit { margin-top: 5px; width: 100%; }
+.macro-rows { display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow: auto; }
+.macro-row { display: flex; flex-direction: column; gap: 4px; padding: 6px; border: 1px solid var(--border-color); border-radius: 6px; }
+.macro-row-top { display: flex; gap: 4px; align-items: center; }
+.macro-name { flex: 1; min-width: 0; }
+.macro-code { width: 100%; box-sizing: border-box; resize: vertical; font-family: var(--font-mono); font-size: 0.74rem; }
+.macro-error { color: var(--danger-color, #e5534b); min-height: 1em; }
+.m-wcs { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 0.72rem; }
+.m-wcs label { flex: 1; min-width: 0; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-wcs select { width: 66px; flex: none; }
+.m-wcs button { flex: none; padding: 5px 8px; font-size: 0.72rem; white-space: nowrap; }
+.m-wcs button:disabled, .m-wcs select:disabled { opacity: 0.4; cursor: default; }
 .m-btn-grid button:disabled, .m-ov-row button:disabled { opacity: 0.4; cursor: default; }
 .m-attention { border-color: #ffb020 !important; color: var(--lt-amber, #ffb020) !important; box-shadow: 0 0 0 1px #ffb020 inset; }
 .m-ov-row { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; }

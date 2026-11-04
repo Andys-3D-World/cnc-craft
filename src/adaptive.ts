@@ -12,7 +12,7 @@
  *  4. In neues Material taucht der Fräser schraubenförmig ein (Helix), nicht senkrecht.
  * Schleifen und Helix werden so klein, dass sie nie näher als den Werkzeugradius an Wand oder Insel kommen.
  */
-import { offsetPolygon, pointInPoly, P } from "./polyOffset";
+import { offsetPolygon, pointInPoly, type P } from "./polyOffset.ts";
 
 export interface AdaptivePath { pts: P[]; closed: boolean; helix?: { x: number; y: number; r: number } }
 /** Linie an Kanten teilen und nur die erlaubten Stücke behalten (clip aus pocket.ts) */
@@ -27,10 +27,12 @@ const MAX_CELLS = 3_000_000;
 
 /** Raster über der Tasche: was noch Material ist und wie viel Platz der Fräsermittelpunkt hat */
 class Grid {
+  x0: number; y0: number; c: number;
   w: number; h: number;
   rest: Uint8Array;      // 1 = Material steht noch
   clear: Float32Array;   // Abstand (mm) des Mittelpunkts bis zur verbotenen Zone
-  constructor(public x0: number, public y0: number, x1: number, y1: number, public c: number) {
+  constructor(x0: number, y0: number, x1: number, y1: number, c: number) {
+    this.x0 = x0; this.y0 = y0; this.c = c;
     this.w = Math.max(1, Math.ceil((x1 - x0) / c));
     this.h = Math.max(1, Math.ceil((y1 - y0) / c));
     this.rest = new Uint8Array(this.w * this.h);

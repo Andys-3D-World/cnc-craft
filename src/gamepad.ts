@@ -15,6 +15,8 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "./i18n/i18n";
+import { zeroCommand } from "./wcs";
+import { macroRunning } from "./macroRun";
 import { machine, MACHINE_EVENT, RT, send, sendAndWait, realtime, activeMachineId, setBeforeSwitch } from "./machine";
 import { streamState, startStreaming, pauseStreaming } from "./machineStream";
 import { bedSizeMm } from "./editor/editorState";
@@ -117,7 +119,7 @@ function context(): GamepadContext {
     jobActive: machine.job.active || streamState.isRunning,
     jobPaused: machine.job.active ? machine.job.paused : streamState.isPaused,
     jobLoaded: streamState.loadedLines.length > 0,
-    busy: toolChangeBusy() || probeRunning(),
+    busy: toolChangeBusy() || probeRunning() || macroRunning(),
     dialog: dialogOpen(),
     focused: document.hasFocus() && !document.hidden,
   };
@@ -211,8 +213,8 @@ function run(cmd: GamepadCommand) {
       break;
     case "start": void confirmStart(); break;
     case "home": guard(send("$H")); break;
-    case "zeroXY": guard(send("G10 L20 P1 X0 Y0")); break;
-    case "zeroZ": guard(send("G10 L20 P1 Z0")); break;
+    case "zeroXY": guard(send(zeroCommand("XY"))); break;
+    case "zeroZ": guard(send(zeroCommand("Z"))); break;
   }
 }
 

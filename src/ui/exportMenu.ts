@@ -15,7 +15,7 @@ import { MM_TO_PIXEL, arcGeometry, shapeToPaths } from "../shapeTransform";
 import { layerForShape } from "../laserLayers";
 import { isLaser, isPlasma } from "../machineMode";
 import { modeColor } from "../render";
-import { ExpItem, ExpResult, toSvg, toDxf, toPdf, toHpgl } from "../vectorExport";
+import { ExpItem, ExpResult, toSvg, toDxf, toPdf, toHpgl, curveItems } from "../vectorExport";
 
 export type ExportFormat = "svg" | "dxf" | "pdf" | "plt";
 export const EXPORT_FORMATS: ExportFormat[] = ["svg", "dxf", "pdf", "plt"];
@@ -62,7 +62,7 @@ export function formatLabel(f: ExportFormat): string {
 export async function exportDrawing(format: ExportFormat, all: boolean, log: (s: string) => void) {
   const sel = selectedShapes();
   const shapes = !all && sel.length ? sel : app().shapes;
-  const items = shapesToItems(shapes);
+  const items = curveItems(shapesToItems(shapes));
   if (!items.length) { log(t("exp.empty")); return; }
   try {
     const p = await save({ title: t("exp.saveTitle", { fmt: NAMES[format] }), defaultPath: `cnc-craft.${format}`, filters: [{ name: NAMES[format], extensions: [format] }] });

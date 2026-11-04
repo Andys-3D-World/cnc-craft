@@ -24,6 +24,7 @@
  * Vor der Rückfahrt zum ersten Punkt über den höchsten gemessenen Punkt. Beim Senden gleicht machineStream.ts Z aus.
  */
 import { t, T, tip } from "../i18n/i18n";
+import { macroRunning } from "../macroRun";
 import { machine, MACHINE_EVENT, canCommand } from "../machine";
 import { getHeightMap, setHeightMap, setHeightMapEnabled, heightMapEnabled, heightRange, HEIGHTMAP_CHANGED, HeightMap } from "../heightMap";
 import { probeSettings, saveProbe, ProbeSettings, LIFT_MAX, setProbeLog, step, settled, guard, startGuard, stopGuard,
@@ -116,7 +117,7 @@ export function initProbePanel(log: (s: string) => void) {
   const ready = (): boolean => {
     if (!machine.connected) { log(t("conn.connectFirst")); return false; }
     if (machine.protocol !== "grbl") { log(t("pr.grblOnly")); return false; }
-    if (busy || toolChangeBusy() || machine.job.active || !canCommand()) { log(t("sp.jobRunning")); return false; }
+    if (busy || toolChangeBusy() || macroRunning() || machine.job.active || !canCommand()) { log(t("sp.jobRunning")); return false; }
     if (machine.status.state === "Alarm") { log(t("m.unlockFirst")); return false; }
     if (machine.status.state !== "Idle") { log(t("m.jogNotIdle", { s: machine.status.state })); return false; }
     // Taster schon ausgelöst (Klemme liegt auf der Platte, Kabel kurzgeschlossen …) → würde sofort „Kontakt“ melden
@@ -146,7 +147,7 @@ export function initProbePanel(log: (s: string) => void) {
     run(async () => {
       log(t("pr.plateStart"));
       if (!await touch()) return false;
-      if (!await step(`G10 L20 P1 Z${s.plate.toFixed(3)}`)) return false;
+      if (!await step(`G10 L20 P0 Z${s.plate.toFixed(3)}`)) return false;
       await liftUp(true);
       log(t("pr.plateDone", { d: s.plate }));
       return true;
@@ -174,7 +175,7 @@ export function initProbePanel(log: (s: string) => void) {
       if (!await settled()) return false;
       // vorher hochgefahren → um so viel weiter nach unten suchen
       if (!await touch(lifted)) return false;
-      if (!await step(`G10 L20 P1 Z${z.toFixed(3)}`)) return false;
+      if (!await step(`G10 L20 P0 Z${z.toFixed(3)}`)) return false;
       await liftUp(true);
       log(t("pr.sensorDone", { z: z.toFixed(2) }));
       return true;
@@ -223,7 +224,7 @@ export function initProbePanel(log: (s: string) => void) {
           // erster Punkt: normaler Suchweg; danach höchstens Abstand + 5 mm (die Oberfläche liegt ja ungefähr gleich hoch)
           const zc = await touchAt(k === 1 ? Math.max(1, s.travel) : hop + 5, true);
           if (zc === null) { log(t("hm.failedAt", { k, x: (ox + i * dx).toFixed(1), y: (oy + j * dy).toFixed(1) })); await up(hop, true); return false; }
-          if (k === 1 && s.mzero && !await step("G10 L20 P1 Z0")) return false;
+          if (k === 1 && s.mzero && !await step("G10 L20 P0 Z0")) return false;
           z[j * nx + i] = zc;
           top = Math.max(top, zc);
           log(t("hm.point", { k, n: nx * ny, z: (zc - z[0]).toFixed(3) }));

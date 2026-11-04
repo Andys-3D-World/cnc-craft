@@ -1,7 +1,7 @@
 // Tests für den Vektor-Export (SVG, DXF, PDF, PLT) – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { toSvg, toDxf, toPdf, toHpgl, aciColor, dxfLayerName, exportBounds, type ExpItem } from "../src/vectorExport.ts";
+import { toSvg, toDxf, toPdf, toHpgl, aciColor, dxfLayerName, exportBounds, curveItems, type ExpItem } from "../src/vectorExport.ts";
 
 /** Rechteck 100 × 50 mm, unten links bei (10, 20) */
 const rect = (layer = "Schnitt", color = "#ff0000", group?: string): ExpItem => ({
@@ -147,4 +147,76 @@ test("PLT: 40 Einheiten je mm, an 0/0, geschlossen zurück zum Anfang, Stift je 
   assert.ok(data.includes("SP2;"));
   // Kreis r = 10 mm um (60, 45) -> erster Punkt (70, 45) = (60 mm, 25 mm) vom Ursprung
   assert.ok(data.includes("PU2400,1000;"));
+});
+
+// ---- Linienzüge aus vielen Punkten ----
+const ringPts = (cx: number, cy: number, r: number, n: number) => Array.from({ length: n }, (_, i) => ({ x: cx + r * Math.cos(i / n * 2 * Math.PI), y: cy + r * Math.sin(i / n * 2 * Math.PI) }));
+const base = { layer: "L", color: "#000000" };
+/** Rechteck 40 × 20 mit Ecken-Radius 5, Ecken aus je k Punkten */
+function rounded(k: number) {
+  const out: { x: number; y: number }[] = [];
+  const corner = (cx: number, cy: number, a0: number) => { for (let i = 0; i <= k; i++) { const a = a0 + (i / k) * Math.PI / 2; out.push({ x: cx + 5 * Math.cos(a), y: cy + 5 * Math.sin(a) }); } };
+  corner(35, 5, -Math.PI / 2); corner(35, 15, 0); corner(5, 15, Math.PI / 2); corner(5, 5, Math.PI);
+  return out;
+}
+
+test("Loch aus vielen Punkten wird ein einziger Kreis", () => {
+  const [it] = curveItems([{ ...base, kind: "path", closed: true, pts: ringPts(20, 30, 4, 2000) }]);
+  assert.equal(it.kind, "circle");
+  if (it.kind === "circle") { assert.ok(near(it.cx, 20, 1e-3)); assert.ok(near(it.cy, 30, 1e-3)); assert.ok(near(it.r, 4, 1e-3)); }
+  assert.equal(entities(toDxf([it]).data).map(e => e.type).join(), "CIRCLE");
+  assert.match(toSvg([it]).data, /<circle /);
+});
+
+test("Grob aufgelöster Kreis (24 Ecken) ist auch ein Kreis, Vielecke mit wenigen Ecken nicht", () => {
+  assert.equal(curveItems([{ ...base, kind: "path", closed: true, pts: ringPts(0, 0, 25, 24) }])[0].kind, "circle");
+  assert.equal(curveItems([{ ...base, kind: "path", closed: true, pts: ringPts(0, 0, 25, 8) }])[0].kind, "path");
+});
+
+test("Rundes Rechteck: ein Pfad mit echten Bögen statt hunderter Punkte", () => {
+  const src = rounded(100);
+  const [it] = curveItems([{ ...base, kind: "path", closed: true, pts: src }]);
+  assert.equal(it.kind, "path");
+  if (it.kind !== "path") return;
+  assert.ok(it.pts.length <= 10, `${it.pts.length} Punkte`);
+  assert.equal(it.bulges!.filter(b => b !== 0).length, 4);
+  // Viertelkreis: Wölbung tan(90°/4)
+  for (const b of it.bulges!) if (b) assert.ok(near(b, Math.tan(Math.PI / 8), 0.01));
+  const e = entities(toDxf([it]).data);
+  assert.equal(e.filter(x => x.type === "POLYLINE").length, 1, "bleibt ein Element");
+  assert.equal(e.filter(x => x.type === "VERTEX").length, it.pts.length);
+  assert.match(toSvg([it]).data, / A5 5 0 0 0 /);
+});
+
+test("Bögen bleiben in Grenzen, PDF und PLT an der richtigen Stelle", () => {
+  const src = rounded(100);
+  const [it] = curveItems([{ ...base, kind: "path", closed: true, pts: src }]);
+  const b = exportBounds([it])!;
+  assert.ok(near(b.minX, 0, 0.02) && near(b.maxX, 40, 0.02) && near(b.minY, 0, 0.02) && near(b.maxY, 20, 0.02), JSON.stringify(b));
+  const plt = toHpgl([it]).data;
+  const nums = [...plt.matchAll(/(-?\d+),(-?\d+)/g)].map(m => [+m[1] / 40, +m[2] / 40]);
+  // jeder Punkt liegt auf der Original-Form (Ecken-Kreise oder Kanten)
+  for (const [x, y] of nums) {
+    const px = Math.min(x, 40 - x), py = Math.min(y, 20 - y);
+    const d = px < 5 && py < 5 ? Math.abs(Math.hypot(5 - px, 5 - py) - 5) : Math.min(px, py);
+    assert.ok(d < 0.1, `${x} ${y}: ${d}`);
+  }
+  assert.ok(toPdf([it]).data.includes(" l "));
+});
+
+test("Bogen über 180° im Pfad zeigt in die richtige Richtung", () => {
+  // Dreiviertelkreis gegen den Uhrzeigersinn um (0,0), r 10: von (10,0) bis (0,-10), dann Gerade zurück
+  const arc = Array.from({ length: 200 }, (_, i) => { const a = (i / 199) * 1.5 * Math.PI; return { x: 10 * Math.cos(a), y: 10 * Math.sin(a) }; });
+  const [it] = curveItems([{ ...base, kind: "path", closed: false, pts: arc }]);
+  const b = exportBounds([it])!;
+  assert.ok(near(b.minX, -10, 0.05) && near(b.maxX, 10, 0.05) && near(b.maxY, 10, 0.05) && near(b.minY, -10, 0.05), JSON.stringify(b));
+});
+
+test("Zickzack und gerade Linien bleiben unverändert genau, Punkte auf einer Geraden fallen weg", () => {
+  const zig = Array.from({ length: 30 }, (_, i) => ({ x: i * 5, y: i % 2 ? 5 : 0 }));
+  const [z] = curveItems([{ ...base, kind: "path", closed: false, pts: zig }]);
+  if (z.kind === "path") assert.deepEqual(z.pts, zig);
+  const straight = Array.from({ length: 50 }, (_, i) => ({ x: i, y: 2 * i }));
+  const [s] = curveItems([{ ...base, kind: "path", closed: false, pts: straight }]);
+  if (s.kind === "path") assert.equal(s.pts.length, 2);
 });

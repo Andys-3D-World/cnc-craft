@@ -20,6 +20,8 @@ import { getMachineMode, MachineMode } from "./machineMode";
 import { stockBed } from "./stock";
 import { compensate, getHeightMap, heightMapEnabled, heightRange } from "./heightMap";
 import { buildResume, resumeMarks, ResumeMark } from "./jobResume";
+import { ensureWcsForJob } from "./wcsSync";
+import { macroRunning } from "./macroRun";
 import { toolChangeBusy, tcAbort } from "./toolChange";
 
 // Zustand des aktuellen Jobs
@@ -269,6 +271,9 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
     }
   }
 
+  // Koordinatensystem frisch lesen (Fortsetzen braucht es; M30/Reset können es umgestellt haben)
+  if (machine.connected && machine.status.state !== "Alarm" && !await ensureWcsForJob()) return;
+
   // Fortsetzen: Vorspann (Zustand herstellen) + Job ab der Zeile; jede Zeile merkt sich ihre Original-Nummer
   let base = src;
   let baseOrigin: number[] | null = srcOrigin;
@@ -276,7 +281,7 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
     try {
       // umgewandelte Bohrzyklen: ab der ersten neuen Zeile, die zur gewählten Original-Zeile gehört
       const from = srcOrigin ? Math.max(0, srcOrigin.findIndex(o => o >= resumeFrom)) : resumeFrom;
-      const plan = buildResume(src, from, getMachineMode());
+      const plan = buildResume(src, from, getMachineMode(), machine.protocol === "grbl" ? machine.wcs : "");
       base = [...plan.pre, ...plan.rest];
       baseOrigin = [...plan.pre.map(() => from), ...plan.rest.map((_, i) => from + i)];
       if (srcOrigin) baseOrigin = baseOrigin.map(i => srcOrigin![i]);
@@ -289,6 +294,7 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
 
   if (machine.connected) {
     if (machine.status.state === "Alarm") { appendToConsole(t("m.unlockFirst")); return; }
+    if (macroRunning()) { appendToConsole(t("macro.block.busy")); return; }
     // Laser-Modus an der Fräse: GRBL schaltet die Spindel bei jeder Eilfahrt (G0) ab und bei G1 ohne Hochlaufzeit
     // wieder an – der Fräser fährt dann stehend oder halb drehend ins Material
     if (getMachineMode() === "mill" && machine.protocol === "grbl" && machine.settings.get("$32") === "1"

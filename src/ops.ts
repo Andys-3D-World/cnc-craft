@@ -13,6 +13,8 @@
  * Art „face“ (Planfräsen): das umgebende Rechteck der Form auf Tiefe planen (siehe facing.ts).
  */
 
+import { cleanMillDir, type MillDir } from "./millDir";
+
 export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread" | "face";
 export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread", "face"];
 
@@ -22,6 +24,7 @@ export interface ShapeOp {
   depth: number;        // Frästiefe (negativ, wie millingDepth); bei der Fase unbenutzt
   chamferW?: number;    // Fase: Breite in mm
   finishAllow?: number; // Schlicht-Aufmaß in mm
+  millDir?: MillDir;    // Fräsrichtung (fehlt = Standard, siehe millDir.ts)
   threadD?: number;     // Gewinde: Nenn-Ø in mm (0 = aus dem Kreis)
   threadLeft?: boolean; // Gewinde: Linksgewinde
   threadPitch?: number; // Gewinde: Steigung (0 = Werkzeug bzw. ISO-Regelgewinde)
@@ -40,6 +43,7 @@ export function extraOps(s: any): ShapeOp[] {
     depth: Math.min(0, num(o.depth, -1)),
     chamferW: Math.max(0.05, num(o.chamferW, 1)),
     finishAllow: Math.max(0, num(o.finishAllow, 0)),
+    millDir: cleanMillDir(o.millDir) || undefined,
     ...(o.kind === "thread" ? {
       threadD: Math.max(0, Math.min(500, num(o.threadD, 0))), threadLeft: o.threadLeft === true,
       threadPitch: Math.max(0, Math.min(10, num(o.threadPitch, 0))),
@@ -69,6 +73,7 @@ export function expandOps(shapes: any[]): any[] {
         toolId: o.toolId,
         millingDepth: o.depth,
         finishAllow: o.finishAllow || undefined,
+        millDir: o.millDir,
         chamferW: o.chamferW,
         chamferSide: chamferSide(s),
         threadD: o.threadD,

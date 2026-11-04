@@ -12,6 +12,7 @@
  * CO₂-Laser mit Ruida-Steuerung (src-tauri/src/ruida.rs) melden dieselben Ereignisse.
  * Dann ist machine.protocol = "ruida": kein $$, kein $I, Aufträge werden als RD-Datei geschickt.
  */
+import { parseActiveWcs } from "./wcs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { t } from "./i18n/i18n";
@@ -64,6 +65,8 @@ export const machine = {
   job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
   settings: new Map<string, string>(),  // "$110" -> "5000.000"
   lastAlarm: 0,
+  wcs: "",        // aktives Koordinatensystem laut $G ("" = unbekannt, wcsSync.ts liest es beim nächsten Stillstand)
+  wcsWanted: "",  // vom Nutzer gewähltes System ("" = nie gewählt)
   info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] } as BoardInfo
 };
 
@@ -244,7 +247,7 @@ function syncAwake() {
 // laufen im Hintergrund weiter (Status, Job-Fortschritt, Alarme werden dort mitgeschrieben).
 // ---------------------------------------------------------------------
 
-type MachineState = Pick<typeof machine, "protocol" | "ruidaBed" | "connected" | "port" | "firmware" | "version" | "status" | "job" | "settings" | "lastAlarm" | "info">;
+type MachineState = Pick<typeof machine, "protocol" | "ruidaBed" | "connected" | "port" | "firmware" | "version" | "status" | "job" | "settings" | "lastAlarm" | "wcs" | "wcsWanted" | "info">;
 interface Slot { id: string; mode: MachineMode; state: MachineState; infoRequested: boolean; espInfoRequested: boolean }
 
 /** Kurzinfo für die Maschinen-Liste */
@@ -265,13 +268,13 @@ function emptyState(): MachineState {
     protocol: "grbl", ruidaBed: null, connected: false, port: "", firmware: "", version: "",
     status: { state: "", sub: null, mpos: [0, 0, 0], wpos: [0, 0, 0], feed: 0, spindle: 0, ov: [100, 100, 100], pins: "", acc: null },
     job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
-    settings: new Map(), lastAlarm: 0,
+    settings: new Map(), lastAlarm: 0, wcs: "", wcsWanted: "",
     info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] }
   };
 }
 function takeState(): MachineState {
-  const { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, info } = machine;
-  return { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, info };
+  const { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, wcs, wcsWanted, info } = machine;
+  return { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, wcs, wcsWanted, info };
 }
 
 /** Alle Maschinen (ausgewählte zuerst nicht nötig – Reihenfolge nach Kennung) */
@@ -426,6 +429,7 @@ export async function initMachine(logFn: (s: string) => void) {
       m.protocol = "ruida";
       m.ruidaBed = p.bedX > 0 && p.bedY > 0 ? { w: p.bedX, h: p.bedY } : null;
     }
+    m.wcs = ""; // nach einem Reset steht GRBL wieder auf G54
     fire("slots");
     if (!own) { log(tag + t("m.welcome", { fw: m.firmware, v: m.version })); return; }
     flushAcks(false);
@@ -506,6 +510,15 @@ export async function initMachine(logFn: (s: string) => void) {
       default:
         // grblHAL-Einstellungsbeschreibungen ($ES/$ESG/$EG): über 100 Zeilen – nicht in die Konsole
         if (parseHalLine(String(p.text || ""))) { fire("text", p); break; }
+        {
+          // $G-Antwort: aktives Koordinatensystem merken (die eigenen Abfragen nicht in die Konsole)
+          const wcs = parseActiveWcs(String(p.text || ""));
+          if (wcs) {
+            machine.wcs = wcs;
+            fire("wcs", wcs);
+            if (muteParser > 0) { muteParser--; fire("text", p); break; }
+          }
+        }
         parseInfoLine(String(p.text || ""));
         log(`[${t("m.board")}] ${maskSecrets(String(p.text || ""))}`);
         fire("text", p);
@@ -573,6 +586,7 @@ export async function initMachine(logFn: (s: string) => void) {
     m.job.active = false;
     m.job.paused = false;
     m.job.toolChange = false;
+    m.wcs = ""; // M30 oder Abbruch-Reset stellen GRBL wieder auf G54 → neu lesen
     if (p.aborted) log(tag + t("m.jobAborted", { reason: t("m.reason." + (p.reason || "stopped")), n: p.acked, total: p.total }));
     else log(tag + t("m.jobDone", { total: p.total, errors: p.errors }));
     fire("slots");
@@ -607,6 +621,7 @@ export async function listPorts(): Promise<PortInfo[]> {
 
 export async function connect(port: string, baud: number): Promise<void> {
   machine.protocol = "grbl";
+  machine.wcs = ""; machine.wcsWanted = "";
   machine.firmware = "";
   machine.version = "";
   machine.settings.clear();
@@ -728,6 +743,10 @@ export async function exportRd(lines: string[], path: string): Promise<{ bytes: 
   const o = ruidaOptions();
   return await invoke("ruida_export", { lines, path, bedW: o.bedW, bedH: o.bedH, origin: o.origin, sMax: o.sMax, magic: o.magic, minPower: o.minPower });
 }
+
+/** Die nächste $G-Antwort nicht in die Konsole schreiben (eigene Abfrage im Hintergrund) */
+let muteParser = 0;
+export function muteNextParserReply(on: boolean) { muteParser = on ? 1 : 0; }
 
 /** Zeile senden (ohne auf die Antwort zu warten). Fehler der Maschine erscheinen in der Konsole. */
 export async function send(line: string, quiet = false): Promise<void> {

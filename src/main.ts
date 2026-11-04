@@ -4,7 +4,7 @@ import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
 import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
-import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings, noGcodeMessage } from "./cam";
+import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
 import { openCostDialog } from "./ui/costCalc";
 import { initOpsPanel, refreshOps } from "./ui/opsPanel";
@@ -34,6 +34,8 @@ import { initProbePanel } from "./ui/probePanel";
 import { initWorkshopPanel } from "./ui/workshopPanel";
 import { initVfdPanel } from "./ui/vfdPanel";
 import { initGamepadPanel } from "./ui/gamepadPanel";
+import { initWcsPanel } from "./ui/wcsPanel";
+import { initMacroPanel } from "./ui/macroPanel";
 import { initPinLeds } from "./ui/pinLeds";
 import { initWiringPage } from "./ui/wiringPage";
 import { initAboutDialog } from "./ui/aboutDialog";
@@ -234,6 +236,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     initProbePanel(appendToConsole);   // Antasten: Tasterplatte, Werkzeuglängensensor
     initWorkshopPanel(appendToConsole); // Werkstatt: Absaugung/Kompressor mit dem Job schalten
     initVfdPanel(appendToConsole); // Frequenzumrichter der Spindel per Modbus
+    initMacroPanel(appendToConsole);   // eigene G-Code-Knöpfe
+    initWcsPanel(appendToConsole);     // Koordinatensystem G54–G59
     initGamepadPanel(appendToConsole); // Gamepad: fahren mit Totmann-Knopf, Knöpfe belegen
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
@@ -261,6 +265,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       const gcode = generateGcode(state.shapes, { flat: !prism });
       if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
+      lastGcodeNotes.forEach(n => appendToConsole(n));
       if (rotary.on && !isPlasma()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
       setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
       openSimTab();

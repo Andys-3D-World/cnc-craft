@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.3.9 Beta
 
 **New**
 - **Rotary axis for other stock shapes:** new *Stock shape* setting in the Rotary section (laser and milling): round,
@@ -22,6 +22,39 @@
   limit of the jog buttons applies. Buttons for zero point, homing, start/pause/resume and stop can be assigned; a job
   only starts after a confirmation on screen. Live view of the pressed buttons and sticks. GRBL machines only for driving.
   Controllers are read natively (gilrs), because the window on macOS may not report them.
+- **Coordinate systems G54–G59** (GRBL family, machine tab → *Status & position*): a dropdown shows the system the
+  controller really reports (`$G`), plus a *Zero here* button (X, Y and Z). Locked during a job (also when paused), while
+  probing, during a tool change and on alarm. M30 and every reset silently put GRBL back on G54: a system you chose is
+  set again afterwards, and a job does not start if that fails. The console and macros count as choosing a system.
+- **Macro buttons** (machine tab → *Macros*): your own buttons with multi-line G-code, e.g. a park position. Lines are
+  sent one by one, each waiting for the answer; the first error stops the macro, and clicking the running button cancels
+  it (feed hold, then reset). Locked during a job (also when paused), on alarm, while probing or during a tool change.
+  The first run, and the first run after a change or import, shows what will be sent and asks. Hovering a button also
+  shows its lines. Characters GRBL would swallow on the way (`?`, `!`, `~`, umlauts) are refused when saving. Export and
+  import as a file.
+- **Cut direction per operation** (milling parameters and extra operations): *Default*, *Climb* or *Conventional*, for
+  contours, circles, arcs, pockets, chamfers and rest machining, including tabs and finishing passes. *Default* changes
+  nothing in existing jobs. Zigzag pockets alternate by nature, so the choice applies to their walls only; adaptive pockets
+  stay climb (with a warning); threads, facing, V-carve, lines and open paths have no side and are not affected.
+- **Lead-in and lead-out for milled contours** (milling parameters, off by default): for closed outside and inside
+  contours and circles, as a tangent arc or a 45° line with its own length or radius. The cutter plunges in the waste (also
+  as a ramp) instead of on the contour, which avoids the plunge mark. Each depth pass then runs on its own with a retract
+  in between. The lead stays outside the part (inside mode: in the hole) and keeps clear of other shapes; a place with
+  room is searched, then half the length is tried, and if nothing fits there is a warning and the contour is cut without.
+  Works with tabs and ramps. Finishing passes still enter on the roughing path; with lead-out they return to it before
+  lifting.
+- **Arc fitting** (milling parameters, off by default): runs of short G1 pieces at constant Z become real G2/G3 arcs, so
+  the machine stops stuttering on round shapes. Tolerance adjustable (default 0.01 mm); the new path never leaves it.
+  Straight runs, corners and low-poly shapes stay as they are, feed changes are kept, the console reports the saved lines.
+  Milling only, and off while the rotary axis is on.
+
+**Fixed**
+- **Zero point in the wrong coordinate system:** the zero buttons, the gamepad and the probe routines always wrote to
+  G54 (`G10 L20 P1`). They now write to the active system (`P0`).
+- **Job resume forced G54:** a resumed job that does not choose a system itself now stays in the active one.
+- **Vector export with thousands of points:** round holes that are stored as many points (generators, imports, traced
+  shapes) are now exported as one real circle, and curves in a contour as real arcs in the same path (SVG, DXF). Deviation
+  at most 0.02 mm. PDF and PLT stay fine line pieces.
 
 ## 0.3.8 Beta
 

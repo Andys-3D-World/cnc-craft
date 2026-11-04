@@ -7,11 +7,13 @@
  *   Fräse:  Z auf sichere Höhe → Spindel an + Hochlaufzeit → Kühlung → XY anfahren → langsam auf Tiefe → Vorschub
  *   Laser:  Laser bleibt aus (S0) → XY anfahren → die erste Zeile bekommt die richtige Leistung (S)
  *   Plasma: nur an Stellen mit Brenner aus (mitten im Schnitt fehlt das Einstechen)
+ * Wählt der Job kein Koordinatensystem selbst, gilt das gerade aktive (activeWcs, aus $G) – nie fest G54.
  * Was nicht sicher geht (G91 relativ, G92/G10 im Job), wird abgelehnt.
  * Die Zeilennummern sind die des geladenen Jobs (ohne Kommentarzeilen) – wie in der Simulation.
  */
 import { t } from "./i18n/i18n";
 import type { MachineMode } from "./machineMode";
+import { resumeWcs } from "./wcs";
 
 export interface ResumeMark { line: number; label: string }
 
@@ -34,9 +36,9 @@ const n3 = (v: number) => String(+v.toFixed(3));
 /**
  * Vorspann + restlicher Job ab Zeile "from" (0-basiert). Wirft Error mit übersetztem Text, wenn es nicht sicher geht.
  */
-export function buildResume(lines: string[], from: number, mode: MachineMode): ResumePlan {
+export function buildResume(lines: string[], from: number, mode: MachineMode, activeWcs = ""): ResumePlan {
   if (from < 0 || from >= lines.length) throw new Error(t("res.errRange", { n: lines.length }));
-  let abs = true, inch = false, plane = 17, wcs = 54, feedMode = 94, motion = 0;
+  let abs = true, inch = false, plane = 17, wcs: number | null = null, feedMode = 94, motion = 0;
   let f: number | null = null, s: number | null = null, spindle = "M5", toolNote = "";
   const cool = new Set<number>();
   let x: number | null = null, y: number | null = null, z: number | null = null, a: number | null = null;
@@ -87,7 +89,8 @@ export function buildResume(lines: string[], from: number, mode: MachineMode): R
   for (const l of lines) { const m = strip(l).match(/Z\s*([-+]?(?:\d+\.?\d*|\.\d+))/); if (m) safe = Math.max(safe, parseFloat(m[1])); }
 
   const pre: string[] = [];
-  pre.push(`${inch ? "G20" : "G21"} G90 G${plane} G${wcs} G${feedMode}`);
+  const sys = resumeWcs(wcs, activeWcs);
+  pre.push(`${inch ? "G20" : "G21"} G90 G${plane}${sys ? " " + sys : ""} G${feedMode}`);
   const xy = x !== null && y !== null ? `X${n3(x)} Y${n3(y)}${a !== null ? ` A${n3(a)}` : ""}` : "";
   if (mode === "laser") {
     // Laser: Modus an, aber Leistung 0 – erst die nächste Schnittzeile bekommt wieder S

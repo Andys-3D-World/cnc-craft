@@ -22,10 +22,13 @@ import { probePanelHtml } from "./probePanel";
 import { pinLedsHtml } from "./pinLeds";
 import { workshopPanelHtml } from "./workshopPanel";
 import { gamepadPanelHtml } from "./gamepadPanel";
+import { wcsRowHtml } from "./wcsPanel";
+import { macroPanelHtml } from "./macroPanel";
 import { vfdPanelHtml } from "./vfdPanel";
 import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
 import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt";
+import { arcFit, loadArcFit, saveArcFit, clampArcTol } from "../arcFit";
 
 const CONSOLE_KEY = "cnc_craft_console_collapsed";
 /** Meldungen, bei denen die zugeklappte Konsole von selbst aufgeht (alle Sprachen) */
@@ -82,6 +85,24 @@ export function renderRightPanel(container: HTMLElement) {
           <div class="menu-body rp-box">
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
             <div class="prop-row" ${tip("rp.finishTip")}>${T("rp.finish")}<input type="number" id="dim-finish" value="0" min="0" max="5" step="0.05" class="prop-input"></div>
+            <div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}
+              <select id="dim-mill-dir" class="prop-input" style="width: 110px;">
+                <option value="" data-i18n="rp.millDir.default">${t("rp.millDir.default")}</option>
+                <option value="climb" data-i18n="rp.millDir.climb">${t("rp.millDir.climb")}</option>
+                <option value="conventional" data-i18n="rp.millDir.conventional">${t("rp.millDir.conventional")}</option>
+              </select>
+            </div>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.leadTip")}>${T("rp.leadIn")}<input type="checkbox" id="dim-lead-in" style="width:auto;"></label>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.leadTip")}>${T("rp.leadOut")}<input type="checkbox" id="dim-lead-out" style="width:auto;"></label>
+            <div class="prop-row" id="dim-lead-opts" ${tip("rp.leadTip")}>${T("rp.leadSize")}
+              <span style="display:flex;gap:4px;align-items:center;">
+                <select id="dim-lead-type" class="prop-input" style="width: 74px;">
+                  <option value="arc" data-i18n="rp.leadArc">${t("rp.leadArc")}</option>
+                  <option value="line" data-i18n="rp.leadLine">${t("rp.leadLine")}</option>
+                </select>
+                <input type="number" id="dim-lead-len" value="3" min="0.1" max="50" step="0.5" class="prop-input" style="width: 54px;">
+              </span>
+            </div>
             <div class="prop-row" ${tip("rp.pocketStrategyTip")}>${T("rp.pocketStrategy")}
               <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
                 <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
@@ -91,6 +112,8 @@ export function renderRightPanel(container: HTMLElement) {
             </div>
             <label class="prop-row" style="cursor:pointer;" ${tip("rp.feedAdaptTip")}><span>${T("rp.feedAdapt")}</span><input type="checkbox" id="feed-adapt-on" style="width:auto;"></label>
             <div class="prop-row" ${tip("rp.feedAdaptTip")}>${T("rp.feedAdaptMin")}<input type="number" id="feed-adapt-min" min="10" max="100" step="5" class="prop-input"></div>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.arcFitTip")}><span>${T("rp.arcFit")}</span><input type="checkbox" id="arc-fit-on" style="width:auto;"></label>
+            <div class="prop-row" ${tip("rp.arcFitTip")}>${T("rp.arcFitTol")}<input type="number" id="arc-fit-tol" min="0.001" max="0.1" step="0.005" class="prop-input"></div>
           </div>
         </div>
 
@@ -258,6 +281,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="m-zero-z" class="btn-secondary not-ruida not-k40" ${tip("m.zeroZTip")}>⊥ Z=0</button>
               <button id="m-goto-zero" class="btn-secondary" ${tip("m.gotoZeroTip")}>➜ 0,0</button>
             </div>
+            ${wcsRowHtml()}
           </div>
         </div>
 
@@ -271,6 +295,8 @@ export function renderRightPanel(container: HTMLElement) {
             <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
           </div>
         </div>
+
+        ${macroPanelHtml()}
 
         ${spindlePanelHtml()}
 
@@ -304,6 +330,12 @@ export function renderRightPanel(container: HTMLElement) {
 
   // Vorschub in Kurven anpassen (gemerkt, gilt für alle Formen)
   loadFeedAdapt();
+  loadArcFit();
+  const afOn = container.querySelector<HTMLInputElement>("#arc-fit-on")!, afTol = container.querySelector<HTMLInputElement>("#arc-fit-tol")!;
+  const afShow = () => { afOn.checked = arcFit.on; afTol.value = String(arcFit.tol); afTol.disabled = !arcFit.on; };
+  afShow();
+  afOn.addEventListener("change", () => { arcFit.on = afOn.checked; saveArcFit(); afShow(); });
+  afTol.addEventListener("change", () => { const v = parseFloat(afTol.value); if (Number.isFinite(v) && v > 0) arcFit.tol = clampArcTol(v); saveArcFit(); afShow(); });
   const faOn = container.querySelector<HTMLInputElement>("#feed-adapt-on")!, faMin = container.querySelector<HTMLInputElement>("#feed-adapt-min")!;
   const faShow = () => { faOn.checked = feedAdapt.on; faMin.value = String(feedAdapt.minPct); faMin.disabled = !feedAdapt.on; };
   faShow();

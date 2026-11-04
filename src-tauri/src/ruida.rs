@@ -1126,6 +1126,7 @@ mod tests {
         assert_eq!(manual_from_line("G21 G90 G0 Z5").unwrap(), Manual::Nothing);
         assert!(manual_from_line("$$").is_err());
         assert!(manual_from_line("G10 L20 P1 X0 Y0").is_err());
+        assert!(manual_from_line("G10 L20 P0 X0 Y0").is_err());
     }
 
     // ---------------- Schein-Steuerung für Verbindungstests ----------------

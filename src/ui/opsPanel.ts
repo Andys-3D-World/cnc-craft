@@ -11,6 +11,11 @@
 import { t, T, tip } from "../i18n/i18n";
 import { getTools, getTool, toolForShape, toolLabel } from "../toolLibrary";
 import { OP_KINDS, OpKind, ShapeOp, extraOps } from "../ops";
+import { cleanMillDir, type MillDir } from "../millDir";
+
+const MILL_DIRS: MillDir[] = ["", "climb", "conventional"];
+/** Arten, bei denen die Fräsrichtung etwas bedeutet (Gewinde läuft immer im Gleichlauf, siehe threadMill.ts) */
+const DIR_KINDS: OpKind[] = ["outside", "inside", "pocket", "chamfer"];
 
 const KEEP = "__keep__";
 
@@ -80,6 +85,7 @@ export function initOpsPanel(redraw: () => void, log: (s: string) => void) {
       kind, toolId: tool || undefined,
       depth: Number.isFinite(depth) ? Math.min(0, depth) : prev?.depth ?? -1,
       chamferW: Number.isFinite(cw) && cw > 0 ? cw : prev?.chamferW ?? 1,
+      millDir: DIR_KINDS.includes(kind) ? cleanMillDir(q("ops-dir")?.value) || undefined : prev?.millDir,
       ...(kind === "thread" ? {
         threadD: Number.isFinite(td) && td >= 0 ? td : prev?.threadD ?? 0,
         threadLeft: left ? left.checked : prev?.threadLeft ?? false,
@@ -163,6 +169,8 @@ export function refreshOps(force = false) {
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadSpringTip")}>${T("ops.threadSpring")}<input type="checkbox" class="ops-spring" style="width:auto;"${o.threadSpring ? " checked" : ""}></label>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadLeftTip")}>${T("ops.threadLeft")}<input type="checkbox" class="ops-left" style="width:auto;"${o.threadLeft ? " checked" : ""}></label>`
         : `<div class="prop-row">${T("rp.depth")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
+      ${DIR_KINDS.includes(o.kind) ? `<div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}<select class="prop-input ops-dir" style="width:110px;">
+        ${MILL_DIRS.map(d => `<option value="${d}"${d === (o.millDir || "") ? " selected" : ""}>${esc(t("rp.millDir." + (d || "default")))}</option>`).join("")}</select></div>` : ""}
     </div>`).join("");
   list.innerHTML = first + rows;
   const scope = document.getElementById("ops-scope");

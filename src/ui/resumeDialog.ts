@@ -63,7 +63,7 @@ export function openResumeDialog(log: (s: string) => void, startLine?: number) {
     sel.value = st.marks.some(m => m.line === line) ? String(line) : "";
     const pre = $<HTMLElement>("res-pre"), warn = $<HTMLElement>("res-warn"), ok = $<HTMLButtonElement>("res-ok");
     try {
-      const p = buildResume(st.loadedLines, line, getMachineMode());
+      const p = buildResume(st.loadedLines, line, getMachineMode(), machine.protocol === "grbl" ? machine.wcs : "");
       pre.textContent = [...p.pre, `→ ${p.rest[0]}`, ...p.rest.slice(1, 3), "…"].join("\n");
       const w: string[] = [];
       if (p.toolNote) w.push(t("res.toolNote", { note: p.toolNote }));
