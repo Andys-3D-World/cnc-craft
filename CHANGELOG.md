@@ -1,6 +1,6 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.4.1 Beta
 
 **New**
 - **Camera on the machine head: crosshair, offset and camera zero point:** the camera window has a new *Crosshair* button.
