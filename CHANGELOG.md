@@ -3,6 +3,14 @@
 ## Next version (unreleased)
 
 **New**
+- **Material profiles for milling:** the milling parameters now have a dropdown that applies a saved profile or a
+  material from the database to the selected shapes with one click. Manage your own profiles (name, feed, spindle speed,
+  depth per pass, optional plunge feed, tool and cutter diameter) in the material database window. The values are stored
+  per shape; the tool stays untouched, so other shapes using it don't change. Shapes without a profile produce the same
+  G-code as before. Feed and speed are limited to the machine limits in the tool settings, depth per pass to the flute
+  length, and a profile made for another cutter diameter asks first. If the shape's tool is swapped or its diameter
+  changed later, the tool's own values are used again with a warning. Profiles are part of the tool library backup, and
+  imported values are checked. Extra operations with another tool, facing and 3D toolpaths keep the tool's values.
 - **Edit generated parts again:** right-click a part made by a generator and choose *Edit with generator*. The same
   dialog opens with the values used last time; on OK the new parts replace the old ones at the same position, and one
   undo brings the old state back. Cancel changes nothing. Works for boxes, birdhouses, ornaments (both kinds), names,

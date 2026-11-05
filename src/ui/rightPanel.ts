@@ -11,6 +11,7 @@
 import { icon } from "./icons";
 import { t, T, tip, ph } from "../i18n/i18n";
 import { toolPickerHtml, toolSummaryHtml } from "./toolPicker";
+import { millProfilePickerHtml } from "./millProfilePicker";
 import { opsPanelHtml } from "./opsPanel";
 import { modeSwitchHtml, laserLayersHtml, laserSettingsHtml } from "./laserPanel";
 import { rotarySectionHtml } from "./rotaryPanel";
@@ -83,6 +84,7 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="menu-section-unified only-mill">
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
+            ${millProfilePickerHtml()}
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
             <div class="prop-row" ${tip("rp.finishTip")}>${T("rp.finish")}<input type="number" id="dim-finish" value="0" min="0" max="5" step="0.05" class="prop-input"></div>
             <div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}

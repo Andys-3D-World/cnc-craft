@@ -1,6 +1,7 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter } from "./toolLibrary";
+import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter, toolSettings } from "./toolLibrary";
+import { resolveCut, cleanCutData } from "./millProfiles";
 import { toolChangeGcode } from "./toolChange";
 import { berechne3PunktBogen } from "./arcEngine";
 import { offsetPolygon, polygonArea, pointInPoly, simplifyPolygon, simplifyPolyline, P } from "./polyOffset";
@@ -889,9 +890,36 @@ const generateGcodeInner = (shapes: any): string | null => {
   gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
 
   const vDone = new Set<any>();
+  // Schnittwerte der Form (Material-Profil, millProfiles.ts) – ohne Profil bleibt der G-Code Zeichen für Zeichen wie bisher
+  const groupTool = curTool as MillingTool | null;
+  const toolFeed = feedXY, toolRpm = rpm, toolStep = stepZ, toolPlunge = PLUNGE_FEED;
+  const cutKey = (s: any) => { const r = s?.restOf ? null : resolveCut(s?.cutData, groupTool, toolSettings); return r ? `${r.feedrate}|${r.rpm}|${r.stepZ}|${r.plungeFeed}` : ""; };
+  let lastCutKey = "";
+  const useCut = (shape: any) => {
+    const r = shape.restOf ? null : resolveCut(shape.cutData, groupTool, toolSettings);
+    // Für ein anderes Werkzeug angewendet (Werkzeug getauscht, Ø geändert): Werkzeug-Werte nehmen und sagen.
+    // Weitere Bearbeitungen mit eigenem Werkzeug (shape.opOf) haben bewusst eigene Werte.
+    if (!r && !shape.restOf && !shape.opOf) {
+      const old = cleanCutData(shape.cutData);
+      if (old) { const w = t("gcw.cutDataOff", { name: old.label }); if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w); }
+    }
+    const f = r ? r.feedrate : toolFeed, s = r ? r.rpm : toolRpm;
+    stepZ = r ? r.stepZ : toolStep;
+    PLUNGE_FEED = r ? r.plungeFeed : toolPlunge;
+    const key = cutKey(shape);
+    if (r && key !== lastCutKey) gcode += `\n${c("gc.cutData", { name: r.label, f, s, z: stepZ })}\n`;
+    lastCutKey = key;
+    if (s !== rpm) {
+      // Drehzahl nur über dem Material ändern, dann kurz hochlaufen lassen
+      gcode += `G0 Z${SAFE_Z.toFixed(2)}\n${spindleCode("M3")} S${s} ${c("gc.spindleOn", { rpm: s })}\nG4 P2 ${c("gc.spinUp")}\n`;
+      rpm = s;
+    }
+    if (f !== feedXY) { gcode += `F${f} ${c("gc.feed", { f })}\n`; feedXY = f; }
+  };
   const millShape = (shape: any) => {
     if (vDone.has(shape)) return;
     if (shape.restOf) {
+      useCut(shape);
       formCounter++;
       curLead = null;
       computePasses(computeDepth(shape.restOf));
@@ -902,6 +930,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (shape.parentChainId && alreadyChained.has(shape.parentChainId)) return;
     if (shape.parentChainId) alreadyChained.add(shape.parentChainId);
 
+    useCut(shape);
     formCounter++;
     computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
@@ -929,6 +958,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (mode === "vcarve" || mode === "vplug") {
       const depth = computeDepth(shape), start = mode === "vplug" ? Math.max(0, shape.vStart ?? 0) : 0;
       const same = group.shapes.filter((o: any) => (o.millingMode === mode) && computeDepth(o) === depth
+        && cutKey(o) === cutKey(shape)
         && (mode !== "vplug" || Math.max(0, o.vStart ?? 0) === start));
       same.forEach((o: any) => vDone.add(o));
       gcode += `\n${c(mode === "vplug" ? "gc.vplug" : "gc.vcarve", { n: formCounter, k: same.length })}\n`;

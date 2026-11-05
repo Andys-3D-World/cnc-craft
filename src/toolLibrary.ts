@@ -393,7 +393,10 @@ export function mergeProjectTools(list: any, shapes: any[]): number {
       tools.push(stamp({ ...tool, id: newId }));
       added++;
     }
-    if (newId !== tool.id) shapes.forEach(s => { if (s.toolId === tool.id) s.toolId = newId; });
+    if (newId !== tool.id) shapes.forEach(s => {
+      if (s.toolId === tool.id) s.toolId = newId;
+      if (s.cutData?.toolId === tool.id) s.cutData.toolId = newId; // Schnittwerte der Form (millProfiles.ts)
+    });
   }
   if (added) changed();
   return added;

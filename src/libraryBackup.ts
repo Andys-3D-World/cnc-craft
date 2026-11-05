@@ -8,7 +8,7 @@
  * Dateiformat (JSON, Endung .json):
  *   {
  *     "format": "cnc-craft-library", "version": 1, "app": "CNC Craft 0.2.0", "created": "2026-…",
- *     "tools":  { "tools": [...],  "settings": {...}, "active": "t1" },   // Fräse
+ *     "tools":  { "tools": [...],  "settings": {...}, "active": "t1", "profiles": [...] },   // Fräse (mit Fräs-Profilen)
  *     "laser":  { "layers": [...], "settings": {...}, "active": "L1" },   // Laser
  *     "plasma": { "cuts": [...],   "settings": {...}, "active": "P1" }    // Plasma
  *   }
@@ -28,6 +28,7 @@ import { isFusionLibrary, fusionToTools, unzipJson } from "./fusionTools";
 import { exportLaserLibrary, importLaserLibrary, getLayers } from "./laserLayers";
 import { exportPlasmaLibrary, importPlasmaLibrary, getCuts } from "./plasmaCuts";
 import { appInfo } from "./update/updater";
+import { exportMillProfiles, importMillProfiles } from "./millProfiles";
 
 export type LibKind = "tools" | "laser" | "plasma";
 export const ALL_KINDS: LibKind[] = ["tools", "laser", "plasma"];
@@ -38,7 +39,7 @@ export interface LibFile {
   version: number;
   app?: string;
   created?: string;
-  tools?: { tools: any[]; settings?: any; active?: string | null };
+  tools?: { tools: any[]; settings?: any; active?: string | null; profiles?: any[] };
   laser?: { layers: any[]; settings?: any; active?: string | null };
   plasma?: { cuts: any[]; settings?: any; active?: string | null };
   /** aus einer Fusion-360-Bibliothek: so viele Einträge waren keine passenden Fräser (Halter, Taster …) */
@@ -57,7 +58,7 @@ export function libCounts(f: LibFile): Record<LibKind, number> {
 /** Sicherung der gewünschten Teile zusammenstellen */
 export function buildLibFile(kinds: LibKind[], appName = "CNC Craft"): LibFile {
   const f: LibFile = { format: LIB_FORMAT, version: 1, app: appName, created: new Date().toISOString() };
-  if (kinds.includes("tools")) f.tools = exportToolLibrary();
+  if (kinds.includes("tools")) f.tools = { ...exportToolLibrary(), profiles: exportMillProfiles() };
   if (kinds.includes("laser")) f.laser = exportLaserLibrary();
   if (kinds.includes("plasma")) f.plasma = exportPlasmaLibrary();
   return f;
@@ -104,7 +105,10 @@ export function parseLibFile(text: string): LibFile {
 /** Teile aus der Datei übernehmen. Gibt je Teil die Anzahl übernommener Einträge zurück. */
 export function applyLibFile(f: LibFile, kinds: LibKind[], replace: boolean): Partial<Record<LibKind, number>> {
   const r: Partial<Record<LibKind, number>> = {};
-  if (kinds.includes("tools") && f.tools) r.tools = importToolLibrary(f.tools, replace);
+  if (kinds.includes("tools") && f.tools) {
+    r.tools = importToolLibrary(f.tools, replace);
+    importMillProfiles(f.tools.profiles, replace); // ältere Dateien haben keine Liste: dann bleibt alles, wie es ist
+  }
   if (kinds.includes("laser") && f.laser) r.laser = importLaserLibrary(f.laser, replace);
   if (kinds.includes("plasma") && f.plasma) r.plasma = importPlasmaLibrary(f.plasma, replace);
   return r;

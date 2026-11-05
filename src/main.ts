@@ -17,6 +17,7 @@ import { initFlyouts } from "./ui/flyout";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
+import { initMillProfilePicker, refreshMillProfilePicker } from "./ui/millProfilePicker";
 import { initMachineMode, isPlasma } from "./machineMode";
 import { rotary } from "./rotary";
 import { isPrism } from "./rotaryStock";
@@ -177,6 +178,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
+        refreshMillProfilePicker();
         refreshOps();        // Bearbeitungen der Auswahl
         refreshLaserPanel(); // Laser-Ebenen ebenso
         refreshPlasmaPanel(); // und Plasma-Schnitte
@@ -283,6 +285,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initToolPage();                    // Reiter "Werkzeuge": Fräswerkzeuge
     initLibraryTab(appendToConsole);   // im selben Reiter: Laser-/Plasma-Bibliothek + Export/Import/Sicherung
     initToolPicker(redraw);
+    initMillProfilePicker(redraw);
     initOpsPanel(redraw, appendToConsole);
     initLaserPanel(redraw);
     initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
