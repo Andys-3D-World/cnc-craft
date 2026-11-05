@@ -1396,6 +1396,21 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .cam-ovl-row input[type=range] { flex: 1; min-width: 80px; accent-color: var(--accent-color); }
 .cam-status { font-size: 0.7rem; color: var(--text-muted); padding: 0 10px 8px; line-height: 1.35; }
 .cam-status.warn { color: var(--lt-amber, #ffb547); }
+.cam-xh { position: absolute; inset: 0; pointer-events: none; --xh-x: 50%; --xh-y: 50%; }
+.cam-xh i { position: absolute; background: #ff3b3b; box-shadow: 0 0 0 1px rgba(0,0,0,0.65); }
+.cam-xh-h { left: 0; right: 0; top: var(--xh-y); height: 1px; transform: translateY(-0.5px); }
+.cam-xh-v { top: 0; bottom: 0; left: var(--xh-x); width: 1px; transform: translateX(-0.5px); }
+.cam-xh b { position: absolute; left: var(--xh-x); top: var(--xh-y); width: 22px; height: 22px; margin: -11px 0 0 -11px; border: 1px solid #ff3b3b; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,0.5); box-sizing: border-box; }
+.cam-view.cam-adjust { cursor: crosshair; touch-action: none; }
+.cam-xh-panel { flex-shrink: 0; }
+.cam-off { width: 66px; font-size: 0.74rem; padding: 3px 5px; text-align: right; }
+.cam-off-wiz { margin: 0 8px 6px; padding: 7px 8px 2px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 0.74rem; line-height: 1.4; }
+.cam-off-wiz .cam-bar { padding: 6px 0 4px; }
+.cam-zero-box { width: 430px; }
+.cam-zero-opt { display: flex; gap: 8px; align-items: flex-start; font-size: 0.84rem; padding: 8px; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; }
+.cam-zero-opt.off { opacity: 0.65; cursor: default; }
+.cam-zero-opt code { font-size: 0.72rem; }
+.cam-zero-warn { color: var(--lt-amber, #ffb547); font-size: 0.78rem; line-height: 1.35; }
 
 .cam-wiz { z-index: 5200; }
 .cam-wiz-box { display: flex; width: min(1280px, calc(100vw - 32px)); height: min(820px, calc(100vh - 32px)); background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; }

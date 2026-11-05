@@ -25,6 +25,8 @@ import { Warper } from "./cameraWarp";
 import { cameraUnderlay } from "./cameraOverlay";
 import { openAlignWizard } from "./cameraAlign";
 import { openMaterialDialog } from "./materialDialog";
+import { clampCentre, parseOffsetValue } from "./cameraOffset";
+import { crosshairHtml, initCameraZero, positionCrosshair, wireCameraZero, zeroPanelHtml, syncCameraZero, stopCrosshairAdjust } from "./cameraZero";
 
 export interface CamCalib {
   k1: number;
@@ -48,16 +50,30 @@ interface CamSettings {
   k1: number;
   calib: CamCalib | null;
   win: { x: number; y: number; w: number; h: number } | null;
+  /** Fadenkreuz an/aus und seine Mitte im Kamerabild (−0,5 … 0,5, siehe cameraOffset.ts) */
+  xh: boolean;
+  xhX: number;
+  xhY: number;
+  /** Fadenkreuz − Werkzeug-Mitte in mm; null = nicht eingestellt */
+  offX: number | null;
+  offY: number | null;
 }
 
 const KEY = "cnc_craft_camera";
 export const cam: CamSettings = {
   source: "", deviceId: "", url: "", rot180: false, mirror: false,
-  overlay: false, opacity: 0.85, live: true, k1: 0, calib: null, win: null
+  overlay: false, opacity: 0.85, live: true, k1: 0, calib: null, win: null,
+  xh: false, xhX: 0, xhY: 0, offX: null, offY: null
 };
 
 function load() {
   try { Object.assign(cam, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch { /* Standard */ }
+  // Werte können aus einer fremden Einstellungs-Datei kommen und landen in G-Code
+  cam.xh = cam.xh === true;
+  cam.xhX = clampCentre(cam.xhX);
+  cam.xhY = clampCentre(cam.xhY);
+  cam.offX = parseOffsetValue(cam.offX);
+  cam.offY = parseOffsetValue(cam.offY);
 }
 export function saveCam() {
   try { localStorage.setItem(KEY, JSON.stringify(cam)); } catch { /* egal */ }
@@ -326,7 +342,7 @@ function syncRec() {
 // Fenster
 // ---------------------------------------------------------------------
 
-function setStatus(text: string, warn = false) {
+export function setStatus(text: string, warn = false) {
   const el = $("cam-status");
   if (!el) return;
   el.textContent = text;
@@ -364,6 +380,7 @@ function showView() {
     v.muted = true; v.playsInline = true; v.autoplay = true;
     v.srcObject = stream;
     v.style.transform = tf;
+    v.addEventListener("loadedmetadata", positionCrosshair);
     box.prepend(v);
     void v.play().catch(() => {});
     empty.style.display = "none";
@@ -373,7 +390,7 @@ function showView() {
     img.style.transform = tf;
     img.alt = "";
     img.onerror = () => { empty.style.display = ""; empty.textContent = t("cam.ipNoView"); };
-    img.onload = () => { empty.style.display = "none"; };
+    img.onload = () => { empty.style.display = "none"; positionCrosshair(); };
     img.src = url;
     if (!isStreamUrl(url)) {
       // Einzelbild-Adresse: regelmäßig neu laden
@@ -384,6 +401,7 @@ function showView() {
     empty.style.display = "";
     empty.textContent = t("cam.pickSource");
   }
+  positionCrosshair();
 }
 
 async function selectSource(val: string) {
@@ -428,7 +446,7 @@ async function selectSource(val: string) {
 function syncWindow() {
   if (!win) return;
   const on = (id: string, v: boolean) => $(id)?.classList.toggle("active", v);
-  on("cam-rot", cam.rot180); on("cam-mir", cam.mirror); on("cam-ovl", cam.overlay);
+  on("cam-rot", cam.rot180); on("cam-mir", cam.mirror); on("cam-ovl", cam.overlay); on("cam-xh-btn", cam.xh);
   const rec = $<HTMLButtonElement>("cam-recbtn");
   if (rec) {
     rec.disabled = cam.source !== "device" || !stream;
@@ -447,6 +465,7 @@ function syncWindow() {
   if (op && document.activeElement !== op) op.value = String(Math.round(cam.opacity * 100));
   $("camera-btn")?.classList.toggle("active", !!win && win.style.display !== "none");
   syncRec();
+  syncCameraZero();
 }
 
 function placeWindow() {
@@ -476,12 +495,14 @@ function buildWindow() {
     <div class="cam-view" id="cam-view">
       <div class="cam-empty" id="cam-empty"></div>
       <div class="cam-rec" id="cam-rec" style="display:none;"></div>
+      ${crosshairHtml()}
     </div>
     <div class="cam-bar">
       <button id="cam-photo" class="btn-secondary" data-tip="${esc(t("cam.photoTip"))}">📸 ${esc(t("cam.photo"))}</button>
       <button id="cam-recbtn" class="btn-secondary" data-tip="${esc(t("cam.recTip"))}"></button>
       <button id="cam-rot" class="btn-secondary cam-tg" data-tip="${esc(t("cam.rotTip"))}">↻ 180°</button>
       <button id="cam-mir" class="btn-secondary cam-tg" data-tip="${esc(t("cam.mirTip"))}">⇆</button>
+      <button id="cam-xh-btn" class="btn-secondary cam-tg" data-tip="${esc(t("camz.xhTip"))}">✛ ${esc(t("camz.xh"))}</button>
       <span class="cam-sp"></span>
       <button id="cam-ovl" class="btn-secondary cam-tg" data-tip="${esc(t("cam.ovlTip"))}">▦ ${esc(t("cam.ovl"))}</button>
       <button id="cam-align" class="btn-secondary" data-tip="${esc(t("cam.alignTip"))}">🎯 ${esc(t("cam.align"))}</button>
@@ -493,6 +514,7 @@ function buildWindow() {
       <button id="cam-live" class="btn-secondary" data-tip="${esc(t("cam.liveTip"))}"></button>
       <button id="cam-refresh" class="btn-secondary" data-tip="${esc(t("cam.refreshTip"))}">⟳</button>
     </div>
+    ${zeroPanelHtml()}
     <div class="cam-status" id="cam-status"></div>`;
   document.body.appendChild(win);
   placeWindow();
@@ -539,6 +561,7 @@ function buildWindow() {
   op.addEventListener("input", () => { cam.opacity = parseInt(op.value, 10) / 100; cameraUnderlay.opacity = cam.opacity; saveCam(); window.dispatchEvent(new Event("cnc-redraw")); });
   $("cam-live")!.onclick = () => { cam.live = !cam.live; saveCam(); syncWindow(); if (cam.live) startOverlayLoop(); else stopOverlayLoop(); };
   $("cam-refresh")!.onclick = () => { void renderOverlay(); };
+  wireCameraZero();
 }
 
 let saveWinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -569,6 +592,7 @@ export function closeWindow() {
   if (!win) return;
   if (recorder) stopRecording(true);
   win.style.display = "none";
+  stopCrosshairAdjust();
   if (ipRefresh) { clearInterval(ipRefresh); ipRefresh = null; }
   win.querySelectorAll("video, img").forEach(e => e.remove());
   if (!cam.overlay) stopStream();
@@ -607,6 +631,7 @@ function rebuild() {
 export function initCamera(logFn: (s: string) => void) {
   log = logFn;
   load();
+  initCameraZero(logFn);
   cameraUnderlay.opacity = cam.opacity;
   $("camera-btn")?.addEventListener("click", () => {
     if (win && win.style.display !== "none") closeWindow(); else void openWindow();

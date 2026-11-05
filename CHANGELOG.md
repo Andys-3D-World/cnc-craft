@@ -3,6 +3,15 @@
 ## Next version (unreleased)
 
 **New**
+- **Camera on the machine head: crosshair, offset and camera zero point:** the camera window has a new *Crosshair* button.
+  It draws a crosshair over the live image; if the lens isn't centred, you can move its centre by clicking in the image,
+  and it stays on the same image spot when you rotate or mirror. Enter the camera offset (X/Y in mm from cutter or laser
+  to the crosshair) or use the *Measure offset* assistant: make a mark, drive the crosshair onto it, and the app
+  calculates the offset. *Set camera zero point* makes the spot under the crosshair X0 Y0 in the active coordinate
+  system with `G10 L20 P0` (G54–G59 stay correct, no G92, Z is never touched). By default the machine doesn't move at
+  all; driving the tool there is an option that shows the exact distance first, raises Z first and sets zero only if the
+  head really arrived. Locked during a job, on alarm and when not connected; GRBL family only. Warns if the offset is 0
+  or not set.
 - **Material profiles for milling:** the milling parameters now have a dropdown that applies a saved profile or a
   material from the database to the selected shapes with one click. Manage your own profiles (name, feed, spindle speed,
   depth per pass, optional plunge feed, tool and cutter diameter) in the material database window. The values are stored
