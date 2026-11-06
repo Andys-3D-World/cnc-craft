@@ -1,8 +1,22 @@
 # Changelog
 
-## Next version (unreleased)
+## 0.4.2 Beta
 
 **New**
+- **Candy holder generator (laser, router):** small refillable layered wooden tags for chocolates or sweets. It reuses the theme,
+  shapes, toppers and decorations of the decoration ornament. Set height, material thickness, a round praline (diameter) or a
+  small bar (width and height), filling depth, clearance, up to 6 openings, a ribbon hole or ring, and a name or greeting as
+  engraving. The number of middle layers follows from filling depth and material thickness and is shown in the dialog, with a
+  live preview of all layers. Parts are placed side by side and labelled, with cut and engrave on the right layers; on a router the
+  text is a pocket or on the line. Optional retaining bar: the pocket is taller than the window, so the filling goes in through the
+  window, drops behind the bar and stays in. Checks use the real outline, not the bounding box: opening too large, too close to
+  the edge, thin walls (recommended 2 × material), ribbon hole hitting the opening, with a suggested height when a larger
+  shape would fit. The dialog notes that unpackaged food shouldn't touch cut wood directly; it makes no food-safety claim.
+  A second construction, and the default, is a one-piece folding strip for the laser: front, bend zone, floor, bend zone and back. It
+  folds into a tent and is tied at the top through both holes, so it's refilled by untying the ribbon. Optional side bars glue
+  onto marked lines on the floor. The side view of the folded tent is shown, and the checks cover whether the filling fits inside and
+  whether the bend is too tight. *Edit with generator* works too. Not yet cut or bent on a real machine: cut a test piece to check
+  the fit and the bend zones.
 - **Folding box generator (laser):** a one-piece box for thin cardboard that closes without glue: a tuck-end box with flaps at
   the top and bottom, or a tray with a fold-over lid. It sets inside or outside sizes, cardboard thickness, flap length and
   clearance, with a barbed locking tab, a window and a hang hole as options. Panels are offset by the material thickness at the

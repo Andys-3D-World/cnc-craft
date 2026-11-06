@@ -39,6 +39,7 @@ const P: Record<string, string> = {
   birth: `<path d="M5 21V3h4.5l2.5 6 2.5-6H19v18h-4V11l-3 6-3-6v10z" stroke-width="1.5"/><path d="M12 19.6c-.9-.7-1.6-1.2-1.6-1.8a.8.8 0 011.6-.2.8.8 0 011.6.2c0 .6-.7 1.1-1.6 1.8z" stroke-width="1"/>`,
   vent: `<rect x="2.5" y="3.5" width="19" height="17" rx="2"/><path d="M8 7.5l1.7 1v2l-1.7 1-1.7-1v-2zM15.5 7.5l1.7 1v2l-1.7 1-1.7-1v-2zM11.8 13l1.7 1v2l-1.7 1-1.7-1v-2z" stroke-width="1.3"/>`,
   shelf: `<path d="M5 2.5v19M19 2.5v19"/><path d="M3 7h18M3 13h18M3 19h18" stroke-width="1.5"/>`,
+  candyHolder: `<path d="M12 3a9 9 0 1 0 .01 0z"/><circle cx="12" cy="13" r="4"/><path d="M12 3V1"/>`,
   foldBox: `<path d="M3 9h18v10H3z"/><path d="M9 9v10M15 9v10" stroke-dasharray="2 1.6"/><path d="M9 9l1.500-5h3L15 9"/>`,
   divider: `<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18" stroke-width="1.5"/>`,
   joint: `<path d="M3 6h7v3h-3v3h3v3h-3v3h3v3H3z"/><path d="M21 6h-8v3h3v3h-3v3h3v3h-3v3h8z" stroke-width="1.5"/>`,

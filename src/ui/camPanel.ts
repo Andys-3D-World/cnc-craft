@@ -37,7 +37,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
     ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
-      ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"],
+      ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"], ["candyHolder", "candyHolder", "tip.cmd.candyHolder"],
       ["birth", "birth", "tip.cmd.birth"], ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
       ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
     ${flyCmds("extras", "extras", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
