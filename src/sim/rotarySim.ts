@@ -78,6 +78,7 @@ export function wrapSimProgram(p: SimProgram, R: number, mode: "surface" | "a", 
     return fs.findIndex(f => Math.min(Math.abs(d - f.angle), 360 - Math.abs(d - f.angle)) < 0.01);
   };
   const type = new Uint8Array(total), line = new Uint32Array(total), t0 = new Float64Array(total), dur = new Float32Array(total);
+  const durPlain = p.durPlain ? new Float32Array(total) : undefined;
   let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   let aMin = Infinity, aMax = -Infinity;
   let cutMin = Infinity, cutMax = -Infinity;
@@ -136,13 +137,14 @@ export function wrapSimProgram(p: SimProgram, R: number, mode: "surface" | "a", 
       }
       type[k] = p.type[i]; line[k] = p.line[i];
       dur[k] = p.dur[i] / n;
+      if (durPlain) durPlain[k] = p.durPlain![i] / n;
       t0[k] = p.t0[i] + (p.dur[i] * q) / n;
     }
   }
   if (!total) { minX = minY = minZ = maxX = maxY = maxZ = 0; aMin = aMax = 0; }
   const deg = 180 / Math.PI;
   return {
-    ...p, n: total, x0, y0, z0, x1, y1, z1, type, line, t0, dur, a0: undefined, a1: undefined,
+    ...p, n: total, x0, y0, z0, x1, y1, z1, type, line, t0, dur, durPlain, a0: undefined, a1: undefined,
     bounds: { minX, minY, minZ, maxX, maxY, maxZ },
     // Farben: bei runden Teilen wie im G-Code, sonst aus den Abständen zur Oberfläche
     ...(stock.shape !== "round" && cutMin <= cutMax ? { cutMinZ: cutMin, cutMaxZ: cutMax } : {}),

@@ -19,6 +19,10 @@
  * was die Maschine noch nicht bekommen hat (Sicherheitsabstand, siehe liveEditFloor) – mit Rückfrage.
  */
 import { t, T, tip } from "../i18n/i18n";
+import { motionLimits } from "./motionLimits";
+import { getMachineMode } from "../machineMode";
+import { zonesFromShapes } from "../keepOutShapes";
+import { state as appState } from "../main";
 import { SimProgram, MOVE_CUT, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
@@ -60,8 +64,7 @@ let keepViewOnce = false;   // nächstes geladenes Programm: Kamera nicht neu ei
 
 // Live mit echter Maschine: „ok“ heißt bei GRBL nur „im Puffer“, nicht „gefahren“ – grblHAL puffert viele Zeilen voraus.
 // Deshalb folgt das Werkzeug der gemeldeten Position (Statusbericht, ~5× pro Sekunde). Dazwischen läuft es mit dem
-// GEMESSENEN Tempo weiter (die Zeitschätzung kennt keine Beschleunigung – bei vielen kurzen Linien ist die Maschine
-// langsamer) und gleitet weich zum Ziel, statt zu springen.
+// GEMESSENEN Tempo weiter (die Zeitschätzung kennt z. B. keine Übertragung und keine Überschreibungen) und gleitet weich zum Ziel, statt zu springen.
 const LIVE_TOL = 0.1;       // mm: so nah muss die Position an einer Bahn liegen
 const LIVE_EASE = 0.12;     // s: Zeitkonstante, mit der die Anzeige dem Ziel folgt
 let liveIdx = 0;            // frühestmögliche Bewegung (die Maschine fährt im Programm nie zurück)
@@ -423,7 +426,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
  * G-Code mit A-Achse immer, die Zeichnung (noch nicht umgerechnet) wenn die Drehachse an ist
  */
 function parseSim(lines: string[], src: Source = source): SimProgram {
-  const p = parseGcodeProgram(lines);
+  const p = parseGcodeProgram(lines, { motion: motionLimits() });
   const R = refRadius(rotary);
   if (!(R > 0)) return p;
   // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
@@ -437,6 +440,7 @@ function parseSim(lines: string[], src: Source = source): SimProgram {
 export function setSimProgram(lines: string[], name: string, src: Source) {
   const b = bedSizeMm();
   view.setBed(b.w, b.h);
+  view.setZones(getMachineMode() === "mill" ? zonesFromShapes(appState.shapes) : []);
   prog = parseSim(lines, src);
   source = src;
   label = name;
@@ -608,6 +612,7 @@ function updateInfo() {
   const row = (k: string, v: string) => `<div><span>${k}</span><b>${v}</b></div>`;
   el.innerHTML =
     row(t("sim.estTime"), fmtTime(prog.totalTime)) +
+    row(t("sim.timeBasis"), t("sim.timeBasis." + (motionLimits().source || "default"))) +
     row(t("sim.cutLength"), `${(prog.cutLength / 1000).toFixed(2)} m`) +
     row(t("sim.rapidLength"), `${(prog.rapidLength / 1000).toFixed(2)} m`) +
     row("X", `${b.minX.toFixed(1)} … ${b.maxX.toFixed(1)} mm`) +

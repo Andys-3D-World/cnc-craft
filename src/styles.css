@@ -1844,3 +1844,13 @@ html.os-linux {
   --font-ui: "CNC UI", "Noto Sans", sans-serif;
   --font-mono: "CNC Mono", "Noto Sans Mono", monospace;
 }
+
+/* Einrichteblatt: liegt über der App; beim Drucken nur die Seite selbst */
+#setup-sheet-overlay { position: fixed; inset: 0; z-index: 3000; overflow: auto; background: #fff; }
+#setup-sheet-overlay .sheet-bar { position: sticky; top: 0; display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; background: var(--bg-panel, #eee); }
+@media print {
+  body > *:not(#setup-sheet-overlay) { display: none !important; }
+  #setup-sheet-overlay { position: static; overflow: visible; }
+  #setup-sheet-overlay .sheet-bar { display: none; }
+  html, body { height: auto !important; overflow: visible !important; background: #fff !important; }
+}

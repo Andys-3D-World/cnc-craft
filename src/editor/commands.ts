@@ -23,6 +23,8 @@ import { openStlExport } from "../ui/stlExportDialog";
 import { openNodeEditor } from "../nodes/nodeEditor";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
+import { openHealDialog } from "../ui/healDialog";
+import { openKeepOutDialog } from "../ui/keepOutDialog";
 import { combine, splitByLines, roundCorners, patternFill, weldAndScore, tileShapes, BoolOp, OpResult, PatternOptions, Tile } from "./shapeOps";
 import { getLayers } from "../laserLayers";
 import { centerOn } from "./dims";
@@ -115,6 +117,9 @@ export const commands: Record<string, () => void> = {
     log(t("edit.grouped", { n: sel.length }));
     done();
   },
+  keepOut: () => openKeepOutDialog(log, () => { done(); checkpoint(); }),
+  heal: () => openHealDialog(log, () => { done(); checkpoint(); }),
+
   ungroup: () => {
     const sel = selectedShapes();
     let n = 0;

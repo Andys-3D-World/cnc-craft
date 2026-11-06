@@ -20,6 +20,7 @@ import { isLaser } from "../machineMode";
 import { t, currentLanguage } from "../i18n/i18n";
 import { generateGcode, noGcodeMessage } from "../cam";
 import { parseGcodeProgram } from "../sim/gcodeParser";
+import { motionLimits } from "../sim/motionLimits";
 import { groupBounds, MM_TO_PIXEL } from "../shapeTransform";
 import { getStock } from "../stock";
 
@@ -114,9 +115,9 @@ function hms(s: number): string {
 export function openCostDialog(shapes: any[], log: (s: string) => void) {
   const gcode = generateGcode(shapes, { flat: true });
   if (!gcode) { log(noGcodeMessage()); return; }
-  const timeS = parseGcodeProgram(gcode.split("\n")).totalTime;
+  const timeS = parseGcodeProgram(gcode.split("\n"), { motion: motionLimits() }).totalTime;
   // Fläche der Teile: Umriss aller Formen + 5 mm Rand ringsum
-  const b = groupBounds(shapes.filter((s: any) => s.type !== "image"));
+  const b = groupBounds(shapes.filter((s: any) => s.type !== "image" && !s.keepOut));
   const partsM2 = b ? ((b.maxX - b.minX) / MM_TO_PIXEL + 10) * ((b.maxY - b.minY) / MM_TO_PIXEL + 10) / 1e6 : 0;
   const st = getStock();
   const sheetM2 = st.w * st.h / 1e6;

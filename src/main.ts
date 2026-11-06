@@ -109,7 +109,7 @@ function flushConsole() {
       continue;
     }
     const el = document.createElement("p");
-    el.className = "system-msg";
+    el.className = zeile.startsWith("⛔") ? "error-msg" : "system-msg";
     el.textContent = zeile;
     frag.appendChild(el);
     lastLine = { el, text: zeile, n: 1 };

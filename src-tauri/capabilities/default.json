@@ -5,6 +5,7 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:webview:allow-print",
     "core:window:allow-set-title",
     "core:window:allow-destroy",
     "opener:default",

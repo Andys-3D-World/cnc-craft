@@ -23,6 +23,7 @@ import { buildResume, resumeMarks, ResumeMark } from "./jobResume";
 import { ensureWcsForJob } from "./wcsSync";
 import { macroRunning } from "./macroRun";
 import { toolChangeBusy, tcAbort } from "./toolChange";
+import { limitsAllowStart } from "./ui/limitGuard";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -320,6 +321,9 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
         return;
       }
     }
+    // Maschinengrenzen: geprüft wird genau das, was gleich gesendet wird
+    if (!await limitsAllowStart(send, appendToConsole)) return;
+    if (streamState.isRunning || !machine.connected || machine.status.state === "Alarm") return; // während der Frage geändert
     try {
       streamState.currentLine = Math.max(0, resumeFrom);
       streamState.isRunning = true;

@@ -206,6 +206,8 @@ function shapeMenu(): MenuEntry[] {
     "sep",
     { label: t("cm.group"), ico: "group", key: ctrl("G"), run: cmd("group"), disabled: n < 2 },
     { label: t("cm.ungroup"), ico: "ungroup", key: ctrl("U"), run: cmd("ungroup"), disabled: !grouped },
+    { label: t("cm.heal"), ico: "heal", run: cmd("heal") },
+    { label: t("cm.keepOut"), ico: "keepOut", run: cmd("keepOut") },
     { label: t("cm.front"), ico: "toFront", run: cmd("toFront") },
     { label: t("cm.back"), ico: "toBack", run: cmd("toBack") },
     "sep",

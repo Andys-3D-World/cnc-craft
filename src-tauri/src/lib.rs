@@ -39,6 +39,7 @@ mod machine;
 mod marlin;
 mod modbus;
 mod netscan;
+mod portscan;
 mod camfetch;
 mod ruida;
 mod serial;
@@ -262,6 +263,60 @@ async fn machine_connect(app: AppHandle, port: String, baud: u32, conn: Option<S
         serial::open_machine(&port, baud, emitter(&app, &id))?
     };
     add_slot(id, port, Conn::Grbl(m))
+}
+
+/// Läuft auf irgendeiner Verbindung gerade ein Job?
+fn any_job_running() -> bool {
+    MACHINES.lock().map(|g| g.iter().any(|s| match &s.conn {
+        Conn::Grbl(m) => m.has_job(),
+        Conn::Marlin(m) => m.has_job(),
+        // Ruida/K40 melden keinen Job-Zustand: lieber nichts anfassen
+        Conn::Ruida(_) | Conn::K40(_) => true,
+    })).unwrap_or(true)
+}
+
+/// USB-Suche (nur auf Knopfdruck): meldet jeden Port, auf dem GRBL antwortet. Öffnet nichts, was schon verbunden ist,
+/// startet nicht und hört auf, wenn ein Job läuft. Danach sind alle Ports wieder zu: verbunden wird normal.
+#[tauri::command]
+async fn port_scan(app: AppHandle, bauds: Vec<u32>) -> Result<Vec<portscan::Found>, String> {
+    use portscan::{BUSY, CANCEL};
+    use std::time::Duration;
+    if BUSY.swap(true, Ordering::SeqCst) { return Err("scan-busy".into()); }
+    CANCEL.store(false, Ordering::SeqCst);
+    let res = tauri::async_runtime::spawn_blocking(move || -> Result<Vec<portscan::Found>, String> {
+        let mut found = Vec::new();
+        let ports = serial::list_ports();
+        let total = ports.len();
+        for (i, p) in ports.into_iter().enumerate() {
+            if CANCEL.load(Ordering::SeqCst) { break; }
+            let taken = MACHINES.lock().map(|g| g.iter().any(|s| s.target == p.name)).unwrap_or(true);
+            let _ = app.emit("port-scan", serde_json::json!({ "port": p.name, "index": i, "total": total, "skipped": taken }));
+            if taken { continue; }
+            for (k, &baud) in bauds.iter().enumerate() {
+                if CANCEL.load(Ordering::SeqCst) { break; }
+                if any_job_running() { return Err("job-running".into()); }
+                let Ok(mut port) = serialport::new(&p.name, baud).timeout(Duration::from_millis(50)).open() else { break };
+                let _ = port.write_data_terminal_ready(false);
+                let _ = port.write_request_to_send(false);
+                // Erste Baudrate länger: das Board startet evtl. gerade neu
+                let window = Duration::from_millis(if k == 0 { 3000 } else { 2000 });
+                if let Some(firmware) = portscan::probe(&mut port, window, Duration::from_millis(400), &CANCEL) {
+                    let hit = portscan::Found { port: p.name.clone(), baud, firmware };
+                    let _ = app.emit("port-scan-found", &hit);
+                    found.push(hit);
+                    break;
+                }
+            }
+        }
+        Ok(found)
+    }).await.map_err(|e| e.to_string());
+    BUSY.store(false, Ordering::SeqCst);
+    res?
+}
+
+#[tauri::command]
+fn port_scan_cancel() {
+    portscan::CANCEL.store(true, Ordering::SeqCst);
 }
 
 /// Marlin-Maschine verbinden (Creality, Anycubic, MPCNC …). laser = bei Pause Laser aus
@@ -882,6 +937,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             gamepad_read,
             list_ports,
+            port_scan,
+            port_scan_cancel,
             keep_awake,
             machine_connect,
             marlin_connect,

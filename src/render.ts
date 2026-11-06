@@ -162,6 +162,20 @@ export function drawEverything(
   for (const shape of shapes) {
     if (!inView(shape, view)) continue;
     const isSel = selected.has(shape.id);
+    if (shape.keepOut) {
+      // Sperrzone: rot gestrichelt, leicht gefüllt – kein Schnitt
+      ctx.beginPath();
+      tracePath(ctx, shape, sx, sy, scale);
+      ctx.fillStyle = "rgba(255,60,60,0.14)";
+      ctx.fill();
+      ctx.save();
+      ctx.setLineDash([6, 4]);
+      ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : "#ff4d4d";
+      ctx.lineWidth = isSel ? 2.2 : 1.5;
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
     ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
     ctx.lineWidth = isSel ? 2.2 : 1.5;
     ctx.beginPath();

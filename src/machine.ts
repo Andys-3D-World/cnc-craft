@@ -47,6 +47,7 @@ export interface BoardInfo {
 }
 const INFO_KEY = "cnc_craft_board_info";
 
+export type HomeState = "" | "pending" | "homed" | "lost";
 export type Protocol = "grbl" | "marlin" | "ruida" | "k40";
 
 /** Werte, die die Ruida-Steuerung zum Umrechnen braucht (kommen aus der gewählten Maschine) */
@@ -64,6 +65,8 @@ export const machine = {
   status: { state: "", sub: null, mpos: [0, 0, 0], wpos: [0, 0, 0], feed: 0, spindle: 0, ov: [100, 100, 100], pins: "", acc: null } as MachineStatus,
   job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
   settings: new Map<string, string>(),  // "$110" -> "5000.000"
+  /** Referenzfahrt: "" = nicht gesehen, "pending" = $H geschickt, "homed" = fertig, "lost" = Alarm (Position nicht mehr sicher) */
+  homeState: "" as HomeState,
   lastAlarm: 0,
   wcs: "",        // aktives Koordinatensystem laut $G ("" = unbekannt, wcsSync.ts liest es beim nächsten Stillstand)
   wcsWanted: "",  // vom Nutzer gewähltes System ("" = nie gewählt)
@@ -247,7 +250,7 @@ function syncAwake() {
 // laufen im Hintergrund weiter (Status, Job-Fortschritt, Alarme werden dort mitgeschrieben).
 // ---------------------------------------------------------------------
 
-type MachineState = Pick<typeof machine, "protocol" | "ruidaBed" | "connected" | "port" | "firmware" | "version" | "status" | "job" | "settings" | "lastAlarm" | "wcs" | "wcsWanted" | "info">;
+type MachineState = Pick<typeof machine, "protocol" | "ruidaBed" | "connected" | "port" | "firmware" | "version" | "status" | "job" | "settings" | "homeState" | "lastAlarm" | "wcs" | "wcsWanted" | "info">;
 interface Slot { id: string; mode: MachineMode; state: MachineState; infoRequested: boolean; espInfoRequested: boolean }
 
 /** Kurzinfo für die Maschinen-Liste */
@@ -268,13 +271,13 @@ function emptyState(): MachineState {
     protocol: "grbl", ruidaBed: null, connected: false, port: "", firmware: "", version: "",
     status: { state: "", sub: null, mpos: [0, 0, 0], wpos: [0, 0, 0], feed: 0, spindle: 0, ov: [100, 100, 100], pins: "", acc: null },
     job: { active: false, sent: 0, acked: 0, total: 0, paused: false, toolChange: false, stopping: false },
-    settings: new Map(), lastAlarm: 0, wcs: "", wcsWanted: "",
+    settings: new Map(), homeState: "", lastAlarm: 0, wcs: "", wcsWanted: "",
     info: { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] }
   };
 }
 function takeState(): MachineState {
-  const { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, wcs, wcsWanted, info } = machine;
-  return { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, lastAlarm, wcs, wcsWanted, info };
+  const { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, homeState, lastAlarm, wcs, wcsWanted, info } = machine;
+  return { protocol, ruidaBed, connected, port, firmware, version, status, job, settings, homeState, lastAlarm, wcs, wcsWanted, info };
 }
 
 /** Alle Maschinen (ausgewählte zuerst nicht nötig – Reihenfolge nach Kennung) */
@@ -470,6 +473,9 @@ export async function initMachine(logFn: (s: string) => void) {
     if (Array.isArray(p.ov)) s.ov = p.ov;
     if (typeof p.acc === "string") s.acc = p.acc;
     s.pins = p.pins || "";
+    // Referenzfahrt verfolgen (klassisches GRBL meldet „Home“ nicht, darum am $H festgemacht); Alarm = Position unsicher
+    if (s.state === "Alarm") m.homeState = "lost";
+    else if (s.state === "Idle" && m.homeState === "pending") m.homeState = "homed";
     if (prev !== s.state) fire("slots");
     if (!own) return;
     if (!machine.firmware && s.state && machine.protocol === "grbl") {
@@ -615,11 +621,21 @@ export async function netScan(hints: string[] = []): Promise<{ own: string; devi
   return await invoke<{ own: string; devices: NetDevice[] }>("net_scan", { hints });
 }
 
+export interface PortHit { port: string; baud: number; firmware: string }
+/** USB-Suche (nur auf Knopfdruck); schon verbundene Ports werden übersprungen, bei laufendem Job Abbruch */
+export async function portScan(bauds: number[]): Promise<PortHit[]> {
+  return await invoke<PortHit[]>("port_scan", { bauds });
+}
+export async function portScanCancel(): Promise<void> {
+  await invoke("port_scan_cancel");
+}
+
 export async function listPorts(): Promise<PortInfo[]> {
   try { return await invoke<PortInfo[]>("list_ports"); } catch { return []; }
 }
 
 export async function connect(port: string, baud: number): Promise<void> {
+  machine.homeState = "";
   machine.protocol = "grbl";
   machine.wcs = ""; machine.wcsWanted = "";
   machine.firmware = "";
@@ -748,9 +764,15 @@ export async function exportRd(lines: string[], path: string): Promise<{ bytes: 
 let muteParser = 0;
 export function muteNextParserReply(on: boolean) { muteParser = on ? 1 : 0; }
 
+/** $H (alle Achsen) geschickt: nach dem nächsten „Idle“ gilt die Maschine als referenziert */
+function noteHomeCommand(line: string) {
+  if (/^\s*\$H\s*$/i.test(line)) machine.homeState = "pending";
+}
+
 /** Zeile senden (ohne auf die Antwort zu warten). Fehler der Maschine erscheinen in der Konsole. */
 export async function send(line: string, quiet = false): Promise<void> {
   if (!quiet) log(`> ${line}`);
+  noteHomeCommand(line);
   await invoke<number>("machine_send", { line });
 }
 
@@ -765,6 +787,7 @@ export function maskSecrets(line: string): string {
 
 export async function sendAndWait(line: string, timeoutMs = 6000, quiet = false): Promise<Ack> {
   if (!quiet) log(`> ${line}`);
+  noteHomeCommand(line);
   let id: number;
   try { id = await invoke<number>("machine_send", { line }); }
   catch { return { ok: false, code: -1 }; }

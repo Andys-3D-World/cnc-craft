@@ -24,7 +24,7 @@ function selectedShapes(): any[] {
   const st = state();
   if (!st) return [];
   const ids = new Set(st.selectedShapeIds);
-  return st.shapes.filter((s: any) => ids.has(s.id) && s.type !== "image");
+  return st.shapes.filter((s: any) => ids.has(s.id) && s.type !== "image" && !s.keepOut);
 }
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -185,7 +185,7 @@ export function openAssignTools() {
   const st = state();
   if (!st) return;
   const sel = selectedShapes();
-  const scope = (sel.length ? sel : st.shapes).filter((s: any) => s.type !== "image");
+  const scope = (sel.length ? sel : st.shapes).filter((s: any) => s.type !== "image" && !s.keepOut);
   // wie oft kommt jede Art vor (erste Bearbeitung + weitere)
   const count = new Map<string, number>();
   for (const s of scope) {

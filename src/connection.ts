@@ -27,6 +27,7 @@ import {
 } from "./machine";
 import { isRuidaMachine, isMarlinMachine, isK40Machine, currentMachine } from "./ui/machineWizard";
 import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
+import { openPortScanDialog } from "./ui/portScanDialog";
 import { analyze, isDefaultHost } from "./wifiCodec";
 import { releaseMachine } from "./ui/pinLeds";
 
@@ -240,6 +241,21 @@ export function initConnection(appendToConsole: (text: string) => void) {
   };
   window.addEventListener("cnc-protocol-changed", () => { if (!machine.connected) scan(); });
   $("scan-btn")?.addEventListener("click", scan);
+  // USB-Suche: nur auf Knopfdruck; der Fund wird eingetragen und ganz normal verbunden
+  $("usb-find-btn")?.addEventListener("click", () => {
+    if (isMarlinMachine()) { appendToConsole(t("usb.grblOnly")); return; }
+    if (machineSlots().some(s => s.job.active)) { appendToConsole(t("usb.jobRunning")); return; }
+    const bauds = [...baudSelect.options].map(o => parseInt(o.value, 10)).filter(b => b > 0);
+    openPortScanDialog(bauds, appendToConsole, async hit => {
+      if (machine.job.active) { appendToConsole(t("usb.jobRunning")); return; }
+      if (machine.connected) await newMachineSlot(); // die verbundene Maschine bleibt, wie sie ist
+      await scan();
+      portSelect.value = hit.port;
+      baudSelect.value = String(hit.baud);
+      baudSelect.dispatchEvent(new Event("change"));
+      connectBtn.click();
+    });
+  });
   portSelect?.addEventListener("focus", () => { if (!machine.connected) scan(); });
   scan();
 

@@ -24,7 +24,8 @@ const WRITERS: Record<ExportFormat, (items: ExpItem[]) => ExpResult> = { svg: to
 const NAMES: Record<ExportFormat, string> = { svg: "SVG", dxf: "DXF", pdf: "PDF", plt: "PLT / HPGL" };
 
 /** Formen -> Export-Elemente (mm, Y oben) */
-export function shapesToItems(shapes: any[]): ExpItem[] {
+export function shapesToItems(allShapes: any[]): ExpItem[] {
+  const shapes = allShapes.filter((s: any) => !s.keepOut); // Sperrzonen sind kein Teil
   const k = 1 / MM_TO_PIXEL;
   const laser = isLaser(), plasma = isPlasma();
   const out: ExpItem[] = [];

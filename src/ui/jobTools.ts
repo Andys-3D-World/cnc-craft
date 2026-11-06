@@ -15,6 +15,7 @@ import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from
 import { state } from "../main";
 import { rotary } from "../rotary";
 import { isPlasma } from "../machineMode";
+import { openSetupSheet } from "./setupSheetDialog";
 
 export interface Bounds { x0: number; y0: number; x1: number; y1: number }
 
@@ -118,4 +119,5 @@ export async function saveRdFile(log: (s: string) => void) {
 export function initJobTools(log: (s: string) => void) {
   document.getElementById("btn-job-frame")?.addEventListener("click", () => runFrame(log));
   document.getElementById("btn-save-rd")?.addEventListener("click", () => saveRdFile(log));
+  document.getElementById("btn-setup-sheet")?.addEventListener("click", () => openSetupSheet(log));
 }

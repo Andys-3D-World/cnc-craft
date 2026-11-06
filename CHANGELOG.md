@@ -1,5 +1,39 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Machine limits checked before job start (GRBL family):** on Start, the app works out the X/Y/Z extents of exactly the lines
+  it is about to send (rapids and arcs included) and compares them with `$130`–`$132`, using the work offset from the status
+  report. If the job leaves the limits, Start is blocked with a red message naming the axes and how far over they are; the
+  only way past it is a deliberate *Start anyway* in that window, for controllers whose settings are wrong. Machine space
+  isn't assumed to be negative: the range is derived from the current position and `$23`. If limits or position are unknown
+  (not homed, `$22` off, settings not read), or the job contains something that can't be calculated (G92, G10, another
+  G54–G59, G28/G30, probing), the app warns instead of blocking. A job wider than the travel is always reported.
+- **Close vectors:** a new command (edit toolbar and right-click menu) joins open paths with small gaps into closed contours,
+  for the selection or the whole project. The largest gap is adjustable (default 0.1 mm). Points aren't moved: only the
+  gap is bridged with a straight piece. It reports how many contours were made, selects what stayed open and shows how far
+  apart those ends are. One undo step.
+- **USB search for GRBL controllers:** a new compass button next to the port list looks for a GRBL controller on all free USB
+  ports and baud rates, only when you start it (opening a port can restart a board, so the window warns first). It sends only
+  `?` and accepts only a valid status or welcome line. Connected ports are skipped, it doesn't run during a job, and it can be
+  cancelled. Choosing a result fills in port and baud and connects the normal way; a machine already connected stays connected.
+- **Keep-out zones for clamps (milling):** turn a drawn rectangle or circle into a keep-out zone with its clamp height and a
+  margin. Zones are saved in the project, shown in red in the drawing and simulation, and are never cut or exported. In the
+  generated G-code, rapid moves that cross a zone first raise Z to clamp height plus margin (cutter radius included) and go
+  back down afterwards. Cutting moves into a zone can't be avoided automatically, so they stay as they are and produce a
+  warning naming the shape. Loaded G-code files aren't changed, and zones are ignored with a rotary axis (with a message).
+- **Setup sheet:** a new button shows an overview for the operator at the machine: tools (number, diameter, type, length), stock
+  size, estimated run time, zero point (corner or centre, Z reference, active G54–G59), operations in order with depth and feed,
+  tool changes, keep-out zones, warnings and a small picture of the job. Print it or save it as a standalone HTML file.
+
+**Improved**
+- **Run time estimate includes acceleration:** the simulation and cost calculator now plan the job like GRBL does, with
+  `$110`–`$112`, `$120`–`$122`, corner speed from `$11`, arcs from `$12` and the controller's small look-ahead buffer. It's
+  still an estimate, but much closer on jobs with many short segments and arcs. Offline it uses the last values read
+  from the machine, otherwise defaults; the simulation shows which. The laser preview's darkness still uses the programmed
+  feed, and G-code output is unchanged.
+
 ## 0.4.1 Beta
 
 **New**

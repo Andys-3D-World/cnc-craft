@@ -213,6 +213,7 @@ export function renderRightPanel(container: HTMLElement) {
                 <option value="" data-i18n="rp.scanPorts">Ports scannen...</option>
               </select>
               <button id="scan-btn" class="btn-secondary btn-icon" ${tip("m.scanTip")}>🔍</button>
+              <button id="usb-find-btn" class="btn-secondary btn-icon not-ruida not-k40" ${tip("usb.findTip")}>🧭</button>
             </div>
             <div style="display: flex; gap: 4px;">
               <input type="text" id="ruida-ip" style="flex: 1; min-width: 0; font-size: 0.78rem; padding: 4px; display: none;" placeholder="192.168.1.100" ${tip("m.ruidaIpTip")}>
@@ -295,6 +296,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
             </div>
             <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
+            <button id="btn-setup-sheet" class="btn-secondary" ${tip("sheet.tip")}>📋 ${T("sheet.btn")}</button>
           </div>
         </div>
 

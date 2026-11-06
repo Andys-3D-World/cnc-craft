@@ -15,6 +15,8 @@
  * Enthält die Datei gar keine M3/M4/M5-Befehle, gilt jede G1-G3-Bewegung als Schnitt.
  */
 
+import { planDurations, type MotionLimits } from "./motionPlan.ts";
+
 export const MOVE_RAPID = 0;
 export const MOVE_CUT = 1;
 export const MOVE_TRAVEL = 2;
@@ -31,6 +33,10 @@ export interface SimProgram {
   line: Uint32Array;          // Zeilennummer (0-basiert) der Bewegung
   t0: Float64Array;           // Startzeit in Sekunden
   dur: Float32Array;          // Dauer in Sekunden
+  /** mit Beschleunigung gerechnet: Dauer ohne Rampen (daraus liest die Laser-Vorschau den programmierten Vorschub) */
+  durPlain?: Float32Array;
+  /** Werte, mit denen die Zeit gerechnet ist (fehlt = ohne Beschleunigung) */
+  motion?: MotionLimits;
   totalTime: number;
   cutLength: number;
   rapidLength: number;
@@ -58,6 +64,7 @@ export interface ParseOptions {
   rapidRate?: number;   // mm/min für G0 (Schätzung)
   defaultFeed?: number; // mm/min, falls kein F angegeben
   arcTol?: number;      // mm, Genauigkeit der Bogen-Unterteilung
+  motion?: MotionLimits; // Zeit mit Beschleunigung rechnen (motionPlan.ts); ohne: einfache Schätzung Weg/Vorschub
 }
 
 export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): SimProgram {
@@ -67,6 +74,12 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   const x0: number[] = [], y0: number[] = [], z0: number[] = [];
   const x1: number[] = [], y1: number[] = [], z1: number[] = [];
   const type: number[] = [], lineNo: number[] = [], dur: number[] = [];
+  // nur für die Rechnung mit Beschleunigung
+  const plan = !!opts.motion;
+  const rateOf: number[] = [], lenOf: number[] = [], stopOf: number[] = [], dwellOf: number[] = [];
+  const arcROf: number[] = [], arcInOf: number[] = [];
+  let arcNow = 0, arcInside = 0;
+  let stopNext = false;
   // Drehachse A: nur wenn sie vorkommt (sonst kein Speicher dafür)
   const hasA = lines.some(l => /(^|[^A-Z])A\s*[-+]?[\d.]/i.test(stripComments(l)));
   const a0: number[] = [], a1: number[] = [];
@@ -98,6 +111,11 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     type.push(kind); lineNo.push(li);
     const rate = kind === MOVE_RAPID ? rapidRate : Math.max(1, f);
     dur.push(len / (rate / 60) + dwell);
+    if (plan) {
+      rateOf.push(kind === MOVE_RAPID ? 0 : Math.max(1, f)); lenOf.push(len); stopOf.push(stopNext ? 1 : 0); dwellOf.push(dwell);
+      arcROf.push(arcNow); arcInOf.push(arcInside);
+      stopNext = false;
+    }
     dwell = 0;
     if (kind === MOVE_RAPID) rapidLength += geo; else if (kind === MOVE_CUT) cutLength += geo;
   };
@@ -138,11 +156,13 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     for (const mc of ms) {
       if (mc === 3 || mc === 4) toolCmdOn = true;
       else if (mc === 5 || mc === 2 || mc === 30) toolCmdOn = false;
+      // Die Steuerung wartet hier, bis alle Fahrten fertig sind (Spindel, Kühlung, Pause)
+      if (mc <= 5 || mc === 7 || mc === 8 || mc === 9) stopNext = true;
     }
     const spindleOn = !hasSpindle || (toolCmdOn && power > 0);
 
     // G4 P = warten (Sekunden; bei GRBL immer Sekunden)
-    if (gs.includes(4)) { if (words.P !== undefined) dwell += Math.max(0, words.P); continue; }
+    if (gs.includes(4)) { if (words.P !== undefined) dwell += Math.max(0, words.P); stopNext = true; continue; }
     // Antasten (G38.2 usw.): Ergebnis ist unbekannt -> nicht nachbilden
     if (gs.some(g => g >= 38 && g < 39)) continue;
 
@@ -230,9 +250,11 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
         const qx = s === segs ? nx : cx + r * Math.cos(a);
         const qy = s === segs ? ny : cy + r * Math.sin(a);
         const qz = z + (nz - z) * tt;
+        arcNow = r; arcInside = s > 1 ? 1 : 0;
         add(px, py, pz, qx, qy, qz, kind, li, feed);
         px = qx; py = qy; pz = qz;
       }
+      arcNow = 0; arcInside = 0;
     }
     x = nx; y = ny; z = nz;
   }
@@ -240,7 +262,10 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   const n = x0.length;
   const t0 = new Float64Array(n);
   let t = 0;
-  for (let i = 0; i < n; i++) { t0[i] = t; t += dur[i]; }
+  const planned = opts.motion
+    ? planDurations({ n, x0, y0, z0, x1, y1, z1, rate: rateOf, len: lenOf, stop: stopOf, dwell: dwellOf, arcR: arcROf, arcIn: arcInOf }, opts.motion)
+    : null;
+  for (let i = 0; i < n; i++) { t0[i] = t; t += planned ? planned[i] : dur[i]; }
 
   let minX = Infinity, minY = Infinity, minZ = Infinity, maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
   let cutMinZ = Infinity, cutMaxZ = -Infinity;
@@ -263,7 +288,8 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     x0: Float32Array.from(x0), y0: Float32Array.from(y0), z0: Float32Array.from(z0),
     x1: Float32Array.from(x1), y1: Float32Array.from(y1), z1: Float32Array.from(z1),
     type: Uint8Array.from(type), line: Uint32Array.from(lineNo),
-    t0, dur: Float32Array.from(dur),
+    t0, dur: Float32Array.from(planned || dur),
+    ...(planned ? { durPlain: Float32Array.from(dur), motion: opts.motion } : {}),
     totalTime: t, cutLength, rapidLength,
     bounds: { minX, minY, minZ, maxX, maxY, maxZ }, cutMinZ, cutMaxZ,
     ...(hasA ? { a0: Float32Array.from(a0), a1: Float32Array.from(a1) } : {})

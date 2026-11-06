@@ -11,49 +11,33 @@
 import { isClosedShape, shapeToPaths, pathArea, pointInPath, createPolyline, cloneShape, MM_TO_PIXEL, Pt } from "./shapeTransform";
 import { t } from "./i18n/i18n";
 import { openInlayDialog } from "./editor/inlay";
+import { joinChains } from "./joinPaths";
 
 /** Enden gelten als verbunden, wenn sie höchstens so weit auseinander liegen (0,05 mm) */
 const JOIN_TOL = 0.05 * MM_TO_PIXEL;
 
-/**
- * Verbindet offene Formen (Linien, Bögen, offene Polylinien), deren Enden sich treffen.
- * Nur Ketten, die sich schließen, werden ersetzt – alles andere bleibt unverändert.
- */
+/** Verbindet offene Formen (Linien, Bögen, offene Polylinien), deren Enden sich treffen (siehe joinPaths.ts) */
 function joinOpenShapes(open: any[]): { closed: { pts: Pt[]; from: any[] }[]; left: any[] } {
-  const items = open.map(s => ({ s, pts: shapeToPaths(s)[0]?.pts || [] })).filter(i => i.pts.length >= 2);
-  const used = items.map(() => false);
-  const d = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
-  const closed: { pts: Pt[]; from: any[] }[] = [];
-  const left: any[] = [];
-  for (let i = 0; i < items.length; i++) {
-    if (used[i]) continue;
-    used[i] = true;
-    let chain = items[i].pts.map(p => ({ x: p.x, y: p.y }));
-    const from = [items[i].s];
-    let grew = true;
-    while (grew && d(chain[0], chain[chain.length - 1]) > JOIN_TOL) {
-      grew = false;
-      for (let j = 0; j < items.length && !grew; j++) {
-        if (used[j]) continue;
-        const q = items[j].pts, a = q[0], b = q[q.length - 1];
-        const end = chain[chain.length - 1], start = chain[0];
-        let add: Pt[] | null = null, front = false;
-        if (d(end, a) <= JOIN_TOL) add = q.slice(1);
-        else if (d(end, b) <= JOIN_TOL) add = q.slice(0, -1).reverse();
-        else if (d(start, b) <= JOIN_TOL) { add = q.slice(0, -1); front = true; }
-        else if (d(start, a) <= JOIN_TOL) { add = q.slice(1).reverse(); front = true; }
-        if (!add) continue;
-        const copy = add.map(p => ({ x: p.x, y: p.y }));
-        chain = front ? copy.concat(chain) : chain.concat(copy);
-        used[j] = true; from.push(items[j].s); grew = true;
-      }
-    }
-    if (chain.length > 2 && d(chain[0], chain[chain.length - 1]) <= JOIN_TOL) {
-      chain.pop();
-      closed.push({ pts: chain, from });
-    } else left.push(...from);
-  }
-  return { closed, left };
+  const r = joinChains(open.map(s => ({ ref: s, pts: shapeToPaths(s)[0]?.pts || [] })), JOIN_TOL);
+  return { closed: r.closed, left: r.left.flatMap(l => l.from) };
+}
+
+/**
+ * Fertige Ketten in der Zeichnung ersetzen: neue Polylinien an der Stelle der ersten alten Form.
+ * Werkzeug, Tiefe, Ebene, Gruppe … kommen von der ersten Form. Gibt die neuen Formen zurück.
+ */
+export function replaceWithJoined(state: any, joined: { pts: Pt[]; from: any[] }[]): any[] {
+  const gone = new Set(joined.flatMap(c => c.from.map((s: any) => s.id)));
+  const made = joined.map(c => {
+    const extra = cloneShape(c.from[0]);
+    ["id", "type", "points", "closed", "x", "y", "w", "h", "midX", "midY", "rotation"].forEach(k => delete extra[k]);
+    return createPolyline(c.pts, true, "outside", extra);
+  });
+  const at = state.shapes.findIndex((s: any) => gone.has(s.id));
+  const rest = state.shapes.filter((s: any) => !gone.has(s.id));
+  rest.splice(Math.max(0, Math.min(at, rest.length)), 0, ...made);
+  state.shapes = rest;
+  return made;
 }
 
 export function bindOffsetModes(state: any, redraw: () => void, appendToConsole: (t: string) => void) {
@@ -76,16 +60,7 @@ export function bindOffsetModes(state: any, redraw: () => void, appendToConsole:
         const { closed: joined, left } = joinOpenShapes(open);
         if (joined.length) {
           const gone = new Set(joined.flatMap(c => c.from.map((s: any) => s.id)));
-          const made = joined.map(c => {
-            // Werkzeug, Tiefe, Ebene, Gruppe … von der ersten Form übernehmen
-            const extra = cloneShape(c.from[0]);
-            ["id", "type", "points", "closed", "x", "y", "w", "h", "midX", "midY", "rotation"].forEach(k => delete extra[k]);
-            return createPolyline(c.pts, true, "outside", extra);
-          });
-          const at = state.shapes.findIndex((s: any) => gone.has(s.id));
-          const rest = state.shapes.filter((s: any) => !gone.has(s.id));
-          rest.splice(Math.max(0, Math.min(at, rest.length)), 0, ...made);
-          state.shapes = rest;
+          const made = replaceWithJoined(state, joined);
           sel = sel.filter((s: any) => !gone.has(s.id)).concat(made);
           state.selectedShapeIds = sel.map((s: any) => s.id);
           appendToConsole(t("mode.joined", { n: gone.size, k: made.length }));

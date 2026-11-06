@@ -92,6 +92,10 @@ export class SimView {
 
   setBed(w: number, h: number) { this.bedW = w; this.bedH = h; this.invalidate(); }
 
+  /** Sperrzonen (Spannpratzen) als rote Säulen zeigen: Umriss unten (Z0) und auf der Pratzenhöhe */
+  private zones: { pts: { x: number; y: number }[]; height: number }[] = [];
+  setZones(z: { pts: { x: number; y: number }[]; height: number }[]) { this.zones = z; this.invalidate(); }
+
   setProgram(p: SimProgram | null) {
     this.prog = p;
     this.curIdx = -1;
@@ -338,6 +342,23 @@ export class SimView {
     ctx.moveTo(PX(0, 0), PY(0, 0, 0)); ctx.lineTo(PX(this.bedW, 0), PY(this.bedW, 0, 0));
     ctx.lineTo(PX(this.bedW, this.bedH), PY(this.bedW, this.bedH, 0)); ctx.lineTo(PX(0, this.bedH), PY(0, this.bedH, 0));
     ctx.closePath(); ctx.stroke();
+    }
+    // ---- Sperrzonen: Umriss auf Z0 und auf Pratzenhöhe ----
+    if (!rp && this.zones.length) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(255, 77, 77, 0.9)";
+      ctx.fillStyle = "rgba(255, 77, 77, 0.12)";
+      for (const zn of this.zones) {
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        zn.pts.forEach((p, i) => { const sx = PX(p.x, p.y), sy = PY(p.x, p.y, zn.height); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        zn.pts.forEach((p, i) => { const sx = PX(p.x, p.y), sy = PY(p.x, p.y, 0); if (i) ctx.lineTo(sx, sy); else ctx.moveTo(sx, sy); });
+        ctx.closePath(); ctx.stroke();
+      }
+      ctx.restore();
     }
 
     // Achsen am Nullpunkt

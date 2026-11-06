@@ -76,6 +76,8 @@ const P: Record<string, string> = {
   duplicate: `<rect x="4" y="4" width="11" height="11" rx="1.5"/><rect x="9" y="9" width="11" height="11" rx="1.5"/>`,
   selectAll: `<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.5"/><rect x="8.5" y="8.5" width="7" height="7"/>`,
   group: `<rect x="3.5" y="3.5" width="17" height="17" rx="1" stroke-dasharray="3 2.5"/><rect x="7" y="7" width="5" height="5"/><circle cx="15" cy="15" r="2.7"/>`,
+  keepOut: `<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2"/><path d="M8 8l8 8M16 8l-8 8"/>`,
+  heal: `<path d="M9 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-3"/><path d="M12 3v5M12 11v2" stroke-dasharray="2 1.5"/>`,
   ungroup: `<rect x="4" y="4" width="7" height="7"/><circle cx="16.5" cy="16.5" r="3.5"/><path d="M14 4h6v6M4 14v6h6" stroke-dasharray="2.5 2"/>`,
   splitParts: `<rect x="3" y="5" width="8" height="14" rx="1"/><circle cx="7" cy="12" r="1.8"/><rect x="13" y="5" width="8" height="14" rx="1"/><circle cx="17" cy="12" r="1.8"/>`,
   boolUnion: `<path d="M14.5 9.5A5.5 5.5 0 109.5 14.5 5.5 5.5 0 1014.5 9.5z" fill="currentColor" fill-opacity=".25"/>`,

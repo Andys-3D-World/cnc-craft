@@ -398,9 +398,10 @@ export class LiveCarve {
     if (!plasma) {
       // Vorschub aus Länge und Dauer (mm/min)
       const len3 = Math.hypot(dx, dy, this.Z1[m] - this.Z0[m]);
-      const feed = p.dur[m] > 1e-9 ? Math.max(10, (len3 / p.dur[m]) * 60) : 1000;
+      const d = (p.durPlain || p.dur)[m]; // programmierter Vorschub: Rampen sollen die Vorschau nicht abdunkeln
+      const feed = d > 1e-9 ? Math.max(10, (len3 / d) * 60) : 1000;
       dose = (this.pow ? this.pow[p.line[m]] : 1) * (1000 / feed);
-      if (len3 < 1e-6) dose = (this.pow ? this.pow[p.line[m]] : 1) * Math.max(0.2, p.dur[m]) * 5; // Stillstand (Punkt)
+      if (len3 < 1e-6) dose = (this.pow ? this.pow[p.line[m]] : 1) * Math.max(0.2, d) * 5; // Stillstand (Punkt)
       if (dose <= 0) return false;
     }
     const outer = plasma ? this.spot * 2 : this.spot;

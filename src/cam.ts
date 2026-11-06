@@ -28,6 +28,9 @@ import { facingPath } from "./facing";
 import { DRIFT_SLOT, placeDriftPoints } from "./driftPoints";
 import { probeSettings } from "./probe";
 import { parseGcodeProgram } from "./sim/gcodeParser";
+import { applyKeepOuts, isKeepOut } from "./keepOut";
+import { zonesFromShapes } from "./keepOutShapes";
+import { state as appState } from "./main";
 import { optimizeCutOrder, CutItem } from "./cutOrder";
 
 const MM_TO_PIXEL = 2;
@@ -130,8 +133,10 @@ function withRestGroups(groups: ToolGroup[]): ToolGroup[] {
  */
 /** flat: Drehachse nicht umrechnen (Simulation zeigt die abgewickelte Fläche) */
 let flatOnly = false;
-export const generateGcode = (shapes: any, opts: { flat?: boolean } = {}): string | null => {
+export const generateGcode = (allShapes: any, opts: { flat?: boolean } = {}): string | null => {
   flatOnly = !!opts.flat;
+  // Sperrzonen werden nie geschnitten; sie gelten auch, wenn nur ein Teil der Zeichnung erzeugt wird
+  const shapes = allShapes.filter((s: any) => !isKeepOut(s));
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
   const skipped = usedAreaShapes(shapes);
   allSkipped = skipped.size > 0 && skipped.size === shapes.length;
@@ -144,11 +149,27 @@ export const generateGcode = (shapes: any, opts: { flat?: boolean } = {}): strin
     g = r.gcode;
     if (r.arcs) lastGcodeNotes.push(t("arc.result", { before: r.before, after: r.after, arcs: r.arcs, pct: Math.round((1 - r.after / r.before) * 100) }));
   }
+  if (g && !isLaser() && !isPlasma()) g = applyZones(g, used);
   if (g && rotary.on && !flatOnly && !isPlasma()) g = rotaryGcode(g, used);
   if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
   else if (g) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
   return g;
 };
+
+/** Sperrzonen (keepOut.ts): Eilfahrten anheben, Schnitte hinein melden. Mit Drehachse gibt es keine feste Fläche → nur Hinweis */
+function applyZones(g: string, used: any[]): string {
+  const zones = zonesFromShapes(appState.shapes);
+  if (!zones.length) return g;
+  if (rotary.on) { lastGcodeWarnings.push(t("ko.rotary")); return g; }
+  const dia = Math.max(0, ...used.map((s: any) => { const tl = toolForShape(s); return tl ? cutDiameter(tl) : 3; }));
+  const r = applyKeepOuts(g, zones, { radius: dia / 2, note: `(${ascii(t("gc.keepOut"))})` });
+  if (r.raised) lastGcodeNotes.push(t("ko.raised", { n: r.raised }));
+  if (r.unsure) lastGcodeWarnings.push(t("ko.unsure"));
+  for (const h of r.hits) {
+    lastGcodeWarnings.push(t(h.kind === "cut" ? "ko.hitCut" : "ko.hitRapid", { zone: h.zone + 1, form: h.label || "?" }));
+  }
+  return r.gcode;
+}
 
 /**
  * Drehachse (Laser und Fräse): Y auf den Umfang umrechnen (Y-Anschluss) oder in eine A-Achse (Grad),
