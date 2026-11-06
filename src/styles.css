@@ -730,6 +730,9 @@ input:not([type]) {
 .dlg-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; }
 .dlg-box { background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; width: 360px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow: auto; color: var(--text-main); display: flex; flex-direction: column; gap: 9px; font-family: var(--font-ui); box-sizing: border-box; }
 .dlg-box h3 { margin: 0 0 2px; font-size: 1rem; }
+/* Symbole statt Emojis: stehen wie ein Zeichen in der Textzeile; Klicks gehen an den Knopf drumherum */
+.ico.emo { display: inline-block; vertical-align: -0.22em; flex: none; pointer-events: none; margin-right: 0.1em; }
+.dlg-box h3 > .ico { display: inline-block; vertical-align: -4px; margin-right: 6px; color: var(--accent-color); }
 .dlg-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.84rem; }
 .dlg-num { display: inline-flex; align-items: center; gap: 5px; }
 .dlg-num input { width: 90px; text-align: right; }
@@ -1697,6 +1700,23 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .fly-menu .fly-item:hover { background: var(--accent-glow); border-color: var(--accent-color); transform: none; }
 .fly-menu .fly-item.active { background: var(--accent-glow); border-color: var(--accent-color); box-shadow: none; }
 .fly-lbl { flex: 1; white-space: nowrap; }
+/* Generatoren als Tafel: drei Spalten, damit die Liste nicht über den Bildschirm hinausläuft */
+.fly.open > .fly-board { display: grid; grid-auto-flow: column; grid-auto-columns: 214px; gap: 4px 12px; padding: 12px; max-height: calc(100vh - 16px); overflow-y: auto; align-items: start; }
+.fly-menu { --fly-c: var(--accent-color); }
+.fly-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fly-col-boxes, .fly-col-prep, .fly-col-outline { --fly-c: #f08c00; }
+.fly-col-deco, .fly-col-check, .fly-col-parts { --fly-c: #e8589a; }
+.fly-col-tech { --fly-c: #22a6b3; }
+.fly-col-head { padding: 0 6px 6px; margin-bottom: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); border-bottom: 1px solid var(--border-color); }
+.fly-board .fly-item { height: auto; min-height: 38px; padding: 3px 6px; gap: 10px; }
+.fly-board .fly-lbl { white-space: normal; line-height: 1.2; }
+.fly-chip { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; color: var(--fly-c); background: color-mix(in srgb, var(--fly-c) 14%, transparent); }
+.fly-board .fly-chip { width: 30px; height: 30px; border-radius: 8px; }
+.fly-menu .fly-item:hover { background: color-mix(in srgb, var(--fly-c) 12%, transparent); border-color: color-mix(in srgb, var(--fly-c) 55%, transparent); }
+.fly-menu .fly-item:hover .fly-chip { color: #fff; background: var(--fly-c); }
+.fly-menu .fly-item.active .fly-chip { color: #fff; background: var(--fly-c); }
+.fly-menu .fly-item { height: 36px; padding: 0 5px; }
+@media (max-width: 760px) { .fly.open > .fly-board { grid-auto-flow: row; } }
 .fly-kbd { margin-left: 10px; padding: 0 5px; border-radius: 4px; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-muted); font: 600 0.68rem/16px var(--font-mono, monospace); }
 .editor-toolbar .fly-btn { width: 28px; }
 #opt-material { max-width: 118px; }

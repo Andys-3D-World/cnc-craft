@@ -6,6 +6,7 @@
  * Erleichterungslöcher. Vorschau zeigt Paare im Eingriff, „Aufs Bett“ legt die Teile nebeneinander (je eine Gruppe).
  * Geometrie: gear.ts (Stirnrad, Bohrung) und drives.ts (Zahnstange, Riemenscheibe, Kettenrad).
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -155,7 +156,7 @@ export function openGearDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(800px, calc(100vw - 32px));">
-      <h3>⚙ ${t("gear.title")}</h3>
+      <h3>${icon("gear", 20)}${t("gear.title")}</h3>
       <div class="dlg-hint">${t("gear.desc")}</div>
       <div style="display:grid;grid-template-columns:310px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

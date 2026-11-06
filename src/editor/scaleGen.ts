@@ -4,6 +4,7 @@
  * Umriss + Löcher auf der stärksten Linien-Ebene (schneiden), Striche + Zahlen auf der schwächsten (gravieren).
  * Geometrie: scales.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
@@ -63,7 +64,7 @@ export function openScaleDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(780px, calc(100vw - 32px));">
-      <h3>📏 ${t("scale.title")}</h3>
+      <h3>${icon("scale", 20)}${t("scale.title")}</h3>
       <div class="dlg-hint">${t("scale.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

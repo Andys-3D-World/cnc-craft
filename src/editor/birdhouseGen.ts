@@ -3,6 +3,7 @@
  * Vorschau (Platten oder 3D), Platten aufs Bett. Die Geometrie entsteht in birdhouse.ts.
  * Jede Art merkt sich ihre eigenen Werte – beim Umschalten kommen die zuletzt benutzten wieder.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
@@ -62,7 +63,7 @@ export function openBirdhouseDialog(log: (s: string) => void, done: () => void) 
   // data-for: Feld nur bei dieser Art zeigen
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:600px;">
-      <h3>🐦 ${t("bh.title")}</h3>
+      <h3>${icon("birdhouse", 20)}${t("bh.title")}</h3>
       <div class="dlg-hint">${t("bh.desc")}</div>
       ${sel("bh-kind", "bh.kind", KINDS, "bh.kind.")}
       <div id="bh-kdesc" class="dlg-hint"></div>

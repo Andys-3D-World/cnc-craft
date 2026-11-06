@@ -1,7 +1,7 @@
 // Tests für den Box-Generator – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boxPanels, outerSize, cabinetDrawer, diceMinHeight, diceAngle, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
+import { boxPanels, outerSize, hingeAxis, cabinetDrawer, diceMinHeight, diceAngle, BOX_TYPES, type BoxOptions, type Panel } from "../src/box.ts";
 
 type Pt = { x: number; y: number };
 const base: BoxOptions = { w: 120, d: 90, h: 70, inner: false, t: 3, finger: 9, lid: true, kerf: 0, nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6 };
@@ -59,7 +59,7 @@ for (const [type, lidded] of [["closed", true], ["open", false]] as const) {
 }
 
 test("Vieleck-Kiste: Zapfen der Wände passen in die Schlitze im Boden", () => {
-  for (const sides of [5, 6, 8, 12]) {
+  for (const sides of [3, 4, 5, 6, 8, 12]) {
     const o = opts("hex", { sides }), ps = boxPanels(o), t = o.t;
     const walls = ps.filter(p => p.name === "hexWall"), bottom = ps.find(p => p.name === "bottom")!;
     assert.equal(walls.length, sides);
@@ -170,4 +170,80 @@ test("Würfelturm: niedriger Turm bekommt flachere Rampen (35° … 20°)", () =
     assert.ok(a >= 20 - 1e-9 && a <= 35 + 1e-9, `Neigung ${a}`);
     assert.ok(boxPanels(o).filter(p => p.name === "ramp").length >= 2, `bei ${h} mm Höhe passen Rampen`);
   }
+});
+
+// ---------- Klappdeckel ----------
+for (const type of ["hingetop", "jewel", "hingeduo"] as const) for (const kerf of [0, 0.15]) {
+  test(`${type} kerf ${kerf}: Deckel schwenkt frei, Zapfen passen in die Löcher`, () => {
+    const o = opts(type, { kerf, w: 120, d: 90, h: 70 }), t = o.t, ps = boxPanels(o);
+    const lids = ps.filter(p => p.name === "hingeLid");
+    assert.equal(lids.length, type === "hingeduo" ? 2 : 1);
+    const { a, reach, gap, earW } = hingeAxis(t);
+    assert.ok(gap > reach - a, "Deckel-Ecke läuft nicht gegen die Wand");
+    // Schnittspalt frisst an der Luft: je Seite kerf/2 vom Deckel, kerf/2 von der Wand – darf nicht klemmen
+    assert.ok(gap - kerf > reach - a - 1e-9 || gap - kerf > 0, "Luft bleibt nach dem Schnittspalt");
+    const left = ps.find(p => p.name === "left")!, right = ps.find(p => p.name === "right")!;
+    const round = (p: Panel) => (p.holes || []).filter(h => h.length >= 24);
+    const holes = round(left);
+    assert.equal(holes.length, lids.length, "ein Loch je Deckel in jeder Seitenwand");
+    assert.equal(round(right).length, lids.length);
+    // Eckiger Zapfen (t × Zapfenbreite + Schnittspalt) dreht in der fertigen Bohrung
+    const d = Math.max(...holes[0].map(q => q.x)) - Math.min(...holes[0].map(q => q.x));
+    assert.ok(d > Math.hypot(t, earW + kerf), `Bohrung ${d} groß genug`);
+    // Loch bleibt ganz in der Wand (Steg nach oben)
+    const top = Math.max(...holes[0].map(q => q.y));
+    assert.ok(top < 70 - 1, "Steg über dem Loch");
+    // Deckel reicht von Wand zu Wand: Zapfen bis zur Außenseite
+    const lid = lids[0];
+    assert.ok(Math.abs(lid.w - 120) < 1e-9);
+    assert.ok(Math.abs(Math.max(...lid.pts.map(q => q.x)) - Math.min(...lid.pts.map(q => q.x)) - 120) < kerf + 1e-6);
+  });
+}
+
+test("Klappdeckel: Front niedriger (Deckel liegt auf), Wände darüber bilden den Rand", () => {
+  const o = opts("hingetop"), ps = boxPanels(o), t = o.t;
+  assert.equal(ps.find(p => p.name === "front")!.h, o.h - 2 * t);
+  assert.equal(ps.find(p => p.name === "back")!.h, o.h);
+});
+
+test("Schmuckkiste: Trennwände bleiben unter dem schwenkenden Deckel", () => {
+  const o = opts("jewel"), ps = boxPanels(o), t = o.t, { reach } = hingeAxis(t);
+  for (const p of ps.filter(q => q.name === "divX" || q.name === "divY")) assert.ok(t + p.h <= o.h - 1.5 * t - reach, "Oberkante " + (t + p.h));
+});
+
+test("Doppeldeckel: Mittelwand trägt beide Deckel, die Kanten stoßen nicht aneinander", () => {
+  const o = opts("hingeduo"), ps = boxPanels(o), t = o.t;
+  const mid = ps.filter(p => p.name === "divX");
+  assert.equal(mid.length, 1);
+  assert.equal(t + mid[0].h, o.h - 2 * t, "Oberkante Mittelwand = Unterkante Deckel");
+  const lids = ps.filter(p => p.name === "hingeLid");
+  assert.ok(2 * lids[0].h + 2 * t + 2 * hingeAxis(t).gap < o.d, "Luft in der Mitte");
+});
+
+test("Geld-Halter: drei Lagen, Rahmen oben offen, Tasche so groß wie angegeben", () => {
+  const o = opts("money", { inner: true, w: 90, h: 60 }), ps = boxPanels(o), m = Math.max(6, 2 * o.t);
+  assert.deepEqual(ps.map(p => p.name), ["moneyBack", "moneyFrame", "moneyFront"]);
+  assert.equal(ps[0].w, 90 + 2 * m); assert.equal(ps[0].h, 60 + m);
+  assert.equal(ps[2].holes!.length, 1, "Fenster");
+  assert.ok(ps[2].pts.length > 4, "Griffmulde");
+});
+
+test("Buch: Lade passt in den Schuber, Buchdeckel stehen über", () => {
+  const o = opts("slidebook", { w: 200, d: 150, h: 50, overhang: 4 }), ps = boxPanels(o);
+  assert.equal(ps.filter(p => p.name === "bookCover").length, 2);
+  assert.equal(ps.filter(p => p.name === "drPlate").length, 1);
+  const c = ps.find(p => p.name === "bookCover")!;
+  assert.equal(c.w, 208); assert.equal(c.h, 154);
+});
+
+test("Fräse: Dogbones an allen Zinken, Löcher und Bögen bleiben, Flex-Wand nie", () => {
+  const plain = boxPanels(opts("closed", { t: 6, finger: 18 })), bones = boxPanels(opts("closed", { t: 6, finger: 18, tool: 3 }));
+  const cnt = (ps: Panel[]) => ps.reduce((a, p) => a + p.pts.length, 0);
+  assert.ok(cnt(bones) > cnt(plain) * 2, "Innenecken haben Bögen");
+  for (const p of bones) assert.ok(!selfIntersects(p.pts), p.name);
+  // Innenecke: der Bogen geht über die Ecke hinaus (der Zapfen der Gegenplatte passt)
+  const f = boxPanels(opts("flex", { tool: 3 })).find(p => p.name === "flexWall")!, f0 = boxPanels(opts("flex")).find(p => p.name === "flexWall")!;
+  assert.equal(f.pts.length, f0.pts.length);
+  const lid = boxPanels(opts("hingetop", { t: 6, finger: 18, tool: 3 })).find(p => p.name === "hingeLid")!;
+  assert.ok(lid.pts.length > 12, "auch am Zapfen-Ansatz");
 });

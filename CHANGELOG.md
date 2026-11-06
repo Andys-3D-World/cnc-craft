@@ -1,5 +1,20 @@
 # Changelog
 
+## Next version (unreleased)
+
+**New**
+- **Shape box generator:** a box in any shape: heart, star, circle, triangle, polygons, Christmas and seasonal outlines of our own, a letter or digit from any font (holes such as in A or 8 get their own inner wall) or your own shape from the selection. The wall follows the outline, either as one flex strip with a puzzle joint (laser only) or as straight pieces (laser and router, with dogbones). Live preview in 2D and 3D, slots and tabs matched, floor, top ring and optional lid. Clear messages for shapes that are too small, too narrow or too low. *Edit with generator* works, including your own shape after saving and reopening.
+- **New box types in the box generator:** swinging lid on its own pegs in round holes (no hardware), two swinging lids with a centre wall, jewellery box with compartments, pull-off lid with finger notch, money or gift card holder, book with sliding tray. Triangle and square now work in the polygon box. The type list is grouped by kind.
+- **Dogbones in the box generator:** enter the router bit diameter and all inner corners and slots of the panels get dogbones (not for flex walls, which are laser only).
+- **Family decoration generator:** several names on one decoration, in three ways: a bar or branch with the family name and one hanging tag per person, the same as one joined piece, or one big name tree. Choose from our own motifs such as bauble, star, heart, mitten, stocking or winter hat. Works with any font; names can be engraved or scored. *Edit with generator* works.
+- **Your own shape in the ornament generator:** take a closed shape from the selection and put a name in it.
+
+Not yet cut on a real machine, so the fits of all new boxes are untested: cut a small test piece first.
+
+**Improved**
+- **Generator menu:** the long list is now a board with three columns (boxes and storage, names and decoration, workshop and technology), so it always fits on the screen. All generator icons were redrawn in one style, and the generator windows use the same icons instead of system emoji.
+- **Icons everywhere:** system emoji across the whole program (tabs, buttons, windows, messages) are now replaced by our own icons that look the same on Windows, Mac and Linux. In dropdown lists, which cannot show graphics, the emoji is left out. The *Edit* and *Extras* menus are boards with columns like the generators, and all pop-out menus use the same icon tiles.
+
 ## 0.4.2 Beta
 
 **New**

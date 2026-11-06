@@ -1,11 +1,12 @@
 /**
  * BOX-GENERATOR – Fenster: Maße eingeben, Vorschau, Platten aufs Bett legen. Die Geometrie entsteht in box.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
-import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, LIDDED, isFlex, type BoxOptions, type BoxType } from "../box";
+import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, BOX_GROUPS, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
 import { Box3DView } from "./box3d";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
@@ -13,13 +14,13 @@ const hexWallTooSmall = (b: BoxOptions) => !boxPanels(b).some(p => p.name === "h
 
 const KEY = "cnc_craft_box";
 const VIEW_KEY = "cnc_craft_box_view"; // Vorschau: "2d" (Platten) oder "3d" (fertige Kiste)
-const DEF: BoxOptions = { w: 100, d: 80, h: 50, inner: false, t: 3, finger: 9, lid: true, kerf: 0.1, type: "closed", nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6 };
+const DEF: BoxOptions = { w: 100, d: 80, h: 50, inner: false, t: 3, finger: 9, lid: true, kerf: 0.1, type: "closed", nx: 1, ny: 2, overhang: 5, shelves: 2, radius: 15, sides: 6, tool: 0 };
 
 function loadBox(): BoxOptions {
   try {
     const s = JSON.parse(loadSettings(KEY) || "{}");
     const o: any = { ...DEF };
-    for (const k of ["w", "d", "h", "t", "finger", "kerf", "nx", "ny", "overhang", "shelves", "radius", "sides"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
+    for (const k of ["w", "d", "h", "t", "finger", "kerf", "nx", "ny", "overhang", "shelves", "radius", "sides", "tool"] as const) if (Number.isFinite(Number(s[k])) && Number(s[k]) >= 0) o[k] = Number(s[k]);
     for (const k of ["inner", "lid"] as const) if (typeof s[k] === "boolean") o[k] = s[k];
     o.type = BOX_TYPES.includes(s.type) ? s.type : (o.lid ? "closed" : "open");
     return o;
@@ -38,6 +39,38 @@ export function layout(panels: { w: number; h: number }[], gap: number, maxW: nu
   return pos;
 }
 
+/** 2D-Vorschau: alle Platten nebeneinander (Bezeichnungen sind eigene Übersetzungen) */
+export function panelsPreview(svg: SVGSVGElement, ps: Panel[], rowW: number) {
+  const pos = layout(ps, 4, rowW);
+  let W = 0, H = 0;
+  ps.forEach((p, i) => { W = Math.max(W, pos[i].x + p.w); H = Math.max(H, pos[i].y + p.h); });
+  svg.setAttribute("viewBox", `-2 -2 ${W + 4} ${H + 4}`);
+  svg.innerHTML = ps.map((p, i) => {
+    const ring = (pts: { x: number; y: number }[]) => pts.map((q, k) => `${k ? "L" : "M"}${(pos[i].x + q.x).toFixed(2)},${(pos[i].y + p.h - q.y).toFixed(2)}`).join("") + "Z";
+    const d = ring(p.pts) + (p.holes || []).map(ring).join("");
+    const ln = (p.lines || []).map(l => ring(l).slice(0, -1)).join("");
+    return `<path d="${d}" fill-rule="evenodd" class="box-panel"/>${ln ? `<path d="${ln}" class="box-cut"/>` : ""}<text x="${pos[i].x + p.w / 2}" y="${pos[i].y + p.h / 2}" class="box-lbl" style="font-size:${Math.max(4, Math.min(p.w, p.h) / 6)}px">${t("box.p." + p.name)}</text>`;
+  }).join("");
+}
+
+/** Platten aufs Bett legen: Platte + ihre Ausschnitte als Gruppe – sie bewegen sich zusammen */
+export function panelsToBed(ps: Panel[], source: string) {
+  const bed = bedSizeMm();
+  const pos = layout(ps, 5, Math.max(bed.w - 20, Math.max(...ps.map(p => p.w))));
+  const st = app();
+  const toW = (i: number, pts: { x: number; y: number }[]) => pts.map(q => ({ x: (10 + pos[i].x + q.x) * MM_TO_PIXEL, y: (10 + pos[i].y + q.y) * MM_TO_PIXEL }));
+  const made: any[] = [];
+  ps.forEach((p, i) => {
+    const gid = p.holes?.length || p.lines?.length ? "box-" + Math.random().toString(36).slice(2, 10) : undefined;
+    const extra = gid ? { source, groupId: gid } : { source };
+    made.push(createPolyline(toW(i, p.pts), true, "outside", extra));
+    for (const hl of p.holes || []) made.push(createPolyline(toW(i, hl), true, "inside", extra));
+    for (const ln of p.lines || []) made.push(createPolyline(toW(i, ln), false, "on-line", extra));
+  });
+  st.shapes = [...st.shapes, ...made];
+  st.selectedShapeIds = made.map(s => s.id);
+}
+
 export function openBoxDialog(log: (s: string) => void, done: () => void) {
   const o = loadBox();
   document.getElementById("box-dialog-overlay")?.remove();
@@ -48,24 +81,25 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     `<label class="prop-row">${t(key)}<input id="${id}" type="number" step="${step}" min="${min}" value="${v}" class="prop-input"></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:560px;">
-      <h3>📦 ${t("box.title")}</h3>
+      <h3>${icon("boxgen", 20)}${t("box.title")}</h3>
       <div class="dlg-hint">${t("box.desc")}</div>
       <label class="prop-row">${t("box.type")}
-        <select id="box-type" class="prop-input" style="width:auto;">${BOX_TYPES.map(k => `<option value="${k}">${t("box.type." + k)}</option>`).join("")}</select></label>
+        <select id="box-type" class="prop-input" style="width:auto;">${Object.entries(BOX_GROUPS).map(([g, list]) => `<optgroup label="${t("box.group." + g)}">${list.map(k => `<option value="${k}">${t("box.type." + k)}</option>`).join("")}</optgroup>`).join("")}</select></label>
       <div id="box-tdesc" class="dlg-hint"></div>
       <div class="box-grid">
         <div class="box-fields">
           ${num("box-w", "box.w", o.w)}
-          <div class="box-x" data-not="hex">${num("box-d", "box.d", o.d)}</div>
+          <div class="box-x" data-not="hex money">${num("box-d", "box.d", o.d)}</div>
           ${num("box-h", "box.h", o.h)}
           <label class="prop-row" style="cursor:pointer;"><span>${t("box.inner")}</span><input id="box-inner" type="checkbox" ${o.inner ? "checked" : ""} style="width:auto;"></label>
           ${num("box-t", "box.t", o.t, "0.1", "0.5")}
-          ${num("box-f", "box.finger", o.finger, "0.5", "1")}
-          <div class="box-x" data-for="tray traylid">${num("box-nx", "box.nx", o.nx ?? 1, "1", "0")}${num("box-ny", "box.ny", o.ny ?? 2, "1", "0")}</div>
-          <div class="box-x" data-for="drawer">${num("box-ov", "box.overhang", o.overhang ?? 5, "1", "0")}</div>
+          <div class="box-x" data-not="money">${num("box-f", "box.finger", o.finger, "0.5", "1")}</div>
+          <div class="box-x" data-for="tray traylid jewel">${num("box-nx", "box.nx", o.nx ?? 1, "1", "0")}${num("box-ny", "box.ny", o.ny ?? 2, "1", "0")}</div>
+          <div class="box-x" data-for="drawer slidebook">${num("box-ov", "box.overhang", o.overhang ?? 5, "1", "0")}</div>
           <div class="box-x" data-for="shelf cabinet">${num("box-sh", "box.shelves", o.shelves ?? 2, "1", "0")}</div>
           <div class="box-x" data-for="flex flexcup">${num("box-rad", "box.radius", o.radius ?? 15, "1", "2")}</div>
-          <div class="box-x" data-for="hex">${num("box-sides", "box.sides", o.sides ?? 6, "1", "5")}</div>
+          <div class="box-x" data-for="hex">${num("box-sides", "box.sides", o.sides ?? 6, "1", "3")}</div>
+          <div class="box-x" data-not="flex flexcup money">${num("box-tool", "box.tool", o.tool ?? 0, "0.5", "0")}</div>
           ${num("box-kerf", "box.kerf", o.kerf, "0.01", "0")}
         </div>
         <div class="box-prev">
@@ -98,15 +132,22 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
       finger: n("box-f", o.finger), lid: LIDDED.includes(type), kerf: n("box-kerf", o.kerf), type,
       nx: Math.round(n("box-nx", o.nx ?? 1)), ny: Math.round(n("box-ny", o.ny ?? 2)), overhang: n("box-ov", o.overhang ?? 5),
       shelves: Math.min(20, Math.round(n("box-sh", o.shelves ?? 2))), radius: n("box-rad", o.radius ?? 15),
-      sides: Math.max(5, Math.min(12, Math.round(n("box-sides", o.sides ?? 6)))) };
+      sides: Math.max(3, Math.min(12, Math.round(n("box-sides", o.sides ?? 6)))),
+      tool: isFlex(type) || type === "money" ? 0 : n("box-tool", o.tool ?? 0) };
   };
   const valid = (b: BoxOptions) => {
-    if (!(b.t > 0) || Math.min(b.w, b.d, b.h) <= (b.inner ? 0 : 3 * b.t)) return false;
+    if (!(b.t > 0)) return false;
+    if (b.type === "money") return !b.inner ? Math.min(b.w, b.h) > 12 * Math.max(b.t, 3) : Math.min(b.w, b.h) > 20;
+    if (Math.min(b.w, b.d, b.h) <= (b.inner ? 0 : 3 * b.t)) return false;
     const { H } = outerSize(b);
+    if ((b.tool ?? 0) > 0.67 * b.t) return false;
+    if ((b.type === "hingetop" || b.type === "hingeduo") && H < 6 * b.t) return false;
+    if (b.type === "jewel" && H < 9 * b.t + 3) return false;         // Trennwände unter dem schwenkenden Deckel
+    if ((b.type === "hingetop" || b.type === "hingeduo" || b.type === "jewel") && !boxPanels(b).some(p => p.name === "hingeLid")) return false;
     if (b.type === "slide" && H < 6 * b.t + 2) return false;         // Platz für Futter + Deckel + Leiste
     if (b.type === "hex" && hexWallTooSmall(b)) return false;
     if (b.type === "dice" && boxPanels(b).filter(p => p.name === "ramp").length < 2) return false; // mindestens zwei Rampen
-    if (b.type === "cabinet" && !boxPanels(b).some(p => p.name === "drPlate")) return false;      // Fächer zu niedrig
+    if ((b.type === "cabinet" || b.type === "slidebook") && !boxPanels(b).some(p => p.name === "drPlate")) return false;      // Fächer zu niedrig
     if (isFlex(b.type) && H < 6 * Math.max(2, b.t) + 8) return false;   // Aussparungen oben/unten + Biegescharnier + Verschluss
     return true;
   };
@@ -127,23 +168,14 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
       svg.innerHTML = ""; view3d.setPanels([], b.t, 0);
       // Würfelturm: meist fehlt nur Höhe – sagen, wie viel (bei Innenmaßen ohne den Boden)
       const need = b.type === "dice" ? diceMinHeight(b) - (b.inner ? b.t : 0) : 0;
-      info.textContent = need > b.h ? t("box.dice.minH", { h: need }) : t("box.tooSmall");
+      info.textContent = need > b.h ? t("box.dice.minH", { h: need }) : (b.tool ?? 0) > 0.67 * b.t ? t("fbx.err.toolThick") : t("box.tooSmall");
       $<HTMLButtonElement>("box-ok").disabled = true; return;
     }
     $<HTMLButtonElement>("box-ok").disabled = false;
     const ps = boxPanels(b);
     // 2D: Platten nebeneinander; 3D: fertige Kiste (ohne Schnittspalt, der ist zu klein zum Sehen)
     if (mode === "3d") view3d.setPanels(boxPanels({ ...b, kerf: 0 }), b.t, parseFloat($("box-explode").value) || 0);
-    const pos = layout(ps, 4, Math.max(b.w, b.d) * 2.4);
-    let W = 0, H = 0;
-    ps.forEach((p, i) => { W = Math.max(W, pos[i].x + p.w); H = Math.max(H, pos[i].y + p.h); });
-    svg.setAttribute("viewBox", `-2 -2 ${W + 4} ${H + 4}`);
-    svg.innerHTML = ps.map((p, i) => {
-      const ring = (pts: { x: number; y: number }[]) => pts.map((q, k) => `${k ? "L" : "M"}${(pos[i].x + q.x).toFixed(2)},${(pos[i].y + p.h - q.y).toFixed(2)}`).join("") + "Z";
-      const d = ring(p.pts) + (p.holes || []).map(ring).join("");
-      const ln = (p.lines || []).map(l => ring(l).slice(0, -1)).join("");
-      return `<path d="${d}" fill-rule="evenodd" class="box-panel"/>${ln ? `<path d="${ln}" class="box-cut"/>` : ""}<text x="${pos[i].x + p.w / 2}" y="${pos[i].y + p.h / 2}" class="box-lbl" style="font-size:${Math.max(4, Math.min(p.w, p.h) / 6)}px">${t("box.p." + p.name)}</text>`;
-    }).join("");
+    panelsPreview(svg, ps, Math.max(b.w, b.d) * 2.4);
     const os = outerSize(b);
     info.textContent = t("box.info", { n: ps.length, w: os.W.toFixed(1), d: os.D.toFixed(1), h: os.H.toFixed(1) });
     if (b.type === "dice") info.textContent += " · " + t("box.dice.angle", { a: Math.round(diceAngle(b)), n: ps.filter(p => p.name === "ramp").length });
@@ -166,21 +198,7 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     saveSettings(KEY, b);
     close();
     const ps = boxPanels(b);
-    const bed = bedSizeMm();
-    const pos = layout(ps, 5, Math.max(bed.w - 20, Math.max(...ps.map(p => p.w))));
-    const st = app();
-    const toW = (i: number, pts: { x: number; y: number }[]) => pts.map(q => ({ x: (10 + pos[i].x + q.x) * MM_TO_PIXEL, y: (10 + pos[i].y + q.y) * MM_TO_PIXEL }));
-    const made: any[] = [];
-    ps.forEach((p, i) => {
-      // Platte + ihre Ausschnitte (Schlitze, Griffe) als Gruppe – sie bewegen sich zusammen
-      const gid = p.holes?.length || p.lines?.length ? "box-" + Math.random().toString(36).slice(2, 10) : undefined;
-      const extra = gid ? { source: t("box.title"), groupId: gid } : { source: t("box.title") };
-      made.push(createPolyline(toW(i, p.pts), true, "outside", extra));
-      for (const hl of p.holes || []) made.push(createPolyline(toW(i, hl), true, "inside", extra));
-      for (const ln of p.lines || []) made.push(createPolyline(toW(i, ln), false, "on-line", extra));
-    });
-    st.shapes = [...st.shapes, ...made];
-    st.selectedShapeIds = made.map(s => s.id);
+    panelsToBed(ps, t("box.title"));
     log(t("box.done", { n: ps.length }));
     done();
   };

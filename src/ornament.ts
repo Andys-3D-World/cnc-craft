@@ -43,6 +43,7 @@ export interface OrnamentOptions {
   scene?: SceneKind;  // zwei Schichten: Landschaft unten im Rahmen
   seed?: number;      // Zufall der Landschaft
   textLines?: number; // Anzahl Textzeilen (hilft, die Grundlinien zu finden)
+  customArea?: MultiPolygon; // eigene Form (statt shape), z. B. aus der Auswahl auf dem Bett
 }
 
 /** Schrift, wie sie aus dem Fenster kommt (beliebige Größe/Lage – wird ins Textfeld eingepasst) */
@@ -113,6 +114,7 @@ function starPts(cx: number, cy: number, n: number, ro: number, ri: number): XY[
 
 /** Form in Einheiten (beliebige Größe) mit Textfeld – wird danach auf die gewünschte Höhe gebracht */
 function rawShape(o: OrnamentOptions): { body: MultiPolygon; box: Box | null } {
+  if (o.customArea?.length) return { body: o.customArea, box: null };
   // Jahreszeiten-Formen: Textfeld wird gesucht (größtes Rechteck in der Form)
   if ((SEASON_SHAPES as string[]).includes(o.shape)) return { body: seasonOutline(o.shape as SeasonShape), box: null };
   switch (o.shape) {

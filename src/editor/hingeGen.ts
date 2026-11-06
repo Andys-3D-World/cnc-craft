@@ -2,6 +2,7 @@
  * FLEX-SCHARNIER – Fenster (Generatoren): Muster, Platte, Scharnier-Zone, Abstand/Schnitt/Steg, Vorschlag aus der
  * Materialdicke. „Aufs Bett“ legt Platte und Schnitte als eine Gruppe in die Bettmitte. Geometrie: livingHinge.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, newId, createPolyline } from "../shapeTransform";
@@ -51,7 +52,7 @@ export function openHingeDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><span class="dlg-num"><input id="${id}" type="number" min="${min}" step="${step}"><em>${unit}</em></span></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(780px, calc(100vw - 32px));">
-      <h3>〰 ${t("hinge.title")}</h3>
+      <h3>${icon("hinge", 20)}${t("hinge.title")}</h3>
       <div class="dlg-hint">${t("hinge.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

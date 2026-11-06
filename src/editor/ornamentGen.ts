@@ -3,6 +3,7 @@
  * Liebe) wählen – es filtert Formen, Verzierungen, Aufsätze und Landschaften –, dann Form wählen, Name (und zweite Zeile) eingeben, Vorschau mit Größe,
  * „Aufs Bett“ legt den Anhänger als Gruppe in die Bettmitte. Die Geometrie entsteht in ornament.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
@@ -17,11 +18,13 @@ import { bounds, union, type ScoreLine, type XY } from "../nameConnect";
 import { SCENE_KINDS, type SceneKind } from "../landscape";
 import { themeList, type Theme } from "../themes";
 import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
+import { selectionArea } from "./shapeBoxGen";
+import { packArea, sizedArea, unpackArea } from "../shapeBox";
 import { ornament, ORNAMENT_SHAPES, ORNAMENT_DECOS, ORNAMENT_TOPPERS, type OrnamentTopper, type OrnamentOptions, type OrnamentResult, type OrnamentText, type OrnamentShape,
   type OrnamentHanger, type OrnamentInner, type OrnamentDeco } from "../ornament";
 
 const KEY = "cnc_craft_ornament";
-interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean; theme: Theme }
+interface Opts extends OrnamentOptions { text: string; line2: string; font: string; bold: boolean; theme: Theme; custom?: number[][][] }
 const DEF: Opts = { theme: "christmas", shape: "ball", size: 80, points: 5, hanger: "hole", holeD: 4, inner: "engrave", textSize: 100, border: false, deco: "none",
   vertical: false, layers: 1, scene: "trees", seed: 1, topper: "none", text: "Andreas", line2: "", font: "Pacifico", bold: false };
 const HANGERS: OrnamentHanger[] = ["hole", "ring", "none"];
@@ -39,7 +42,8 @@ function load(): Opts {
     if (SCENE_KINDS.includes(s.scene)) o.scene = s.scene;
     if (isTheme(s.theme)) o.theme = s.theme;
     if (Number.isFinite(Number(s.seed)) && Number(s.seed) > 0) o.seed = Number(s.seed);
-    if (ORNAMENT_SHAPES.includes(s.shape)) o.shape = s.shape;
+    if (ORNAMENT_SHAPES.includes(s.shape) || s.shape === "custom") o.shape = s.shape;
+    if (Array.isArray(s.custom)) o.custom = s.custom;
     if (HANGERS.includes(s.hanger)) o.hanger = s.hanger;
     if (INNERS.includes(s.inner)) o.inner = s.inner;
     if (ORNAMENT_DECOS.includes(s.deco)) o.deco = s.deco;
@@ -48,7 +52,7 @@ function load(): Opts {
 }
 
 /** Schrift nachzeichnen: geschlossene Konturen als Fläche (Gerade/Ungerade), Einzellinien-Schrift als Linien */
-async function traceName(o: Opts): Promise<OrnamentText> {
+export async function traceName(o: Opts): Promise<OrnamentText> {
   const text = [o.text, o.line2].map(s => s.trim()).filter(Boolean).join("\n");
   if (!text) return { area: [], lines: [] };
   // zwei Schichten: mehr Zeilenabstand, damit der Steg unter der ersten Zeile nicht an der zweiten klebt
@@ -92,7 +96,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><span class="dlg-num"><input id="${id}" type="number" min="${min}" step="${step}"><em>${unit}</em></span></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(760px, calc(100vw - 32px));">
-      <h3>🎄 ${t("orn.title")}</h3>
+      <h3>${icon("ornament", 20)}${t("orn.title")}</h3>
       <div class="dlg-hint">${t("orn.desc")}</div>
       <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">
@@ -103,6 +107,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
             ${sel("orn-scene", "orn.scene", SCENE_KINDS, "orn.scene.")}
             <div class="orn-only-scene"><button id="orn-dice" class="btn-secondary" type="button" style="width:100%;margin:2px 0 6px;">🎲 ${t("orn.dice")}</button></div>
           </div>
+          <div class="orn-only-custom"><button id="orn-take" class="btn-secondary" type="button" style="width:100%;margin:2px 0 6px;">${t("fbx.take")}</button><div id="orn-cinfo" class="dlg-hint"></div></div>
           <div class="orn-only-star">${num("orn-pts", "orn.points", "1", "5", "")}</div>
           ${num("orn-size", "orn.size", "1", "20")}
           <label class="dlg-row"><span>${t("orn.text")}</span><input id="orn-text" type="text" maxlength="40" style="width:170px;"></label>
@@ -133,7 +138,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
   // Werte per value setzen (der Name ist fremder Text – nie ins innerHTML)
   // Thema: Listen passend befüllen (gespeicherte Werte bleiben, wenn sie zum Thema gehören)
   const applyTheme = (th: Theme, keep: Partial<Opts> = {}) => {
-    fillSelect($<HTMLSelectElement>("orn-shape"), themeList(th, "shapes"), "orn.shape.", keep.shape);
+    fillSelect($<HTMLSelectElement>("orn-shape"), [...themeList(th, "shapes"), "custom"], "orn.shape.", keep.shape);
     fillSelect($<HTMLSelectElement>("orn-deco"), ["none", ...themeList(th, "decos")], "orn.deco.", keep.deco);
     fillSelect($<HTMLSelectElement>("orn-topper"), ["none", ...themeList(th, "toppers")], "orn.topper.", keep.topper);
     fillSelect($<HTMLSelectElement>("orn-scene"), ["none", ...themeList(th, "scenes")], "orn.scene.", keep.scene);
@@ -155,6 +160,11 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
 
   $("orn-vert").checked = !!init.vertical;
   let seed = init.seed || 1;
+  // Eigene Form: gewählte Kontur beim Öffnen merken (beim Bearbeiten ist die Auswahl leer – dann gilt die gespeicherte)
+  const fromSel = selectionArea();
+  let custom: number[][][] = init.custom || [];
+  $<HTMLButtonElement>("orn-take").disabled = !fromSel.length;
+  $<HTMLElement>("orn-take").onclick = () => { custom = packArea(sizedArea(fromSel, 100)); schedule(); };
 
   const read = (): Opts => {
     const n = (id: string, d: number, min: number, max: number) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : d; };
@@ -166,13 +176,17 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
       holeD: n("orn-hd", DEF.holeD, 1, 30), border: $("orn-border").checked,
       deco: v("orn-deco") as OrnamentDeco, vertical: $("orn-vert").checked, layers: (Number(v("orn-layers")) || 1) as 1 | 2 | 3, topper: v("orn-topper") as OrnamentTopper,
       scene: v("orn-scene") as SceneKind, seed,
-      textLines: [$("orn-text").value, $("orn-line2").value].filter(x => x.trim()).length
+      textLines: [$("orn-text").value, $("orn-line2").value].filter(x => x.trim()).length,
+      custom, customArea: v("orn-shape") === "custom" ? unpackArea(custom) : undefined
     };
   };
 
   let last: OrnamentResult | null = null, run = 0, timer = 0;
   const update = async () => {
+    if ($<HTMLSelectElement>("orn-shape").value === "custom" && !custom.length && fromSel.length) custom = packArea(sizedArea(fromSel, 100));
     const o = read(), my = ++run;
+    ov.querySelectorAll<HTMLElement>(".orn-only-custom").forEach(el => { el.style.display = (o.shape as string) === "custom" ? "" : "none"; });
+    $<HTMLElement>("orn-cinfo").textContent = custom.length ? t("fbx.customSet") : t("fbx.customNone");
     ov.querySelectorAll<HTMLElement>(".orn-only-star").forEach(el => { el.style.display = o.shape === "star" ? "" : "none"; });
     ov.querySelectorAll<HTMLElement>(".orn-only-hole").forEach(el => { el.style.display = o.hanger !== "none" ? "" : "none"; });
     ov.querySelectorAll<HTMLElement>(".orn-only-two").forEach(el => { el.style.display = o.layers !== 1 ? "" : "none"; });
@@ -203,7 +217,7 @@ export function openOrnamentDialog(log: (s: string) => void, done: () => void) {
     await update();
     const r = last;
     if (!r || !r.cut.length) return;
-    const o = read();
+    const { customArea: _area, ...o } = read();
     saveSettings(KEY, o);
     close();
     placeOrnament(r, o.text.trim() || t("orn.title"));

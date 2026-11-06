@@ -3,6 +3,7 @@
  * Vorschau zeigt das Regal von vorne und alle Teile so, wie sie aufs Bett kommen (Reihen in Bettbreite).
  * Geometrie: shelf.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -61,7 +62,7 @@ export function openShelfDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><span class="dlg-num"><input id="${id}" type="number" min="${min}" step="${step}"><em>${unit}</em></span></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(820px, calc(100vw - 32px));">
-      <h3>🗄 ${t("shelf.title")}</h3>
+      <h3>${icon("shelf", 20)}${t("shelf.title")}</h3>
       <div class="dlg-hint">${t("shelf.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

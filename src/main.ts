@@ -14,6 +14,7 @@ import { initCollapsibleMenus } from "./ui";
 import { initLightBurnTooltips } from "./tooltips";
 import { renderCamPanel, renderEditorToolbar } from "./ui/camPanel";
 import { initFlyouts } from "./ui/flyout";
+import { initEmojiIcons } from "./ui/emojiIcons";
 import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
@@ -149,6 +150,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (camContainer) renderCamPanel(camContainer);
   if (toolbarContainer) renderEditorToolbar(toolbarContainer);
   initFlyouts();
+  initEmojiIcons();
   if (rightContainer) renderRightPanel(rightContainer);
   applySavedMachine(); // gewählte Maschine: Bettgröße, Baudrate, Nullpunkt
   applyTranslations(document); // feste Texte aus index.html übersetzen

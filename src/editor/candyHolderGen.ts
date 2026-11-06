@@ -3,6 +3,7 @@
  * Tiefe, Spiel, Anzahl Öffnungen, Haltesteg, Aufhänger, Text. Vorschau: alle Schichten nebeneinander.
  * „Aufs Bett“ legt die Teile in einer Reihe ab (jedes eine Gruppe). Geometrie und Prüfungen: candyHolder.ts.
  */
+import { icon } from "../ui/icons";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
 import { loadSettings, saveSettings } from "./genRun";
@@ -112,7 +113,7 @@ export function openCandyHolderDialog(log: (s: string) => void, done: () => void
   const chk = (id: string, key: string) => `<label class="dlg-row" style="cursor:pointer;"><span>${t(key)}</span><input id="${id}" type="checkbox" style="width:auto;"></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>🍫 ${t("ch.title")}</h3>
+      <h3>${icon("candyHolder", 20)}${t("ch.title")}</h3>
       <div class="dlg-hint">${t("ch.desc")}</div>
       <div style="display:grid;grid-template-columns:290px 1fr;gap:12px;align-items:start;">
         <div class="box-fields" style="max-height:62vh;overflow-y:auto;">

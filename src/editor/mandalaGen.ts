@@ -3,6 +3,7 @@
  * Die Geometrie entsteht in mandala.ts. Ergebnis: Außenkontur („außen“) + Muster als Löcher („innen“) oder als
  * Gravur („Mitte“), alles in einer Gruppe – zum Lasern oder Fräsen.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
@@ -41,7 +42,7 @@ export function openMandalaDialog(log: (s: string) => void, done: () => void) {
     `<label class="prop-row">${t(key)}<select id="${id}" class="prop-input" style="width:auto;">${list.map(k => `<option value="${k}">${t(prefix + k)}</option>`).join("")}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:560px;">
-      <h3>🌸 ${t("mand.title")}</h3>
+      <h3>${icon("mandala", 20)}${t("mand.title")}</h3>
       <div class="dlg-hint">${t("mand.desc")}</div>
       <div class="box-grid">
         <div class="box-fields">

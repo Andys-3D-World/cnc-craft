@@ -12,7 +12,7 @@
  * editor/commands.ts verbunden.
  */
 import { icon } from "./icons";
-import { tip } from "../i18n/i18n";
+import { tip, t } from "../i18n/i18n";
 
 const KEY = "cnc_craft_fly";
 let last: Record<string, string> = {};
@@ -27,7 +27,7 @@ export function flyTools(group: string, items: Item[], size = 20): string {
   return `<div class="fly fly-left" data-fly="${group}">
     <button class="btn-tool-icon fly-btn" data-tool="${cur[0]}" data-fly-btn ${tip("fly." + group)}>${icon(cur[1], size)}<i class="fly-tri"></i></button>
     <div class="fly-menu">${items.map(([id, ico, k]) =>
-      `<button class="btn-tool-icon fly-item" data-tool="${id}" data-ico="${ico}" ${tip(k)}>${icon(ico, 18)}<span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}</div>
+      `<button class="btn-tool-icon fly-item" data-tool="${id}" data-ico="${ico}" ${tip(k)}><span class="fly-chip">${icon(ico, 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}</div>
   </div>`;
 }
 
@@ -37,7 +37,22 @@ export function flyCmds(group: string, ico: string, items: Item[], side: "down" 
   return `<div class="fly fly-${side}" data-fly="${group}">
     <button class="${btnCls} fly-btn" data-fly-btn ${tip("fly." + group)}>${icon(ico, size)}<i class="fly-tri"></i></button>
     <div class="fly-menu">${items.map(([id, i, k]) =>
-      `<button class="btn-cmd fly-item" data-cmd="${id}" ${tip(k)}>${icon(i, 18)}<span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}</div>
+      `<button class="btn-cmd fly-item" data-cmd="${id}" ${tip(k)}><span class="fly-chip">${icon(i, 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}</div>
+  </div>`;
+}
+
+/**
+ * Große Befehls-Gruppe als Tafel: Spalten mit Überschrift, jeder Eintrag mit farbigem Symbol. Die Knöpfe bleiben .fly-item mit data-cmd,
+ * Name und Hinweis kommen wie sonst aus dem Hinweis-Text. Spalten-Überschrift: fly.grp.<Spalte>.
+ */
+export function flyGroups(group: string, ico: string, cols: [string, Item[]][], size = 20, side: "down" | "left" = "left"): string {
+  const btnCls = side === "left" ? "btn-tool-icon" : "btn-cmd";
+  return `<div class="fly fly-${side}" data-fly="${group}">
+    <button class="${btnCls} fly-btn" data-fly-btn ${tip("fly." + group)}>${icon(ico, size)}<i class="fly-tri"></i></button>
+    <div class="fly-menu fly-board">${cols.map(([col, items]) => `<div class="fly-col fly-col-${col}">
+      <div class="fly-col-head" data-grp="${col}">${t("fly.grp." + col)}</div>
+      ${items.map(([id, i, k]) => `<button class="btn-cmd fly-item" data-cmd="${id}" ${tip(k)}><span class="fly-chip">${icon(i, 20)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}
+    </div>`).join("")}</div>
   </div>`;
 }
 
@@ -50,6 +65,7 @@ function labelOf(tipText: string): { name: string; key: string } {
 }
 
 function labelAll(root: ParentNode) {
+  root.querySelectorAll<HTMLElement>(".fly-col-head").forEach(h => { h.textContent = t("fly.grp." + h.dataset.grp); });
   root.querySelectorAll<HTMLElement>(".fly-item").forEach(b => {
     const l = labelOf(b.getAttribute("data-tip") || "");
     b.querySelector(".fly-lbl")!.textContent = l.name;

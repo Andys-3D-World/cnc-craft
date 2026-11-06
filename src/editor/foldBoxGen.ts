@@ -5,6 +5,7 @@
  * Faltlinien liegen auf einer eigenen Ebene mit wenig Leistung, die vor der Schnitt-Ebene steht. Beim Fräsen werden sie nur
  * flach angeritzt; Plasma schneidet immer durch, dort geht der Generator nicht (plasmaCam lässt auch später Faltlinien weg).
  */
+import { icon } from "../ui/icons";
 import { loadSettings, matchDefaults, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { MM_TO_PIXEL, createPolyline, newId } from "../shapeTransform";
@@ -60,7 +61,7 @@ export function openFoldBoxDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(900px, calc(100vw - 32px));">
-      <h3>📦 ${t("fold.title")}</h3>
+      <h3>${icon("foldBox", 20)}${t("fold.title")}</h3>
       <div class="dlg-hint">${t("fold.desc")}</div>
       ${mode === "laser" ? "" : `<div class="dlg-hint" style="color:var(--lt-amber, #ffb454);">${t(mode === "plasma" ? "fold.modePlasma" : "fold.modeMill")}</div>`}
       <div style="display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:start;">

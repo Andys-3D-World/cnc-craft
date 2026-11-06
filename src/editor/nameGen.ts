@@ -14,6 +14,7 @@
  * Die Vorschau zeigt, ob alles ein Teil ist (sonst Warnung mit der Anzahl). Rechnung in mm mit polygon-clipping,
  * „Aufs Bett“ legt das Ergebnis als Gruppe in die Bettmitte.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, matchDefaults, saveSettings } from "./genRun";
 import polygonClipping, { MultiPolygon, Polygon, Ring } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -311,7 +312,7 @@ export function openNameGenerator(log: (s: string) => void, done: () => void) {
     + tile("own", t("ng.ownSym"), `<span style="font-size:0.62rem;line-height:1;">SVG<br>+</span>`);
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>✍ ${t("ngen.title")}</h3>
+      <h3>${icon("nameGen", 20)}${t("ngen.title")}</h3>
       <div class="dlg-hint">${t("ng.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

@@ -21,6 +21,8 @@ import { openJointDialog } from "./jointGen";
 import { openShelfDialog } from "./shelfGen";
 import { openDividerDialog } from "./dividerGen";
 import { openFoldBoxDialog } from "./foldBoxGen";
+import { openShapeBoxDialog } from "./shapeBoxGen";
+import { openFamilyDialog } from "./familyGen";
 import { openCandyHolderDialog } from "./candyHolderGen";
 import { openVentDialog } from "./ventGen";
 import { openBirthLetterDialog } from "./birthLetterGen";
@@ -41,7 +43,8 @@ const GENERATORS: Record<string, Open> = {
   gear: openGearDialog, hinge: openHingeDialog, scale: openScaleDialog, joint: openJointDialog, shelf: openShelfDialog,
   divider: openDividerDialog, vent: openVentDialog, birth: openBirthLetterDialog, letterTopper: openLetterTopperDialog,
   puzzle: openPuzzleDialog, wordTiles: openWordTilesDialog, shadowBox: openShadowBoxDialog, slotOrnament: openSlotOrnamentDialog,
-  name: openNameGenerator, materialTest: openMaterialTestDialog, foldBox: openFoldBoxDialog, candyHolder: openCandyHolderDialog
+  name: openNameGenerator, materialTest: openMaterialTestDialog, foldBox: openFoldBoxDialog, candyHolder: openCandyHolderDialog,
+  shapeBox: openShapeBoxDialog, family: openFamilyDialog
 };
 
 const knownType = (type: string) => Object.prototype.hasOwnProperty.call(GENERATORS, type);

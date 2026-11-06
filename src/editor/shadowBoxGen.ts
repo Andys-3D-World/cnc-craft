@@ -4,6 +4,7 @@
  * Vorschau zeigt alle Schichten übereinander wie fertig gebaut.
  * „Aufs Bett“ legt alle Teile nebeneinander (jedes eine Gruppe). Geometrie: shadowBox.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
@@ -96,7 +97,7 @@ export function openShadowBoxDialog(log: (s: string) => void, done: () => void) 
     `<label class="prop-row" style="cursor:pointer;"><span>${t(key)}</span><input id="${id}" type="checkbox" ${on ? "checked" : ""} style="width:auto;"></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(760px, calc(100vw - 32px));">
-      <h3>🏠 ${t("sb.title")}</h3>
+      <h3>${icon("shadowBox", 20)}${t("sb.title")}</h3>
       <div class="dlg-hint">${t("sb.desc")}</div>
       <div class="box-grid">
         <div class="box-fields">

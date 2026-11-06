@@ -3,6 +3,7 @@
  * Rahmen, Rand und Halterung wählen, Vorschau aller Stecker, „Aufs Bett“ legt sie in Reihen aufs Bett (jeder eine Gruppe).
  * Die Geometrie entsteht in letterTopper.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
@@ -87,7 +88,7 @@ export function openLetterTopperDialog(log: (s: string) => void, done: () => voi
     `<label class="dlg-row"><span>${t(key)}</span><span class="dlg-num"><input id="${id}" type="number" min="${min}" step="${step}"><em>mm</em></span></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(820px, calc(100vw - 32px));">
-      <h3>🔤 ${t("lt.title")}</h3>
+      <h3>${icon("letterTopper", 20)}${t("lt.title")}</h3>
       <div class="dlg-hint">${t("lt.desc")}</div>
       <div style="display:grid;grid-template-columns:300px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

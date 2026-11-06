@@ -195,6 +195,8 @@ export const commands: Record<string, () => void> = {
   shadowBox: () => openGenerator("shadowBox", log, () => { done(); checkpoint(); }),
   slotOrnament: () => openGenerator("slotOrnament", log, () => { done(); checkpoint(); }),
   candyHolder: () => openGenerator("candyHolder", log, () => { done(); checkpoint(); }),
+  shapeBox: () => openGenerator("shapeBox", log, () => { done(); checkpoint(); }),
+  family: () => openGenerator("family", log, () => { done(); checkpoint(); }),
   // Opferplatte planen: ganzes Bett, eine Seite (Nullpunkt links unten, Z auf der Opferplatte)
   surface: () => {
     if (getMachineMode() !== "mill") { log(t("face.spoil.millOnly")); return; }

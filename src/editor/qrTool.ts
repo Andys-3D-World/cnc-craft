@@ -5,6 +5,7 @@
  * Fehlerkorrektur). Doppelklick auf den Code öffnet ihn wieder. Platzhalter wie {n} im Text werden
  * erst bei „Seriennummern“ (serial.ts) ersetzt.
  */
+import { icon } from "../ui/icons";
 import { matchDefaults } from "./genRun";
 import { app } from "./editorState";
 import { createPolyline, groupBounds, newId, MM_TO_PIXEL } from "../shapeTransform";
@@ -49,7 +50,7 @@ export function openQrDialog(log: (s: string) => void, done: () => void, edit?: 
   ov.className = "dlg-overlay";
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:520px;">
-      <h3>▦ ${t("qr.title")}</h3>
+      <h3>${icon("qrCode", 20)}${t("qr.title")}</h3>
       <div class="dlg-hint">${t("qr.desc")}</div>
       <textarea id="qr-text" rows="3" style="width:100%;box-sizing:border-box;"></textarea>
       <div class="box-grid">

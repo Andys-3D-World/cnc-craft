@@ -12,7 +12,7 @@ import { icon } from "./icons";
 import { tip, T, t } from "../i18n/i18n";
 import { placeButtonHtml } from "./stockPanel";
 import { materialOptionsHtml } from "../materialView";
-import { flyTools, flyCmds } from "./flyout";
+import { flyTools, flyCmds, flyGroups } from "./flyout";
 
 const tool = (id: string, ico: string, tipKey: string, active = false) =>
   `<button id="tool-${id}" data-tool="${id}" class="btn-tool-icon${active ? " active" : ""}" ${tip(tipKey)}>${icon(ico, 20)}</button>`;
@@ -36,13 +36,18 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"]])}
     ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
-    ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
-      ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"], ["candyHolder", "candyHolder", "tip.cmd.candyHolder"],
-      ["birth", "birth", "tip.cmd.birth"], ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
-      ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
-    ${flyCmds("extras", "extras", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"],
-      ["materialTest", "materialTest", "tip.cmd.materialTest"], ["serial", "serial", "tip.cmd.serial"], ["view3d", "view3d", "tip.cmd.view3d"],
-      ["stlExport", "stlExport", "tip.cmd.stlExport"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]], "left", 20)}
+    ${flyGroups("generators", "boxgen", [
+      ["boxes", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["shapeBox", "shapeBox", "tip.cmd.shapeBox"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
+        ["candyHolder", "candyHolder", "tip.cmd.candyHolder"], ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"]]],
+      ["deco", [["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["family", "family", "tip.cmd.family"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"],
+        ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["birth", "birth", "tip.cmd.birth"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"],
+        ["mandala", "mandala", "tip.cmd.mandala"], ["puzzle", "puzzle", "tip.cmd.puzzle"]]],
+      ["tech", [["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["joint", "joint", "tip.cmd.joint"], ["scale", "scale", "tip.cmd.scale"], ["vent", "vent", "tip.cmd.vent"], ["qrCode", "qrCode", "tip.cmd.qrCode"]]]
+    ], 20)}
+    ${flyGroups("extras", "extras", [
+      ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]]],
+      ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
+    ], 20)}
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
@@ -81,9 +86,10 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${flyCmds("combine", "boolUnion", [["boolUnion", "boolUnion", "tip.cmd.boolUnion"], ["boolSubtract", "boolSubtract", "tip.cmd.boolSubtract"],
         ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
-      ${flyCmds("edit", "offset", [["offset", "offset", "tip.cmd.offset"], ["heal", "heal", "tip.cmd.heal"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"], ["fillet", "fillet", "tip.cmd.fillet"], ["patternFill", "patternFill", "tip.cmd.patternFill"],
-        ["centerFix", "centerFix", "tip.cmd.centerFix"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"],
-        ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"]])}
+      ${flyGroups("edit", "offset", [
+        ["outline", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["heal", "heal", "tip.cmd.heal"], ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"], ["centerFix", "centerFix", "tip.cmd.centerFix"]]],
+        ["parts", [["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]]
+      ], 18, "down")}
       ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"]])}
       ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],
         ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"]])}

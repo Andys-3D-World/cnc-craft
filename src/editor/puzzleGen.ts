@@ -4,6 +4,7 @@
  * genau darüber; sonst in die Bettmitte. „Nur im Puzzle gravieren“ setzt den Umriss als Bildmaske (wie Bild → Maske).
  * Die Linien kommen auf die stärkste Linien-Ebene (Schnitt), das Bild auf die Gravier-Ebene. Geometrie: puzzle.ts.
  */
+import { icon } from "../ui/icons";
 import { editImages, forgetSettings, loadSettings, saveSettings } from "./genRun";
 import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
@@ -53,7 +54,7 @@ export function openPuzzleDialog(log: (s: string) => void, done: () => void) {
     `<label class="prop-row">${t(key)}<input id="${id}" type="number" step="${step}" min="${min}" value="${v}" class="prop-input"></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:620px;">
-      <h3>🧩 ${t("pz.title")}</h3>
+      <h3>${icon("puzzle", 20)}${t("pz.title")}</h3>
       <div class="dlg-hint">${t("pz.desc")}</div>
       <div class="box-grid">
         <div class="box-fields">

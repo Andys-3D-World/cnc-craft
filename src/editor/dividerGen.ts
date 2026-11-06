@@ -2,6 +2,7 @@
  * FACHTEILER – Fenster (Generatoren): Kistenmaße, Fächer, Material, Spiel, Laser/Fräse.
  * Vorschau zeigt den Einsatz von oben und alle Teile so, wie sie aufs Bett kommen. Geometrie: divider.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon } from "polygon-clipping";
 import { app, bedSizeMm } from "./editorState";
@@ -91,7 +92,7 @@ export function openDividerDialog(log: (s: string) => void, done: () => void) {
     `<label class="dlg-row${cls ? " " + cls : ""}"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>▦ ${t("div.title")}</h3>
+      <h3>${icon("divider", 20)}${t("div.title")}</h3>
       <div class="dlg-hint">${t("div.desc")}</div>
       <div style="display:grid;grid-template-columns:340px 1fr;gap:12px;align-items:start;">
         <div class="box-fields" style="max-height:62vh;overflow:auto;">

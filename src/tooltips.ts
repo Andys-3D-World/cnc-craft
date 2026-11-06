@@ -55,7 +55,8 @@ export function initLightBurnTooltips() {
 
     if (el.closest(".tool-strip") || el.closest(".fly-menu")) {
       // rechts neben dem Knopf
-      x = r.right + gap;
+      // (in der Generatoren-Tafel neben der ganzen Tafel, sonst läge er über der nächsten Spalte)
+      x = (el.closest(".fly-board")?.getBoundingClientRect().right ?? r.right) + gap;
       y = r.top + r.height / 2 - t.height / 2;
     } else {
       // unter dem Element, sonst darüber

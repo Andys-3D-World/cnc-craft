@@ -3,6 +3,7 @@
  * Plättchen einzeln (zum Aufkleben, mit Hilfslinien) oder direkt graviert. „Aufs Bett“ legt Grundplatte, Rahmen und
  * Plättchen nebeneinander. Die Geometrie entsteht in wordTiles.ts.
  */
+import { icon } from "../ui/icons";
 import { loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
@@ -124,7 +125,7 @@ export function openWordTilesDialog(log: (s: string) => void, done: () => void) 
     `<label class="dlg-row"><span>${t(key)}</span><select id="${id}" style="width:auto;max-width:190px;">${opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>🔠 ${t("wt.title")}</h3>
+      <h3>${icon("wordTiles", 20)}${t("wt.title")}</h3>
       <div class="dlg-hint">${t("wt.desc")}</div>
       <div style="display:grid;grid-template-columns:310px 1fr;gap:12px;align-items:start;">
         <div class="box-fields">

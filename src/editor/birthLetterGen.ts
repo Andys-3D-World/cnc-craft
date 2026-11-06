@@ -6,6 +6,7 @@
  *   Datum, Daten, Symbole, Motive → schwächste Linien-Ebene (Einzellinien)   Bilder → Füll-Ebene (Bild gravieren)
  * Fremder Text (Name, Daten, Dateinamen) kommt nie ins innerHTML – nur als Geometrie bzw. textContent.
  */
+import { icon } from "../ui/icons";
 import { editImages, loadSettings, saveSettings } from "./genRun";
 import type { MultiPolygon, Polygon } from "polygon-clipping";
 import polygonClipping from "polygon-clipping";
@@ -189,7 +190,7 @@ export function openBirthLetterDialog(log: (s: string) => void, done: () => void
     `<label class="dlg-row"><span>${t(key)}</span><input id="${id}" type="text" maxlength="40" style="width:160px;" ${phKey ? `placeholder="${t(phKey)}"` : ""}></label>`;
   ov.innerHTML = `
     <div class="dlg-box" role="dialog" style="width:min(860px, calc(100vw - 32px));">
-      <h3>👶 ${t("birth.title")}</h3>
+      <h3>${icon("birth", 20)}${t("birth.title")}</h3>
       <div class="dlg-hint">${t("birth.desc")}</div>
       <div style="display:grid;grid-template-columns:320px 1fr;gap:12px;align-items:start;">
         <div class="box-fields" style="max-height:62vh;overflow:auto;padding-right:4px;">
