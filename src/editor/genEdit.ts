@@ -33,6 +33,7 @@ import { openShadowBoxDialog } from "./shadowBoxGen";
 import { openSlotOrnamentDialog } from "./slotOrnamentGen";
 import { openNameGenerator } from "./nameGen";
 import { openMaterialTestDialog } from "./materialTest";
+import { openTestCardDialog } from "./testCardGen";
 
 type Log = (s: string) => void;
 type Open = (log: Log, done: () => void) => void;
@@ -44,7 +45,7 @@ const GENERATORS: Record<string, Open> = {
   divider: openDividerDialog, vent: openVentDialog, birth: openBirthLetterDialog, letterTopper: openLetterTopperDialog,
   puzzle: openPuzzleDialog, wordTiles: openWordTilesDialog, shadowBox: openShadowBoxDialog, slotOrnament: openSlotOrnamentDialog,
   name: openNameGenerator, materialTest: openMaterialTestDialog, foldBox: openFoldBoxDialog, candyHolder: openCandyHolderDialog,
-  shapeBox: openShapeBoxDialog, family: openFamilyDialog
+  testCard: openTestCardDialog, shapeBox: openShapeBoxDialog, family: openFamilyDialog
 };
 
 const knownType = (type: string) => Object.prototype.hasOwnProperty.call(GENERATORS, type);

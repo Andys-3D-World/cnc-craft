@@ -26,6 +26,8 @@ import {
 import { foldLayersFirst } from "./foldBox";
 import { t, ascii } from "./i18n/i18n";
 import { imageGcode } from "./raster/imageShape";
+import { scanOffsetAt, shiftSeg } from "./scanOffset";
+import { orderByStage } from "./testCard";
 
 const MAX_SCANLINES = 40000; // Schutz vor riesigen Dateien
 const AVOID_MARGIN = 3;      // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
@@ -56,7 +58,9 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   // Faltlinien immer zuerst: Ist das Teil ausgeschnitten, kann es sich bewegen. Auch wenn die Ebene ganz unten steht
   // (eine aus einem Projekt übernommene Ebene landet am Listenende) oder von Hand verschoben wurde.
   const foldIds = new Set(shapes.filter(s => s.foldLine).map(s => effectiveLayer(s)?.id));
-  const order = foldLayersFirst(sorted, l => foldIds.has(l.id));
+  // Testkarte: Gravur vor Schnitt, unabhängig von der Ebenen-Liste (ohne Karte ändert das nichts)
+  if (shapes.some(s => Number(s.laserOverride?.zOff) > 0)) warnings.push(t("tcard.w.zJob"));
+  const order = orderByStage(foldLayersFirst(sorted, l => foldIds.has(l.id)));
 
   let g = "";
   g += `G21 ${c("gc.unitMm")}\n`;
@@ -81,13 +85,17 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     const fillS = both ? sOf(layer.fillPower) : S;
     const fillF = both ? layer.fillSpeed : layer.speed;
     g += `\n${c("lgc.layer", { i: li + 1, name: layer.name, mode: t("laser.mode." + layer.mode), p: layer.power, f: layer.speed, x: layer.passes })}\n`;
+    // Versatz hin/zurück: 0 = es wird nichts gerechnet, der G-Code bleibt genau gleich (scanOffset.ts)
+    const scanMm = layer.scanMm ?? scanOffsetAt(laserSettings.scanOffsets, fillF);
+    // Fokus-Leiter: relativ nach oben, am Ende des Blocks wieder genauso weit zurück. Nur solange Laser aus (S0)
+    if (layer.zOff) g += `${c("lgc.zUp", { z: layer.zOff })}\nG91\nG0 Z${n(layer.zOff)} S0\nG90\n`;
     if (layer.air) g += `M8 ${c("lgc.airOn")}\n`;
     g += `F${n(layer.speed)}\n`;
 
     // ---- BILDER (zuerst gravieren, dann schneiden) ----
     for (const s of list) {
       if (s.type !== "image") continue;
-      const r = imageGcode(s, S, n);
+      const r = imageGcode(s, S, n, scanMm);
       if (!r) { warnings.push(t("lgw.imageLoading", { name: ascii(s.source || "") })); continue; }
       if (!r.rows) continue;
       for (let pass = 0; pass < layer.passes; pass++) {
@@ -122,7 +130,8 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
           if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
           g += `${c("lgc.fill", { n: res.segs.length })}\n`;
           if (both) g += `F${n(fillF)}\n`;
-          for (const sg of res.segs) {
+          for (const raw of res.segs) {
+            const sg = scanMm ? shiftSeg(raw, scanMm) : raw;
             g += `G0 X${n(sg[0])} Y${n(sg[1])} S0\n`;
             g += `G1 X${n(sg[2])} Y${n(sg[3])} S${fillS}\n`;
           }
@@ -212,6 +221,7 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
       }
     }
     if (layer.air) g += `M9 ${c("lgc.airOff")}\n`;
+    if (layer.zOff) g += `${c("lgc.zBack")}\nG91\nG0 Z${n(-layer.zOff)} S0\nG90\n`;
   });
 
   g += `\nS0\nM5 ${c("lgc.laserOff")}\n`;

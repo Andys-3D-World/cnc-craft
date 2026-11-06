@@ -338,9 +338,10 @@ export function pointInImage(s: any, x: number, y: number): boolean {
  * Rastert eine Bild-Form zu G-Code (Laser-Modus $32=1, M3/M4 schon gesetzt).
  * Zeilen laufen entlang der unteren Bildkante (bei gedrehtem Bild schräg). Leere Ränder werden übersprungen,
  * vor/nach jeder Zeile wird um „overscan“ mm mit Laser aus weitergefahren.
+ * scanMm: Versatz hin/zurück (siehe scanOffset.ts) – jede Zeile um die Hälfte entgegen ihrer Fahrtrichtung. 0 = wie immer.
  * Gibt null zurück, wenn das Bild noch nicht geladen ist.
  */
-export function imageGcode(s: any, maxS: number, n: (v: number) => string): { g: string; rows: number; lengthMm: number } | null {
+export function imageGcode(s: any, maxS: number, n: (v: number) => string, scanMm = 0): { g: string; rows: number; lengthMm: number } | null {
   const img: ImageSettings = s.img;
   const r = processed(s, img, false);
   if (!r) return null;
@@ -351,6 +352,7 @@ export function imageGcode(s: any, maxS: number, n: (v: number) => string): { g:
   const P = (u: number, v: number) => ({ x: o.x + u * ex.x + v * ey.x, y: o.y + u * ex.y + v * ey.y });
   const widthMm = Math.hypot(ex.x, ex.y) || 1;
   const over = Math.max(0, img.overscan || 0) / widthMm; // in Bildbreiten
+  const du = scanMm / 2 / widthMm;                        // halber Versatz in Bildbreiten
   const gray = img.raster.method === "gray";
   const minS = Math.round((Math.max(0, Math.min(100, img.minPower || 0)) / 100) * maxS);
   const power = (b: number) => gray ? (b < 0.004 ? 0 : Math.round(minS + b * (maxS - minS))) : (b >= 0.5 ? maxS : 0);
@@ -384,15 +386,15 @@ export function imageGcode(s: any, maxS: number, n: (v: number) => string): { g:
     const u0 = a / gw, u1 = (z + 1) / gw;
     lengthMm += (u1 - u0 + 2 * over) * widthMm;
     if (!rtl) {
-      move("G0", P(u0 - over, v), 0);
-      move("G1", P(u0, v), 0);
-      for (const rn of runs) move("G1", P(rn.u1, v), rn.S);
-      move("G1", P(u1 + over, v), 0);
+      move("G0", P(u0 - over - du, v), 0);
+      move("G1", P(u0 - du, v), 0);
+      for (const rn of runs) move("G1", P(rn.u1 - du, v), rn.S);
+      move("G1", P(u1 + over - du, v), 0);
     } else {
-      move("G0", P(u1 + over, v), 0);
-      move("G1", P(u1, v), 0);
-      for (let k = runs.length - 1; k >= 0; k--) move("G1", P(runs[k].u0, v), runs[k].S);
-      move("G1", P(u0 - over, v), 0);
+      move("G0", P(u1 + over + du, v), 0);
+      move("G1", P(u1 + du, v), 0);
+      for (let k = runs.length - 1; k >= 0; k--) move("G1", P(runs[k].u0 + du, v), runs[k].S);
+      move("G1", P(u0 - over + du, v), 0);
     }
   }
   return { g, rows, lengthMm };

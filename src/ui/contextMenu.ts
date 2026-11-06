@@ -194,8 +194,10 @@ function shapeMenu(): MenuEntry[] {
   const units = new Set(sel.map(s => s.groupId || s.id)).size;
   const grouped = sel.some(s => s.groupId);
   const convertible = sel.some(s => s.type !== "polyline" && s.type !== "image");
-  const genEdit: MenuEntry[] = runInSelection(sel) || sel.some(s => s.qrData)
-    ? [{ label: t("gen.edit"), ico: "node", run: cmd("editGenerator") }, "sep"] : [];
+  const run = runInSelection(sel);
+  const genEdit: MenuEntry[] = run || sel.some(s => s.qrData)
+    ? [{ label: t("gen.edit"), ico: "node", run: cmd("editGenerator") },
+       ...(run?.type === "testCard" ? [{ label: t("tcard.readTitle"), ico: "materialTest", run: cmd("testCardRead") } as MenuEntry] : []), "sep"] : [];
   return [
     ...genEdit,
     { label: t("cm.cut"), ico: "cut", key: ctrl("X"), run: cmd("cut") },

@@ -41,6 +41,7 @@ import { offsetPolygon } from "../polyOffset";
 import { openFacingDialog } from "../ui/facingDialog";
 import { getMachineMode } from "../machineMode";
 import { editRun, openGenerator, runInSelection } from "./genEdit";
+import { openTestCardRead } from "./testCardRead";
 import { openQrDialog } from "./qrTool";
 import { openSerialDialog } from "./serial";
 import { openThicknessDialog } from "./thickness";
@@ -204,6 +205,11 @@ export const commands: Record<string, () => void> = {
   shapeLib: () => openShapeLibrary(log),
   nameGen: () => openGenerator("name", log, () => { done(); checkpoint(); }),
   materialTest: () => openGenerator("materialTest", log, () => { done(); checkpoint(); }),
+  testCard: () => openGenerator("testCard", log, () => { done(); checkpoint(); }),
+  testCardRead: () => {
+    const run = runInSelection(selectedShapes());
+    if (run?.type === "testCard") openTestCardRead(app().shapes.filter((s: any) => s.gen?.id === run.id), run.s, log);
+  },
   qrCode: () => openQrDialog(log, () => { done(); checkpoint(); }),
   // Rechtsklick: Teile aus einem Generator nochmal mit dessen Fenster bearbeiten (QR-Code hat sein eigenes Bearbeiten)
   editGenerator: () => {

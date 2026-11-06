@@ -46,7 +46,7 @@ export function renderCamPanel(container: HTMLElement) {
     ], 20)}
     ${flyGroups("extras", "extras", [
       ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]]],
-      ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
+      ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["testCard", "testCard", "tip.cmd.testCard"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
     ], 20)}
     <div class="strip-sep strip-push"></div>
     ${action("generate-gcode", "gcode", "rp.genGcodeTip")}

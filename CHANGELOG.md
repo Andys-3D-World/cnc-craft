@@ -3,6 +3,10 @@
 ## Next version (unreleased)
 
 **New**
+- **Laser test card generator:** one piece of material, one run, several test fields, so you can read off the right values for your own machine. Choose laser type and power, card size, material and thickness, and speed and power ranges; machine data can be engraved on top. Fields: cut grid and engrave grid (power × speed), line interval, gray wedge for photos, kerf (slots with a T piece), power threshold, text size, flex hinge, air on/off, repeat pair, scan offset and ruler. Each field can be switched off and prints a short note on how to read it. The layout rearranges and shrinks grids so the fields fit, and warns about anything left out. Engraving always runs before cutting and the card outline runs last, whatever the layer order. No table of values is included: the card measures your machine. *Edit with generator* works.
+- **Read test card:** right-click the card (or use the button in the generator) and click the best field. The values are saved as your own preset; only values that were really on the card can be saved. Kerf and scan offset can be taken over into your settings after a confirmation. The dialogs include short troubleshooting help.
+- **Scan offset (laser):** a new setting that corrects jagged edges when engraving back and forth, per speed, for fills and image engraving. Empty or 0 leaves the G-code unchanged.
+- **Focus ladder (optional, off by default):** lines at rising Z heights, only with a confirmed motorised Z axis. Z moves only upwards from the starting height, in small steps up to 1 mm and 5 mm in total, and returns after each line.
 - **Shape box generator:** a box in any shape: heart, star, circle, triangle, polygons, Christmas and seasonal outlines of our own, a letter or digit from any font (holes such as in A or 8 get their own inner wall) or your own shape from the selection. The wall follows the outline, either as one flex strip with a puzzle joint (laser only) or as straight pieces (laser and router, with dogbones). Live preview in 2D and 3D, slots and tabs matched, floor, top ring and optional lid. Clear messages for shapes that are too small, too narrow or too low. *Edit with generator* works, including your own shape after saving and reopening.
 - **New box types in the box generator:** swinging lid on its own pegs in round holes (no hardware), two swinging lids with a centre wall, jewellery box with compartments, pull-off lid with finger notch, money or gift card holder, book with sliding tray. Triangle and square now work in the polygon box. The type list is grouped by kind.
 - **Dogbones in the box generator:** enter the router bit diameter and all inner corners and slots of the panels get dogbones (not for flex walls, which are laser only).
@@ -10,6 +14,8 @@
 - **Your own shape in the ornament generator:** take a closed shape from the selection and put a name in it.
 
 Not yet cut on a real machine, so the fits of all new boxes are untested: cut a small test piece first.
+
+Not yet burnt on a real machine: test on scrap first.
 
 **Improved**
 - **Generator menu:** the long list is now a board with three columns (boxes and storage, names and decoration, workshop and technology), so it always fits on the screen. All generator icons were redrawn in one style, and the generator windows use the same icons instead of system emoji.

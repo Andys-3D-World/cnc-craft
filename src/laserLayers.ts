@@ -13,6 +13,7 @@
  */
 import { t } from "./i18n/i18n";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
+import { cleanScanPoints, type ScanPoint } from "./scanOffset";
 
 export type LaserMode = "line" | "fill" | "fill+line";
 
@@ -35,6 +36,9 @@ export interface LaserLayer {
   notes: string;      // Notiz
   updated?: number;   // Werkstatt-Sync: letzte Änderung in ms (0 = vor dem Sync)
   device?: string;    // Werkstatt-Sync: Rechner der letzten Änderung
+  cardStage?: number; // nur Testkarte (laserOverride): Reihenfolge, siehe testCard.ts
+  scanMm?: number;    // nur Testkarte: fester Versatz hin/zurück statt des Werts aus den Einstellungen
+  zOff?: number;      // nur Testkarte, Fokus-Leiter: so viel mm über der Starthöhe, siehe laserCam.ts
 }
 
 export interface LaserSettings {
@@ -45,6 +49,8 @@ export interface LaserSettings {
   cornerPower: boolean;   // ohne M4: Leistung in Ecken nach der Bremsfahrt senken (siehe cornerPower.ts)
   cornerAccel: number;    // Beschleunigung der Maschine (mm/s²) für die Ecken-Leistung
   cornerMin: number;      // Ecken-Leistung: höchstens bis auf so viel % senken
+  kerf: number;           // gemessene Schnittbreite in mm (Testkarte), 0 = nicht gemessen
+  scanOffsets: ScanPoint[]; // gemessener Versatz hin/zurück je Geschwindigkeit, leer = kein Versatz (siehe scanOffset.ts)
 }
 
 export const LAYERS_CHANGED = "cnc-laser-layers-changed";
@@ -60,7 +66,7 @@ export const LAYER_COLORS = [
 
 export let activeLayer: LaserLayer | null = null;
 let layers: LaserLayer[] = [];
-export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false, optimizeOrder: true, cornerPower: false, cornerAccel: 1000, cornerMin: 20 };
+export const laserSettings: LaserSettings = { sMax: 1000, dynamic: true, avoidCut: false, optimizeOrder: true, cornerPower: false, cornerAccel: 1000, cornerMin: 20, kerf: 0, scanOffsets: [] };
 
 // ---------------------------------------------------------------------
 // Laden / Speichern
@@ -179,9 +185,16 @@ export function effectiveLayer(shape: any): LaserLayer | null {
   const power = num(o.power, l.power, 0, 100);
   const speed = num(o.speed, l.speed, 1, 100000);
   const interval = num(o.interval, l.interval, 0.01, 10);
+  // Testkarte: nur, was wirklich gesetzt ist – sonst bleiben ID und G-Code wie immer
+  const extra: Partial<LaserLayer> = {};
+  let tail = "";
+  if (typeof o.air === "boolean") { extra.air = o.air; tail += o.air ? "_a1" : "_a0"; }
+  if (Number.isFinite(o.stage)) { extra.cardStage = num(o.stage, 0, 0, 99); tail += `_st${extra.cardStage}`; }
+  if (Number.isFinite(o.scanMm)) { extra.scanMm = num(o.scanMm, 0, -2, 2); tail += `_sc${extra.scanMm}`; }
+  if (Number.isFinite(o.zOff) && o.zOff > 0) { extra.zOff = num(o.zOff, 0, 0, 5); tail += `_z${extra.zOff}`; }
   return {
-    ...l, power, speed, fillPower: power, fillSpeed: speed, interval,
-    id: `${l.id}~${power}_${speed}_${interval}`,
+    ...l, power, speed, fillPower: power, fillSpeed: speed, interval, ...extra,
+    id: `${l.id}~${power}_${speed}_${interval}${tail}`,
     name: layerHasFill(l) ? `${l.name} ${interval} mm` : l.name
   };
 }
@@ -301,6 +314,8 @@ function setCorner(s: any) {
   if (typeof s.cornerPower === "boolean") laserSettings.cornerPower = s.cornerPower;
   if (Number.isFinite(+s.cornerAccel) && +s.cornerAccel > 0) laserSettings.cornerAccel = Math.min(50000, Math.max(50, +s.cornerAccel));
   if (Number.isFinite(+s.cornerMin) && +s.cornerMin >= 0) laserSettings.cornerMin = Math.min(100, +s.cornerMin);
+  if (Number.isFinite(+s.kerf) && +s.kerf >= 0) laserSettings.kerf = Math.min(2, +s.kerf);
+  if (s.scanOffsets !== undefined) laserSettings.scanOffsets = cleanScanPoints(s.scanOffsets);
 }
 
 /** Projekt öffnen: fehlende Ebenen übernehmen (wie bei den Fräswerkzeugen) */

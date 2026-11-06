@@ -9,6 +9,7 @@
  * Die Daten liegen in laserLayers.ts – dieselben Ebenen wie rechts im CAM-Bereich.
  */
 import { t } from "../i18n/i18n";
+import { formatScanText, parseScanText } from "../scanOffset";
 import {
   LaserLayer, LaserMode, LAYER_COLORS, LAYERS_CHANGED, getLayers, getLayer, addLayer, updateLayer, removeLayer,
   duplicateLayer, moveLayer, activeLayer, setActiveLayer, layerInfo, laserSettings, setLaserSettings
@@ -113,6 +114,8 @@ export function renderLaserLibPage(withEditor = true) {
                 <label class="te-row" data-tip="${esc(t("laser.cornerMinTip"))}"><span>${esc(t("laser.cornerMin"))}</span><span class="dlg-num"><input id="lps-cmin" type="number" min="0" max="100" step="5"><em>%</em></span></label>
               </div>
             </div>
+            <label class="te-row" data-tip="${esc(t("laser.kerfTip"))}"><span>${esc(t("laser.kerf"))}</span><span class="dlg-num"><input id="lps-kerf" type="number" min="0" max="2" step="0.01"><em>mm</em></span></label>
+            <label class="te-row" data-tip="${esc(t("laser.scanTip"))}"><span>${esc(t("laser.scan"))}</span><input id="lps-scan" type="text" placeholder="1000:0.05, 3000:0.1" style="width:130px;"></label>
             <div class="tool-scope">${esc(t("llib.orderHint"))}</div>
           </div>
         </div>
@@ -146,6 +149,7 @@ export function renderLaserLibPage(withEditor = true) {
   (page.querySelector("#lps-corner-box") as HTMLElement).style.display = laserSettings.dynamic ? "none" : "";
   (page.querySelector("#lps-corner") as HTMLInputElement).checked = laserSettings.cornerPower;
   (page.querySelector("#lps-corner-vals") as HTMLElement).style.display = laserSettings.cornerPower ? "" : "none";
+  setv("lps-kerf", String(laserSettings.kerf)); setv("lps-scan", formatScanText(laserSettings.scanOffsets));
   setv("lps-cacc", String(laserSettings.cornerAccel)); setv("lps-cmin", String(laserSettings.cornerMin));
   (page.querySelector("#lp-dup") as HTMLButtonElement).disabled = isNew || !sel;
   (page.querySelector("#lp-up") as HTMLButtonElement).disabled = isNew || layers[0]?.id === sel;
@@ -187,6 +191,9 @@ function bindPage(page: HTMLElement) {
   const cacc = page.querySelector("#lps-cacc") as HTMLInputElement, cmin = page.querySelector("#lps-cmin") as HTMLInputElement;
   cacc.addEventListener("change", () => setLaserSettings({ cornerAccel: parseFloat(cacc.value) }));
   cmin.addEventListener("change", () => setLaserSettings({ cornerMin: parseFloat(cmin.value) }));
+  const kerf = page.querySelector("#lps-kerf") as HTMLInputElement, scan = page.querySelector("#lps-scan") as HTMLInputElement;
+  kerf.addEventListener("change", () => { setLaserSettings({ kerf: parseFloat(kerf.value) }); kerf.value = String(laserSettings.kerf); });
+  scan.addEventListener("change", () => { setLaserSettings({ scanOffsets: parseScanText(scan.value) }); scan.value = formatScanText(laserSettings.scanOffsets); });
 }
 
 // ---------------------------------------------------------------------
