@@ -2,7 +2,7 @@
  * IMPORT-ZENTRALE: Ein Knopf (oder Datei aufs Fenster ziehen) für alle Formate.
  *
  *   Vektoren:  SVG, DXF, PDF, AI (PDF-kompatibel), HPGL/PLT
- *   3D:        STL, 3MF, STEP/STP (eigener Dialog zum Schneiden, siehe meshImport.ts)
+ *   3D:        STL, 3MF, OBJ, STEP/STP (eigener Dialog zum Schneiden, siehe meshImport.ts)
  *   Bilder:    PNG, JPG, BMP, GIF, WEBP (Nachzeichnen-Dialog)
  *   G-Code:    NC, GCODE, TAP, NGC (als Konturen)
  *   Projekt:   CNCC (eigenes Projektformat)
@@ -23,7 +23,8 @@ import { parsePdf } from "./pdfImport";
 import { openImageTraceDialog } from "./imageTrace";
 import { createImageShape } from "../raster/imageShape";
 import { openEngraveDialog } from "../raster/engraveDialog";
-import { isLaser } from "../machineMode";
+import { isLaser, isPlasma } from "../machineMode";
+import { openReliefFromImage } from "../ui/reliefDialog";
 import { openStlFromBytes } from "../stlInteraction";
 import { traceText } from "../editor/textTool";
 import { createPolyline, createCircle, newId, MM_TO_PIXEL, pathArea, pointInPath } from "../shapeTransform";
@@ -42,7 +43,7 @@ import { askUnsaved } from "../ui/unsavedDialog";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
-  model: ["stl", "3mf", "step", "stp"],
+  model: ["stl", "3mf", "obj", "step", "stp"],
   image: ["png", "jpg", "jpeg", "bmp", "gif", "webp"],
   gcode: ["nc", "gcode", "gc", "tap", "ngc", "cnc"],
   project: ["cncc"]
@@ -117,6 +118,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
       const how = await chooseImageUse(name);
       if (!how) return;
       if (how === "engrave") { await insertEngraveImage(name, bytes); return; }
+      if (how === "relief") { await openReliefFromImage(name, bytes, log); return; }
       res = await openImageTraceDialog(name, bytes);
     }
     else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
@@ -133,7 +135,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
 }
 
 /** Kleines Fenster: Bild gravieren oder nachzeichnen? */
-function chooseImageUse(name: string): Promise<"engrave" | "trace" | null> {
+function chooseImageUse(name: string): Promise<"engrave" | "trace" | "relief" | null> {
   return new Promise(resolve => {
     document.getElementById("imguse-overlay")?.remove();
     const ov = document.createElement("div");
@@ -145,11 +147,12 @@ function chooseImageUse(name: string): Promise<"engrave" | "trace" | null> {
         <div class="dlg-hint imguse-file"></div>
         <button type="button" class="imguse-btn" data-how="engrave"><b>${t("img.engrave")}</b><span>${t("img.engraveD")}</span></button>
         <button type="button" class="imguse-btn" data-how="trace"><b>${t("img.trace")}</b><span>${t("img.traceD")}</span></button>
+        ${isLaser() || isPlasma() ? "" : `<button type="button" class="imguse-btn" data-how="relief"><b>${t("img.relief")}</b><span>${t("img.reliefD")}</span></button>`}
         <div class="dlg-buttons"><button type="button" class="btn-secondary" data-how="">${t("dlg.cancel")}</button></div>
       </div>`;
     (ov.querySelector(".imguse-file") as HTMLElement).textContent = name;
     document.body.appendChild(ov);
-    const done = (v: "engrave" | "trace" | null) => { ov.remove(); resolve(v); };
+    const done = (v: "engrave" | "trace" | "relief" | null) => { ov.remove(); resolve(v); };
     ov.querySelectorAll<HTMLElement>("[data-how]").forEach(b => b.addEventListener("click", () => done((b.dataset.how || null) as any)));
     ov.addEventListener("mousedown", e => { if (e.target === ov) done(null); });
     ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") done(null); });

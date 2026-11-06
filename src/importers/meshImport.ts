@@ -15,6 +15,7 @@
 import { StlMesh, meshFromPositions } from "../stlLoader";
 import { t } from "../i18n/i18n";
 import { extractMeshLists, MeshLists } from "./meshScan";
+import { parseObjBytes, ObjError, OBJ_MAX_TRIANGLES } from "./objParse.ts";
 
 // =====================================================================
 // Deflate entpacken (RFC 1951) – nach dem bewährten „puff“-Verfahren
@@ -444,4 +445,14 @@ export async function parseStep(bytes: Uint8Array): Promise<StlMesh> {
 }
 
 /** Alle 3D-Formate */
-export const MODEL_EXTENSIONS = ["stl", "3mf", "step", "stp"];
+export const MODEL_EXTENSIONS = ["stl", "3mf", "obj", "step", "stp"];
+
+/** OBJ (eigener Leser in objParse.ts): Fehlermeldungen in der Sprache der Oberfläche, nie Text aus der Datei */
+export function parseObj(bytes: Uint8Array): StlMesh {
+  try {
+    return meshFromPositions(parseObjBytes(bytes).positions, "obj");
+  } catch (e) {
+    if (e instanceof ObjError) throw new Error(t("m3d.errObj." + e.code, { line: e.line, n: OBJ_MAX_TRIANGLES.toLocaleString() }));
+    throw e;
+  }
+}

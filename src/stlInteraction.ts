@@ -1,5 +1,5 @@
 /**
- * 3D-IMPORT-DIALOG (STL, 3MF, STEP): Datei laden -> Ansicht und Schnitthöhe wählen -> als 2D-Konturen einfügen.
+ * 3D-IMPORT-DIALOG (STL, 3MF, OBJ, STEP): Datei laden -> Ansicht und Schnitthöhe wählen -> als 2D-Konturen einfügen.
  *
  * Farben in der Vorschau:  Blau = Außenkontur, Gelb = Loch, Rot = offene Linie (Modell undicht)
  */
@@ -13,7 +13,7 @@ import { Mesh3DPreview, render2D } from "./stlPreview";
 import { createPolyline, MM_TO_PIXEL } from "./shapeTransform";
 import { updateDimensionInputs } from "./uiInputs";
 import { assignPartGroups } from "./editor/parts";
-import { parse3mf, parseStep, MODEL_EXTENSIONS } from "./importers/meshImport";
+import { parse3mf, parseObj, parseStep, MODEL_EXTENSIONS } from "./importers/meshImport";
 import { t } from "./i18n/i18n";
 import { recognizeFeatures, FeatureResult } from "./meshFeatures";
 import { openCam3D } from "./ui/cam3dDialog";
@@ -49,7 +49,7 @@ export function setupStlLoader(
   });
 }
 
-/** 3D-Modell (STL, 3MF, STEP) aus bereits gelesenen Bytes öffnen (wird auch vom allgemeinen Import benutzt) */
+/** 3D-Modell (STL, 3MF, OBJ, STEP) aus bereits gelesenen Bytes öffnen (wird auch vom allgemeinen Import benutzt) */
 export async function openStlFromBytes(
   fileName: string,
   binary: Uint8Array,
@@ -61,6 +61,7 @@ export async function openStlFromBytes(
   const ext = (fileName.split(".").pop() || "").toLowerCase();
   let mesh;
   if (ext === "3mf") mesh = await parse3mf(binary);
+  else if (ext === "obj") { mesh = parseObj(binary); appendToConsole(t("m3d.objUnits")); }
   else if (ext === "step" || ext === "stp") {
     appendToConsole(t("m3d.stepWait"));
     const t0 = performance.now();

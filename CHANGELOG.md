@@ -3,6 +3,28 @@
 ## Next version (unreleased)
 
 **New**
+- **Folding box generator (laser):** a one-piece box for thin cardboard that closes without glue: a tuck-end box with flaps at
+  the top and bottom, or a tray with a fold-over lid. It sets inside or outside sizes, cardboard thickness, flap length and
+  clearance, with a barbed locking tab, a window and a hang hole as options. Panels are offset by the material thickness at the
+  folds, and flaps are narrower than their opening with chamfered corners. Flaps too long to fit are shortened with a message,
+  and impossible values are refused. Fold lines get their own low-power layer, created or reused automatically and always
+  burned before the cuts, even if that layer is moved down the list. They can also be output as perforation on a separate
+  layer. On a router they are only scored shallowly; plasma mode refuses the generator and leaves fold lines out of the
+  G-code. *Edit with generator* works here too. Not yet cut and folded on real cardboard: test the fit first.
+- **Relief from an image (router):** importing a PNG, JPG, BMP, GIF or WEBP now also offers *Relief for the router*: brightness
+  becomes height. A dialog with a live 3D view sets width and height (aspect ratio kept), max. relief depth, the base left
+  under the relief, invert, smoothing, contrast, gamma, a flat border and a soft fade to the top surface or the deepest level.
+  Grid size is limited and the full grid is calculated in the background, so large photos don't freeze the app. The dialog says
+  plainly that a normal photo gives a height image, not a true 3D shape; depth maps and grayscale reliefs work best.
+- **Relief from shapes (router):** selected closed shapes (text, logos) become a raised relief: flat with a rounded or sloped
+  edge, or a dome/pillow whose height grows with the distance to the contour, up to a max. height. Holes in letters stay holes.
+  Available in the edit toolbar and the right-click menu.
+- Both reliefs continue in the normal 3D milling dialog with the same roughing, finishing, material-removal view, setup sheet and
+  warnings as an STL model. Z 0 stays on the top surface and the paths never go below the chosen depth. New warnings: finishing
+  tool isn't a ball nose, no finishing selected, or the ball nose is too coarse for the detail (with the share of the area
+  it can't reach). The existing warning for flutes shorter than the depth applies too.
+- **OBJ import:** 3D models as OBJ open next to STL, 3MF and STEP. Polygons are split into triangles, negative indices work,
+  and materials and textures are ignored. Damaged or oversized files (limit 5 million triangles) give a clear message.
 - **Machine limits checked before job start (GRBL family):** on Start, the app works out the X/Y/Z extents of exactly the lines
   it is about to send (rapids and arcs included) and compares them with `$130`–`$132`, using the work offset from the status
   report. If the job leaves the limits, Start is blocked with a red message naming the axes and how far over they are; the
@@ -28,6 +50,14 @@
   tool changes, keep-out zones, warnings and a small picture of the job. Print it or save it as a standalone HTML file.
 
 **Improved**
+- **Sharper and smoother 3D view and Simulation:** the milling result no longer looks pixelated, and both views need far less
+  from the graphics card. The 3D view uses every cell of a finer grid, and the material view in the Simulation tab has three
+  times as many cells and draws at full Retina resolution. The cutter's real position is used instead of being rounded to
+  the grid, so round holes stay round, and walls follow their direction instead of forming a sawtooth. Flat areas are drawn with
+  few triangles, each grid point is only calculated once, the Simulation no longer copies its picture every frame, and the
+  3D view only redraws when something changes.
+- **3D finishing near steep edges:** the finishing paths add points where the surface rises sharply, so that the straight line
+  between two points can't cut into a steep wall. Applies to every 3D model, not just reliefs.
 - **Run time estimate includes acceleration:** the simulation and cost calculator now plan the job like GRBL does, with
   `$110`–`$112`, `$120`–`$122`, corner speed from `$11`, arcs from `$12` and the controller's small look-ahead buffer. It's
   still an estimate, but much closer on jobs with many short segments and arcs. Offline it uses the last values read

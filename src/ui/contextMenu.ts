@@ -207,6 +207,7 @@ function shapeMenu(): MenuEntry[] {
     { label: t("cm.group"), ico: "group", key: ctrl("G"), run: cmd("group"), disabled: n < 2 },
     { label: t("cm.ungroup"), ico: "ungroup", key: ctrl("U"), run: cmd("ungroup"), disabled: !grouped },
     { label: t("cm.heal"), ico: "heal", run: cmd("heal") },
+    ...(isLaser() || isPlasma() ? [] : [{ label: t("cm.relief"), ico: "relief", run: cmd("relief") }]),
     { label: t("cm.keepOut"), ico: "keepOut", run: cmd("keepOut") },
     { label: t("cm.front"), ico: "toFront", run: cmd("toFront") },
     { label: t("cm.back"), ico: "toBack", run: cmd("toBack") },

@@ -24,6 +24,7 @@ import { openNodeEditor } from "../nodes/nodeEditor";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { openHealDialog } from "../ui/healDialog";
+import { openReliefFromSelection } from "../ui/reliefDialog";
 import { openKeepOutDialog } from "../ui/keepOutDialog";
 import { combine, splitByLines, roundCorners, patternFill, weldAndScore, tileShapes, BoolOp, OpResult, PatternOptions, Tile } from "./shapeOps";
 import { getLayers } from "../laserLayers";
@@ -119,6 +120,7 @@ export const commands: Record<string, () => void> = {
   },
   keepOut: () => openKeepOutDialog(log, () => { done(); checkpoint(); }),
   heal: () => openHealDialog(log, () => { done(); checkpoint(); }),
+  relief: () => openReliefFromSelection(log),
 
   ungroup: () => {
     const sel = selectedShapes();
@@ -184,6 +186,7 @@ export const commands: Record<string, () => void> = {
   joint: () => openGenerator("joint", log, () => { done(); checkpoint(); }),
   shelf: () => openGenerator("shelf", log, () => { done(); checkpoint(); }),
   divider: () => openGenerator("divider", log, () => { done(); checkpoint(); }),
+  foldBox: () => openGenerator("foldBox", log, () => { done(); checkpoint(); }),
   vent: () => openGenerator("vent", log, () => { done(); checkpoint(); }),
   birth: () => openGenerator("birth", log, () => { done(); checkpoint(); }),
   letterTopper: () => openGenerator("letterTopper", log, () => { done(); checkpoint(); }),

@@ -120,7 +120,7 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
   });
 }
 
-async function loadImage(name: string, bytes: Uint8Array): Promise<CanvasImageSource & { width: number; height: number }> {
+export async function loadImage(name: string, bytes: Uint8Array): Promise<CanvasImageSource & { width: number; height: number }> {
   const ext = name.split(".").pop()?.toLowerCase() || "png";
   const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : ext === "bmp" ? "image/bmp" : ext === "gif" ? "image/gif" : ext === "webp" ? "image/webp" : "image/png";
   const blob = new Blob([bytes as BlobPart], { type: mime });
@@ -135,7 +135,7 @@ async function loadImage(name: string, bytes: Uint8Array): Promise<CanvasImageSo
   }
 }
 
-function toGray(img: CanvasImageSource & { width: number; height: number }) {
+export function toGray(img: CanvasImageSource & { width: number; height: number }) {
   const scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
   const W = Math.max(1, Math.round(img.width * scale)), H = Math.max(1, Math.round(img.height * scale));
   const c = document.createElement("canvas");

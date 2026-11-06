@@ -21,7 +21,7 @@ export interface CarveResult {
   moves: number;               // Schnittbewegungen
 }
 
-const MAX_CELLS = 1_200_000;
+const MAX_CELLS = 5_000_000;
 
 export interface Kernel { di: Int32Array; dj: Int32Array; dz: Float32Array; dist: Float32Array; R: number }
 
@@ -59,6 +59,15 @@ export function kernel(tool: ToolGeom | null, c: number): Kernel {
 }
 
 /**
+ * Zellen um den Fräser für den genauen Abdruck: etwas größer als der Fräser, weil seine Mitte nicht auf einer
+ * Zellmitte liegen muss. Die Höhe kommt dann aus dem echten Abstand (profile), nicht aus dieser Liste.
+ */
+export function exactKernel(tool: ToolGeom | null, c: number): Kernel {
+  const k = kernel({ ...(tool ?? {}), type: "endmill", diameter: (tool?.diameter ?? 3) + 2 * c } as ToolGeom, c);
+  return { ...k, R: Math.max(0.05, (tool?.diameter ?? 3) / 2) };
+}
+
+/**
  * @param tools      Fräser je Abschnitt (Abschnitt = zwischen zwei Werkzeugwechseln); fehlt einer: 3-mm-Schaftfräser
  * @param onProgress 0…1; gibt false zurück = abbrechen
  */
@@ -86,21 +95,28 @@ export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgr
   if (!cuts) return null;
   const margin = Math.max(4, 0.06 * Math.max(x1 - x0, y1 - y0));
   x0 -= margin; y0 -= margin; x1 += margin; y1 += margin;
-  const c = Math.max(0.03, Math.sqrt(((x1 - x0) * (y1 - y0)) / MAX_CELLS));
+  // Kleine Teile: nicht feiner als nötig (feiner = viel länger rechnen, sieht man aber nicht). Feine Fräser dürfen feiner.
+  const rMin = Math.min(...(tools.length ? tools : [null]).map(radius));
+  const c = Math.max(Math.min(0.06, Math.max(0.03, rMin / 4)), Math.sqrt(((x1 - x0) * (y1 - y0)) / MAX_CELLS));
   const nx = Math.max(2, Math.ceil((x1 - x0) / c)), ny = Math.max(2, Math.ceil((y1 - y0) / c));
   const h = new Float32Array(nx * ny); // 0 = Oberkante
   const kernels = new Map<ToolGeom | null, Kernel>();
-  const kern = (tl: ToolGeom | null) => { let q = kernels.get(tl); if (!q) { q = kernel(tl, c); kernels.set(tl, q); } return q; };
+  const kern = (tl: ToolGeom | null) => { let q = kernels.get(tl); if (!q) { q = exactKernel(tl, c); kernels.set(tl, q); } return q; };
 
-  // Fräser an Punkt (x, y) mit Spitze auf z
-  const stamp = (K: Kernel, x: number, y: number, z: number, reach: number) => {
+  // Fräser an Punkt (x, y) mit Spitze auf z. Abstand von der echten Mitte zur Zellmitte – nicht aufs Raster gerundet,
+  // sonst werden runde Taschen und schräge Kanten eckig
+  const stamp = (K: Kernel, f: (r: number) => number, x: number, y: number, z: number, reach: number) => {
     const ci = Math.floor((x - x0) / c), cj = Math.floor((y - y0) / c);
-    const { di, dj, dz, dist } = K;
+    const fx = (x - x0) / c - ci - 0.5, fy = (y - y0) / c - cj - 0.5;
+    const { di, dj, dist } = K;
+    const limit = reach + c;
     for (let q = 0; q < di.length; q++) {
-      if (dist[q] > reach) break;
+      if (dist[q] > limit) break;
       const i = ci + di[q], j = cj + dj[q];
       if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
-      const v = z + dz[q], id = j * nx + i;
+      const ex = di[q] - fx, ey = dj[q] - fy, d = Math.sqrt(ex * ex + ey * ey) * c;
+      if (d > reach) continue;
+      const v = z + f(d), id = j * nx + i;
       if (v < h[id]) h[id] = v;
     }
   };
@@ -122,7 +138,7 @@ export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgr
     for (let s = 0; s <= n; s++) {
       const u = s / n, z = za + (zb - za) * u;
       if (z >= 0) continue;
-      stamp(K, prog.x0[m] + (prog.x1[m] - prog.x0[m]) * u, prog.y0[m] + (prog.y1[m] - prog.y0[m]) * u, z, reach);
+      stamp(K, f, prog.x0[m] + (prog.x1[m] - prog.x0[m]) * u, prog.y0[m] + (prog.y1[m] - prog.y0[m]) * u, z, reach);
     }
     minZ = Math.min(minZ, zmin);
     done++;

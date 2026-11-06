@@ -16,6 +16,7 @@ import { isLaser, isPlasma } from "../machineMode";
 import { layerForShape } from "../laserLayers";
 import { circumference } from "../rotary";
 import type { CarveResult } from "./carveSim";
+import { carveSurface } from "./carveMesh.ts";
 
 type RGB = [number, number, number];
 const col = (c: number[], k: number): RGB => [c[0] / 255 * k, c[1] / 255 * k, c[2] / 255 * k];
@@ -177,6 +178,9 @@ export function cylinderScene(shapes: any[], m: Material, diameter: number, alon
 }
 
 const MAX_QUADS = 160_000;
+/** Fräsergebnis flach: jede Rasterzelle ein Eckpunkt (Nummernliste, siehe carveMesh.ts) */
+const MAX_CARVE_QUADS = 5_200_000;
+const MAX_TEX = 4096;
 
 /**
  * Fräsergebnis (carveSim.ts) als Körper: Oberfläche mit Holzbild und Schatten nach Tiefe, Unterseite, Seiten.
@@ -185,7 +189,7 @@ const MAX_QUADS = 160_000;
 export function carveScene(r: CarveResult, m: Material, thickness: number): Mesh[] {
   const T = Math.max(0.2, thickness);
   // gröberes Netz, falls das Raster sehr fein ist (Mittelwert je Block – so behalten V-Nuten ihre Form)
-  const f = Math.max(1, Math.ceil(Math.sqrt((r.nx * r.ny) / MAX_QUADS)));
+  const f = Math.max(1, Math.ceil(Math.sqrt((r.nx * r.ny) / MAX_CARVE_QUADS)));
   const nx = Math.ceil(r.nx / f), ny = Math.ceil(r.ny / f), cs = r.cell * f;
   const H = new Float32Array(nx * ny);
   for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
@@ -201,9 +205,9 @@ export function carveScene(r: CarveResult, m: Material, thickness: number): Mesh
   const through = (i: number, j: number) => at(i, j) <= -T + 1e-3;
 
   // Bild: Material (Maserung nur angedeutet – hier zählt die Form) + Schatten nach Tiefe
-  const k = Math.max(1, Math.floor(2048 / Math.max(nx, ny)));
+  const k = Math.min(MAX_TEX / Math.max(nx, ny), Math.max(1, Math.floor(2048 / Math.max(nx, ny))));
   const tex = document.createElement("canvas");
-  tex.width = nx * k; tex.height = ny * k;
+  tex.width = Math.max(1, Math.round(nx * k)); tex.height = Math.max(1, Math.round(ny * k));
   const ctx = tex.getContext("2d")!;
   // Maserung feiner (eine Kachel = 60 statt 200 mm), sonst wirken die breiten Jahresringe in 3D wie Wellen
   drawMaterialBed(ctx, 0, 0, tex.width, tex.height, (0.3 * k) / cs / MM_TO_PIXEL, m);
@@ -219,29 +223,19 @@ export function carveScene(r: CarveResult, m: Material, thickness: number): Mesh
   }
   ctx.putImageData(img, 0, 0);
 
-  const top: Mesh = { pos: [], nrm: [], uv: [], tex };
+  const surf = carveSurface(H, nx, ny, X(0), Y(0), cs, T);
+  const top: Mesh = { pos: [], nrm: [], tex, data: surf.data, index: surf.index };
   const bottom: Mesh = { pos: [], nrm: [], color: col(m.base, 0.75) };
   const side: Mesh = { pos: [], nrm: [], color: col(m.core ?? m.base, 0.8) };
-  const nrm = (i: number, j: number) => {
-    const dx = (at(i + 1, j) - at(i - 1, j)) / (2 * cs), dy = (at(i, j + 1) - at(i, j - 1)) / (2 * cs);
-    const l = Math.hypot(dx, dy, 1);
-    return [-dx / l, -dy / l, 1 / l];
-  };
-  const N: number[][] = [];
-  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) N.push(nrm(i, j));
-  const vtx = (i: number, j: number) => {
-    top.pos.push(X(i), Y(j), T + at(i, j));
-    const n = N[j * nx + i]; top.nrm.push(n[0], n[1], n[2]);
-    top.uv!.push((i + 0.5) / nx, 1 - (j + 0.5) / ny);
-  };
-  for (let j = 0; j + 1 < ny; j++) for (let i = 0; i + 1 < nx; i++) {
-    const t00 = through(i, j), t10 = through(i + 1, j), t01 = through(i, j + 1), t11 = through(i + 1, j + 1);
-    if (t00 && t10 && t01 && t11) continue; // durchgefräst: offen
-    vtx(i, j); vtx(i + 1, j); vtx(i + 1, j + 1); vtx(i, j); vtx(i + 1, j + 1); vtx(i, j + 1);
-    if (!(t00 || t10 || t01 || t11)) {
-      bottom.pos.push(X(i), Y(j), 0, X(i + 1), Y(j + 1), 0, X(i + 1), Y(j), 0, X(i), Y(j), 0, X(i), Y(j + 1), 0, X(i + 1), Y(j + 1), 0);
-      for (let q = 0; q < 6; q++) bottom.nrm.push(0, 0, -1);
-    }
+  // Unterseite: gröber reicht (man sieht sie selten), Blöcke mit Durchbruch bleiben offen
+  const bf = Math.max(1, Math.ceil(Math.sqrt((nx * ny) / MAX_QUADS)));
+  for (let j = 0; j + 1 < ny; j += bf) for (let i = 0; i + 1 < nx; i += bf) {
+    const i1 = Math.min(nx - 1, i + bf), j1 = Math.min(ny - 1, j + bf);
+    let open = false;
+    for (let b = j; b <= j1 && !open; b++) for (let a = i; a <= i1; a++) if (through(a, b)) { open = true; break; }
+    if (open) continue;
+    bottom.pos.push(X(i), Y(j), 0, X(i1), Y(j1), 0, X(i1), Y(j), 0, X(i), Y(j), 0, X(i), Y(j1), 0, X(i1), Y(j1), 0);
+    for (let q = 0; q < 6; q++) bottom.nrm.push(0, 0, -1);
   }
   // Seiten des Blocks (am Rand wird nicht gefräst)
   const xa = X(0), xb = X(nx - 1), ya = Y(0), yb = Y(ny - 1);

@@ -50,6 +50,9 @@ export class SimView {
   hiLine = -1;
 
   private dirty = true;
+  private drawCtx!: CanvasRenderingContext2D;
+  private bgCanvas: HTMLCanvasElement | null = null;
+  private bgCtx: CanvasRenderingContext2D | null = null;
   /** Bahnen auf der Grafikkarte zeichnen (false = immer mit dem Canvas, z. B. zum Vergleichen) */
   useGpu = true;
   private gpu = new PathRenderer();
@@ -71,6 +74,7 @@ export class SimView {
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+    this.drawCtx = this.ctx;
     this.bindMouse();
     const loop = () => {
       // Materialabtrag ein Stück weiterrechnen (höchstens ~8 ms je Bild)
@@ -157,7 +161,7 @@ export class SimView {
 
   /** Rohteil der Drehachse: Ringe an den Enden und alle 20 mm, Längslinien alle 30°, Achse gestrichelt */
   private drawCylinder(R: number, stock: RotaryStock, xa: number, xb: number, alongY = false) {
-    const ctx = this.ctx;
+    const ctx = this.drawCtx;
     const proj = this.projection();
     // Achse entlang Y: gleiche Zeichnung mit getauschten Rollen (a = entlang, q = quer)
     const PX = (a: number, q: number) => alongY ? proj.PX(q, a) : proj.PX(a, q);
@@ -311,9 +315,39 @@ export class SimView {
     }, { passive: false });
   }
 
+  /** Material als eigene Ebene: unten Raster/Bett, darüber die Grafikkarte, oben dieses Canvas (Hervorhebung, Maus).
+   *  Das Bild nicht mehr von der Grafikkarte ins 2D-Canvas kopieren – das war der größte Bremsklotz. */
+  private layers(on: boolean) {
+    if (on && !this.bgCanvas) {
+      const parent = this.canvas.parentElement;
+      if (parent) {
+        const bg = document.createElement("canvas");
+        bg.style.cssText = "position:absolute;left:0;top:0;pointer-events:none;";
+        this.bgCanvas = bg;
+        this.bgCtx = bg.getContext("2d");
+        const gl = this.matGpu.canvas;
+        gl.style.position = "absolute"; gl.style.left = "0"; gl.style.top = "0"; gl.style.pointerEvents = "none";
+        parent.insertBefore(bg, this.canvas);
+        parent.insertBefore(gl, this.canvas);
+        this.canvas.style.position = "relative";
+      }
+    }
+    if (this.bgCanvas) this.bgCanvas.style.display = on ? "" : "none";
+    this.matGpu.canvas.style.display = on ? "" : "none";
+  }
+
   draw() {
-    const { ctx, canvas } = this;
+    const { canvas } = this;
     const W = canvas.width, H = canvas.height;
+    const layered = this.materialOn;
+    this.layers(layered);
+    let ctx = this.ctx;
+    if (layered && this.bgCanvas && this.bgCtx) {
+      if (this.bgCanvas.width !== W || this.bgCanvas.height !== H) { this.bgCanvas.width = W; this.bgCanvas.height = H; }
+      this.ctx.clearRect(0, 0, W, H);
+      ctx = this.bgCtx;
+    }
+    this.drawCtx = ctx;
     ctx.fillStyle = "#0e0e12";
     ctx.fillRect(0, 0, W, H);
 
@@ -384,6 +418,9 @@ export class SimView {
     };
     const cur = this.curIdx < 0 ? (this.live ? -1 : p.n) : this.curIdx;
     const mat = this.materialOn ? this.drawMaterial() : false;
+    if (layered && !mat) { this.draw(); return; }   // Grafikkarte geht nicht: noch einmal ohne Material zeichnen
+    ctx = this.ctx;                                 // alles Weitere liegt über dem Material
+    this.drawCtx = ctx;
     const gpuImg = mat ? null : this.useGpu ? this.gpu.render(p, {
       W, H, originX: W / 2 + this.panX, originY: H / 2 + this.panY, center: this.center,
       yaw: this.yaw, pitch: this.pitch, scale: s, cur, started: this.curIdx >= 0, showRapids: this.showRapids,
@@ -502,7 +539,6 @@ export class SimView {
       } : null
     });
     if (!img) { this.materialFailed = true; this.onChange(); return false; }
-    this.ctx.drawImage(img, 0, 0);
     return true;
   }
 

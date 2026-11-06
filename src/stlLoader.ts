@@ -16,7 +16,7 @@ import { t } from "./i18n/i18n";
 
 export type StlView = "top" | "bottom" | "front" | "back" | "left" | "right";
 
-export type MeshFormat = "binary" | "ascii" | "3mf" | "step";
+export type MeshFormat = "binary" | "ascii" | "3mf" | "step" | "obj";
 
 export interface StlMesh {
   /** 9 Werte pro Dreieck: x1,y1,z1, x2,y2,z2, x3,y3,z3 */

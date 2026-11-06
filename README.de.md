@@ -23,7 +23,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   mit Symbolen, Zahnräder (Stirnräder, Zahnstangen, Riemenscheiben, Kettenräder – mit Bohrung und Passfedernut),
   Flex-Scharniere, Lineale und Zifferblätter, Holzverbindungen (Fingerzinken, Schwalbenschwanz), Steckregale und
   Lüftungsgitter
-- Import von SVG, DXF, PDF, PLT und Bildern (Umriss oder Mittellinie nachzeichnen), 3D-Modelle als STL, 3MF und STEP –
+- Import von SVG, DXF, PDF, PLT und Bildern (Umriss oder Mittellinie nachzeichnen), 3D-Modelle als STL, 3MF, OBJ und STEP –
   große Dateien werden im Hintergrund gelesen
 - 3D-Ansicht der fertigen Teile, Node-Graph für wiederverwendbare Abläufe
 
@@ -33,7 +33,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Dogbones, Bohren, Fasen,
   Planfräsen und Opferplatte planen, V-Carve & Inlay, Restmaterial, Gewindefräsen (innen/außen), mehrere
   Bearbeitungen pro Form
-- 3D-Fräsen aus STL-Modellen (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
+- 3D-Fräsen aus 3D-Modellen und Reliefs aus Bildern oder Text (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
   Rohteil beidseitig planen
 - **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;
   3D-Modelle rundherum (4. Achse simultan) oder von mehreren Seiten (Indexieren)

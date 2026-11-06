@@ -24,7 +24,7 @@ T = {
   heroalt="CNC Craft with a drawing and router toolpaths",
   fh="Everything from drawing to the finished part", fl="Draw or import, create toolpaths, check the simulation and send the job – without switching between programs.",
   feats=[
-   ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, STEP)."),
+   ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, OBJ, STEP)."),
    ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
    ("🧩", "17 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles and QR codes."),
    ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
@@ -100,7 +100,7 @@ T = {
   heroalt="CNC Craft mit Zeichnung und Fräsbahnen",
   fh="Alles von der Zeichnung bis zum fertigen Teil", fl="Zeichnen oder importieren, Bahnen erzeugen, Simulation prüfen und den Job senden – ohne zwischen Programmen zu wechseln.",
   feats=[
-   ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, STEP) laden."),
+   ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, OBJ, STEP) laden."),
    ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
    ("🧩", "17 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
    ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),

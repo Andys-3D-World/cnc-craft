@@ -12,6 +12,9 @@ export interface Mesh {
   uv?: number[];          // Bild-Koordinaten je Ecke (nur mit Bild)
   tex?: HTMLCanvasElement;
   color?: [number, number, number];
+  /** große Netze (Fräsergebnis): fertige Eckpunkte (je 8 Werte: Lage, Normale, Bild) + Nummernliste statt pos/nrm/uv */
+  data?: Float32Array;
+  index?: Uint32Array;
   offset?: [number, number, number]; // Verschiebung beim Zeichnen (z. B. Teile herausheben)
 }
 
@@ -52,7 +55,7 @@ void main() {
   gl_FragColor = vec4(base * (0.42 + 0.62 * d + rim), 1.0);
 }`;
 
-interface GpuMesh { buf: WebGLBuffer; count: number; tex: WebGLTexture | null; color: [number, number, number]; off: [number, number, number] }
+interface GpuMesh { buf: WebGLBuffer; ibuf: WebGLBuffer | null; count: number; tex: WebGLTexture | null; color: [number, number, number]; off: [number, number, number] }
 
 export class Viewer3D {
   private gl: WebGLRenderingContext;
@@ -64,12 +67,15 @@ export class Viewer3D {
   spin = false;
   private raf = 0;
   private alive = true;
+  private version = 0;
+  private drawn = "";
   ok = true;
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl", { antialias: true });
     if (!gl) { this.ok = false; this.gl = null as any; this.prog = null as any; return; }
     this.gl = gl;
+    gl.getExtension("OES_element_index_uint");   // Nummernliste für große Netze
     const sh = (type: number, src: string) => { const s = gl.createShader(type)!; gl.shaderSource(s, src); gl.compileShader(s); return s; };
     const p = gl.createProgram()!;
     gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
@@ -81,7 +87,9 @@ export class Viewer3D {
     const loop = () => {
       if (!this.alive) return;
       if (this.spin) this.yaw += 0.006;
-      this.draw();
+      // nur zeichnen, wenn sich etwas geändert hat: steht das Bild, hat die Grafikkarte Ruhe
+      const key = `${this.yaw}|${this.pitch}|${this.dist}|${this.panX}|${this.panY}|${this.canvas.clientWidth}|${this.canvas.clientHeight}|${window.devicePixelRatio}|${this.version}`;
+      if (key !== this.drawn) { this.drawn = key; this.draw(); }
       this.raf = requestAnimationFrame(loop);
     };
     this.raf = requestAnimationFrame(loop);
@@ -91,17 +99,24 @@ export class Viewer3D {
   setMeshes(list: Mesh[], keepView = false) {
     const gl = this.gl;
     if (!this.ok) return;
-    for (const m of this.meshes) gl.deleteBuffer(m.buf);
+    this.version++;
+    for (const m of this.meshes) { gl.deleteBuffer(m.buf); if (m.ibuf) gl.deleteBuffer(m.ibuf); }
     for (const t of new Set(this.meshes.map(m => m.tex))) if (t) gl.deleteTexture(t);
     this.meshes = [];
     let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
     const texCache = new Map<HTMLCanvasElement, WebGLTexture>();
     for (const m of list) {
-      const n = m.pos.length / 3;
+      const n = m.data ? m.data.length / 8 : m.pos.length / 3;
       if (!n) continue;
       const o = m.offset || [0, 0, 0];
-      const data = new Float32Array(n * 8);
-      for (let i = 0; i < n; i++) {
+      const data = m.data ?? new Float32Array(n * 8);
+      if (m.data) {
+        for (let i = 0; i < m.data.length; i += 8) {
+          x0 = Math.min(x0, m.data[i] + o[0]); x1 = Math.max(x1, m.data[i] + o[0]);
+          y0 = Math.min(y0, m.data[i + 1] + o[1]); y1 = Math.max(y1, m.data[i + 1] + o[1]);
+          z0 = Math.min(z0, m.data[i + 2] + o[2]); z1 = Math.max(z1, m.data[i + 2] + o[2]);
+        }
+      } else for (let i = 0; i < n; i++) {
         data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv?.[i * 2] ?? 0, m.uv?.[i * 2 + 1] ?? 0], i * 8);
         x0 = Math.min(x0, m.pos[i * 3] + o[0]); x1 = Math.max(x1, m.pos[i * 3] + o[0]);
         y0 = Math.min(y0, m.pos[i * 3 + 1] + o[1]); y1 = Math.max(y1, m.pos[i * 3 + 1] + o[1]);
@@ -124,7 +139,13 @@ export class Viewer3D {
           texCache.set(m.tex, tex);
         }
       }
-      this.meshes.push({ buf, count: n, tex, color: m.color || [0.7, 0.7, 0.7], off: [o[0], o[1], o[2]] });
+      let ibuf: WebGLBuffer | null = null;
+      if (m.index) {
+        ibuf = gl.createBuffer()!;
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuf);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.index, gl.STATIC_DRAW);
+      }
+      this.meshes.push({ buf, ibuf, count: m.index ? m.index.length : n, tex, color: m.color || [0.7, 0.7, 0.7], off: [o[0], o[1], o[2]] });
     }
     if (!keepView && isFinite(x0)) {
       this.center = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
@@ -163,7 +184,10 @@ export class Viewer3D {
       gl.uniform1i(gl.getUniformLocation(P, "uUseTex"), m.tex ? 1 : 0);
       gl.uniform3f(gl.getUniformLocation(P, "uColor"), m.color[0], m.color[1], m.color[2]);
       if (m.tex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, m.tex); gl.uniform1i(gl.getUniformLocation(P, "uTex"), 0); }
-      gl.drawArrays(gl.TRIANGLES, 0, m.count);
+      if (m.ibuf) {
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ibuf);
+        gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
+      } else gl.drawArrays(gl.TRIANGLES, 0, m.count);
     }
   }
 

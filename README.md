@@ -21,7 +21,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   toppers, birth letters (name, date and birth data with own pictures), birdhouses, mandalas, one-piece names with
   symbols, gears (spur gears, racks, belt pulleys, chain sprockets – with bore and keyway), living hinges, rulers and
   clock faces, wood joints (finger joints, dovetails), slot-together shelves and vent grilles
-- Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF and STEP – big files
+- Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF, OBJ and STEP – big files
   are read in background threads
 - 3D view of the finished parts, node graph for reusable workflows
 
@@ -31,7 +31,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - Outside / inside / on-line, pockets, adaptive clearing, finishing pass, ramp entry, holding tabs, dogbones,
   drilling, chamfers, facing and spoilboard surfacing, V-carve & inlay, rest machining, thread milling
   (internal/external), several operations per shape
-- 3D milling from STL models (roughing and finishing), automatic split into cut-outs, holes and pockets,
+- 3D milling from 3D models and reliefs from images or text (roughing and finishing), automatic split into cut-outs, holes and pockets,
   face stock on both sides
 - **Rotary axis for milling** (along X or Y): engrave, contours, pockets, V-carve and drilling on round parts;
   3D models all around (4th axis simultaneous) or from several sides (indexing)

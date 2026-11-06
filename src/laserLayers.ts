@@ -218,6 +218,30 @@ export function removeLayer(id: string) {
   changed();
 }
 
+/**
+ * Feste Ebene für einen Generator holen (Kennung, sonst gleicher Name) oder anlegen. Sie steht danach vor beforeId,
+ * eigene Werte des Nutzers bleiben, nur die Art bleibt „Linie“. Beispiel: Faltlinien vor dem Ausschneiden.
+ */
+export function ensureLayerBefore(id: string, data: Partial<LaserLayer> & { name: string }, beforeId: string): LaserLayer {
+  let l = getLayer(id) || layers.find(x => x.name === data.name) || null;
+  if (!l) {
+    const used = new Set(layers.map(x => x.color));
+    l = stamp(sanitize({ ...data, mode: "line", color: data.color || LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[3], id }));
+    layers.push(l);
+  } else if (l.mode !== "line") {
+    updateLayer(l.id, { mode: "line" });
+    l = getLayer(l.id)!;
+  }
+  const from = layers.indexOf(l), to = layers.findIndex(x => x.id === beforeId);
+  if (to >= 0 && from > to) {
+    layers.splice(from, 1);
+    layers.splice(to, 0, l);
+    noteOrder("laser");
+  }
+  changed();
+  return l;
+}
+
 /** Ebene in der Liste nach oben/unten schieben (Reihenfolge = Laser-Reihenfolge) */
 export function moveLayer(id: string, dir: -1 | 1) {
   const i = layers.findIndex(l => l.id === id);

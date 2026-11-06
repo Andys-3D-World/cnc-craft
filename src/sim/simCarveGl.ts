@@ -19,6 +19,7 @@
 import { PLASMA_CUT, type LiveCarve, type ToolHolder } from "./simCarve";
 import { materialTile, isWoody, type Material } from "../materialView";
 import { profile } from "../view3d/carveSim";
+import { CHUNK, ChunkGrid } from "./carveChunks.ts";
 import { faces, perimeter } from "../rotaryStock";
 import type { ToolGeom } from "../toolGraphics";
 
@@ -90,8 +91,8 @@ void main() {
   bool cyl = u_cyl.x > 0.0;
   int i, j; float z; vec3 n; vec3 p; float d = 0.0;
   if (u_side == 0) {
-    int w = cyl ? u_n.y : u_n.y - 1;
-    i = q % (u_n.x - 1) + a; j = q / (u_n.x - 1) + b;
+    // Eckpunkt = Rasterpunkt (Nummernliste aus carveChunks.ts, jeder Punkt wird nur einmal gerechnet)
+    i = k % u_n.x; j = k / u_n.x;
     z = H(i, j); d = V(i, j);
     p = P(float(i), float(j), z);
     n = normalize(cross(PC(i + 1, j) - PC(i - 1, j), PC(i, j + 1) - PC(i, j - 1)));
@@ -291,6 +292,11 @@ export class MaterialRenderer {
   private meshCounts = { solid: 0, ghost: 0, beam: 0 };
   private tex: WebGLTexture | null = null;
   private texFor: LiveCarve | null = null;
+  private chunks: ChunkGrid | null = null;
+  private chunksFor: LiveCarve | null = null;
+  private indexBuf: WebGLBuffer | null = null;
+  private readonly scratch = new Uint32Array(CHUNK * CHUNK * 6);
+  private readonly pending = new Set<number>();
   private lookTex: WebGLTexture | null = null;
   private lookId = "";
 
@@ -300,7 +306,8 @@ export class MaterialRenderer {
     if (this.broken) return null;
     if (this.gl) return this.gl.isContextLost() ? null : this.gl;
     try {
-      const g = this.canvas.getContext("webgl2", { antialias: true, premultipliedAlpha: true, alpha: true, depth: true, preserveDrawingBuffer: true }) as GL | null;
+      // Retina: doppelt so viele Pixel – Kantenglättung bringt dort kaum mehr, kostet aber viel
+      const g = this.canvas.getContext("webgl2", { antialias: (window.devicePixelRatio || 1) < 1.5, premultipliedAlpha: true, alpha: true, depth: true }) as GL | null;
       if (!g) { this.broken = true; return null; }
       const sh = (type: number, src: string) => {
         const s = g.createShader(type)!;
@@ -379,6 +386,41 @@ export class MaterialRenderer {
     c.dirty = null;
   }
 
+  /** Oberfläche: Nummernliste je Kachel, neu gebaut wird nur, was der Fräser berührt hat */
+  private drawSurface(g: GL, c: LiveCarve) {
+    if (this.chunksFor !== c || !this.chunks) {
+      // Laser/Plasma: Dosis zählt jeder Wert; Drehachse: krumme Fläche, nichts zusammenfassen
+      this.chunks = new ChunkGrid(c.nx, c.ny, !!c.cyl, !c.cyl, c.kind === "mill" ? -c.T : -Infinity);
+      this.chunksFor = c;
+      c.allTouched = true;
+      if (!this.indexBuf) this.indexBuf = g.createBuffer();
+      g.bindBuffer(g.ELEMENT_ARRAY_BUFFER, this.indexBuf);
+      g.bufferData(g.ELEMENT_ARRAY_BUFFER, this.chunks.total * 4, g.DYNAMIC_DRAW);
+    }
+    const G = this.chunks;
+    g.bindBuffer(g.ELEMENT_ARRAY_BUFFER, this.indexBuf);
+    const put = (k: number) => {
+      const n = G.build(k, c.h, this.scratch);
+      if (n) g.bufferSubData(g.ELEMENT_ARRAY_BUFFER, G.start[k] * 4, this.scratch, 0, n);
+    };
+    if (c.allTouched) {
+      for (let k = 0; k < G.count.length; k++) put(k);
+    } else {
+      for (const key of c.chunkTouched) {
+        const ci = key & 65535, cj = key >>> 16;
+        // der Ring außen zählt mit: auch die Nachbarn neu ansehen
+        for (let b = Math.max(0, cj - 1); b <= Math.min(G.ncy - 1, cj + 1); b++)
+          for (let a = Math.max(0, ci - 1); a <= Math.min(G.ncx - 1, ci + 1); a++) this.pending.add(b * G.ncx + a);
+      }
+      for (const k of this.pending) put(k);
+      this.pending.clear();
+    }
+    c.allTouched = false;
+    c.chunkTouched.clear();
+    const r = G.ranges();
+    for (let q = 0; q < r.length; q += 2) g.drawElements(g.TRIANGLES, r[q + 1], g.UNSIGNED_INT, r[q] * 4);
+  }
+
   private camera(g: GL, L: Record<string, WebGLUniformLocation | null>, v: MaterialView, c: LiveCarve) {
     g.uniform2f(L.u_size, v.W, v.H);
     g.uniform2f(L.u_origin, v.originX, v.originY);
@@ -395,8 +437,13 @@ export class MaterialRenderer {
     const g = this.init();
     if (!g || !this.stockProg || !this.meshProg) return null;
     try {
-      if (this.canvas.width !== v.W || this.canvas.height !== v.H) { this.canvas.width = v.W; this.canvas.height = v.H; }
-      g.viewport(0, 0, v.W, v.H);
+      // eigene Ebene in echter Bildschirm-Auflösung (v.W/v.H bleiben die Rechen-Einheit)
+      const dpr = Math.min(2, window.devicePixelRatio || 1), pw = Math.round(v.W * dpr), ph = Math.round(v.H * dpr);
+      if (this.canvas.width !== pw || this.canvas.height !== ph) {
+        this.canvas.width = pw; this.canvas.height = ph;
+        this.canvas.style.width = v.W + "px"; this.canvas.style.height = v.H + "px";
+      }
+      g.viewport(0, 0, pw, ph);
       g.clearColor(0, 0, 0, 0);
       g.clearDepth(1);
       g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
@@ -460,7 +507,7 @@ export class MaterialRenderer {
       }
       g.uniform1f(L.u_spin, spin);
       g.uniform1i(L.u_side, 0);
-      g.drawArraysInstanced(g.TRIANGLES, 0, 6, (c.nx - 1) * (c.cyl ? c.ny : c.ny - 1));
+      this.drawSurface(g, c);
       for (const s of c.cyl ? [3, 4] : [1, 2, 3, 4]) {
         g.uniform1i(L.u_side, s);
         g.drawArraysInstanced(g.TRIANGLES, 0, 6, c.cyl ? c.ny : (s <= 2 ? c.nx : c.ny) - 1);

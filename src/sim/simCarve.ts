@@ -28,12 +28,12 @@
  * Kegel: Rundherum sind die Zellen am dünnen Ende schmaler (Fräser dort über mehr Zeilen), und entlang der Achse
  * steigt die Oberfläche unter dem waagerechten Fräser an.
  */
-import { kernel, profile, type Kernel } from "../view3d/carveSim.ts";
+import { exactKernel, kernel, profile, type Kernel } from "../view3d/carveSim.ts";
 import { MOVE_CUT, MOVE_RAPID, type SimProgram } from "./gcodeParser.ts";
 import type { ToolGeom } from "../toolGraphics.ts";
 import { type RotaryStock, faces, isPrism, perimeter, cornerRadius, coneRadius } from "../rotaryStock.ts";
 
-const MAX_CELLS = 1_000_000;
+const MAX_CELLS = 3_000_000;
 const MAX_SIDE = 4096;           // Textur-Größe, die jede Grafikkarte kann
 const Q = 0.005;                 // mm je Stufe in den Zwischenständen (Int16: bis −163 mm)
 const SNAP_BYTES = 64e6;         // Speicher für alle Zwischenstände zusammen
@@ -118,6 +118,9 @@ export class LiveCarve {
   /** Laser: ab dieser Dosis durchgeschnitten */
   readonly cutDose: number;
 
+  /** Kacheln (64 Zellen) mit Änderungen seit dem letzten Bild: Zeile × 65536 + Spalte; allTouched = alle */
+  readonly chunkTouched = new Set<number>();
+  allTouched = true;
   private readonly p: SimProgram;
   // Bewegungen im Raster-System (ohne Drehachse: die des Programms)
   private readonly X0: ArrayLike<number>; private readonly Y0: ArrayLike<number>; private readonly Z0: ArrayLike<number>;
@@ -187,7 +190,9 @@ export class LiveCarve {
     this.p = p; this.tools = tools; this.sect = sect; this.kind = kind; this.cyl = g.cyl; this.spot = spot;
     this.X0 = g.X0; this.Y0 = g.Y0; this.Z0 = g.Z0; this.X1 = g.X1; this.Y1 = g.Y1; this.Z1 = g.Z1;
     const w = a.x1 - a.x0, hh = a.y1 - a.y0;
-    let c = Math.max(0.03, Math.sqrt((w * hh) / MAX_CELLS));
+    // Kleine Teile: nicht feiner als nötig (feiner = viel länger rechnen, sieht man aber nicht). Feine Fräser dürfen feiner.
+    const rMin = kind === "mill" ? Math.min(...tools.map(x => Math.max(0.05, (x?.diameter || 3) / 2))) : 0.1;
+    let c = Math.max(Math.min(0.08, Math.max(0.03, rMin / 4)), Math.sqrt((w * hh) / MAX_CELLS));
     c = Math.max(c, w / MAX_SIDE, hh / MAX_SIDE);
     // rundherum: ganze Zahl von Zellen, damit sich das Raster genau schließt
     if (g.cyl) c = hh / Math.max(8, Math.round(hh / c));
@@ -203,7 +208,7 @@ export class LiveCarve {
     this.pow = kind === "laser" ? linePower(p.lines, o.sMax ?? 1000) : null;
     this.touched = kind === "mill" ? null : new Int32Array(this.nx * this.ny).fill(-1);
     this.h = new Float32Array(this.nx * this.ny);
-    this.dirty = [0, 0, this.nx, this.ny];
+    this.dirty = [0, 0, this.nx, this.ny]; this.allTouched = true;
     this.maxSnaps = Math.max(4, Math.min(64, Math.floor(SNAP_BYTES / (this.nx * this.ny * 2))));
   }
 
@@ -262,7 +267,7 @@ export class LiveCarve {
       else this.h.fill(0);
       this.touched?.fill(-1);
       this.at = { i: bi, u: 0 };
-      this.dirty = [0, 0, this.nx, this.ny];
+      this.dirty = [0, 0, this.nx, this.ny]; this.allTouched = true;
       this.work = 0;
       changed = true;
     }
@@ -295,7 +300,8 @@ export class LiveCarve {
     if (Math.min(za, zb) >= (this.cone ? 50 : 0) || ub <= ua) return false;
     const tl = this.toolOf(m);
     let K = this.kernels.get(tl);
-    if (!K) { K = kernel(tl, this.cell); this.kernels.set(tl, K); }
+    // Kegel rechnet mit den festen Höhen der Liste, sonst genauer Abdruck (siehe stamp)
+    if (!K) { K = this.cone ? kernel(tl, this.cell) : exactKernel(tl, this.cell); this.kernels.set(tl, K); }
     const f = profile(tl), c = this.cell;
     // so weit reicht der Fräser bis zur Oberkante (V-Fräser in geringer Tiefe nur ein kleiner Kreis) – wie carveSim.ts
     const zmin = Math.min(za, zb);
@@ -317,7 +323,7 @@ export class LiveCarve {
       const x = ax + dx * u, y = ay + dy * u;
       // Kegel: Die Oberfläche steigt unter dem waagerechten Fräser an – er kann auch mit Spitze „darüber“ anstoßen
       if (z >= (this.cone ? Math.abs(this.cone.d1 - this.cone.d0) / 2 / this.cone.coneLen * K.R : 0)) continue;
-      removed = Math.max(removed, this.stamp(K, x, y, z, reach));
+      removed = Math.max(removed, this.stamp(K, f, x, y, z, reach));
       // Schaft über der Schneide / Spannzange unter der Oberkante: liegt dort noch Material an?
       if (!shank && z + hd.fluteLen < -TOUCH && hd.shankR > reach && this.touches(hd.shankR, x, y, z + hd.fluteLen)) shank = true;
       if (!holder && z + hd.stickout < -TOUCH && this.touches(hd.holderR, x, y, z + hd.stickout)) holder = true;
@@ -331,7 +337,7 @@ export class LiveCarve {
   }
 
   /** Fräser an Punkt (x, y) mit Spitze auf z; Ergebnis: am meisten weggenommen (mm) */
-  private stamp(K: Kernel, x: number, y: number, z: number, reach: number): number {
+  private stamp(K: Kernel, f: (r: number) => number, x: number, y: number, z: number, reach: number): number {
     const { nx, ny, h, x0, y0, cell: c } = this;
     const ci = Math.floor((x - x0) / c), cj0 = Math.floor((y - y0) / c);
     const r = Math.ceil(reach / c) + 1;
@@ -362,14 +368,19 @@ export class LiveCarve {
       if (most > 0) this.markDirty(ci, cj, Math.ceil(r * kY));
       return most;
     }
+    // Abstand von der echten Fräsermitte zur Zellmitte: nicht aufs Raster gerundet, sonst werden runde Taschen eckig
+    const fx = (x - x0) / c - Math.floor((x - x0) / c) - 0.5, fy = (y - y0) / c - cj0 - 0.5;
+    const limit = reach + c;
     for (let q = 0; q < di.length; q++) {
-      if (dist[q] > reach) break;
+      if (dist[q] > limit) break;
       const i = ci + di[q];
       let j = cj + dj[q];
       if (wrap) j = j < 0 ? j + ny : j >= ny ? j - ny : j;
       if (i < 0 || j < 0 || i >= nx || j >= ny) continue;
       if (j < jLo || j >= jHi) continue;
-      const v = Math.max(floor, z + dz[q]), id = j * nx + i;
+      const ex = di[q] - fx, ey = dj[q] - fy, r2 = Math.sqrt(ex * ex + ey * ey) * c;
+      if (r2 > reach) continue;
+      const v = Math.max(floor, z + f(r2)), id = j * nx + i;
       const d = h[id] - v;
       if (d > 0) { h[id] = v; if (d > most) most = d; }
     }
@@ -383,6 +394,8 @@ export class LiveCarve {
     // rundherum über die Naht: ganze Höhe
     let j0 = Math.max(0, cj - r), j1 = Math.min(ny, cj + r + 1);
     if (this.cyl && (cj - r < 0 || cj + r >= ny)) { j0 = 0; j1 = ny; }
+    // berührte Kacheln fürs Netz (carveChunks.ts: 64 Zellen je Kachel)
+    for (let cj = j0 >> 6; cj <= (Math.max(j0, j1 - 1) >> 6); cj++) for (let ci = i0 >> 6; ci <= (Math.max(i0, i1 - 1) >> 6); ci++) this.chunkTouched.add(cj * 65536 + ci);
     this.dirty = a ? [Math.min(a[0], i0), Math.min(a[1], j0), Math.max(a[2], i1), Math.max(a[3], j1)] : [i0, j0, i1, j1];
   }
 

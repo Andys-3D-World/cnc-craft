@@ -252,6 +252,10 @@ function overcutPoints(loop: Pt[], len: number): Pt[] {
 
 export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
   const warnings: string[] = [];
+  // Faltlinien aus der Faltschachtel: Plasma schneidet immer durch – also nicht mitnehmen
+  const noFolds = shapes.filter(s => !s.foldLine);
+  if (noFolds.length < shapes.length) warnings.push(t("fold.plasmaSkipped", { n: shapes.length - noFolds.length }));
+  shapes = noFolds;
   if (!shapes.length) return { gcode: null, warnings };
   const S = plasmaSettings;
   const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;

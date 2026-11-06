@@ -23,6 +23,7 @@ import { cylinderCarveScene } from "../view3d/scenes";
 import { cutDiameter } from "../toolLibrary";
 import { rotary, setRotary, applyRotary, rotaryCheck } from "../rotary";
 import { axesToMachine } from "../rotaryWrap";
+import { HeightField, detailLoss } from "../relief/heightField.ts";
 import { RField, meshForRotary, rotateX, roughRotary, finishRotary, chainRotary, fieldPreview } from "../rotary3d";
 
 const KEY = "cnc_craft_cam3d";
@@ -39,11 +40,18 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 }
 
+/** Vom Relief-Dialog: Lage, Materialdicke, leichtes Modell für die Ansicht und das Höhenfeld für die Detail-Warnung */
+export interface ReliefPreset { x0?: number; y0?: number; thick: number; preview: Float32Array; field: HeightField }
+
+/** Ab diesem Flächenanteil warnt der Dialog: der Kugelfräser ist zu grob für das Relief */
+const COARSE_SHARE = 0.03;
+
 /**
  * @param name  Dateiname (nur Anzeige und G-Code-Kommentar)
  * @param pos   Dreiecke (9 Werte je Dreieck), schon in der gewählten Blickrichtung: z = Höhe
+ * @param relief  Relief aus Bild/Vektoren (ui/reliefDialog.ts): bleibt im Rechteck, nicht rundherum freifräsen
  */
-export function openCam3D(name: string, pos: Float32Array, log: (s: string) => void) {
+export function openCam3D(name: string, pos: Float32Array, log: (s: string) => void, relief?: ReliefPreset) {
   document.getElementById("c3d-overlay")?.remove();
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) {
@@ -71,6 +79,13 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     if (!(o.rsides >= 2 && o.rsides <= 12)) o.rsides = 2;
     for (const k of ["roughTool", "finishTool"] as const) if (tools.some(x => x.id === saved[k])) o[k] = saved[k];
   } catch { /* egal */ }
+  // Relief: eigene Lage und Dicke, nur im Rechteck fräsen. Die gespeicherten Werte fürs nächste STL bleiben unberührt.
+  const keepSaved = { x0: o.x0, y0: o.y0, margin: o.margin, rmode: o.rmode };
+  if (relief) {
+    o.thick = relief.thick; o.margin = false; o.rmode = "flat";
+    if (relief.x0 !== undefined) o.x0 = relief.x0;
+    if (relief.y0 !== undefined) o.y0 = relief.y0;
+  }
   const tool = (id: string) => tools.find(x => x.id === id) || null;
   const defaults = () => {
     const r = tool(o.roughTool), f = tool(o.finishTool);
@@ -182,7 +197,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     $<HTMLElement>("c3d-finish-box").style.display = o.finish ? "" : "none";
     $<HTMLElement>("c3d-fdown-row").style.display = o.rough ? "none" : "";
   };
-  const save_ = () => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ } };
+  const save_ = () => { try { localStorage.setItem(KEY, JSON.stringify(relief ? { ...o, ...keepSaved } : o)); } catch { /* egal */ } };
 
   let paths: Path3D[] | null = null, gcode = "", running = false, run = 0, closed = false;
   const job = (): Job3D => {
@@ -195,6 +210,17 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
       rough: op(o.rough, o.roughTool, o.roughDown, o.roughOver, Math.max(0, o.allow)),
       finish: op(o.finish, o.finishTool, o.finishDown, o.finishOver, 0), name
     };
+  };
+  /** Relief: taugt der Schlicht-Fräser für die Details? (zwischengespeichert, Rechnung dauert einen Moment) */
+  let lossCache = { key: "", share: 0, worst: 0 };
+  const reliefWarnings = (): string[] => {
+    const ft = o.finish ? tool(o.finishTool) : null;
+    if (!ft) return [t("rlf.warnNoFinish")];
+    if (ft.type !== "ball") return [t("rlf.warnNotBall", { name: ft.name })];
+    const key = [cutDiameter(ft), o.sizeX, o.sizeY, o.height].join("|");
+    if (lossCache.key !== key) lossCache = { key, ...detailLoss(relief!.field, o.sizeX, o.sizeY, o.height, cutDiameter(ft) / 2) };
+    if (lossCache.share < COARSE_SHARE) return [];
+    return [t("rlf.warnCoarse", { name: ft.name, d: cutDiameter(ft), p: Math.round(lossCache.share * 100), w: lossCache.worst.toFixed(1) })];
   };
   const warnings = (): string[] => {
     const w: string[] = [];
@@ -215,6 +241,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
       const tl = tool(id);
       if (tl && tl.fluteLen > 0 && tl.fluteLen < o.height) w.push(t("c3d.warnFlute", { name: tl.name, l: tl.fluteLen, h: o.height }));
     }
+    if (relief) w.push(...reliefWarnings());
     return w;
   };
   const showWarn = (extra: string[] = []) => {
@@ -258,9 +285,10 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     const kx = o.sizeX / span[0], ky = o.sizeY / span[1], kz = o.height / span[2];
     const T = Math.max(o.thick, o.height);
     const m: Mesh = { pos: [], nrm: [], color: [0.78, 0.62, 0.42] };
-    const step = Math.max(1, Math.ceil(pos.length / 9 / 400_000)); // sehr große Modelle: nur jedes n-te Dreieck zeigen
-    for (let i = 0; i + 8 < pos.length; i += 9 * step) {
-      const P = [0, 1, 2].map(k => [(pos[i + k * 3] - lo[0]) * kx + o.x0, (pos[i + k * 3 + 1] - lo[1]) * ky + o.y0, (pos[i + k * 3 + 2] - hi[2]) * kz + T]);
+    const show = relief?.preview ?? pos;   // Relief: leichtes Modell mit Seitenwänden
+    const step = Math.max(1, Math.ceil(show.length / 9 / 400_000)); // sehr große Modelle: nur jedes n-te Dreieck zeigen
+    for (let i = 0; i + 8 < show.length; i += 9 * step) {
+      const P = [0, 1, 2].map(k => [(show[i + k * 3] - lo[0]) * kx + o.x0, (show[i + k * 3 + 1] - lo[1]) * ky + o.y0, (show[i + k * 3 + 2] - hi[2]) * kz + T]);
       const u = [P[1][0] - P[0][0], P[1][1] - P[0][1], P[1][2] - P[0][2]], v = [P[2][0] - P[0][0], P[2][1] - P[0][1], P[2][2] - P[0][2]];
       const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
       const l = Math.hypot(n[0], n[1], n[2]) || 1;

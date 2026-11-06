@@ -36,7 +36,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"]])}
     ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
     <div class="strip-sep"></div>
-    ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
+    ${flyCmds("generators", "boxgen", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["mandala", "mandala", "tip.cmd.mandala"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
       ["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"], ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"],
       ["birth", "birth", "tip.cmd.birth"], ["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["scale", "scale", "tip.cmd.scale"], ["joint", "joint", "tip.cmd.joint"],
       ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"], ["vent", "vent", "tip.cmd.vent"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["qrCode", "qrCode", "tip.cmd.qrCode"]], "left", 20)}
@@ -81,7 +81,7 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${flyCmds("combine", "boolUnion", [["boolUnion", "boolUnion", "tip.cmd.boolUnion"], ["boolSubtract", "boolSubtract", "tip.cmd.boolSubtract"],
         ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
-      ${flyCmds("edit", "offset", [["offset", "offset", "tip.cmd.offset"], ["heal", "heal", "tip.cmd.heal"], ["keepOut", "keepOut", "tip.cmd.keepOut"], ["fillet", "fillet", "tip.cmd.fillet"], ["patternFill", "patternFill", "tip.cmd.patternFill"],
+      ${flyCmds("edit", "offset", [["offset", "offset", "tip.cmd.offset"], ["heal", "heal", "tip.cmd.heal"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"], ["fillet", "fillet", "tip.cmd.fillet"], ["patternFill", "patternFill", "tip.cmd.patternFill"],
         ["centerFix", "centerFix", "tip.cmd.centerFix"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"],
         ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"]])}
       ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"]])}

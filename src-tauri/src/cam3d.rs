@@ -975,6 +975,35 @@ fn link(rings: Vec<Vec<P2>>, d: &[f64], g: &Grid, z: f64, top: f64, layer: u32) 
     out
 }
 
+/// An steilen Stellen (Kante eines Reliefs) ändert sich die Höhe zwischen zwei Punkten stark: die gerade Verbindung
+/// könnte ins Modell schneiden. Dort Zwischenpunkte nachrechnen, bis die Gerade stimmt.
+fn refine_row(m: &Model, c: Cutter, sc: &mut Scratch, row: Vec<P3>, tol: f64) -> Vec<P3> {
+    fn between(m: &Model, c: Cutter, sc: &mut Scratch, a: P3, b: P3, tol: f64, depth: u32, out: &mut Vec<P3>) {
+        let len = (b[0] - a[0]).hypot(b[1] - a[1]);
+        if depth == 0 || (b[2] - a[2]).abs() <= 0.5 * len {
+            return;
+        }
+        let (x, y) = ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0);
+        let z = m.drop(x, y, c, sc);
+        if (z - (a[2] + b[2]) / 2.0).abs() <= tol / 2.0 {
+            return;
+        }
+        let mid = [x, y, z];
+        between(m, c, sc, a, mid, tol, depth - 1, out);
+        out.push(mid);
+        between(m, c, sc, mid, b, tol, depth - 1, out);
+    }
+    let mut out = Vec::with_capacity(row.len());
+    for w in row.windows(2) {
+        out.push(w[0]);
+        between(m, c, sc, w[0], w[1], tol, 6, &mut out);
+    }
+    if let Some(l) = row.last() {
+        out.push(*l);
+    }
+    out
+}
+
 /// SCHLICHTEN: Zeilen über das Modell, Fräser folgt der Oberfläche (Drop-Cutter).
 /// Ohne Schruppen in Schichten (Zustellung) von oben, damit der Fräser nie die volle Tiefe auf einmal nimmt.
 pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Option<&ToolOp>, cancel: &AtomicBool, prog: Progress) -> Result<Vec<Path>, String> {
@@ -1011,12 +1040,13 @@ pub fn finish(m: &Model, bounds: [f64; 4], margin: bool, op: &ToolOp, rough: Opt
                         return None;
                     }
                     let v = c0 + k as f64 * sl;
-                    let mut row: Vec<P3> = (0..ns)
+                    let row: Vec<P3> = (0..ns)
                         .map(|i| {
                             let (x, y) = at(a0 + i as f64 * sa, v);
                             [x, y, m.drop(x, y, c, sc)]
                         })
                         .collect();
+                    let mut row = refine_row(m, c, sc, row, tol);
                     // Zickzack: jede zweite Zeile rückwärts
                     if k % 2 == 1 {
                         row.reverse();
@@ -1434,6 +1464,96 @@ mod tests {
         }
         let bytes = encode(&paths);
         assert_eq!(u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as usize, paths.len());
+    }
+
+    /// Relief als Raster: Welle + erhabener Block mit steilen Wänden, nur die Oberfläche (wie src/relief/heightField.ts)
+    fn relief_grid(nx: usize, ny: usize, cell: f64, depth: f64) -> (Vec<Tri>, Vec<f64>) {
+        let mut z = vec![0.0; nx * ny];
+        for j in 0..ny {
+            for i in 0..nx {
+                let (x, y) = (i as f64 * cell, j as f64 * cell);
+                let block = x > 15.0 && x < 30.0 && y > 10.0 && y < 25.0;
+                z[j * nx + i] = if block { 0.0 } else { -depth * (0.75 + 0.25 * (x / 4.0).sin() * (y / 5.0).cos()) };
+            }
+        }
+        let mut tris = Vec::new();
+        let at = |i: usize, j: usize| [i as f64 * cell, j as f64 * cell, z[j * nx + i]];
+        for j in 0..ny - 1 {
+            for i in 0..nx - 1 {
+                tris.push([at(i, j), at(i + 1, j), at(i + 1, j + 1)]);
+                tris.push([at(i, j), at(i + 1, j + 1), at(i, j + 1)]);
+            }
+        }
+        (tris, z)
+    }
+
+    #[test]
+    fn relief_surface_never_gouged_and_never_below_depth() {
+        let (cell, depth, r) = (0.25, 5.0, 1.5);
+        let (nx, ny) = (181, 141);
+        let (tris, z) = relief_grid(nx, ny, cell, depth);
+        let (w, h) = ((nx - 1) as f64 * cell, (ny - 1) as f64 * cell);
+        let j = Job {
+            place: Place { x0: 0.0, y0: 0.0, size_x: w, size_y: h, height: depth },
+            margin: false,
+            rough: Some(ToolOp { ball: false, diameter: 4.0, step_down: 1.5, step_over: 1.6, allowance: 0.3, dir: String::new(), tolerance: 0.0 }),
+            finish: Some(ToolOp { ball: true, diameter: 2.0 * r, step_down: 0.0, step_over: 0.4, allowance: 0.0, dir: "x".into(), tolerance: 0.02 }),
+            stock_top: 0.0,
+            floor: None,
+            bounds: None,
+        };
+        // Wie im Dialog: Oberkante 0, Unterkante wird von place() genau auf `height` gestreckt
+        let cancel = AtomicBool::new(false);
+        let paths = compute(&tris, &j, &cancel, &|_, _| {}).unwrap();
+        assert!(paths.iter().any(|p| p.kind == 0) && paths.iter().any(|p| p.kind == 1));
+        // Zielhöhen nach place() (Oberkante 0, Unterkante = height)
+        let lo = z.iter().cloned().fold(f64::INFINITY, f64::min);
+        let k = depth / -lo;
+        let z: Vec<f64> = z.iter().map(|v| v * k).collect();
+        let mut sum_gap = 0.0;
+        let mut n_gap = 0usize;
+        for p in &paths {
+            let (rr, ball, allow) = if p.kind == 0 { (2.0, false, 0.3) } else { (r, true, 0.0) };
+            for w in p.pts.windows(2) {
+                let steps = (((w[1][0] - w[0][0]).hypot(w[1][1] - w[0][1])) / 0.1).ceil().max(1.0) as usize;
+                for s in 0..=steps {
+                    let u = s as f64 / steps as f64;
+                    let q = [w[0][0] + (w[1][0] - w[0][0]) * u, w[0][1] + (w[1][1] - w[0][1]) * u, w[0][2] + (w[1][2] - w[0][2]) * u];
+                    assert!(q[2] >= -depth - 1e-6, "below chosen depth: {}", q[2]);
+                    assert!(q[2] <= 1e-6, "above top: {}", q[2]);
+                    let i0 = (((q[0] - rr) / cell).floor().max(0.0)) as usize;
+                    let i1 = (((q[0] + rr) / cell).ceil() as usize).min(nx - 1);
+                    let j0 = (((q[1] - rr) / cell).floor().max(0.0)) as usize;
+                    let j1 = (((q[1] + rr) / cell).ceil() as usize).min(ny - 1);
+                    for jj in j0..=j1 {
+                        for ii in i0..=i1 {
+                            let d2 = (ii as f64 * cell - q[0]).powi(2) + (jj as f64 * cell - q[1]).powi(2);
+                            if d2 > rr * rr {
+                                continue;
+                            }
+                            // Schaftfräser: Höhe unter der Fläche. Kugel: Eindringen senkrecht zur Oberfläche –
+                            // an einer steilen Wand wären 0,002 mm seitlich sonst schon 0,05 mm in der Höhe
+                            let zn = z[jj * nx + ii] + allow;
+                            let gouge = if ball {
+                                let up = (zn - (q[2] + rr)).min(0.0);
+                                rr - (d2 + up * up).sqrt()
+                            } else {
+                                zn - q[2]
+                            };
+                            assert!(gouge <= 0.03, "gouge {gouge} kind {} at {:?}", p.kind, q);
+                        }
+                    }
+                    if p.kind == 1 {
+                        let ti = ((q[0] / cell).round() as usize).min(nx - 1);
+                        let tj = ((q[1] / cell).round() as usize).min(ny - 1);
+                        sum_gap += q[2] - z[tj * nx + ti];
+                        n_gap += 1;
+                    }
+                }
+            }
+        }
+        // und der Schlichtgang bleibt auch nah an der Fläche (nicht einfach zu hoch)
+        assert!(sum_gap / n_gap as f64 <= 0.3, "too far above the surface: {}", sum_gap / n_gap as f64);
     }
 
     #[test]

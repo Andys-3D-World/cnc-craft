@@ -23,6 +23,7 @@ import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
 import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
+import { foldLayersFirst } from "./foldBox";
 import { t, ascii } from "./i18n/i18n";
 import { imageGcode } from "./raster/imageShape";
 
@@ -51,7 +52,11 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     byLayer.get(l.id)!.push(s);
   }
   const rank = new Map(getLayers().map((l, i) => [l.id, i]));
-  const order = [...layerById.values()].sort((a, b) => (rank.get(a.id.split("~")[0]) ?? 0) - (rank.get(b.id.split("~")[0]) ?? 0));
+  const sorted = [...layerById.values()].sort((a, b) => (rank.get(a.id.split("~")[0]) ?? 0) - (rank.get(b.id.split("~")[0]) ?? 0));
+  // Faltlinien immer zuerst: Ist das Teil ausgeschnitten, kann es sich bewegen. Auch wenn die Ebene ganz unten steht
+  // (eine aus einem Projekt übernommene Ebene landet am Listenende) oder von Hand verschoben wurde.
+  const foldIds = new Set(shapes.filter(s => s.foldLine).map(s => effectiveLayer(s)?.id));
+  const order = foldLayersFirst(sorted, l => foldIds.has(l.id));
 
   let g = "";
   g += `G21 ${c("gc.unitMm")}\n`;
