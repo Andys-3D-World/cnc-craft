@@ -35,6 +35,7 @@ Not yet cut on a real machine, so the fits of all new boxes are untested: cut a 
 Not yet burnt on a real machine: test on scrap first.
 
 **Improved**
+- **Legal notices:** the About window now shows the copyright and that there is no warranty, as the GPL asks for. The privacy policy now covers the bug report, and the licence list is up to date.
 - **Simpler layout:** one clear way from the drawing to the machine.
   - **To machine** replaces *Generate G-code*: it turns the drawing into the job and shows it in the simulation. The machine only starts when you click Start.
   - **Job bar:** state, progress, *To machine*, Start, Pause and Stop are always visible on the right in Design, whichever tab is open. While a job runs, a Stop button also shows at the top in every main tab.
@@ -50,6 +51,7 @@ Not yet burnt on a real machine: test on scrap first.
 - **Icons everywhere:** system emoji across the whole program (tabs, buttons, windows, messages) are now replaced by our own icons that look the same on Windows, Mac and Linux. In dropdown lists, which cannot show graphics, the emoji is left out. The *Edit* and *Extras* menus are boards with columns like the generators, and all pop-out menus use the same icon tiles.
 
 **Fixed**
+- **Wiring page:** 20 pin descriptions (such as optocoupler or door guard) stayed in German in every language. They are now translated.
 - **Giant warning sign in generators:** icons inside a preview were stretched to the preview size, for example in the candy holder.
 - **Shortcuts behind open windows:** keys such as Del could reach the drawing behind an open window when no field had the focus.
 - **Rotary and "Take over as job":** the simulation button could load the flattened preview as the job for round rotary parts. It now always builds the real G-code from the drawing.

@@ -64,6 +64,7 @@ export async function openAboutDialog(log: (s: string) => void) {
           <div class="about-ver">${esc(t("upd.version", { v: me.version }))} <span class="about-beta">Beta</span></div>
           <div class="about-sys">${esc(osName(me.os, me.arch))}</div>
           <div class="about-sys">${esc(t("about.license"))}</div>
+          <div class="about-sys">© 2026 Andys 3D World · ${esc(t("about.noWarranty"))}</div>
         </div>
       </div>
       <div class="about-section">

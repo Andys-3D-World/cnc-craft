@@ -65,8 +65,9 @@ The complete list of all Rust crates and npm packages in the program, with their
 | earcut 3.0.2 | ISC |
 | Vite, TypeScript, lightningcss (build tools only, not part of the program) | MIT / Apache-2.0 / MPL-2.0 |
 
-libusb is linked statically. Because the complete source code of CNC Craft is public, anyone can rebuild the
-program with a modified libusb (LGPL-2.1 section 6).
+libusb is linked statically. occt-import-js and Open CASCADE are included as separate files in `public/occt/`.
+Because the complete source code of CNC Craft is public, anyone can rebuild the program with a modified libusb,
+occt-import-js or Open CASCADE (LGPL-2.1 section 6).
 
 ## Trademarks
 

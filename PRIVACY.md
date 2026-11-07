@@ -20,6 +20,8 @@ user or the person installing or operating it. The only exceptions are:
   stored unencrypted in the local settings file.
 - **Workshop sync:** if the user chooses a sync folder, the tool, laser and plasma libraries are written there. If
   that folder is inside a cloud service (Dropbox, OneDrive, iCloud …), the libraries are uploaded by that service.
+- **Bug report:** the report window only opens a pre-filled GitHub page in the browser when the user clicks it. Nothing
+  is sent before the user submits that page, and only the information they ticked is included.
 - **Links** (firmware downloads, help pages) are only opened in the browser when the user clicks them.
 
 All settings and libraries are stored locally on the user's computer (app data folder, shown in ⓘ).

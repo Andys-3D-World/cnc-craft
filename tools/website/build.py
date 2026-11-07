@@ -26,11 +26,11 @@ T = {
   feats=[
    ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, OBJ, STEP)."),
    ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
-   ("🧩", "17 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles and QR codes."),
+   ("🧩", "23 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles and QR codes."),
    ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
    ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill, dimensions that stay attached and a right-click menu on the canvas."),
    ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
-   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, dogbones, drilling and thread milling with a tool library – as simple as in Estlcam."),
+   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, dogbones, drilling and thread milling with a tool library."),
    ("🧊", "3D milling", "Rough and finish 3D models from STL, tool change with tool length measurement, probing and height map."),
    ("🌀", "Rotary axis", "Laser and router on round parts: engrave tumblers, mill contours and pockets around a cylinder, or a 3D model all around or from several sides."),
    ("🔦", "Laser layers", "Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn."),
@@ -44,11 +44,11 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.1", nl="Edit generated parts again with a right-click: change a size and the parts are replaced in place. Material profiles for milling, applied to the selection with one click. Camera on the machine head with crosshair, measured offset and camera zero point.",
+  nh="New in 0.4.2", nl="Candy holder generator: small refillable wooden tags for chocolates or sweets, as one folding strip or as glued layers, with the checks for fit and walls built in. Folding box generator for thin cardboard, relief from images and shapes, and OBJ import.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
-  gall="All 17 generators",
+  gall="Some of the generators",
   nlink="All changes",
   gens=[("boxgen", "Boxes"), ("gear", "Gears &amp; pulleys"), ("hinge", "Living hinges"), ("joint", "Wood joints"), ("birth", "Birth letters"),
         ("namegen", "Names"), ("birdhouse", "Birdhouses"), ("mandala", "Mandalas"), ("ornament", "Decoration ornaments"), ("wordtiles", "Word tiles"),
@@ -102,11 +102,11 @@ T = {
   feats=[
    ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, OBJ, STEP) laden."),
    ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
-   ("🧩", "17 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
+   ("🧩", "23 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
    ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),
    ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung, Maße, die mitwandern, und ein Rechtsklick-Menü auf der Arbeitsfläche."),
    ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
-   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Dogbones, Bohren und Gewindefräsen mit Werkzeug-Bibliothek – so einfach wie in Estlcam."),
+   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Dogbones, Bohren und Gewindefräsen mit Werkzeug-Bibliothek."),
    ("🧊", "3D-Fräsen", "3D-Modelle aus STL schruppen und schlichten, Werkzeugwechsel mit Längenmessung, Antasten und Höhenkarte."),
    ("🌀", "Drehachse", "Laser und Fräse auf runden Teilen: Becher gravieren, Konturen und Taschen rund um einen Zylinder fräsen oder ein 3D-Modell rundherum bzw. von mehreren Seiten."),
    ("🔦", "Laser-Ebenen", "Füllen, Linie und Schneiden mit eigener Leistung und Geschwindigkeit, Freischnitt – wie Ebenen in LightBurn."),
@@ -120,11 +120,11 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.1", nl="Generator-Teile per Rechtsklick nachträglich ändern: Maß anpassen, die Teile werden an Ort und Stelle ersetzt. Material-Profile für die Fräse, mit einem Klick auf die Auswahl anwenden. Kamera am Maschinenkopf mit Fadenkreuz, gemessenem Versatz und Kamera-Nullpunkt.",
+  nh="Neu in 0.4.2", nl="Pralinen-Halter-Generator: kleine Holzanhänger zum Nachfüllen für Pralinen oder Süßigkeiten, als ein Faltstreifen oder als verleimte Schichten, mit Prüfung von Passung und Wänden. Faltschachtel-Generator für dünnen Karton, Relief aus Bildern und Formen und OBJ-Import.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
-  gall="Alle 17 Generatoren",
+  gall="Einige der Generatoren",
   nlink="Alle Änderungen",
   gens=[("boxgen", "Kisten"), ("gear", "Zahnräder &amp; Riemenscheiben"), ("hinge", "Biegescharniere"), ("joint", "Holzverbindungen"), ("birth", "Geburtsbuchstaben"),
         ("namegen", "Namen"), ("birdhouse", "Vogelhäuser"), ("mandala", "Mandalas"), ("ornament", "Deko-Anhänger"), ("wordtiles", "Wort-Kacheln"),
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.1</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.2</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

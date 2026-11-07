@@ -46,7 +46,14 @@ const n = (v: number) => Math.round(v * 10) / 10;
 const FN_KEYS: Record<string, string> = {
   "Spindel-Richtung": "wr.fn.spdir", "Spindel/Laser PWM (GRBL 1.1)": "wr.fn.pwm11", "Taster": "wr.fn.probe", "Taster (Probe)": "wr.fn.probe",
   "Tür": "wr.fn.door", "Flammen-Sensor": "wr.fn.flame", "Kühlung M8": "wr.fn.cool", "Spindel (MOSFET)": "wr.fn.spmos",
-  "Reset/Abbruch": "wr.fn.abort", "Nebel M7 (Option)": "wr.fn.mist", "Arduino-Reset": "wr.fn.ardreset", "Z-Limit (GRBL 1.1)": "wr.fn.zlim11"
+  "Reset/Abbruch": "wr.fn.abort", "Nebel M7 (Option)": "wr.fn.mist", "Arduino-Reset": "wr.fn.ardreset", "Z-Limit (GRBL 1.1)": "wr.fn.zlim11",
+  "Eingang oder Relais (Brücke)": "wr.fn.inOrRelay", "Optokoppler (Vorwärts)": "wr.fn.optoFwd", "Optokoppler (Rückwärts)": "wr.fn.optoRev",
+  "Relais (Brücke ⑬)": "wr.fn.relay13", "Längensensor (Brücke ⑩)": "wr.fn.tls10", "Nebel M7 / MOSFET": "wr.fn.mistMos",
+  "Kühlung M8 / MOSFET": "wr.fn.coolMos", "Spindel PWM": "wr.fn.spPwm", "Laserleistung analog": "wr.fn.lasAna",
+  "Wasserschutz (24 V)": "wr.fn.water", "Laserleistung PWM": "wr.fn.lasPwm", "Laser ein (aktiv low)": "wr.fn.lasOn",
+  "Puls (OC)": "wr.fn.pulse", "Richtung (OC)": "wr.fn.dirOc", "Läuft (OC)": "wr.fn.runOc",
+  "Luft/Gebläse (OC)": "wr.fn.airOc", "Fußschalter Start/Pause": "wr.fn.foot", "Tür-Schutz": "wr.fn.doorGuard",
+  "Laser von Hand": "wr.fn.lasHand", "Spindel ein": "wr.fn.spOn"
 };
 function fnText(fn: string): string { const k = FN_KEYS[fn]; return k ? t(k) : fn; }
 
