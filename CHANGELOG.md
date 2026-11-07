@@ -2,6 +2,8 @@
 
 ## Next version (unreleased)
 
+## 0.4.3 Beta
+
 **New**
 - **Laser test card generator:** one piece of material, one run, several test fields, so you can read off the right values for your own machine. Choose laser type and power, card size, material and thickness, and speed and power ranges; machine data can be engraved on top. Fields: cut grid and engrave grid (power × speed), line interval, gray wedge for photos, kerf (slots with a T piece), power threshold, text size, flex hinge, air on/off, repeat pair, scan offset and ruler. Each field can be switched off and prints a short note on how to read it. The layout rearranges and shrinks grids so the fields fit, and warns about anything left out. Engraving always runs before cutting and the card outline runs last, whatever the layer order. No table of values is included: the card measures your machine. *Edit with generator* works.
 - **Read test card:** right-click the card (or use the button in the generator) and click the best field. The values are saved as your own preset; only values that were really on the card can be saved. Kerf and scan offset can be taken over into your settings after a confirmation. The dialogs include short troubleshooting help.
@@ -15,7 +17,7 @@
 
 - **Dimension a line:** new tool in the measure group. Click a line or a straight edge and its length dimension appears, also on slanted lines, with the value ready to type. The new number changes the length: the end nearer your click moves (highlighted before you click), the other stays. On open polylines everything behind it moves along so angles stay; on closed shapes a rectangle stays a rectangle. Clicking a circle gives its diameter. Double-click the number to change it later, click it and press Del to remove it. Curves with handles, arcs and text are refused with a note, and you get a warning if the change makes a shape cross itself.
 - **Remove duplicate lines:** finds lines that lie on top of each other, common in DXF files, so they aren't cut twice. Works on the selection or the whole bed, with an adjustable tolerance and a preview of what goes. Closed shapes are only removed when another one is identical (also drawn the other way round or from another start), and they're never broken open, so two rectangles sharing an edge stay whole. Open lines lose only the doubled pieces.
-- **Start job here (GRBL):** pick a reference point on the job (corners, edges or centre) and it's placed under the current head position, for example to use up an offcut. Only the work zero is set; the G-code stays the same, so frame, simulation, saved files and the limit check keep working. Not for rotary, Ruida or K40. Not yet tried on a real machine: check the position before cutting (on a laser, run the frame first).
+- **Start job here (GRBL):** pick a reference point on the job (corners, edges or centre) and it's placed under the current head position, for example to use up an offcut. Only the work zero is set; the G-code stays the same, so frame, simulation, saved files and the limit check keep working. Not for rotary, Ruida or K40. Check the position before cutting (on a laser, run the frame first).
 - **More shapes to draw:** star (number of points and inner radius in the toolbar), slot with round ends, ring (two real circles grouped, wall thickness in the toolbar) and an arc by centre, start and end, alongside the 3-point arc. All are in the shapes group on the left and drawn freely with the mouse, with a live preview.
 - **Array:** copies in a grid (rows, columns, free gap or centre-to-centre spacing) or around a centre (number, total angle, centre typed in or clicked, rotate the copies or not). Live preview on the canvas, a note when it runs past the bed, one undo step. Find it under *Edit* and in the right-click menu.
 - **Text on path:** select a curve (line, arc, circle, polyline), optionally with a text, and the letters follow it: offset along the path, reference point in the text, on or below the path, distance from it, letter spacing, and direction (on a circle: outside or inside). Works with all fonts including the single-line font. It stays text: double-click opens it again, and the curve is stored with it and moves along. Letters are placed and turned as a whole, not bent.
@@ -28,11 +30,11 @@
 - **Convert to image:** selected vectors become a grayscale image for engraving, with resolution, line width and fill options and a preview. The originals are removed (Undo brings them back) or kept if you choose.
 - **Print & Cut (laser only):** align the design to a printed sheet with two registration marks. Select the two marks, jog to each printed mark, read the position (or type it in), and the whole bed is moved and rotated to match. Wrong or swapped marks and marks that are too close are refused. The window never turns the laser on: for aiming it points you to a red-dot pointer or the existing hold-to-fire test at low power, clearly marked.
 
-These tools were only tried in the preview with G-code checked by reading it, not on a real machine. For Start point and Print & Cut in particular, test on scrap first.
+These tools have only had a first test on one machine. For Start point and Print & Cut in particular, test on scrap first.
 
-Not yet cut on a real machine, so the fits of all new boxes are untested: cut a small test piece first.
+The fits of the new boxes have only had a first test: cut a small test piece first.
 
-Not yet burnt on a real machine: test on scrap first.
+The test card has only had a first test on one machine: test on scrap first.
 
 **Improved**
 - **Legal notices:** the About window now shows the copyright and that there is no warranty, as the GPL asks for. The privacy policy now covers the bug report, and the licence list is up to date.
@@ -55,6 +57,9 @@ Not yet burnt on a real machine: test on scrap first.
 - **Giant warning sign in generators:** icons inside a preview were stretched to the preview size, for example in the candy holder.
 - **Shortcuts behind open windows:** keys such as Del could reach the drawing behind an open window when no field had the focus.
 - **Rotary and "Take over as job":** the simulation button could load the flattened preview as the job for round rotary parts. It now always builds the real G-code from the drawing.
+
+**Security**
+- **Libraries updated:** a security check of the Rust libraries reported problems in the ZIP library used by the updater and in the certificate check for internet connections. Both are updated; the check now reports no known vulnerabilities.
 
 ## 0.4.2 Beta
 

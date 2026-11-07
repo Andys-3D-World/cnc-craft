@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.2", nl="Candy holder generator: small refillable wooden tags for chocolates or sweets, as one folding strip or as glued layers, with the checks for fit and walls built in. Folding box generator for thin cardboard, relief from images and shapes, and OBJ import.",
+  nh="New in 0.4.3", nl="A simpler layout with one clear way from the drawing to the machine: To machine, a job bar with Stop always in view, and Ctrl+K to find any command. All generators share one window. New tools: array, text on path, trim, line dimensions, Print &amp; Cut, laser test card and more.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -64,7 +64,7 @@ T = {
             ("07-external-drivers", "External drivers", "TB6600 / DM542 wiring – hover a wire to highlight it"),
             ("08-image-engraving", "Image engraving", "original and engraving side by side, auto enhance"),
             ("09-material-view", "Material preview", "how the job will look on birch plywood"),
-            ("10-shape-tools", "Shape tools", "combined shape, Bézier curve and dimensions"),
+            ("10-shape-tools", "Shape tools", "offset, array, text on path and more in one menu"),
             ("11-beds", "Several beds", "parts spread over three beds in one project")],
   dh="Download", dlead='Free for everyone. Latest version: <b data-version>see GitHub</b>. All files and older versions are on <a href="' + GH + '/releases">GitHub Releases</a>.',
   dcards=[("🍎 macOS", [("mac-arm", "Apple chip (M1–M4) · .dmg"), ("mac-intel", "Intel · .dmg")], "Not signed by Apple yet: on first start right-click the app → “Open”, or System Settings → Privacy &amp; Security → “Open Anyway”."),
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.2", nl="Pralinen-Halter-Generator: kleine Holzanhänger zum Nachfüllen für Pralinen oder Süßigkeiten, als ein Faltstreifen oder als verleimte Schichten, mit Prüfung von Passung und Wänden. Faltschachtel-Generator für dünnen Karton, Relief aus Bildern und Formen und OBJ-Import.",
+  nh="Neu in 0.4.3", nl="Einfacheres Layout mit einem klaren Weg von der Zeichnung zur Maschine: Zur Maschine, Job-Leiste mit immer sichtbarem Stopp und Strg+K, um jeden Befehl zu finden. Alle Generatoren haben dasselbe Fenster. Neue Werkzeuge: Array, Text auf Pfad, Trimmen, Linien bemaßen, Print &amp; Cut, Laser-Testkarte und mehr.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -140,7 +140,7 @@ T = {
             ("07-extern", "Externe Treiber", "TB6600 / DM542 anschließen – Maus aufs Kabel hebt es hervor"),
             ("08-bildgravur", "Bildgravur", "Original und Gravur nebeneinander, automatisch verbessern"),
             ("09-materialansicht", "Materialansicht", "so sieht der Job auf Birke-Sperrholz aus"),
-            ("10-formen", "Form-Werkzeuge", "verbundene Form, Bézier-Kurve und Maße"),
+            ("10-formen", "Form-Werkzeuge", "Versatz, Array, Text auf Pfad und mehr in einem Menü"),
             ("11-betten", "Mehrere Betten", "Teile auf drei Betten in einem Projekt verteilt")],
   dh="Download", dlead='Kostenlos für alle. Neueste Version: <b data-version>siehe GitHub</b>. Alle Dateien und ältere Versionen gibt es unter <a href="' + GH + '/releases">GitHub Releases</a>.',
   dcards=[("🍎 macOS", [("mac-arm", "Apple-Chip (M1–M4) · .dmg"), ("mac-intel", "Intel · .dmg")], "Noch nicht von Apple signiert: beim ersten Start Rechtsklick auf das Programm → „Öffnen“, oder Systemeinstellungen → Datenschutz &amp; Sicherheit → „Dennoch öffnen“."),
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.2</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.3</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>
