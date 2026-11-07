@@ -149,7 +149,7 @@
   "rp.start": "Start",
   "rp.pause": "Pauze",
   "rp.stop": "Stop",
-  "rp.stopTip": "Noodstop: feed hold + spil uit",
+  "rp.stopTip": "Stop: stopt de job en bewegingen, spil/laser uit. Dit is geen noodstop: die vraagt een eigen schakelaar die de machine spanningsloos maakt.",
   "rp.jog": "Handmatig verplaatsen",
   "rp.console": "Console",
   "rp.consoleTip": "Console tonen / verbergen",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser met de hand",
   "wr.fn.spOn": "Spindel aan",
   "gen.warnBed": "⚠ Samen zijn de delen {w} × {h} mm en steken ze buiten het bed ({bw} × {bh} mm). Nest ze of verdeel ze over meerdere bedden.",
-  "gen.warnWeb": "⚠ Dunste brug tussen twee sneden: {d} mm (richtwaarde vanaf {min} mm). Het deel kan daar breken, dus maak het groter of wijzig de waarden."
+  "gen.warnWeb": "⚠ Dunste brug tussen twee sneden: {d} mm (richtwaarde vanaf {min} mm). Het deel kan daar breken, dus maak het groter of wijzig de waarden.",
+  "job.lintWarn": "⚠ G-code-controle: {n} verdachte plek(ken), eerst op regel {line}: {text} ({rule}). Bekijk het in de simulatie en meld het als fout.",
+  "m.stopNoJob": "[Machine] Stop: beweging wordt afgebroken."
 }

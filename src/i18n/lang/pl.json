@@ -149,7 +149,7 @@
   "rp.start": "Start",
   "rp.pause": "Pauza",
   "rp.stop": "Stop",
-  "rp.stopTip": "Zatrzymanie awaryjne: zatrzymanie posuwu + wyłączenie wrzeciona",
+  "rp.stopTip": "Stop: zatrzymuje zadanie i ruchy, wrzeciono/laser wył. To nie jest wyłącznik awaryjny: ten wymaga osobnego przełącznika odcinającego zasilanie maszyny.",
   "rp.jog": "Ruch ręczny",
   "rp.console": "Konsola",
   "rp.consoleTip": "Pokaż / ukryj konsolę",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser ręcznie",
   "wr.fn.spOn": "Wrzeciono wł.",
   "gen.warnBed": "⚠ Razem części mają {w} × {h} mm i wystają poza stół ({bw} × {bh} mm). Zagnieźdź je lub rozłóż na kilka stołów.",
-  "gen.warnWeb": "⚠ Najcieńszy mostek między dwoma cięciami: {d} mm (wartość orientacyjna od {min} mm). Część może tam pęknąć, więc powiększ ją lub zmień wartości."
+  "gen.warnWeb": "⚠ Najcieńszy mostek między dwoma cięciami: {d} mm (wartość orientacyjna od {min} mm). Część może tam pęknąć, więc powiększ ją lub zmień wartości.",
+  "job.lintWarn": "⚠ Kontrola G-code: podejrzanych miejsc: {n}, pierwsze w wierszu {line}: {text} ({rule}). Obejrzyj to w symulacji i zgłoś jako błąd.",
+  "m.stopNoJob": "[Maszyna] Stop: przerywanie ruchu."
 }

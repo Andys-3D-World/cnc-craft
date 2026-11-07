@@ -149,7 +149,7 @@
   "rp.start": "Start",
   "rp.pause": "Pause",
   "rp.stop": "Stop",
-  "rp.stopTip": "Emergency stop: feed hold + spindle off",
+  "rp.stopTip": "Stop: halts the job and any move, spindle/laser off. This is not an emergency stop: that needs its own switch that cuts the machine's power.",
   "rp.jog": "Jog",
   "rp.console": "Console",
   "rp.consoleTip": "Show / hide console",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser by hand",
   "wr.fn.spOn": "Spindle on",
   "gen.warnBed": "⚠ Together the parts are {w} × {h} mm and go past the bed ({bw} × {bh} mm). Nest them or spread them over several beds.",
-  "gen.warnWeb": "⚠ Thinnest bridge between two cuts: {d} mm (guide value from {min} mm). The part can break there, so make it larger or change the values."
+  "gen.warnWeb": "⚠ Thinnest bridge between two cuts: {d} mm (guide value from {min} mm). The part can break there, so make it larger or change the values.",
+  "job.lintWarn": "⚠ G-code check: {n} suspicious spot(s), first at line {line}: {text} ({rule}). Please look at it in the simulation and report it as a bug.",
+  "m.stopNoJob": "[Machine] Stop: cancelling the move."
 }

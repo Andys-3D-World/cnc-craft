@@ -149,7 +149,7 @@
   "rp.start": "Démarrer",
   "rp.pause": "Pause",
   "rp.stop": "Arrêt",
-  "rp.stopTip": "Arrêt d'urgence : arrêt d'avance + broche coupée",
+  "rp.stopTip": "Arrêt : stoppe le travail et les déplacements, broche/laser coupés. Ce n'est pas un arrêt d'urgence : celui-ci exige un interrupteur propre qui coupe l'alimentation de la machine.",
   "rp.jog": "Déplacement manuel",
   "rp.console": "Console",
   "rp.consoleTip": "Afficher / masquer la console",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser manuel",
   "wr.fn.spOn": "Broche en marche",
   "gen.warnBed": "⚠ Ensemble, les pièces font {w} × {h} mm et dépassent du plateau ({bw} × {bh} mm). Imbrique-les ou répartis-les sur plusieurs plateaux.",
-  "gen.warnWeb": "⚠ Pont le plus fin entre deux coupes : {d} mm (valeur indicative à partir de {min} mm). La pièce peut casser à cet endroit : agrandis-la ou change les valeurs."
+  "gen.warnWeb": "⚠ Pont le plus fin entre deux coupes : {d} mm (valeur indicative à partir de {min} mm). La pièce peut casser à cet endroit : agrandis-la ou change les valeurs.",
+  "job.lintWarn": "⚠ Contrôle du G-code : {n} endroit(s) suspect(s), d'abord ligne {line} : {text} ({rule}). Regarde dans la simulation et signale le bug.",
+  "m.stopNoJob": "[Machine] Arrêt : déplacement annulé."
 }

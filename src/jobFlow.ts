@@ -8,6 +8,10 @@ import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from
 import { loadGcodeFromText, streamState } from "./machineStream";
 import { t } from "./i18n/i18n";
 import { askChoice } from "./ui/unsavedDialog";
+import { lintGcode, type LintKind } from "./gcodeLint";
+import { getMachineMode } from "./machineMode";
+import { laserSettings } from "./laserLayers";
+import { rotary } from "./rotary";
 
 type Log = (s: string) => void;
 
@@ -32,12 +36,20 @@ window.addEventListener("cnc-job-loaded", () => {
   if (!building) { builtLines = null; builtGcode = null; builtPrint = null; }
 });
 
+/** Sicherheitsnetz: fertigen G-Code noch einmal lesen. Nur Hinweis, gestartet wird weiter nur von Hand */
+function warnIfSuspicious(gcode: string, log: Log) {
+  if (rotary.on) return; // Drehachse: Z und Bahnen bedeuten dort etwas anderes
+  const list = lintGcode(gcode, { kind: getMachineMode() as LintKind, sMax: laserSettings.sMax });
+  if (list.length) log(t("job.lintWarn", { n: list.length, line: list[0].line, text: list[0].text, rule: list[0].rule }));
+}
+
 /** Zeichnung als Job bereitlegen. true = Job liegt bereit */
 export function buildJob(shapes: any, log: Log): boolean {
   const gcode = generateGcode(shapes);
   if (!gcode) { log(noGcodeMessage()); return false; }
   lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
   lastGcodeNotes.forEach(n => log(n));
+  warnIfSuspicious(gcode, log);
   building = true;
   const ok = loadGcodeFromText(gcode, t("sim.currentDesign"), log);
   building = false;

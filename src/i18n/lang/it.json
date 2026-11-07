@@ -149,7 +149,7 @@
   "rp.start": "Avvia",
   "rp.pause": "Pausa",
   "rp.stop": "Stop",
-  "rp.stopTip": "Arresto di emergenza: arresto avanzamento + mandrino spento",
+  "rp.stopTip": "Stop: ferma il lavoro e i movimenti, mandrino/laser spenti. Non è un arresto di emergenza: quello richiede un interruttore proprio che tolga corrente alla macchina.",
   "rp.jog": "Movimento manuale",
   "rp.console": "Console",
   "rp.consoleTip": "Mostra / nascondi console",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser manuale",
   "wr.fn.spOn": "Mandrino acceso",
   "gen.warnBed": "⚠ Insieme i pezzi misurano {w} × {h} mm e sporgono dal piano ({bw} × {bh} mm). Annidali o distribuiscili su più piani.",
-  "gen.warnWeb": "⚠ Ponte più sottile tra due tagli: {d} mm (valore indicativo da {min} mm). Il pezzo può rompersi lì: ingrandiscilo o cambia i valori."
+  "gen.warnWeb": "⚠ Ponte più sottile tra due tagli: {d} mm (valore indicativo da {min} mm). Il pezzo può rompersi lì: ingrandiscilo o cambia i valori.",
+  "job.lintWarn": "⚠ Controllo del G-code: {n} punto/i sospetto/i, prima alla riga {line}: {text} ({rule}). Guardalo nella simulazione e segnalalo come errore.",
+  "m.stopNoJob": "[Macchina] Stop: movimento annullato."
 }

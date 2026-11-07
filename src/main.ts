@@ -48,6 +48,9 @@ import { initProjectSafety } from "./projectSafety";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
 import { buildJob, okToStart } from "./jobFlow";
+import { stopPlanFor, holdSettled } from "./stopPlan";
+import { macroRunning, cancelMacro } from "./macroRun";
+import { machine, realtime, RT, jobStop } from "./machine";
 import { initCommandPalette } from "./ui/commandPalette";
 import { setupToolsHandler } from "./toolsHandler";
 import { initMouseEngine } from "./mouseEngine";
@@ -225,7 +228,25 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
     document.getElementById("btn-job-resume")?.addEventListener("click", () => openResumeDialog(appendToConsole));
     if (jobPauseBtn) jobPauseBtn.addEventListener("click", () => pauseStreaming(appendToConsole));
-    if (jobStopBtn) jobStopBtn.addEventListener("click", () => stopStreaming());
+    if (jobStopBtn) jobStopBtn.addEventListener("click", async () => {
+      if (streamState.isRunning) { stopStreaming(); return; }
+      if (machine.job.active) { await jobStop().catch(e => appendToConsole(`${t("log.error")} ${e}`)); return; }
+      // kein Job, aber die Maschine fährt (Nullpunkt, Referenzfahrt, Makro …): auch das muss der Knopf anhalten
+      if (macroRunning()) { await cancelMacro(appendToConsole); return; } // bremst und setzt selbst zurück
+      if (!machine.connected || machine.protocol !== "grbl") return;
+      const plan = stopPlanFor(machine.status.state);
+      if (plan === "none") return;
+      appendToConsole(t("m.stopNoJob"));
+      try {
+        if (plan === "jog-cancel") { await realtime(RT.jogCancel); return; }
+        if (plan === "hold-reset") {
+          await realtime(RT.hold);
+          const t0 = performance.now();
+          while (!holdSettled(machine.status.state, performance.now() - t0)) await new Promise(r => setTimeout(r, 50));
+        }
+        await realtime(RT.reset);
+      } catch (e) { appendToConsole(`${t("log.error")} ${e}`); }
+    });
 
     // Dateien einfach aufs Fenster ziehen
     window.addEventListener("dragover", (e) => { e.preventDefault(); document.body.classList.add("drop-active"); });

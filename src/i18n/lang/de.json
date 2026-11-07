@@ -149,7 +149,7 @@
   "rp.start": "Start",
   "rp.pause": "Pause",
   "rp.stop": "Stopp",
-  "rp.stopTip": "Not-Stopp: Feed Hold + Spindel aus",
+  "rp.stopTip": "Stopp: hält Job und Fahrten an, Spindel/Laser aus. Das ist kein Not-Aus: Der muss die Maschine über einen eigenen Schalter stromlos machen.",
   "rp.jog": "Manuelle Fahrt",
   "rp.console": "Konsole",
   "rp.consoleTip": "Konsole ein-/ausklappen",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Laser von Hand",
   "wr.fn.spOn": "Spindel ein",
   "gen.warnBed": "⚠ Die Teile sind zusammen {w} × {h} mm und ragen über das Bett ({bw} × {bh} mm). Verschachteln oder auf mehrere Betten verteilen.",
-  "gen.warnWeb": "⚠ Dünnster Steg zwischen zwei Schnitten: {d} mm (Richtwert ab {min} mm). Dort kann das Teil brechen, also größer machen oder die Werte ändern."
+  "gen.warnWeb": "⚠ Dünnster Steg zwischen zwei Schnitten: {d} mm (Richtwert ab {min} mm). Dort kann das Teil brechen, also größer machen oder die Werte ändern.",
+  "job.lintWarn": "⚠ G-Code-Prüfung: {n} auffällige Stelle(n), zuerst Zeile {line}: {text} ({rule}). Bitte in der Simulation ansehen und als Fehler melden.",
+  "m.stopNoJob": "[Maschine] Stopp: Fahrt wird abgebrochen."
 }

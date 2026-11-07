@@ -4,10 +4,15 @@
 
 **Improved**
 - **Generator checks:** after placing parts, a generator warns if they go past the bed or if a bridge between two cuts is thinner than a guide value (laser 0.8 mm, router 1.5 mm, plasma 3 mm). Points lying almost on top of each other are removed, which saves pointless tiny moves.
+- **G-code check:** *To machine* reads the finished G-code once more and warns about anything suspicious, such as a rapid move through material or a laser or torch left on. It only warns and changes nothing.
 - **Runs better on older computers:** the program no longer keeps redrawing checks while idle, the hidden Simulation tab rests, and the order of cuts is found much faster for very large jobs (5,000 laser shapes: from about 2 s to 0.2 s). Start checks instantly whether the job still matches the drawing.
 - **Better motifs:** ghost, bat, shell, mushroom, mitten, stocking, cat ears and the small tree and bat cut-outs are redrawn with smooth, symmetric curves. Existing projects change when you edit them with the generator.
 - **Shadow box:** small cut-outs in the scenery closer than 1 mm to another cut-out are filled, so no thin strip can break and no crumbs fall out. An existing shadow box changes slightly when you edit it.
 - **Feel of the interface:** buttons react more clearly when pressed, and windows open with a short fade. Jog, Start, Pause and Stop deliberately react without any movement, and the jog and tool buttons no longer shift on hover. The system setting for reduced motion is now respected.
+
+**Fixed**
+- **Stop button when no job runs:** Stop did nothing during other moves. It now halts a move to zero, homing or a macro, and cancels jogging. Not yet tried on a real machine.
+- **Wording:** the Stop button's hint called it an emergency stop. It now says plainly that software can't replace a real emergency stop switch.
 
 ## 0.4.3 Beta
 

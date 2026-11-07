@@ -149,7 +149,7 @@
   "rp.start": "Iniciar",
   "rp.pause": "Pausa",
   "rp.stop": "Parar",
-  "rp.stopTip": "Parada de emergencia: parada de avance + husillo apagado",
+  "rp.stopTip": "Parar: detiene el trabajo y los movimientos, husillo/láser apagados. No es una parada de emergencia: esta necesita su propio interruptor que corte la alimentación de la máquina.",
   "rp.jog": "Movimiento manual",
   "rp.console": "Consola",
   "rp.consoleTip": "Mostrar / ocultar la consola",
@@ -5842,5 +5842,7 @@
   "wr.fn.lasHand": "Láser manual",
   "wr.fn.spOn": "Husillo encendido",
   "gen.warnBed": "⚠ En conjunto las piezas miden {w} × {h} mm y se salen de la mesa ({bw} × {bh} mm). Anídalas o repártelas en varias mesas.",
-  "gen.warnWeb": "⚠ Puente más fino entre dos cortes: {d} mm (valor orientativo desde {min} mm). La pieza puede romperse ahí: hazla más grande o cambia los valores."
+  "gen.warnWeb": "⚠ Puente más fino entre dos cortes: {d} mm (valor orientativo desde {min} mm). La pieza puede romperse ahí: hazla más grande o cambia los valores.",
+  "job.lintWarn": "⚠ Comprobación del G-code: {n} punto(s) sospechoso(s), primero en la línea {line}: {text} ({rule}). Míralo en la simulación e infórmalo como error.",
+  "m.stopNoJob": "[Máquina] Parar: se cancela el movimiento."
 }
