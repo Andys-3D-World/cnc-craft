@@ -87,7 +87,8 @@ export class SimView {
         this.draw();
         this.drawMs = 0.8 * this.drawMs + 0.2 * (performance.now() - t0);
       }
-      requestAnimationFrame(loop);
+      // Reiter nicht sichtbar: nur selten nachsehen statt 60-mal in der Sekunde
+      if (canvas.offsetParent) requestAnimationFrame(loop); else setTimeout(loop, 250);
     };
     requestAnimationFrame(loop);
   }

@@ -172,8 +172,11 @@ window.addEventListener("DOMContentLoaded", async () => {
 
     // Neu zeichnen nur, wenn sich etwas geändert hat (spart Rechenleistung)
     let dirty = true;
-    const redraw = () => { dirty = true; };
+    // Nur dann ein Bild anfordern, wenn etwas zu zeichnen ist: Im Leerlauf bleibt der Rechner so wirklich ruhig
+    let paintQueued = false;
+    const redraw = () => { dirty = true; if (!paintQueued) { paintQueued = true; requestAnimationFrame(paint); } };
     const paint = () => {
+      paintQueued = false;
       if (dirty && ctx && canvas) {
         dirty = false;
         solveConstraints(); // Maße: abhängige Formen folgen ihrer Bezugsform
@@ -189,9 +192,8 @@ window.addEventListener("DOMContentLoaded", async () => {
         // Reiter „Objekt“: ohne Auswahl nur Ebenen + Hinweis
         document.getElementById("rp-object")?.classList.toggle("no-sel", !state.selectedShapeIds.length);
       }
-      requestAnimationFrame(paint);
     };
-    requestAnimationFrame(paint);
+    redraw();
     window.addEventListener("cnc-redraw", redraw);
 
     setupToolsHandler(state);

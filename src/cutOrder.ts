@@ -38,6 +38,7 @@ export interface CutStep {
 
 const SAMPLE = 16;       // so viele Punkte je Kontur reichen für die grobe Auswahl beim nächsten Nachbarn
 const TOL = 1e-6;
+const GRID_FROM = 1500; // ab so vielen Konturen sucht der nächste Nachbar über ein Raster (Ergebnis gleich gut)
 
 /**
  * Reihenfolge für die Konturen einer Ebene. `from` = wo der Kopf vorher steht.
@@ -61,21 +62,29 @@ export function optimizeCutOrder(items: CutItem[], from: Pt, timeMs = 150): CutS
   for (let i = 0; i < n; i++) if (!left[i]) avail.push(i);
   const order: number[] = [];
   let pos = from;
-  while (avail.length) {
-    let bestK = 0, bestD = Infinity;
-    for (let k = 0; k < avail.length; k++) {
-      const d = roughDist(items[avail[k]], pos);
-      if (d < bestD) { bestD = d; bestK = k; }
+  // sehr viele Konturen: Suche über ein Raster, sonst wächst die Rechenzeit mit dem Quadrat der Anzahl
+  const near = n > GRID_FROM ? nearGrid(items) : null;
+  if (near) avail.forEach(near.add);
+  while (near ? near.count() : avail.length) {
+    let i: number;
+    if (near) {
+      i = near.take(pos);
+    } else {
+      let bestK = 0, bestD = Infinity;
+      for (let k = 0; k < avail.length; k++) {
+        const d = roughDist(items[avail[k]], pos);
+        if (d < bestD) { bestD = d; bestK = k; }
+      }
+      i = avail[bestK];
+      avail[bestK] = avail[avail.length - 1];
+      avail.pop();
     }
-    const i = avail[bestK];
-    avail[bestK] = avail[avail.length - 1];
-    avail.pop();
     const it = items[i];
     if (it.freeStart) start[i] = nearestIdx(it.pts, pos);
     else if (it.reversible) rev[i] = dist(pos, it.exit) < dist(pos, it.entry) - TOL;
     order.push(i);
     pos = exitOf(i);
-    for (const b of succ[i]) if (--left[b] === 0) avail.push(b);
+    for (const b of succ[i]) if (--left[b] === 0) { if (near) near.add(b); else avail.push(b); }
   }
   if (order.length < n) return items.map((_, i) => ({ index: i, reversed: false, start: 0 })); // (kann nicht passieren: keine Kreise)
 
@@ -121,15 +130,21 @@ function precedence(items: CutItem[]): number[][] {
   const box = items.map(it => bbox(it.pts));
   const area = items.map(it => it.closed ? Math.abs(polyArea(it.pts)) : 0);
   const preds: number[][] = items.map(() => []);
+  // nach linker Kante sortiert: Für jede Kontur kommen nur die in Frage, deren linke Kante innerhalb von ihr liegt
+  const byLeft = items.map((_, i) => i).sort((p, q) => box[p][0] - box[q][0]);
+  const lefts = byLeft.map(i => box[i][0]);
+  const firstFrom = (v: number) => { let lo = 0, hi = lefts.length; while (lo < hi) { const m = (lo + hi) >> 1; if (lefts[m] < v) lo = m + 1; else hi = m; } return lo; };
   for (let b = 0; b < n; b++) {
     if (!items[b].closed || items[b].pts.length < 3) continue;
     const B = box[b];
-    for (let a = 0; a < n; a++) {
+    for (let k = firstFrom(B[0] - TOL); k < n && lefts[k] <= B[2] + TOL; k++) {
+      const a = byLeft[k];
       if (a === b || !(area[a] < area[b] - TOL)) continue;
       const A = box[a];
-      if (A[0] < B[0] - TOL || A[1] < B[1] - TOL || A[2] > B[2] + TOL || A[3] > B[3] + TOL) continue;
+      if (A[1] < B[1] - TOL || A[2] > B[2] + TOL || A[3] > B[3] + TOL) continue;
       if (anyInside(items[a].pts, items[b].pts)) preds[b].push(a);
     }
+    preds[b].sort((p, q) => p - q); // gleiche Reihenfolge wie früher: Ergebnis bleibt gleich
   }
   return preds;
 }
@@ -212,6 +227,64 @@ function placeStarts(order: number[], items: CutItem[], start: number[],
     if (best !== start[order[k]]) { start[order[k]] = best; moved = true; }
   }
   return moved;
+}
+
+/** Punkte, an denen eine Kontur begonnen werden kann – dieselben, die roughDist prüft */
+function startPoints(it: CutItem): Pt[] {
+  if (it.freeStart) { const step = Math.max(1, Math.floor(it.pts.length / SAMPLE)), out: Pt[] = []; for (let i = 0; i < it.pts.length; i += step) out.push(it.pts[i]); return out; }
+  return it.reversible ? [it.entry, it.exit] : [it.entry];
+}
+
+/** Nächste verfügbare Kontur über ein Raster: gesucht wird ringförmig, bis kein näherer Treffer mehr möglich ist */
+function nearGrid(items: CutItem[]) {
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const it of items) for (const p of startPoints(it)) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
+  const cell = Math.max(Math.sqrt(Math.max(x1 - x0, 1e-6) * Math.max(y1 - y0, 1e-6) / items.length), Math.max(x1 - x0, y1 - y0, 1e-6) / 2000);
+  const nx = Math.floor((x1 - x0) / cell) + 1, ny = Math.floor((y1 - y0) / cell) + 1;
+  const cells = new Map<number, number[]>();
+  const inGrid = new Uint8Array(items.length);
+  let live = 0;
+  const key = (cx: number, cy: number) => cy * nx + cx;
+  return {
+    count: () => live,
+    add(i: number) {
+      inGrid[i] = 1; live++;
+      for (const p of startPoints(items[i])) {
+        const k = key(Math.floor((p.x - x0) / cell), Math.floor((p.y - y0) / cell));
+        const list = cells.get(k);
+        if (list) list.push(i); else cells.set(k, [i]);
+      }
+    },
+    take(pos: Pt): number {
+      const px = (pos.x - x0) / cell, py = (pos.y - y0) / cell, cx = Math.floor(px), cy = Math.floor(py);
+      // außerhalb des Rasters liegt der erste Ring mit Zellen erst nach diesem Abstand
+      const maxR = Math.max(Math.abs(cx), Math.abs(cx - nx), Math.abs(cy), Math.abs(cy - ny)) + 1;
+      let best = -1, bestD = Infinity;
+      for (let r = 0; r <= maxR; r++) {
+        // Zellen in Ring r sind mindestens (r - 1) Zellen entfernt: danach kann nichts Näheres mehr kommen
+        if (best >= 0 && bestD < (r - 1) * cell) break;
+        for (let y = cy - r; y <= cy + r; y++) {
+          if (y < 0 || y >= ny) continue;
+          const onEdge = y === cy - r || y === cy + r;
+          for (let x = cx - r; x <= cx + r; x += onEdge || r === 0 ? 1 : 2 * r) {
+            if (x < 0 || x >= nx) continue;
+            const list = cells.get(key(x, y));
+            if (!list) continue;
+            let w = 0;
+            for (const i of list) {
+              if (!inGrid[i]) continue; // schon gefahren: aus der Liste nehmen
+              list[w++] = i;
+              const d = roughDist(items[i], pos);
+              if (d < bestD || (d === bestD && i < best)) { bestD = d; best = i; }
+            }
+            list.length = w;
+          }
+        }
+      }
+      inGrid[best] = 0; live--;
+      return best;
+    }
+  };
 }
 
 /** grober Abstand für die Auswahl beim nächsten Nachbarn */

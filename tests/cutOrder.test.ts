@@ -114,3 +114,25 @@ test("stays fast with many parts (time limit)", () => {
   const pos = new Map(steps.map((s, k) => [s.index, k]));
   for (let k = 0; k < items.length; k += 2) assert.ok(pos.get(k + 1)! < pos.get(k)!, "hole before part");
 });
+
+test("Raster-Suche bei vielen Konturen: gleich gute Wege wie die volle Suche, alle einmal", () => {
+  // 1600 offene Linien auf einem unregelmäßigen Feld: über GRID_FROM, also mit Raster
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const big: CutItem[] = Array.from({ length: 1600 }, () => { const x = rnd() * 800, y = rnd() * 500, a = { x, y }, b = { x: x + 1, y }; return { entry: a, exit: b, pts: [a, b], closed: false }; });
+  const steps = optimizeCutOrder(big, { x: 0, y: 0 }, 0);
+  assert.equal(new Set(steps.map(s => s.index)).size, 1600);
+  // die volle Suche auf derselben Menge, in Stücken unter der Grenze nicht vergleichbar: Vergleich gegen von Hand gerechneten nächsten Nachbarn
+  const left = new Set(big.map((_, i) => i)); let pos = { x: 0, y: 0 }, full = 0;
+  while (left.size) { let b = -1, d = Infinity; for (const i of left) { const q = Math.hypot(big[i].entry.x - pos.x, big[i].entry.y - pos.y); if (q < d) { d = q; b = i; } } full += d; pos = big[b].exit; left.delete(b); }
+  const got = travelLength(big, steps, { x: 0, y: 0 });
+  assert.ok(got <= full * 1.0001, `Raster ${got}, voll ${full}`);
+});
+
+test("Raster-Suche: Start weit außerhalb, Reihenfolge innen vor außen bleibt", () => {
+  const square = (x: number, y: number, s: number): CutItem => { const pts = [{ x, y }, { x: x + s, y }, { x: x + s, y: y + s }, { x, y: y + s }]; return { entry: pts[0], exit: pts[0], pts, closed: true }; };
+  const list: CutItem[] = [square(0, 0, 1000)];
+  for (let i = 0; i < 1600; i++) list.push(square(10 + (i % 40) * 24, 10 + Math.floor(i / 40) * 24, 20));
+  const steps = optimizeCutOrder(list, { x: -5000, y: 9000 }, 0);
+  assert.equal(new Set(steps.map(s => s.index)).size, list.length);
+  assert.equal(steps[steps.length - 1].index, 0, "der große Rahmen kommt zuletzt");
+});

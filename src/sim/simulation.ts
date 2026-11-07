@@ -417,7 +417,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   updateJobState();
   updateEditUI();
   updateCarveUI(true);
-  requestAnimationFrame(tick);
+  nextTick();
 }
 
 /**
@@ -486,6 +486,12 @@ function seek(time: number) {
   applyTime(true);
 }
 
+/** Nächster Durchlauf: flüssig, solange die Simulation sichtbar ist, sonst nur selten nachsehen */
+function nextTick() {
+  if (document.getElementById("tab-sim")?.classList.contains("active")) requestAnimationFrame(tick);
+  else setTimeout(() => tick(performance.now()), 250);
+}
+
 function tick(now: number) {
   updateCarveUI();
   if (playing && prog) {
@@ -503,11 +509,11 @@ function tick(now: number) {
     const diff = target - simTime;
     if (Math.abs(diff) > 2) simTime = target;                       // großer Sprung (Start, Fortsetzen): sofort
     else if (Math.abs(diff) > 1e-4) simTime += diff * (1 - Math.exp(-dt / LIVE_EASE));
-    else { requestAnimationFrame(tick); lastFrame = now; return; }   // steht: nichts neu zeichnen
+    else { nextTick(); lastFrame = now; return; }   // steht: nichts neu zeichnen
     applyTime(!editing, true);
   }
   lastFrame = now;
-  requestAnimationFrame(tick);
+  nextTick();
 }
 
 /** Abstand zwischen zwei Live-Bildern: so oft wie möglich, bei großen Programmen (langsames Zeichnen) seltener */
