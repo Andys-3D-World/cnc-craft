@@ -32,6 +32,7 @@ import { t, ascii } from "./i18n/i18n";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
+import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo } from "./cutSetting";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
@@ -48,7 +49,7 @@ export interface PlasmaPlan {
   runs: Pt[][] | null; // mit Haltestegen: Schneid-Stücke (dazwischen Brenner aus, neu einstechen)
 }
 
-interface ShapePlan { plans: PlasmaPlan[]; tooSmall: boolean; leadShort: boolean }
+interface ShapePlan { plans: PlasmaPlan[]; tooSmall: boolean; leadShort: boolean; dirByHand?: boolean; startInTab?: boolean }
 
 // ---------------------------------------------------------------------
 // Planung (mit Zwischenspeicher – wird auch fürs Zeichnen benutzt)
@@ -62,7 +63,7 @@ function sigOf(shape: any, cut: PlasmaCut): string {
   for (let i = 0; i < pts.length; i++) { a += pts[i].x * (i % 7 + 1); b += pts[i].y * (i % 5 + 1); }
   return [shape.type, shape.millingMode, shape.x, shape.y, shape.w, shape.h, shape.midX, shape.midY, pts.length,
     a.toFixed(3), b.toFixed(3), cut.kerf, cut.leadIn, plasmaSettings.overcut,
-    shape.tabMode, shape.tabN, shape.tabLen, JSON.stringify(shape.tabPts || [])].join("|");
+    shape.tabMode, shape.tabN, shape.tabLen, JSON.stringify(shape.tabPts || []), shape.cutStart, shape.cutDir].join("|");
 }
 
 export function planShape(shape: any, cut: PlasmaCut): ShapePlan {
@@ -82,7 +83,7 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
     const pts = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL, y: p.y / MM_TO_PIXEL }));
 
     if (!path.closed || mode === "on-line") {
-      res.plans.push({ pts, closed: path.closed, lead: null, over: [], area: 0, hole: false, size: extent(pts), runs: null });
+      res.plans.push({ pts: applyCut(pts, path.closed, shape), closed: path.closed, lead: null, over: [], area: 0, hole: false, size: extent(pts), runs: null });
       continue;
     }
     const outside = mode === "outside";
@@ -96,16 +97,26 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
       loop = cleanLoop(loop, 0.05);
       if (loop.length < 3) continue;
       // Richtung: außen im Uhrzeigersinn, Löcher gegen den Uhrzeigersinn
+      // Von Hand gesetzte Richtung gewinnt (cutSetting.ts), dann liegt die saubere Schnittkante aber auf der anderen Seite
       const ccw = polygonArea(loop) > 0;
-      if (outside === ccw) loop = loop.slice().reverse();
-      // Startpunkt an der schärfsten Ecke
-      const si = cornerIndex(loop);
-      loop = loop.slice(si).concat(loop.slice(0, si));
+      const dirHand = cutDirOf(shape);
+      if (dirHand === "cw" || dirHand === "ccw") {
+        if ((dirHand === "ccw") === outside) res.dirByHand = true;
+        loop = orientClosed(loop, dirHand);
+      } else if (outside === ccw) loop = loop.slice().reverse();
+      // Startpunkt von Hand, sonst an der schärfsten Ecke
+      const startHand = cutStartMm(shape);
+      if (startHand) loop = rotateLoopTo(loop, startHand);
+      else {
+        const si = cornerIndex(loop);
+        loop = loop.slice(si).concat(loop.slice(0, si));
+      }
       let lead = leadPoint(loop, outside, cut.leadIn);
       if (cut.leadIn > 0 && !lead) res.leadShort = true;
       // Haltestege: Lücke auf der Bahn = Steglänge + Schnittspalt; kein Überlauf (der liefe in einen Steg)
       const tr = tabRuns(shape, loop, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), (Number(shape.tabLen) || 0) + cut.kerf);
       if (tr?.rotated) lead = null;
+      if (tr?.rotated && cutStartOf(shape) !== null) res.startInTab = true;
       res.plans.push({ pts: loop, closed: true, lead, over: tr ? [] : overcutPoints(loop, plasmaSettings.overcut), area: Math.abs(polygonArea(loop)), hole: !outside, size: extent(loop), runs: tr ? tr.runs : null });
     }
   }
@@ -301,6 +312,8 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
       const sp = planShape(s, cut);
       if (sp.tooSmall) warnings.push(t("pgw.tooSmall", { name: cut.name, n: si + 1, k: cut.kerf }));
       if (sp.leadShort) warnings.push(t("pgw.leadShort", { name: cut.name, n: si + 1 }));
+      if (sp.dirByHand) warnings.push(t("cut.plasmaDir", { name: cut.name, n: si + 1 }));
+      if (sp.startInTab) warnings.push(t("cut.startInTab"));
       plans.push(...sp.plans);
     });
     // offene Linien zuerst, dann geschlossene von klein nach groß

@@ -204,7 +204,15 @@ function shapeMenu(): MenuEntry[] {
     { label: t("cm.copy"), ico: "copy", key: ctrl("C"), run: cmd("copy") },
     { label: t("cm.paste"), ico: "paste", key: ctrl("V"), run: cmd("paste"), disabled: !hasClipboard() },
     { label: t("cm.duplicate"), ico: "duplicate", key: ctrl("D"), run: cmd("duplicate") },
+    { label: t("cm.array"), ico: "array", run: cmd("array") },
     { label: t("cm.delete"), ico: "delete", key: t("cm.keyDel"), run: cmd("delete") },
+    {
+      label: t("cm.selectSim"), ico: "selectSim", sub: [
+        { label: t("cm.selectOpen"), ico: "selectOpen", run: cmd("selectOpen") },
+        { label: t("cm.selectSameLayer"), ico: "layers", run: cmd("selectSameLayer") },
+        { label: t("cm.selectSameSize"), ico: "selectSameSize", run: cmd("selectSameSize") }
+      ]
+    },
     "sep",
     { label: t("cm.group"), ico: "group", key: ctrl("G"), run: cmd("group"), disabled: n < 2 },
     { label: t("cm.ungroup"), ico: "ungroup", key: ctrl("U"), run: cmd("ungroup"), disabled: !grouped },
@@ -219,7 +227,8 @@ function shapeMenu(): MenuEntry[] {
         { label: t("cm.rotateLeft"), ico: "rotateLeft", run: cmd("rotateLeft") },
         { label: t("cm.rotateRight"), ico: "rotateRight", run: cmd("rotateRight") },
         { label: t("cm.mirrorH"), ico: "mirrorH", run: cmd("mirrorH") },
-        { label: t("cm.mirrorV"), ico: "mirrorV", run: cmd("mirrorV") }
+        { label: t("cm.mirrorV"), ico: "mirrorV", run: cmd("mirrorV") },
+        { label: t("cm.shear"), ico: "shear", run: cmd("shear") }
       ]
     },
     {
@@ -230,7 +239,10 @@ function shapeMenu(): MenuEntry[] {
         { label: t("cm.alignRight"), ico: "alignRight", run: cmd("alignRight") },
         { label: t("cm.alignTop"), ico: "alignTop", run: cmd("alignTop") },
         { label: t("cm.alignCenterV"), ico: "alignCenterV", run: cmd("alignCenterV") },
-        { label: t("cm.alignBottom"), ico: "alignBottom", run: cmd("alignBottom") }
+        { label: t("cm.alignBottom"), ico: "alignBottom", run: cmd("alignBottom") },
+        "sep",
+        { label: t("cm.distributeH"), ico: "distributeH", run: cmd("distributeH"), disabled: units < 3 },
+        { label: t("cm.distributeV"), ico: "distributeV", run: cmd("distributeV"), disabled: units < 3 }
       ]
     },
     {
@@ -243,6 +255,12 @@ function shapeMenu(): MenuEntry[] {
       ]
     },
     { label: t("cm.toPath"), ico: "node", run: cmd("toPath"), disabled: !convertible },
+    { label: t("cm.toImage"), ico: "toImage", run: cmd("toImage"), disabled: !sel.some(s => s.type !== "image") },
+    { label: t("cm.textOnPath"), ico: "textOnPath", run: cmd("textOnPath"), disabled: n < 1 },
+    { label: t("cm.simplify"), ico: "simplify", run: cmd("simplify"), disabled: !sel.some(s => s.type === "polyline") },
+    { label: t("cm.dedupe"), ico: "dedupe", run: cmd("dedupe") },
+    { label: t("cm.cutStart"), ico: "cutStart", run: cmd("cutStart") },
+    { label: t("cm.reverseDir"), ico: "reverseDir", run: cmd("reverseDir") },
     ...layerEntries(),
     "sep",
     { label: t("cm.exportSel", { n }), ico: "export", sub: exportEntries(false) }
@@ -256,6 +274,8 @@ function canvasMenu(): MenuEntry[] {
     { label: t("cm.import"), ico: "import", key: ctrl("I"), run: cmd("importFile") },
     "sep",
     { label: t("cm.selectAll"), ico: "selectAll", key: ctrl("A"), run: cmd("selectAll"), disabled: !any },
+    { label: t("cm.dedupe"), ico: "dedupe", run: cmd("dedupe"), disabled: !any },
+    { label: t("cm.selectOpen"), ico: "selectOpen", run: cmd("selectOpen"), disabled: !any },
     { label: t("cm.exportAll"), ico: "export", sub: exportEntries(true), disabled: !any },
     "sep",
     { label: t("cm.zoomFit"), ico: "zoomFit", key: "F", run: cmd("zoomFit") }

@@ -18,6 +18,7 @@ import { t } from "../i18n/i18n";
 import { FALLBACK_FONT, resolveFont } from "./fonts";
 import { createFontPicker } from "./fontPicker";
 import { traceSingleLine } from "./singleLine";
+import { openTextOnPathEdit } from "./textOnPathTool";
 
 export interface TextParams {
   text: string;
@@ -30,7 +31,7 @@ export interface TextParams {
   letterSpacing: number; // zusätzlicher Buchstabenabstand in mm
 }
 
-const DEFAULTS: TextParams = {
+export const TEXT_DEFAULTS: TextParams = {
   text: "CNC Craft",
   font: FALLBACK_FONT,
   heightMm: 20,
@@ -41,7 +42,7 @@ const DEFAULTS: TextParams = {
   letterSpacing: 0
 };
 
-let lastParams: TextParams = { ...DEFAULTS };
+let lastParams: TextParams = { ...TEXT_DEFAULTS };
 let redrawHook: () => void = () => {};
 
 export function setTextRedraw(fn: () => void) { redrawHook = fn; }
@@ -53,6 +54,8 @@ export function setTextRedraw(fn: () => void) { redrawHook = fn; }
 export interface TracedText {
   loops: Pt[][]; holes: boolean[]; width: number; height: number;
   closed?: boolean[]; // nur Einzellinien-Schrift: offene Linien (fehlt = alle geschlossen)
+  baseline?: number;  // Höhe der Grundlinie über der Unterkante (Text auf Pfad)
+  glyphOf?: number[]; // nur Einzellinien-Schrift: zu welchem Zeichen gehört die Linie (Text auf Pfad)
 }
 
 /** Ergebnis inkl. Hinweis, ob die gewünschte Schrift fehlte (dann Ersatzschrift) */
@@ -207,7 +210,7 @@ export function traceGlyphs(p: TextParams, cssFamily = p.font): TracedText[] {
     minX = Math.min(minX, q.x); maxX = Math.max(maxX, q.x); minY = Math.min(minY, q.y); maxY = Math.max(maxY, q.y);
   }
   if (!isFinite(minX)) return raw.map(() => ({ loops: [], holes: [], width: 0, height: 0 }));
-  return raw.map(g => ({ loops: g.loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY }))), holes: g.holes, width: maxX - minX, height: maxY - minY }));
+  return raw.map(g => ({ loops: g.loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY }))), holes: g.holes, width: maxX - minX, height: maxY - minY, baseline: -minY }));
 }
 
 /** traceGlyphs mit geladener Schrift; null bei Einzellinien-Schrift (die hat keine Flächen) */
@@ -232,7 +235,8 @@ export function editTextGroup(shape: any) {
   const st = app();
   const members = shape.groupId ? st.shapes.filter((s: any) => s.groupId === shape.groupId) : [shape];
   const b = groupBounds(members);
-  const params: TextParams = { ...DEFAULTS, ...shape.textData };
+  if (members.some((m: any) => m.textPath)) { openTextOnPathEdit(members); return; } // Text auf Pfad hat sein eigenes Fenster
+  const params: TextParams = { ...TEXT_DEFAULTS, ...shape.textData };
   showDialog(params, (p, traced) => {
     const ids = new Set(members.map((m: any) => m.id));
     st.shapes = st.shapes.filter((s: any) => !ids.has(s.id));
@@ -339,11 +343,11 @@ function showDialog(initial: TextParams, onOk: (p: TextParams, t: TracedText) =>
   const read = (): TextParams => ({
     text: $<HTMLTextAreaElement>("txt-text").value,
     font: picker.get() || FALLBACK_FONT,
-    heightMm: Math.max(0.5, parseFloat($<HTMLInputElement>("txt-height").value) || DEFAULTS.heightMm),
+    heightMm: Math.max(0.5, parseFloat($<HTMLInputElement>("txt-height").value) || TEXT_DEFAULTS.heightMm),
     bold: $<HTMLInputElement>("txt-bold").checked,
     italic: $<HTMLInputElement>("txt-italic").checked,
     align: $<HTMLSelectElement>("txt-align").value as TextParams["align"],
-    lineSpacing: Math.max(50, parseFloat($<HTMLInputElement>("txt-line").value) || DEFAULTS.lineSpacing),
+    lineSpacing: Math.max(50, parseFloat($<HTMLInputElement>("txt-line").value) || TEXT_DEFAULTS.lineSpacing),
     letterSpacing: parseFloat($<HTMLInputElement>("txt-letter").value) || 0
   });
 

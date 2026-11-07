@@ -16,12 +16,16 @@
  * Größenmaß. Maßzahl anklicken = auswählen (Entf löscht), Doppelklick auf die Zahl = Wert eingeben.
  */
 import { app, toScreen } from "./editorState";
-import { Pt, Bounds, MM_TO_PIXEL, shapeBounds, translateShape, scaleShape, shapeToPaths, pointInPath, pathArea } from "../shapeTransform";
+import { Pt, Bounds, MM_TO_PIXEL, shapeBounds, translateShape, scaleShape, shapeToPaths, pointInPath, pathArea, convertToPolyline, updatePolylineBounds } from "../shapeTransform";
+import { dimSide, pickSegment, Segment, setSegmentLength } from "./lineDim";
+import { intersections } from "./trim";
 
 type KX = "l" | "c" | "r";
 type KY = "b" | "c" | "t";
 export interface Cons { axis: "x" | "y"; ref: string; rk: KX | KY; ok: KX | KY; value: number; pos: number; lastRef?: number; force?: boolean; center?: boolean }
 export interface SizeDim { axis: "x" | "y"; pos: number }
+/** Längenmaß an einer Linie („Linie bemaßen“): Punkt-Nummern, n = Punktzahl beim Anlegen (ändert sie sich, gilt das Maß nicht mehr) */
+export interface LineDim { i: number; j: number; moves: number; n: number; off: number }
 
 const ax = (b: Bounds, k: string) => (k === "l" ? b.minX : k === "r" ? b.maxX : (b.minX + b.maxX) / 2);
 const ay = (b: Bounds, k: string) => (k === "b" ? b.minY : k === "t" ? b.maxY : (b.minY + b.maxY) / 2);
@@ -112,7 +116,7 @@ export function centerOn(ref: any, others: any[]): number {
 // Anzeige + Anklicken der Maßzahlen
 // ---------------------------------------------------------------------
 
-export interface DimRef { kind: "cons" | "size"; shapeId: string; idx: number }
+export interface DimRef { kind: "cons" | "size" | "line"; shapeId: string; idx: number }
 interface Label { r: { x: number; y: number; w: number; h: number }; ref: DimRef }
 let labels: Label[] = [];
 export const dimSel = { cur: null as DimRef | null };
@@ -137,6 +141,9 @@ export function drawDims(ctx: CanvasRenderingContext2D) {
   ctx.font = "600 11px system-ui, sans-serif";
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
   for (const s of st.shapes) {
+    (s.lineDims || []).forEach((d: LineDim, idx: number) => {
+      if (lineDimValid(s, d)) alignedDim(ctx, s.points[d.i], s.points[d.j], d.off, { kind: "line", shapeId: s.id, idx });
+    });
     const ob = (s.cons?.length || s.dims?.length) ? shapeBounds(s) : null;
     if (!ob) continue;
     (s.cons || []).forEach((c: Cons, idx: number) => {
@@ -191,6 +198,32 @@ function dimLine(ctx: CanvasRenderingContext2D, axis: "x" | "y", a: number, b: n
   label(ctx, text, (pa.x + pb.x) / 2, (pa.y + pb.y) / 2, ref);
 }
 
+const lineDimValid = (s: any, d: LineDim) => s.type === "polyline" && s.points.length === d.n && !!s.points[d.i] && !!s.points[d.j];
+
+/** Maßlinie parallel zur Strecke a–b, im Abstand off (Welt-Pixel, zur Links-Normalen von a nach b) */
+function alignedDim(ctx: CanvasRenderingContext2D, a: Pt, b: Pt, off: number, ref: DimRef) {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  if (len < 1e-9) return;
+  const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+  const sa = toScreen(a.x, a.y), sb = toScreen(b.x, b.y);
+  const pa = toScreen(a.x + nx * off, a.y + ny * off), pb = toScreen(b.x + nx * off, b.y + ny * off);
+  ctx.strokeStyle = ctx.fillStyle = same(dimSel.cur, ref) ? "#34d17b" : "#4dabf7";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(pa.x, pa.y); ctx.moveTo(sb.x, sb.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
+  const sl = Math.hypot(pb.x - pa.x, pb.y - pa.y) || 1, ux = (pb.x - pa.x) / sl, uy = (pb.y - pa.y) / sl;
+  for (const [p, k] of [[pa, 1], [pb, -1]] as [Pt, number][]) {
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + k * ux * 7 - uy * 3, p.y + k * uy * 7 + ux * 3);
+    ctx.lineTo(p.x + k * ux * 7 + uy * 3, p.y + k * uy * 7 - ux * 3);
+    ctx.closePath(); ctx.fill();
+  }
+  label(ctx, fmt(len), (pa.x + pb.x) / 2, (pa.y + pb.y) / 2, ref);
+}
+
 function label(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, ref: DimRef) {
   const w = ctx.measureText(text).width + 8, h = 16;
   const sel = same(dimSel.cur, ref);
@@ -205,6 +238,7 @@ export function deleteDim(ref: DimRef): boolean {
   const s = app().shapes.find((q: any) => q.id === ref.shapeId);
   if (!s) return false;
   if (ref.kind === "size") { s.dims?.splice(ref.idx, 1); return true; }
+  if (ref.kind === "line") { s.lineDims?.splice(ref.idx, 1); return true; }
   const c: Cons | undefined = s.cons?.[ref.idx];
   if (!c) return false;
   // „mittig“ besteht aus zwei Bedingungen (x und y) – beide entfernen
@@ -216,6 +250,11 @@ export function deleteDim(ref: DimRef): boolean {
 export function dimValue(ref: DimRef): number | null {
   const s = app().shapes.find((q: any) => q.id === ref.shapeId);
   if (!s) return null;
+  if (ref.kind === "line") {
+    const d: LineDim | undefined = s.lineDims?.[ref.idx];
+    if (!d || !lineDimValid(s, d)) return null;
+    return Math.hypot(s.points[d.j].x - s.points[d.i].x, s.points[d.j].y - s.points[d.i].y) / MM_TO_PIXEL;
+  }
   if (ref.kind === "cons") { const c = s.cons?.[ref.idx]; return c && !c.center ? Math.abs(c.value) / MM_TO_PIXEL : null; }
   const d: SizeDim | undefined = s.dims?.[ref.idx], b = shapeBounds(s);
   return d && b ? (d.axis === "x" ? b.maxX - b.minX : b.maxY - b.minY) / MM_TO_PIXEL : null;
@@ -226,6 +265,19 @@ export function setDimValue(ref: DimRef, mm: number): boolean {
   if (!(mm >= 0)) return false;
   const s = app().shapes.find((q: any) => q.id === ref.shapeId);
   if (!s) return false;
+  if (ref.kind === "line") {
+    const d: LineDim | undefined = s.lineDims?.[ref.idx];
+    if (!d || !lineDimValid(s, d) || mm <= 0) return false;
+    const cur = dimValue(ref)!;
+    if (Math.abs(cur - mm) < 5e-4) return false; // Wert nicht geändert (Feld rundet auf 3 Stellen)
+    const closed = !!s.closed;
+    const crossedBefore = intersections({ pts: s.points, closed }, []).length > 0;
+    s.points = setSegmentLength(s.points, closed, d, mm * MM_TO_PIXEL);
+    delete s.bez;
+    updatePolylineBounds(s);
+    lastLineDimCrossed = !crossedBefore && intersections({ pts: s.points, closed }, []).length > 0;
+    return true;
+  }
   if (ref.kind === "cons") {
     const c: Cons | undefined = s.cons?.[ref.idx];
     if (!c || c.center) return false;
@@ -243,6 +295,40 @@ export function setDimValue(ref: DimRef, mm: number): boolean {
   if (s.type === "circle") scaleShape(s, b.minX, b.minY, f, f);
   else scaleShape(s, b.minX, b.minY, d.axis === "x" ? f : 1, d.axis === "y" ? f : 1);
   return true;
+}
+
+// ---------------------------------------------------------------------
+// Werkzeug „Linie bemaßen“: ein Klick auf eine Linie, Zahl eingeben (Rechnung: lineDim.ts)
+// ---------------------------------------------------------------------
+
+/** Hat die letzte Längenänderung die Form sich selbst kreuzen lassen? (Hinweis in der Konsole) */
+export let lastLineDimCrossed = false;
+
+export type LineDimPick = { seg: Segment; a: Pt; b: Pt; moved: Pt } | { why: "curve" | "text" | "image" };
+
+/** Was träfe ein Klick? Nur gerade Stücke: Kurven mit Griffen, Texte und Bilder haben keine sinnvolle Einzelstrecke */
+export function lineDimPick(s: any, at: Pt): LineDimPick | null {
+  if (s.type === "image") return { why: "image" };
+  if (s.textData) return { why: "text" };
+  if (s.bez) return { why: "curve" };
+  if (s.type === "arc") return { why: "curve" };
+  const p = shapeToPaths(s)[0];
+  if (!p) return null;
+  const seg = pickSegment(p.pts, p.closed, at);
+  return seg ? { seg, a: p.pts[seg.i], b: p.pts[seg.j], moved: p.pts[seg.moves] } : null;
+}
+
+/** Maß an der Linie anlegen (oder das vorhandene nehmen). Liefert die Maßzahl zum Bearbeiten */
+export function addLineDim(s: any, at: Pt, offPx: number): DimRef | null {
+  if (s.type === "line" || s.type === "rect") convertToPolyline(s);
+  if (s.type !== "polyline") return null;
+  const seg = pickSegment(s.points, !!s.closed, at);
+  if (!seg) return null;
+  s.lineDims = (s.lineDims || []).filter((d: LineDim) => lineDimValid(s, d));
+  const found = s.lineDims.findIndex((d: LineDim) => d.i === seg.i && d.j === seg.j);
+  if (found >= 0) { s.lineDims[found].moves = seg.moves; return { kind: "line", shapeId: s.id, idx: found }; }
+  s.lineDims.push({ i: seg.i, j: seg.j, moves: seg.moves, n: s.points.length, off: dimSide(s.points, !!s.closed) * offPx });
+  return { kind: "line", shapeId: s.id, idx: s.lineDims.length - 1 };
 }
 
 // ---------------------------------------------------------------------

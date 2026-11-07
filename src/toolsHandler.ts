@@ -20,13 +20,13 @@ export function setupToolsHandler(_state: any) {
       window.dispatchEvent(new Event("cnc-redraw"));
     });
   };
-  const bindNum = (id: string, key: "gridStep" | "rectRadius" | "polygonSides", min: number) => {
+  const bindNum = (id: string, key: "gridStep" | "rectRadius" | "polygonSides" | "starTips" | "starInner" | "ringWall", min: number, max = Infinity) => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.value = String(options[key]);
     el.addEventListener("change", () => {
       const v = parseFloat(el.value);
-      options[key] = Number.isFinite(v) ? Math.max(min, key === "polygonSides" ? Math.round(v) : v) : options[key];
+      options[key] = Number.isFinite(v) ? Math.min(max, Math.max(min, key === "polygonSides" || key === "starTips" ? Math.round(v) : v)) : options[key];
       el.value = String(options[key]);
       saveOptions();
     });
@@ -37,4 +37,7 @@ export function setupToolsHandler(_state: any) {
   bindNum("opt-grid-step", "gridStep", 0.01);
   bindNum("opt-rect-radius", "rectRadius", 0);
   bindNum("opt-poly-sides", "polygonSides", 3);
+  bindNum("opt-star-tips", "starTips", 3, 100);
+  bindNum("opt-star-inner", "starInner", 5, 95);
+  bindNum("opt-ring-wall", "ringWall", 0.01);
 }

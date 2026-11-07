@@ -14,8 +14,13 @@ import { streamState } from "../machineStream";
 import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "../cam";
 import { state } from "../main";
 import { rotary } from "../rotary";
-import { isPlasma } from "../machineMode";
+import { isLaser, isPlasma } from "../machineMode";
 import { openSetupSheet } from "./setupSheetDialog";
+import { openToolPanel, rowCss } from "./toolPanel";
+import { esc } from "../setupSheet";
+import { JOB_ANCHORS, JobAnchor, extentFromHead, jobHereCommand } from "../jobOrigin";
+
+const JOB_ANCHOR_KEY = "cnc_craft_job_anchor";
 
 export interface Bounds { x0: number; y0: number; x1: number; y1: number }
 
@@ -98,6 +103,52 @@ export async function runFrame(log: (s: string) => void) {
   log(t("frame.done"));
 }
 
+/** Auftrag dort starten, wo der Kopf steht: Bezugspunkt wählen, dann wird nur der Nullpunkt gesetzt (jobOrigin.ts) */
+export function openJobHereDialog(log: (s: string) => void, redraw: () => void) {
+  if (!machine.connected) { log(t("conn.connectFirst")); return; }
+  if (machine.protocol !== "grbl") { log(t("jobhere.grblOnly")); return; }
+  if (rotary.on) { log(t("jobhere.noRotary")); return; }
+  if (!canCommand() || machine.job.active) { log(t("m.why.job running")); return; }
+  const job = currentLines();
+  if (!job) { log(noGcodeMessage()); return; }
+  const laser = isLaser();
+  const b = jobBounds(job.lines, laser);
+  if (!b) { log(t("frame.empty")); return; }
+  let anchor: JobAnchor = "bl";
+  try { const v = localStorage.getItem(JOB_ANCHOR_KEY) as JobAnchor; if (JOB_ANCHORS.includes(v)) anchor = v; } catch { /* egal */ }
+  const panel = openToolPanel({
+    id: "job-here-panel", ico: "jobHere", title: t("jobhere.title"), ok: "✔ " + t("jobhere.run"), redraw,
+    body: `
+      <div style="font-size:0.8rem;color:var(--text-muted);">${t("jobhere.hint", { w: r2(b.x1 - b.x0), h: r2(b.y1 - b.y0), label: esc(job.label) })}</div>
+      <div style="${rowCss}">${t("jobhere.anchor")}
+        <div style="display:grid;grid-template-columns:repeat(3,28px);gap:4px;padding:5px;border:1px dashed var(--border-color);border-radius:6px;">
+          ${JOB_ANCHORS.map(a => `<button type="button" class="jh-pick" data-a="${a}" aria-label="${a}" style="width:28px;height:28px;padding:0;border-radius:5px;cursor:pointer;font-size:0.6rem;">●</button>`).join("")}
+        </div></div>
+      <div style="font-size:0.78rem;color:var(--text-muted);">${t(laser ? "jobhere.note" : "jobhere.noteOther")}</div>`,
+    onChange: p => {
+      p.el.querySelectorAll<HTMLButtonElement>(".jh-pick").forEach(x => {
+        const on = x.dataset.a === anchor;
+        x.style.border = `1px solid ${on ? "var(--accent-color)" : "var(--border-color)"}`;
+        x.style.background = on ? "var(--accent-color)" : "transparent";
+        x.style.color = on ? "#fff" : "var(--text-muted)";
+      });
+      const e = extentFromHead(b, anchor);
+      p.info(t("jobhere.info", { l: r2(e.left), r: r2(e.right), d: r2(e.down), u: r2(e.up) }));
+    },
+    onOk: async p => {
+      if (!canCommand() || machine.job.active || (machine.status.state && machine.status.state !== "Idle")) { p.info(t("m.jogNotIdle", { s: esc(machine.status.state || "") }), true); return false; }
+      try { localStorage.setItem(JOB_ANCHOR_KEY, anchor); } catch { /* egal */ }
+      const a = await sendAndWait(jobHereCommand(b, anchor), 4000, true);
+      if (!a.ok) { p.info(t("jobhere.failed"), true); return false; }
+      log(t(laser ? "jobhere.done" : "jobhere.doneOther"));
+    }
+  });
+  panel.el.querySelectorAll<HTMLButtonElement>(".jh-pick").forEach(x => x.addEventListener("click", () => {
+    anchor = x.dataset.a as JobAnchor;
+    panel.el.dispatchEvent(new Event("change"));
+  }));
+}
+
 export async function saveRdFile(log: (s: string) => void) {
   const job = currentLines();
   if (!job) { log(noGcodeMessage()); return; }
@@ -118,6 +169,7 @@ export async function saveRdFile(log: (s: string) => void) {
 
 export function initJobTools(log: (s: string) => void) {
   document.getElementById("btn-job-frame")?.addEventListener("click", () => runFrame(log));
+  document.getElementById("btn-job-here")?.addEventListener("click", () => openJobHereDialog(log, () => window.dispatchEvent(new Event("cnc-redraw"))));
   document.getElementById("btn-save-rd")?.addEventListener("click", () => saveRdFile(log));
   document.getElementById("btn-setup-sheet")?.addEventListener("click", () => openSetupSheet(log));
 }

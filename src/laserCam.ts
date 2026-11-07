@@ -20,6 +20,7 @@ import { cornerPowerPath } from "./cornerPower";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
 import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
+import { applyCutClosed, applyCutOpen, cutDirOf, cutStartOf } from "./cutSetting";
 import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
@@ -111,12 +112,15 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     const closed: Pt[][] = [];
     const closedShape = new Map<Pt[], any>(); // zu welcher Form gehört die Kontur (für Haltestege)
     const open: Pt[][] = [];
+    const fixedOpen = new Set<Pt[]>(); // offene Linien mit Richtung von Hand: die Optimierung dreht sie nicht um (cutSetting.ts)
     for (const s of list) {
       for (const p of shapeToPaths(s)) {
         if (p.pts.length < 2) continue;
-        const pts = p.pts.map(q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }));
+        const raw = p.pts.map(q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }));
+        const pts = p.closed ? applyCutClosed(raw, s) : applyCutOpen(raw, s);
         (p.closed ? closed : open).push(pts);
         if (p.closed) closedShape.set(pts, s);
+        else if (cutDirOf(s)) fixedOpen.add(pts);
       }
     }
 
@@ -145,22 +149,24 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     if (layerHasLine(layer)) {
       // kleine (innere) Konturen zuerst, offene Linien ganz am Anfang
       // Haltestege: Kontur in Stücke, dazwischen Laser aus (das Teil bleibt im Blech hängen)
-      const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null; runs: Pt[][] | null }[] = [
+      const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null; runs: Pt[][] | null; shape?: any }[] = [
         ...open.map(pts => ({ pts, closed: false, area: 0, lead: null, runs: null })),
         ...closed.map(pts => {
-          const lp = withLeadIn(pts, closed, layer.leadIn);
           const shape = closedShape.get(pts);
+          const lp = withLeadIn(pts, closed, layer.leadIn, cutStartOf(shape) !== null);
           const tr = shape ? tabRuns(shape, lp.pts, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), Number(shape.tabLen) || 0) : null;
-          return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)) };
+          if (tr?.rotated && cutStartOf(shape) !== null) warnings.push(t("cut.startInTab"));
+          return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)), shape };
         }).sort((a, b) => a.area - b.area)
       ];
       // kürzeste Leerfahrten (Löcher bleiben vor ihrem Teil, siehe cutOrder.ts)
       if (laserSettings.optimizeOrder && paths.length > 1) {
         const items: CutItem[] = paths.map(p => {
           if (p.runs) return { entry: p.lead || p.runs[0][0], exit: lastOf(p.runs[p.runs.length - 1]), pts: p.pts, closed: true };
-          if (!p.closed) return { entry: p.pts[0], exit: lastOf(p.pts), pts: p.pts, closed: false, reversible: true };
+          if (!p.closed) return { entry: p.pts[0], exit: lastOf(p.pts), pts: p.pts, closed: false, reversible: !fixedOpen.has(p.pts) };
           if (p.lead) return { entry: p.lead, exit: p.pts[0], pts: p.pts, closed: true };
-          return { entry: p.pts[0], exit: p.pts[0], pts: p.pts, closed: true, freeStart: true };
+          // Startpunkt von Hand bleibt liegen; nur die Richtung von Hand darf am Start wandern, gedreht wird dabei nie
+          return { entry: p.pts[0], exit: p.pts[0], pts: p.pts, closed: true, freeStart: cutStartOf(p.shape) === null };
         });
         const from = pos || { x: 0, y: 0 };
         const steps = optimizeCutOrder(items, from);
@@ -237,7 +243,7 @@ const lastOf = (pts: Pt[]) => pts[pts.length - 1];
  * "len" mm daneben im Abfall. Liegt die Kontur in einer ungeraden Anzahl anderer Konturen, ist sie
  * ein Loch -> Einstich im Loch, sonst außerhalb des Teils.
  */
-function withLeadIn(pts: Pt[], all: Pt[][], len: number): { pts: Pt[]; lead: Pt | null } {
+function withLeadIn(pts: Pt[], all: Pt[][], len: number, fixedStart = false): { pts: Pt[]; lead: Pt | null } {
   if (!(len > 0) || pts.length < 3) return { pts, lead: null };
   let loop = pts;
   const a = loop[0], z = loop[loop.length - 1];
@@ -245,7 +251,7 @@ function withLeadIn(pts: Pt[], all: Pt[][], len: number): { pts: Pt[]; lead: Pt 
   if (loop.length < 3) return { pts, lead: null };
   let depth = 0;
   for (const o of all) if (o !== pts && pointInPoly(loop[0].x, loop[0].y, o)) depth++;
-  const si = cornerIndex(loop);
+  const si = fixedStart ? 0 : cornerIndex(loop); // Startpunkt von Hand: nicht zur schärfsten Ecke wandern
   loop = loop.slice(si).concat(loop.slice(0, si));
   return { pts: loop, lead: leadPoint(loop, depth % 2 === 0, len) };
 }

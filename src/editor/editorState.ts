@@ -7,7 +7,7 @@
  */
 import { MM_TO_PIXEL } from "../shapeTransform";
 
-export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim";
+export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim";
 
 export function app(): any {
   return (window as any).cncState;
@@ -19,6 +19,9 @@ export const options = {
   gridStep: 1,         // Raster-Fang in mm
   rectRadius: 0,       // Eckenradius für Rechtecke in mm
   polygonSides: 6,     // Ecken für das Polygon-Werkzeug
+  starTips: 5,         // Zacken für das Stern-Werkzeug
+  starInner: 50,       // Innenradius des Sterns in % vom Außenradius
+  ringWall: 5,         // Wandstärke für das Ring-Werkzeug in mm
   showTools: true      // Fräserbreite + Werkzeug-Marken auf der Zeichenfläche zeigen
 };
 

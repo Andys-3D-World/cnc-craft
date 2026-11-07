@@ -31,10 +31,11 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("pan", "pan", "tip.tool.pan")}
     <div class="strip-sep"></div>
     ${flyTools("shapes", [["line", "line", "tip.tool.line"], ["rect", "rect", "tip.tool.rect"], ["ellipse", "ellipse", "tip.tool.ellipse"],
-      ["polygon", "polygon", "tip.tool.polygon"], ["arc", "arc", "tip.tool.arc"]])}
+      ["polygon", "polygon", "tip.tool.polygon"], ["star", "star", "tip.tool.star"], ["slot", "slot", "tip.tool.slot"], ["ring", "ring", "tip.tool.ring"],
+      ["arc", "arc", "tip.tool.arc"], ["arcCenter", "arcCenter", "tip.tool.arcCenter"]])}
     ${tool("text", "text", "tip.tool.text")}
-    ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"]])}
-    ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"]])}
+    ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"], ["trim", "trim", "tip.tool.trim"]])}
+    ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"], ["lineDim", "lineDim", "tip.tool.lineDim"]])}
     <div class="strip-sep"></div>
     ${flyGroups("generators", "boxgen", [
       ["boxes", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["shapeBox", "shapeBox", "tip.cmd.shapeBox"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
@@ -45,7 +46,7 @@ export function renderCamPanel(container: HTMLElement) {
       ["tech", [["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["joint", "joint", "tip.cmd.joint"], ["scale", "scale", "tip.cmd.scale"], ["vent", "vent", "tip.cmd.vent"], ["qrCode", "qrCode", "tip.cmd.qrCode"]]]
     ], 20)}
     ${flyGroups("extras", "extras", [
-      ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"]]],
+      ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"], ["printCut", "printCut", "tip.cmd.printCut"]]],
       ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["testCard", "testCard", "tip.cmd.testCard"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
     ], 20)}
     <div class="strip-sep strip-push"></div>
@@ -78,6 +79,7 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${cmd("duplicateDialog", "duplicate", "tip.cmd.duplicateDialog")}
       ${cmd("delete", "delete", "tip.cmd.delete")}
       ${cmd("selectAll", "selectAll", "tip.cmd.selectAll")}
+      ${flyCmds("selectSim", "selectSim", [["selectOpen", "selectOpen", "tip.cmd.selectOpen"], ["selectSameLayer", "layers", "tip.cmd.selectSameLayer"], ["selectSameSize", "selectSameSize", "tip.cmd.selectSameSize"]])}
     </div>
     <div class="tb-group">
       ${cmd("group", "group", "tip.cmd.group")}
@@ -88,14 +90,15 @@ export function renderEditorToolbar(container: HTMLElement) {
         ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
       ${flyGroups("edit", "offset", [
         ["outline", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["heal", "heal", "tip.cmd.heal"], ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"], ["centerFix", "centerFix", "tip.cmd.centerFix"]]],
-        ["parts", [["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]]
+        ["parts", [["array", "array", "tip.cmd.array"], ["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]],
+        ["paths", [["textOnPath", "textOnPath", "tip.cmd.textOnPath"], ["simplify", "simplify", "tip.cmd.simplify"], ["dedupe", "dedupe", "tip.cmd.dedupe"], ["cutStart", "cutStart", "tip.cmd.cutStart"], ["reverseDir", "reverseDir", "tip.cmd.reverseDir"]]]
       ], 18, "down")}
-      ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"]])}
+      ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"], ["toImage", "toImage", "tip.cmd.toImage"]])}
       ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],
-        ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"]])}
+        ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"], ["shear", "shear", "tip.cmd.shear"]])}
       ${flyCmds("align", "alignCenterH", [["alignLeft", "alignLeft", "tip.cmd.alignLeft"], ["alignCenterH", "alignCenterH", "tip.cmd.alignCenterH"],
         ["alignRight", "alignRight", "tip.cmd.alignRight"], ["alignTop", "alignTop", "tip.cmd.alignTop"], ["alignCenterV", "alignCenterV", "tip.cmd.alignCenterV"],
-        ["alignBottom", "alignBottom", "tip.cmd.alignBottom"]])}
+        ["alignBottom", "alignBottom", "tip.cmd.alignBottom"], ["distributeH", "distributeH", "tip.cmd.distributeH"], ["distributeV", "distributeV", "tip.cmd.distributeV"]])}
     </div>
     <div class="tb-group">
       ${cmd("zoomFit", "zoomFit", "tip.cmd.zoomFit")}
@@ -117,6 +120,12 @@ export function renderEditorToolbar(container: HTMLElement) {
         <input type="number" id="opt-grid-step" min="0.1" step="0.5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="rect" ${tip("tip.rectRadius")}>
         ${icon("rect", 16)}<span class="tb-lbl">R</span><input type="number" id="opt-rect-radius" min="0" step="0.5" class="tb-num"></label>
+      <label class="tb-opt tb-opt-tool" data-for="star" ${tip("tip.starTips")}>
+        ${icon("star", 16)}<input type="number" id="opt-star-tips" min="3" max="100" step="1" class="tb-num"></label>
+      <label class="tb-opt tb-opt-tool" data-for="star" ${tip("tip.starInner")}>
+        <span class="tb-lbl">%</span><input type="number" id="opt-star-inner" min="5" max="95" step="5" class="tb-num"></label>
+      <label class="tb-opt tb-opt-tool" data-for="ring" ${tip("tip.ringWall")}>
+        ${icon("ring", 16)}<input type="number" id="opt-ring-wall" min="0.01" step="0.5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="polygon" ${tip("tip.polySides")}>
         ${icon("polygon", 16)}<input type="number" id="opt-poly-sides" min="3" max="100" step="1" class="tb-num"></label>
     </div>

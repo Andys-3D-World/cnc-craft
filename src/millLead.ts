@@ -116,6 +116,16 @@ export function leadAtPoint(p: P, tIn: P, tOut: P, loop: P[], ccw: boolean, side
  * Für eine geschlossene Bahn die beste Stelle suchen: zuerst die Mitte langer Geraden (dort sieht man die Marke am
  * wenigsten), dann gleichmäßig verteilte Ecken (runde Formen). Die Bahn fängt danach an dieser Stelle an.
  */
+/** Wie planLead, aber der Start steht fest: An-/Wegfahren genau am ersten Punkt der Bahn (Startpunkt von Hand, cutSetting.ts) */
+export function planLeadAtStart(loop: P[], side: MillSide, o: LeadOpts, free: (pts: P[]) => boolean): (LeadPlan & { loop: P[] }) | null {
+  const n = loop.length;
+  if (n < 3) return null;
+  const tIn = unit(loop[n - 1], loop[0]), tOut = unit(loop[0], loop[1]);
+  if (!tIn || !tOut) return null;
+  const plan = leadAtPoint(loop[0], tIn, tOut, loop, area(loop) > 0, side, o, free);
+  return plan ? { ...plan, loop } : null;
+}
+
 export function planLead(loop: P[], side: MillSide, o: LeadOpts, free: (pts: P[]) => boolean): (LeadPlan & { loop: P[] }) | null {
   const n = loop.length;
   if (n < 3) return null;

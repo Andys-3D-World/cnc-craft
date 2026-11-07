@@ -4,7 +4,7 @@
  * Fangpunkt-Markierung, Messlinie, Info-Text an der Maus, Statuszeile.
  */
 import { app, toScreen, toWorld, fmtMm, options, bedSizeMm } from "./editorState";
-import { live, currentTool, toolHint, dragRect, dragPolygonPoints, measureText } from "./tools";
+import { live, currentTool, toolHint, dragRect, dragPolygonPoints, dragSlotPoints, dragStarPoints, lineDimHover, measureText, previewCenterArc } from "./tools";
 import { t } from "../i18n/i18n";
 import { selectionBounds, selectionHandles, HANDLE_SIZE, selectedShapes } from "./selection";
 import { Pt, shapeToPaths, makeEllipsePoints, makeRectPoints, arcGeometry, MM_TO_PIXEL } from "../shapeTransform";
@@ -13,6 +13,10 @@ import { drawBezierOverlay } from "./bezier";
 import { drawDims, drawDimPreview } from "./dims";
 import { drawRotaryBand } from "../rotary";
 import { isPlasma } from "../machineMode";
+import { livePreview } from "./livePreview";
+import { trimHover } from "./trimTool";
+import { cutMark, hasCutSetting, MachineKind } from "../cutSetting";
+import { isLaser } from "../machineMode";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -48,6 +52,26 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
 
   // ---- Zeichen-Vorschau ----
   drawToolPreview(ctx, tool);
+  drawLivePreview(ctx);
+  drawCutMarks(ctx);
+  // ---- Linie bemaßen: welches Stück, und welches Ende wandert (Punkt) ----
+  if (tool === "lineDim" && lineDimHover.pick) {
+    const h = lineDimHover.pick;
+    ctx.strokeStyle = "#ffe14d";
+    ctx.lineWidth = 3;
+    polyPath(ctx, [h.a, h.b], false);
+    ctx.stroke();
+    const m = toScreen(h.moved.x, h.moved.y);
+    ctx.fillStyle = "#ffe14d";
+    ctx.beginPath(); ctx.arc(m.x, m.y, 5, 0, Math.PI * 2); ctx.fill();
+  }
+  // ---- Trim: gelb, was beim Klick wegfällt (rot wäre auf der Schneid-Ebene nicht zu sehen) ----
+  if (tool === "trim" && trimHover.removed) {
+    ctx.strokeStyle = "#ffe14d";
+    ctx.lineWidth = 3;
+    polyPath(ctx, trimHover.removed, false);
+    ctx.stroke();
+  }
   // ---- Maße (immer sichtbar) + Vorschau beim Bemaßen ----
   drawDims(ctx);
   if (tool === "dim") drawDimPreview(ctx);
@@ -73,6 +97,51 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
 
   drawStatusBar(ctx, canvas, tool);
   ctx.restore();
+}
+
+export const machineKind = (): MachineKind => isPlasma() ? "plasma" : isLaser() ? "laser" : "mill";
+
+/** Startpunkt (Kreis) und Richtung (Pfeil) von Hand gesetzter Konturen, immer sichtbar (cutSetting.ts) */
+function drawCutMarks(ctx: CanvasRenderingContext2D) {
+  const kind = machineKind();
+  for (const s of app().shapes as any[]) {
+    if (!hasCutSetting(s) || livePreview.hideMarksOf.has(s.id)) continue;
+    const m = cutMark(s, kind);
+    if (m) drawCutMark(ctx, m);
+  }
+  for (const m of livePreview.marks) drawCutMark(ctx, m);
+}
+
+function drawCutMark(ctx: CanvasRenderingContext2D, m: { at: Pt; dir: Pt; fixedStart: boolean }) {
+  const p = toScreen(m.at.x, m.at.y);
+  const dx = m.dir.x, dy = -m.dir.y; // Bildschirm: Y nach unten
+  const L = 16, W = 5;
+  const tip = { x: p.x + dx * L, y: p.y + dy * L };
+  ctx.save();
+  ctx.strokeStyle = "#ffb454"; ctx.fillStyle = "#ffb454"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(tip.x, tip.y); ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(tip.x + dx * 5, tip.y + dy * 5);
+  ctx.lineTo(tip.x - dy * W, tip.y + dx * W);
+  ctx.lineTo(tip.x + dy * W, tip.y - dx * W);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+  if (m.fixedStart) ctx.fill(); else { ctx.fillStyle = "#1f1f26"; ctx.fill(); ctx.stroke(); }
+  ctx.restore();
+}
+
+/** Vorschau der Werkzeug-Fenster (Array, Text auf Pfad …): blass = vorher, leuchtend = nachher */
+function drawLivePreview(ctx: CanvasRenderingContext2D) {
+  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = "rgba(255, 180, 84, 0.55)";
+  for (const p of livePreview.ghost) { polyPath(ctx, p.pts, p.closed); ctx.stroke(); }
+  ctx.strokeStyle = PREVIEW;
+  for (const p of livePreview.paths) { polyPath(ctx, p.pts, p.closed); ctx.stroke(); }
+  ctx.fillStyle = PREVIEW;
+  for (const d of livePreview.dots) {
+    const s = toScreen(d.x, d.y);
+    ctx.beginPath(); ctx.arc(s.x, s.y, 3, 0, Math.PI * 2); ctx.fill();
+  }
 }
 
 function polyPath(ctx: CanvasRenderingContext2D, pts: Pt[], closed: boolean) {
@@ -150,6 +219,24 @@ function drawToolPreview(ctx: CanvasRenderingContext2D, tool: string) {
     return;
   }
 
+  if (tool === "arcCenter" && live.points.length > 0) {
+    const c = toScreen(live.points[0].x, live.points[0].y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
+    ctx.strokeStyle = PREVIEW;
+    ctx.lineWidth = 1.2;
+    const a = previewCenterArc();
+    if (a) {
+      const steps = Math.max(8, Math.ceil(Math.abs(a.sweep) / 0.05));
+      const a0 = Math.atan2(a.start.y - live.points[0].y, a.start.x - live.points[0].x);
+      const pts = Array.from({ length: steps + 1 }, (_, i) => ({ x: live.points[0].x + a.radius * Math.cos(a0 + (a.sweep * i) / steps), y: live.points[0].y + a.radius * Math.sin(a0 + (a.sweep * i) / steps) }));
+      polyPath(ctx, pts, false);
+      ctx.stroke();
+    } else {
+      polyPath(ctx, [live.points[0], live.world], false);
+      ctx.stroke();
+    }
+    return;
+  }
   if (tool === "arc" && live.points.length > 0) {
     const p = live.points;
     if (p.length === 1) {
@@ -179,6 +266,21 @@ function drawToolPreview(ctx: CanvasRenderingContext2D, tool: string) {
     ctx.stroke();
     const c = toScreen(live.dragStart.x, live.dragStart.y);
     ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
+  } else if (tool === "star" || tool === "ring") {
+    if (tool === "star") polyPath(ctx, dragStarPoints(), true);
+    else {
+      const r = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
+      polyPath(ctx, makeEllipsePoints(live.dragStart.x, live.dragStart.y, r, r), true);
+      ctx.stroke();
+      const inner = r - options.ringWall * MM_TO_PIXEL;
+      if (inner > 0) polyPath(ctx, makeEllipsePoints(live.dragStart.x, live.dragStart.y, inner, inner), true);
+    }
+    ctx.stroke();
+    const c = toScreen(live.dragStart.x, live.dragStart.y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
+  } else if (tool === "slot") {
+    polyPath(ctx, dragSlotPoints(), true);
+    ctx.stroke();
   } else if (tool === "measure") {
     drawMeasure(ctx, live.dragStart, w);
   }

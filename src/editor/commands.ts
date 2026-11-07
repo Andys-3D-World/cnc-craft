@@ -27,7 +27,8 @@ import { openHealDialog } from "../ui/healDialog";
 import { openReliefFromSelection } from "../ui/reliefDialog";
 import { openKeepOutDialog } from "../ui/keepOutDialog";
 import { combine, splitByLines, roundCorners, patternFill, weldAndScore, tileShapes, BoolOp, OpResult, PatternOptions, Tile } from "./shapeOps";
-import { getLayers } from "../laserLayers";
+import { effectiveLayer, getLayers } from "../laserLayers";
+import { cutForShape } from "../plasmaCuts";
 import { centerOn } from "./dims";
 import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
@@ -52,6 +53,11 @@ import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
 import { t } from "../i18n/i18n";
+import { initEditTools, openArrayDialog, openCutStartDialog, openDedupeDialog, openPrintCutDialog, openShearDialog, openSimplifyDialog, openToImageDialog, reverseDirection } from "./editTools";
+import { isOpenShape, shapesWithSameKey, SIZE_TOL_MM, unitsOfSameSize } from "./selectSimilar";
+import { openTextOnPathDialog, initTextOnPath } from "./textOnPathTool";
+import { setTrimLog } from "./trimTool";
+import { distributeDeltas } from "./distribute";
 
 let redrawFn: () => void = () => {};
 let log: (t: string) => void = () => {};
@@ -110,6 +116,38 @@ export const commands: Record<string, () => void> = {
     st.selectedShapeIds = st.shapes.map((s: any) => s.id);
     done();
   },
+  selectOpen: () => {
+    const st = app();
+    const list = st.shapes.filter(isOpenShape);
+    st.selectedShapeIds = list.map((s: any) => s.id);
+    log(t("selsim.open", { n: list.length }));
+    done();
+  },
+  selectSameLayer: () => {
+    const st = app(), sel = selectedShapes();
+    if (!sel.length) { log(t("selsim.needOne")); return; }
+    const list = shapesWithSameKey<any>(st.shapes, sel, layerKey);
+    st.selectedShapeIds = list.map((s: any) => s.id);
+    log(t("selsim.layer", { n: list.length }));
+    done();
+  },
+  selectSameSize: () => {
+    const st = app(), sel = selectedShapes();
+    if (!sel.length) { log(t("selsim.needOne")); return; }
+    const byUnit = new Map<string, any[]>();
+    for (const s of st.shapes) { const k = s.groupId || s.id; if (!byUnit.has(k)) byUnit.set(k, []); byUnit.get(k)!.push(s); }
+    const sizes = [...byUnit.entries()].flatMap(([key, m]) => {
+      const b = groupBounds(m);
+      return b ? [{ key, w: (b.maxX - b.minX) / MM_TO_PIXEL, h: (b.maxY - b.minY) / MM_TO_PIXEL }] : [];
+    });
+    const keys = unitsOfSameSize(sizes, new Set(sel.map(s => s.groupId || s.id)), SIZE_TOL_MM);
+    st.selectedShapeIds = st.shapes.filter((s: any) => keys.has(s.groupId || s.id)).map((s: any) => s.id);
+    log(t("selsim.size", { n: keys.size }));
+    done();
+  },
+  shear: () => openShearDialog(),
+  printCut: () => openPrintCutDialog(),
+  toImage: () => openToImageDialog(),
 
   group: () => {
     const sel = selectedShapes();
@@ -164,6 +202,8 @@ export const commands: Record<string, () => void> = {
   alignTop: () => align("top"),
   alignCenterV: () => align("centerV"),
   alignBottom: () => align("bottom"),
+  distributeH: () => distribute("x"),
+  distributeV: () => distribute("y"),
 
   offset: () => openOffsetDialog(),
   boolUnion: () => runCombine("union"),
@@ -225,6 +265,12 @@ export const commands: Record<string, () => void> = {
   nodeGraph: () => openNodeEditor(log),
   tiles: () => openTileDialog(),
   duplicateDialog: () => openDuplicateDialog(),
+  array: () => openArrayDialog(),
+  textOnPath: () => openTextOnPathDialog(),
+  simplify: () => openSimplifyDialog(),
+  dedupe: () => openDedupeDialog(),
+  cutStart: () => openCutStartDialog(),
+  reverseDir: () => reverseDirection(),
   importFile: () => { importWithDialog(); },
   openProject: () => { openProjectWithDialog(); },
   saveProject: () => { saveProject(false); },
@@ -244,7 +290,7 @@ export const commands: Record<string, () => void> = {
 };
 
 /** Kopien mit neuen IDs und eigenen Gruppen, um offsetPx nach rechts unten versetzt */
-function makeCopies(source: any[], offsetPx: number): any[] {
+export function makeCopies(source: any[], offsetPx: number): any[] {
   const groupMap = new Map<string, string>(), genMap = new Map<string, string>();
   return source.map(s => {
     const c = cloneShape(s);
@@ -315,6 +361,33 @@ function align(kind: "left" | "centerH" | "right" | "top" | "centerV" | "bottom"
     if (kind === "centerV") dy = (ref.minY + ref.maxY) / 2 - (b.minY + b.maxY) / 2;
     members.forEach(s => translateShape(s, dx, dy));
   });
+  done();
+}
+
+/** „Ebene“ je Maschine: Laser-Ebene, Plasma-Schnitt; an der Fräse Werkzeug + Bearbeitungsart + Tiefe */
+function layerKey(s: any): string {
+  const mode = getMachineMode();
+  if (mode === "laser") return effectiveLayer(s)?.id ?? "";
+  if (mode === "plasma") return cutForShape(s)?.id ?? "";
+  return [s.toolId ?? "", s.millingMode ?? "", s.millingDepth ?? ""].join("|");
+}
+
+/** Gleichmäßig verteilen: gleiche Lücken zwischen 3 oder mehr Teilen (Gruppen zählen als ein Teil) */
+function distribute(axis: "x" | "y") {
+  const units = new Map<string, any[]>();
+  selectedShapes().forEach(s => {
+    const key = s.groupId || s.id;
+    if (!units.has(key)) units.set(key, []);
+    units.get(key)!.push(s);
+  });
+  const list = [...units.values()];
+  const r = distributeDeltas(list.map(m => {
+    const b = groupBounds(m)!;
+    return axis === "x" ? { min: b.minX, max: b.maxX } : { min: b.minY, max: b.maxY };
+  }));
+  if (!r) { log(t("dist.needThree")); return; }
+  list.forEach((m, i) => m.forEach(s => translateShape(s, axis === "x" ? r.deltas[i] : 0, axis === "y" ? r.deltas[i] : 0)));
+  log(t(r.gap < 0 ? "dist.overlap" : "dist.done", { n: list.length, gap: (r.gap / MM_TO_PIXEL).toFixed(2) }));
   done();
 }
 
@@ -1039,6 +1112,9 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
   redrawFn = redraw;
   log = appendToConsole;
   initCanvasMenu(redraw, appendToConsole);
+  initEditTools(canvas, redraw, appendToConsole);
+  initTextOnPath(redraw, appendToConsole);
+  setTrimLog(appendToConsole);
 
   // „Stege setzen“ im Panel (Fräs-Parameter) schaltet das Werkzeug ein
   document.getElementById("btn-tab-tool")?.addEventListener("click", () => setTool("tab"));

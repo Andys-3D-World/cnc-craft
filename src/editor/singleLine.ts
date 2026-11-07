@@ -83,16 +83,19 @@ export async function traceSingleLine(p: TextParams): Promise<TracedText> {
 
   const loops: { x: number; y: number }[][] = [];
   const closed: boolean[] = [];
+  const glyphOf: number[] = [];
+  let glyphNo = 0;
   lines.forEach((l, i) => {
     const dx = p.align === "center" ? (maxW - l.width) / 2 : p.align === "right" ? maxW - l.width : 0;
     const baseY = -i * lineH;
-    for (const it of l.items) for (const path of it.g.paths) {
+    for (const it of l.items) { glyphNo++; for (const path of it.g.paths) {
+      glyphOf.push(glyphNo);
       loops.push(path.pts.map(q => {
         const y = q.y + baseY;
         return { x: (q.x + it.x + dx + q.y * slant) * s, y: y * s };
       }));
       closed.push(path.closed);
-    }
+    } }
   });
   if (!loops.length) return { loops: [], holes: [], width: 0, height: 0 };
 
@@ -105,6 +108,8 @@ export async function traceSingleLine(p: TextParams): Promise<TracedText> {
     loops: loops.map(l => l.map(q => ({ x: q.x - minX, y: q.y - minY }))),
     holes: loops.map(() => false),
     closed,
+    glyphOf,
+    baseline: -minY,
     width: maxX - minX,
     height: maxY - minY
   };

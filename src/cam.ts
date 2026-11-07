@@ -9,12 +9,12 @@ import { pocketPaths, pocketWallPaths, PocketStrategy } from "./pocket";
 import { vcarvePaths } from "./vcarve";
 import { CONE_TYPES } from "./toolLibrary";
 import { tabSettings, tabCenters, cumulative, pointAt, TabSettings } from "./tabs";
-import { makeEllipsePoints, shapeBounds, shapeToPaths } from "./shapeTransform";
+import { cloneShape, convertToPolyline, makeEllipsePoints, shapeBounds, shapeToPaths } from "./shapeTransform";
 import { expandOps } from "./ops";
 import { spindleCode } from "./spindleDir";
 import { cleanMillDir, orientLoop, circleCmd, arcNeedsReverse } from "./millDir";
 import { arcFit, fitArcs } from "./arcFit";
-import { leadOptions, leadAtPoint, planLead, distToPath, LeadMove, LeadOpts, LeadPlan } from "./millLead";
+import { leadOptions, leadAtPoint, planLead, planLeadAtStart, distToPath, LeadMove, LeadOpts, LeadPlan } from "./millLead";
 import { t, ascii } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
@@ -32,6 +32,7 @@ import { applyKeepOuts, isKeepOut } from "./keepOut";
 import { zonesFromShapes } from "./keepOutShapes";
 import { state as appState } from "./main";
 import { optimizeCutOrder, CutItem } from "./cutOrder";
+import { applyCut, applyCutClosed, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSetting";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -451,6 +452,11 @@ const generateGcodeInner = (shapes: any): string | null => {
       const next = i + 1 < centers.length ? centers[i + 1] : centers[0] + L;
       if (next - c > gap) { gap = next - c; s0 = (c + next) / 2; }
     });
+    // Startpunkt von Hand: die Bahn beginnt schon dort. Liegt er in einem Steg, gewinnt der Steg
+    if (cutStartOf(shape) !== null) {
+      if (centers.some(c => Math.min(Math.abs(c), Math.abs(c - L)) < half)) lastGcodeWarnings.push(t("cut.startInTab"));
+      else s0 = 0;
+    }
     const tooMany = shape.tabMode === "manual" ? gap <= 2 * half : L / centers.length < 3 * half;
     if (tooMany) { lastGcodeWarnings.push(t("gcw.tabsTooMany", { n: formCounter, k: centers.length })); return false; }
     const rel = (x: number) => (((x - s0) % L) + L) % L;
@@ -875,11 +881,11 @@ const generateGcodeInner = (shapes: any): string | null => {
       const loops = o > 1e-9 ? offsetPolygon(pts, side * o) : [pts];
       if (!loops.length) { lastGcodeWarnings.push(t("gcw.toolTooBig", { n: formCounter, d: toolDiameter })); return; }
       // Standard wie die Konturen: außen gegen, innen im Uhrzeigersinn; sonst Vorgabe (millDir.ts)
-      for (const l of loops) millPath(dir ? orientLoop(l, millSide, dir) : (side > 0) !== (polygonArea(l) > 0) ? [l[0], ...l.slice(1).reverse()] : l, true);
+      for (const l of loops) millPath(applyCutClosed(dir ? orientLoop(l, millSide, dir) : (side > 0) !== (polygonArea(l) > 0) ? [l[0], ...l.slice(1).reverse()] : l, shape), true);
       return;
     }
     // offene Linien, Bögen, Gravur-Formen: auf der Linie
-    for (const p of shapeToPaths(shape)) if (p.pts.length > 1) millPath(p.pts.map(q => toMachine(q.x, q.y)), p.closed);
+    for (const p of shapeToPaths(shape)) if (p.pts.length > 1) millPath(applyCut(p.pts.map(q => toMachine(q.x, q.y)), p.closed, shape), p.closed);
   };
 
   // ---- 6. FORMEN NACHEINANDER ABFAHREN ----
@@ -937,7 +943,21 @@ const generateGcodeInner = (shapes: any): string | null => {
     }
     if (f !== feedXY) { gcode += `F${f} ${c("gc.feed", { f })}\n`; feedXY = f; }
   };
-  const millShape = (shape: any) => {
+  /**
+   * Form mit Startpunkt/Richtung von Hand (cutSetting.ts): Kreis, Bogen und Linie fahren dann als Polylinie (gleiche Bahn, auf 0,01 mm
+   * genau; die Bogen-Glättung macht daraus wieder G2/G3). Taschen, Bohren & Co. bestimmen ihre Bahn selbst: Warnung.
+   */
+  const cutReady = (s: any): any => {
+    if (!hasCutSetting(s)) return s;
+    if (!["on-line", "outside", "inside", "chamfer"].includes(s.millingMode || "outside")) { lastGcodeWarnings.push(t("cut.ignored", { n: formCounter + 1 })); return s; }
+    if (overridesMillDir(s)) lastGcodeWarnings.push(t("cut.millDir", { n: formCounter + 1 }));
+    if (s.type === "polyline") return s;
+    const copy = cloneShape(s);
+    convertToPolyline(copy);
+    return copy;
+  };
+  const millShape = (input: any) => {
+    const shape = cutReady(input);
     if (vDone.has(shape)) return;
     if (shape.restOf) {
       useCut(shape);
@@ -1117,7 +1137,7 @@ const generateGcodeInner = (shapes: any): string | null => {
 
       // (Tasche bei geschlossenen Polylinien: siehe millPocket oben)
       if (!shape.closed || mode === "on-line" || mode === "pocket") {
-        millPath(pts, !!shape.closed);
+        millPath(mode === "pocket" ? pts : applyCut(pts, !!shape.closed, shape), !!shape.closed);
       } else {
         let allow = finishAllow(shape);
         let loops = offsetPolygon(pts, offset + Math.sign(offset) * allow);
@@ -1137,14 +1157,15 @@ const generateGcodeInner = (shapes: any): string | null => {
         // mit Vorgabe der Form die gewählte Richtung.
         // umdrehen, aber am selben Punkt anfangen (dann liegen die Haltestege wie in der Vorschau)
         const dir = cleanMillDir(shape.millDir);
-        const orient = (loop: P[]) => dir ? orientLoop(loop, mode as "outside" | "inside", dir)
-          : ((mode === "outside") !== (polygonArea(loop) > 0) ? [loop[0], ...loop.slice(1).reverse()] : loop);
+        // Startpunkt und Richtung von Hand gewinnen über Gleich-/Gegenlauf (cutSetting.ts); ohne Einstellung ändert das nichts
+        const orient = (loop: P[]) => applyCutClosed(dir ? orientLoop(loop, mode as "outside" | "inside", dir)
+          : ((mode === "outside") !== (polygonArea(loop) > 0) ? [loop[0], ...loop.slice(1).reverse()] : loop), shape);
         const tab = tabSettings(shape);
         const rough = loops.map(orient);
         const side = mode as "outside" | "inside";
         rough.forEach(path => {
           if (tab && millTabbed(path, shape, tab)) return;
-          const plan = curLead ? planLead(path, side, curLead, leadFree(shape)) : null;
+          const plan = curLead ? (cutStartOf(shape) !== null ? planLeadAtStart(path, side, curLead, leadFree(shape)) : planLead(path, side, curLead, leadFree(shape))) : null;
           if (curLead && !plan) warnNoLead();
           if (plan) millPath(plan.loop, true, null, plan); else millPath(path, true);
         });

@@ -7,7 +7,11 @@
  *  Rechteck (R)  ziehen, Shift = Quadrat, Strg/Alt = von der Mitte
  *  Ellipse (E)   ziehen, Shift = Kreis, Strg/Alt = von der Mitte
  *  Polygon (P)   von der Mitte ziehen, Ecken-Anzahl in den Werkzeug-Optionen
+ *  Stern         von der Mitte ziehen, Zacken und Innenradius in den Werkzeug-Optionen
+ *  Langloch      Rahmen ziehen, die kurzen Seiten werden Halbkreise
+ *  Ring          von der Mitte ziehen, Wandstärke in den Werkzeug-Optionen
  *  Bogen (A)     Start, Ende, Wölbung
+ *  Bogen Mitte   Mittelpunkt, Start, Ende; Strg/Alt = andere Richtung
  *  Text (T)      klicken -> Text-Dialog
  *  Messen (M)    ziehen -> Abstand und Winkel
  *  Stege setzen  Klick auf eine Kontur setzt einen Haltesteg, Klick auf einen Steg entfernt ihn
@@ -22,16 +26,18 @@ import {
 } from "./selection";
 import {
   Pt, Bounds, MM_TO_PIXEL, cloneShape, translateShape, scaleShape, rotateShape,
-  createPolyline, createCircle, createArc, makeRectPoints, makeEllipsePoints, makePolygonPoints
+  createPolyline, createCircle, createArc, makeRectPoints, makeEllipsePoints, makePolygonPoints, newId
 } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
 import { openTextDialog, editTextGroup } from "./textTool";
 import { openQrDialog } from "./qrTool";
 import { openEngraveDialog } from "../raster/engraveDialog";
-import { dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue } from "./dims";
+import { addLineDim, addSize, dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue, lastLineDimCrossed, lineDimPick } from "./dims";
 import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
 import { t } from "../i18n/i18n";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
+import { toolLog, trimClick, trimMouseMove } from "./trimTool";
+import { centerArc, CenterArc, ringInner, slotPoints, starPoints } from "./drawShapes";
 
 type Mode =
   | "idle" | "panning" | "pressSelect" | "moving" | "scaling" | "rotating" | "boxselect"
@@ -180,7 +186,7 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
   live.measure = tool === "measure" ? null : live.measure;
 
   // Maßzahl angeklickt (Auswahl- oder Bemaßungs-Werkzeug): Maß auswählen (Entf löscht, Doppelklick ändert)
-  if (tool === "select" || tool === "dim") {
+  if (tool === "select" || tool === "dim" || tool === "lineDim") {
     const d = dimAt(sx, sy);
     dimSel.cur = d;
     if (d) { redrawFn(); return; }
@@ -212,12 +218,21 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
     case "rect":
     case "ellipse":
     case "polygon":
+    case "star":
+    case "slot":
+    case "ring":
     case "measure":
       live.dragStart = { ...live.world };
       live.mode = "dragDraw";
       break;
     case "tab":
       placeTab();
+      break;
+    case "trim":
+      if (trimClick(live.raw)) finishChange();
+      break;
+    case "lineDim":
+      lineDimClick(live.raw);
       break;
     case "node":
       nodeDown(live.raw, sx, sy, hitTest(live.raw.x, live.raw.y));
@@ -307,6 +322,13 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
   }
   if (tool === "node" && nodeEdit.grab) { nodeMove(live.raw, live.alt); redrawFn(); return; }
   if (tool === "pen") { updateSnap(); penMove(pen.dragging ? live.raw : live.world); redrawFn(); return; }
+  if (tool === "trim") { trimMouseMove(live.raw); redrawFn(); return; }
+  if (tool === "lineDim") {
+    const hit = hitTest(live.raw.x, live.raw.y), pick = hit ? lineDimPick(hit, live.raw) : null;
+    lineDimHover.pick = pick && "seg" in pick ? pick : null;
+    redrawFn();
+    return;
+  }
   if (tool === "dim") { dimTool.mouse = { ...live.raw }; live.hover = hitTest(live.raw.x, live.raw.y); redrawFn(); return; }
 
   switch (live.mode) {
@@ -477,14 +499,25 @@ function updateLabel() {
     live.label = `${fmtMm(len)} mm  ${ang.toFixed(1)}°`;
   } else if (live.mode === "dragDraw" && live.dragStart) {
     const r = dragRect();
-    if (tool === "rect" || tool === "ellipse") {
+    if (tool === "rect" || tool === "ellipse" || tool === "slot") {
       live.label = `${fmtMm(Math.abs(r.x1 - r.x0))} × ${fmtMm(Math.abs(r.y1 - r.y0))} mm`;
     } else if (tool === "polygon") {
       const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
       live.label = `Ø ${fmtMm(rad * 2)} mm · ${t("label.corners", { n: options.polygonSides })}`;
+    } else if (tool === "star") {
+      const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
+      live.label = `Ø ${fmtMm(rad * 2)} mm · ${t("label.tips", { n: options.starTips })}`;
+    } else if (tool === "ring") {
+      const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
+      live.label = `Ø ${fmtMm(rad * 2)} mm · ${ringInner(rad, options.ringWall * MM_TO_PIXEL) === null ? t("ring.wallTooThick") : `Ø ${fmtMm((rad - options.ringWall * MM_TO_PIXEL) * 2)} mm`}`;
     } else if (tool === "measure") {
       live.label = measureText(live.dragStart, w);
     }
+  } else if (tool === "arcCenter" && live.points.length === 1) {
+    live.label = `R ${fmtMm(Math.hypot(w.x - live.points[0].x, w.y - live.points[0].y))} mm`;
+  } else if (tool === "arcCenter" && live.points.length === 2) {
+    const a = previewCenterArc();
+    live.label = a ? `R ${fmtMm(a.radius)} mm · ${Math.abs((a.sweep * 180) / Math.PI).toFixed(1)}°` : "";
   } else if (live.mode === "moving") {
     live.label = `Δ ${fmtMm(live.moveDelta.x)} / ${fmtMm(live.moveDelta.y)} mm`;
   }
@@ -508,6 +541,26 @@ export function dragRect(): { x0: number; y0: number; x1: number; y1: number } {
   }
   if (live.ctrl || live.alt) return { x0: a.x - dx, y0: a.y - dy, x1: a.x + dx, y1: a.y + dy };
   return { x0: a.x, y0: a.y, x1: a.x + dx, y1: a.y + dy };
+}
+
+/** Stern-Vorschau/-Erzeugung: wie beim Polygon zeigt die erste Spitze zur Maus */
+export function dragStarPoints(): Pt[] {
+  const c = live.dragStart!, w = live.world;
+  const r = Math.hypot(w.x - c.x, w.y - c.y);
+  let a = Math.atan2(w.y - c.y, w.x - c.x);
+  if (live.shift) { const step = Math.PI / 12; a = Math.round(a / step) * step; }
+  return starPoints(c.x, c.y, r, options.starTips, options.starInner / 100, a);
+}
+
+export function dragSlotPoints(): Pt[] {
+  const r = dragRect();
+  return slotPoints(r.x0, r.y0, r.x1, r.y1);
+}
+
+/** Bogen mit Mittelpunkt: nach Mitte und Start gesetzt, das Ende folgt der Maus. Strg/Alt = andere Richtung, Shift = 15°-Schritte */
+export function previewCenterArc(): CenterArc | null {
+  if (live.points.length !== 2) return null;
+  return centerArc(live.points[0], live.points[1], live.world, !(live.ctrl || live.alt), live.shift ? Math.PI / 12 : 0);
 }
 
 /** Polygon-Vorschau/-Erzeugung aus Ziehpunkt und Maus */
@@ -574,6 +627,8 @@ export function onMouseUp(e: MouseEvent, sx: number, sy: number) {
 
   if (tool === "line") {
     handleLineClick();
+  } else if (tool === "arcCenter") {
+    handleCenterArcClick();
   } else if (tool === "arc") {
     handleArcClick();
   } else if (tool === "text") {
@@ -607,6 +662,53 @@ export function finishLine(close: boolean) {
   live.points = [];
   live.label = "";
   redrawFn();
+}
+
+export const lineDimHover = { pick: null as null | { a: Pt; b: Pt; moved: Pt } };
+
+/** Linie bemaßen: Maß setzen und gleich das Eingabefeld öffnen. Kreis: Durchmesser wie beim Größenmaß */
+function lineDimClick(world: Pt) {
+  const hit = hitTest(world.x, world.y);
+  if (!hit) return;
+  lineDimHover.pick = null;
+  const off = screenDist(26);
+  let ref: ReturnType<typeof addLineDim> = null;
+  if (hit.type === "circle") {
+    addSize(hit, "x", hit.y + Math.abs(hit.w) + off);
+    ref = { kind: "size", shapeId: hit.id, idx: hit.dims.length - 1 };
+  } else {
+    const pick = lineDimPick(hit, world);
+    if (pick && "why" in pick) { toolLog(t("linedim.no." + pick.why)); return; }
+    ref = addLineDim(hit, world, off);
+  }
+  if (!ref) return;
+  finishChange();
+  // Erst nach dem Loslassen: sonst nimmt die Maus dem Feld gleich wieder den Fokus
+  const open = ref;
+  setTimeout(() => {
+    if (!canvasEl) return;
+    editDimValue(open, canvasEl, () => {
+      if (open.kind === "line" && lastLineDimCrossed) toolLog(t("linedim.crossed"));
+      finishChange();
+      window.dispatchEvent(new Event("cnc-dims-changed"));
+    });
+  }, 60);
+}
+
+function handleCenterArcClick() {
+  const p = { ...live.world };
+  const pts = live.points;
+  if (pts.length === 0) { live.points = [p]; return; }
+  if (pts.length === 1) {
+    if (Math.hypot(p.x - pts[0].x, p.y - pts[0].y) < screenDist(3)) return;
+    pts.push(p);
+    return;
+  }
+  const a = previewCenterArc();
+  if (!a) return;
+  live.points = [];
+  live.label = "";
+  addShapes([createArc(a.start.x, a.start.y, a.end.x, a.end.y, a.mid.x, a.mid.y)]);
 }
 
 function handleArcClick() {
@@ -655,6 +757,19 @@ function finishDragDraw(tool: ToolName) {
     }
   } else if (tool === "polygon") {
     addShapes([createPolyline(dragPolygonPoints(), true, "outside")]);
+  } else if (tool === "star") {
+    addShapes([createPolyline(dragStarPoints(), true, "outside")]);
+  } else if (tool === "slot") {
+    const r = dragRect();
+    if (Math.abs(r.x1 - r.x0) > 0 && Math.abs(r.y1 - r.y0) > 0) addShapes([createPolyline(dragSlotPoints(), true, "outside")]);
+  } else if (tool === "ring") {
+    const inner = ringInner(size, options.ringWall * MM_TO_PIXEL);
+    if (inner === null) toolLog(t("ring.tooThickLog"));
+    else {
+      // Außen und Loch gehören zusammen und bleiben echte Kreise (G2)
+      const groupId = "grp-" + newId();
+      addShapes([Object.assign(createCircle(start.x, start.y, size), { groupId }), Object.assign(createCircle(start.x, start.y, inner, "inside"), { groupId })]);
+    }
   }
   live.dragStart = null;
   live.label = "";

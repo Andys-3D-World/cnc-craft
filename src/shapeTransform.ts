@@ -234,6 +234,8 @@ export function groupBounds(shapes: any[]): Bounds | null {
 
 /** Bézier-Knoten (siehe editor/bezier.ts) samt Tangenten mitbewegen */
 function mapBezNodes(s: any, f: (p: Pt) => Pt) {
+  // Text auf Pfad: die gemerkte Kurve geht mit, damit der Text weiter bearbeitbar bleibt
+  if (s.textPath) s.textPath = { ...s.textPath, pts: s.textPath.pts.map(f) };
   if (!s.bez) return;
   s.bez = s.bez.map((n: any) => {
     const p = f(n);
@@ -268,6 +270,9 @@ export function convertToPolyline(s: any) {
 export function scaleShape(s: any, ox: number, oy: number, sx: number, sy: number) {
   const fx = (x: number) => ox + (x - ox) * sx;
   const fy = (y: number) => oy + (y - oy) * sy;
+
+  // Spiegeln dreht den Umlaufsinn: die von Hand gesetzte Richtung (cutSetting.ts) geht mit
+  if (sx * sy < 0 && (s.cutDir === "cw" || s.cutDir === "ccw")) s.cutDir = s.cutDir === "cw" ? "ccw" : "cw";
 
   if (s.type === "circle" && Math.abs(Math.abs(sx) - Math.abs(sy)) > 1e-9) {
     // Kreis wird ungleichmäßig gezogen -> wird zur Ellipse
@@ -322,6 +327,21 @@ export function rotateShape(s: any, cx: number, cy: number, angle: number) {
     s.x = a.x; s.y = a.y; s.w = e.x - a.x; s.h = e.y - a.y;
   }
   s.rotation = 0;
+}
+
+/**
+ * Schert eine Form um (cx, cy): x' = x + shx·(y − cy), y' = y + shy·(x − cx).
+ * Kreis, Bogen und Rechteck bleiben dabei nicht, was sie sind, und werden zur Polylinie. Bilder nicht aufrufen.
+ */
+export function shearShape(s: any, cx: number, cy: number, shx: number, shy: number) {
+  if (s.type !== "polyline") convertToPolyline(s);
+  const f = (p: Pt): Pt => ({ x: p.x + shx * (p.y - cy), y: p.y + shy * (p.x - cx) });
+  mapBezNodes(s, f);
+  s.points = s.points.map(f);
+  updatePolylineBounds(s);
+  s.rotation = 0;
+  // Sehr starke Scherung in beiden Richtungen stülpt die Form um
+  if (1 - shx * shy < 0 && (s.cutDir === "cw" || s.cutDir === "ccw")) s.cutDir = s.cutDir === "cw" ? "ccw" : "cw";
 }
 
 export function cloneShape(s: any): any {

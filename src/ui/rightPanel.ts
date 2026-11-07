@@ -296,6 +296,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
             </div>
             <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
+            <button id="btn-job-here" class="btn-secondary not-ruida not-k40" ${tip("jobhere.tip")}>${icon("jobHere", 14)} ${T("jobhere.title")}</button>
             <button id="btn-setup-sheet" class="btn-secondary" ${tip("sheet.tip")}>📋 ${T("sheet.btn")}</button>
           </div>
         </div>
