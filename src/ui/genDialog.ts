@@ -9,6 +9,88 @@
  * Klick neben das Fenster schließt es nicht: Eingaben gehen so nicht versehentlich verloren.
  */
 import { t } from "../i18n/i18n";
+import { addPreset, removePreset, sanitizePresets, MAX_NAME, type GenPreset, type PresetValue } from "../genPresets";
+
+const PRESET_KEY = "cnc_craft_gen_presets";
+
+function readPresets(kind: string): GenPreset[] {
+  try { return sanitizePresets(JSON.parse(localStorage.getItem(PRESET_KEY) || "{}")?.[kind]); } catch { return []; }
+}
+function writePresets(kind: string, list: GenPreset[]) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PRESET_KEY) || "{}") || {};
+    all[kind] = list;
+    localStorage.setItem(PRESET_KEY, JSON.stringify(all));
+  } catch { /* egal */ }
+}
+
+/** Felder mit Kennung im Fenster (Schriftauswahl und Suchfelder gehören nicht dazu) */
+function presetFields(box: HTMLElement): (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[] {
+  return Array.from(box.querySelectorAll<HTMLInputElement>("input[id], select[id], textarea[id]"))
+    .filter(el => !["file", "search", "button", "hidden"].includes(el.type) && !el.closest(".gen-presets"));
+}
+
+/** Vorlagen unten links: häufige Maße unter einem Namen speichern. Namen nur als Text einsetzen */
+function addPresetBar(ov: HTMLElement, box: HTMLElement, footer: HTMLElement) {
+  const kind = (ov.dataset.preset || ov.id).replace(/-?(dialog-)?overlay$/, "");
+  const bar = document.createElement("div");
+  bar.className = "gen-presets";
+  const sel = document.createElement("select");
+  const name = document.createElement("input");
+  name.type = "text"; name.maxLength = MAX_NAME; name.placeholder = t("gen.preset.name"); name.hidden = true;
+  const save = document.createElement("button");
+  save.type = "button"; save.className = "btn-secondary"; save.textContent = t("gen.preset.save");
+  const del = document.createElement("button");
+  del.type = "button"; del.className = "btn-secondary"; del.textContent = "✕"; del.title = t("gen.preset.delete");
+  bar.append(sel, name, save, del);
+  footer.prepend(bar);
+  const fill = (current = "") => {
+    const list = readPresets(kind);
+    sel.textContent = "";
+    sel.append(new Option(t("gen.preset.pick"), ""));
+    for (const p of list) sel.append(new Option(p.name, p.name));
+    sel.value = current;
+    del.hidden = !sel.value;
+    sel.hidden = !list.length;
+  };
+  const store = () => {
+    const values: Record<string, PresetValue> = {};
+    for (const el of presetFields(box)) values[el.id] = el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio") ? el.checked : el.value;
+    const list = addPreset(readPresets(kind), name.value, values);
+    writePresets(kind, list);
+    const done = list.find(p => p.name.toLowerCase() === name.value.trim().toLowerCase());
+    name.hidden = true; name.value = "";
+    fill(done?.name || "");
+  };
+  save.addEventListener("click", () => {
+    if (name.hidden) { name.hidden = false; name.value = sel.value; name.focus(); name.select(); return; }
+    store();
+  });
+  name.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); store(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); name.hidden = true; }
+  });
+  sel.addEventListener("change", () => {
+    del.hidden = !sel.value;
+    const p = readPresets(kind).find(q => q.name === sel.value);
+    if (!p) return;
+    for (const el of presetFields(box)) {
+      if (!(el.id in p.values)) continue;
+      const v = p.values[el.id];
+      if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) el.checked = v === true;
+      else el.value = String(v);
+      // jedes Feld meldet sich: der Generator blendet passende Felder ein und rechnet die Vorschau neu
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  del.addEventListener("click", () => {
+    if (!sel.value) return;
+    writePresets(kind, removePreset(readPresets(kind), sel.value));
+    fill();
+  });
+  fill();
+}
 
 function gridOf(box: HTMLElement): HTMLElement | null {
   for (const el of Array.from(box.children) as HTMLElement[]) {
@@ -62,6 +144,7 @@ export function polishGenDialog(label: "new" | "edit" = "new") {
   if (right.classList.contains("box-prev")) markStage(right);
   right.querySelectorAll<HTMLElement>(".box-prev").forEach(markStage);
   setOkLabel(box, label);
+  addPresetBar(ov, box, footer);
 
   box.tabIndex = -1;
   box.addEventListener("keydown", e => {
@@ -70,7 +153,7 @@ export function polishGenDialog(label: "new" | "edit" = "new") {
     if (e.key === "Escape") {
       e.preventDefault();
       okCancel(box).cancel?.click();
-    } else if (e.key === "Enter" && el.tagName === "INPUT" && !["checkbox", "radio", "file", "button"].includes((el as HTMLInputElement).type)) {
+    } else if (e.key === "Enter" && el.tagName === "INPUT" && !el.closest(".gen-presets") && !["checkbox", "radio", "file", "button"].includes((el as HTMLInputElement).type)) {
       e.preventDefault();
       const ok = okCancel(box).ok;
       if (ok && !ok.disabled) ok.click();
@@ -81,7 +164,7 @@ export function polishGenDialog(label: "new" | "edit" = "new") {
 }
 
 function okCancel(box: HTMLElement) {
-  const btns = Array.from(box.querySelectorAll<HTMLButtonElement>(":scope > .dlg-buttons button"));
+  const btns = Array.from(box.querySelectorAll<HTMLButtonElement>(":scope > .dlg-buttons > button"));
   return { ok: btns.filter(b => b.classList.contains("btn-primary")).pop(), cancel: btns.find(b => b.classList.contains("btn-secondary")) };
 }
 

@@ -42,11 +42,11 @@ export function renderCamPanel(container: HTMLElement) {
         ["candyHolder", "candyHolder", "tip.cmd.candyHolder"], ["shelf", "shelf", "tip.cmd.shelf"], ["divider", "divider", "tip.cmd.divider"]]],
       ["deco", [["nameGen", "nameGen", "tip.cmd.nameGen"], ["ornament", "ornament", "tip.cmd.ornament"], ["family", "family", "tip.cmd.family"], ["letterTopper", "letterTopper", "tip.cmd.letterTopper"],
         ["wordTiles", "wordTiles", "tip.cmd.wordTiles"], ["birth", "birth", "tip.cmd.birth"], ["shadowBox", "shadowBox", "tip.cmd.shadowBox"], ["slotOrnament", "slotOrnament", "tip.cmd.slotOrnament"],
-        ["mandala", "mandala", "tip.cmd.mandala"], ["puzzle", "puzzle", "tip.cmd.puzzle"]]],
-      ["tech", [["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["joint", "joint", "tip.cmd.joint"], ["scale", "scale", "tip.cmd.scale"], ["vent", "vent", "tip.cmd.vent"], ["qrCode", "qrCode", "tip.cmd.qrCode"]]]
+        ["mandala", "mandala", "tip.cmd.mandala"], ["puzzle", "puzzle", "tip.cmd.puzzle"], ["keychain", "keychain", "tip.cmd.keychain"], ["frame", "frame", "tip.cmd.frame"]]],
+      ["tech", [["gear", "gear", "tip.cmd.gear"], ["hinge", "hinge", "tip.cmd.hinge"], ["joint", "joint", "tip.cmd.joint"], ["scale", "scale", "tip.cmd.scale"], ["vent", "vent", "tip.cmd.vent"], ["qrCode", "qrCode", "tip.cmd.qrCode"], ["label", "label", "tip.cmd.label"]]]
     ], 20)}
     ${flyGroups("extras", "extras", [
-      ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"], ["printCut", "printCut", "tip.cmd.printCut"]]],
+      ["prep", [["nest", "nest", "tip.cmd.nest"], ["surface", "surface", "tip.cmd.surface"], ["shapeLib", "shapeLib", "tip.cmd.shapeLib"], ["serial", "serial", "tip.cmd.serial"], ["nodeGraph", "nodeGraph", "tip.cmd.nodeGraph"], ["printCut", "printCut", "tip.cmd.printCut"], ["fontTest", "fontTest", "tip.cmd.fontTest"]]],
       ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["testCard", "testCard", "tip.cmd.testCard"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
     ], 20)}
     <div class="strip-sep strip-push"></div>
@@ -92,8 +92,8 @@ export function renderEditorToolbar(container: HTMLElement) {
         ["boolIntersect", "boolIntersect", "tip.cmd.boolIntersect"], ["splitByLine", "splitByLine", "tip.cmd.splitByLine"], ["weldScore", "weldScore", "tip.cmd.weldScore"]])}
       ${flyGroups("edit", "offset", [
         ["outline", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["heal", "heal", "tip.cmd.heal"], ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"], ["centerFix", "centerFix", "tip.cmd.centerFix"]]],
-        ["parts", [["array", "array", "tip.cmd.array"], ["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]],
-        ["paths", [["textOnPath", "textOnPath", "tip.cmd.textOnPath"], ["simplify", "simplify", "tip.cmd.simplify"], ["dedupe", "dedupe", "tip.cmd.dedupe"], ["cutStart", "cutStart", "tip.cmd.cutStart"], ["reverseDir", "reverseDir", "tip.cmd.reverseDir"]]]
+        ["parts", [["array", "array", "tip.cmd.array"], ["copiesOnPath", "copiesOnPath", "tip.cmd.copiesOnPath"], ["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]],
+        ["paths", [["textOnPath", "textOnPath", "tip.cmd.textOnPath"], ["simplify", "simplify", "tip.cmd.simplify"], ["perforate", "perforate", "tip.cmd.perforate"], ["dedupe", "dedupe", "tip.cmd.dedupe"], ["cutStart", "cutStart", "tip.cmd.cutStart"], ["reverseDir", "reverseDir", "tip.cmd.reverseDir"]]]
       ], 18, "down")}
       ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"], ["toImage", "toImage", "tip.cmd.toImage"]])}
       ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],

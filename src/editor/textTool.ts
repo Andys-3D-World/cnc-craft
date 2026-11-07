@@ -224,6 +224,9 @@ export async function traceGlyphsWithFont(p: TextParams): Promise<TracedText[] |
 // =====================================================================
 
 /** Neuer Text an der Stelle "at" (Welt-Pixel, linke untere Ecke) */
+/** Schrift für den nächsten neuen Text (Schriften testen) */
+export function setNextTextFont(font: string) { lastParams = { ...lastParams, font }; }
+
 export function openTextDialog(at: Pt) {
   showDialog({ ...lastParams }, (params, traced) => {
     insertText(params, traced, at.x, at.y, null);

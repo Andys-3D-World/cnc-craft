@@ -53,7 +53,8 @@ import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
 import { t } from "../i18n/i18n";
-import { initEditTools, openArrayDialog, openCutStartDialog, openDedupeDialog, openPrintCutDialog, openShearDialog, openSimplifyDialog, openToImageDialog, reverseDirection } from "./editTools";
+import { openFontTester } from "../ui/fontTester";
+import { initEditTools, openCopiesOnPathDialog, openPerforateDialog, openArrayDialog, openCutStartDialog, openDedupeDialog, openPrintCutDialog, openShearDialog, openSimplifyDialog, openToImageDialog, reverseDirection } from "./editTools";
 import { isOpenShape, shapesWithSameKey, SIZE_TOL_MM, unitsOfSameSize } from "./selectSimilar";
 import { openTextOnPathDialog, initTextOnPath } from "./textOnPathTool";
 import { setTrimLog } from "./trimTool";
@@ -266,6 +267,12 @@ export const commands: Record<string, () => void> = {
   tiles: () => openTileDialog(),
   duplicateDialog: () => openDuplicateDialog(),
   array: () => openArrayDialog(),
+  copiesOnPath: () => openCopiesOnPathDialog(),
+  perforate: () => openPerforateDialog(),
+  fontTest: () => openFontTester(log),
+  label: () => openGenerator("label", log, () => { done(); checkpoint(); }),
+  keychain: () => openGenerator("keychain", log, () => { done(); checkpoint(); }),
+  frame: () => openGenerator("frame", log, () => { done(); checkpoint(); }),
   textOnPath: () => openTextOnPathDialog(),
   simplify: () => openSimplifyDialog(),
   dedupe: () => openDedupeDialog(),

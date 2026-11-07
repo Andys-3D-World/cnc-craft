@@ -3,6 +3,7 @@
  * Die Rechnung liegt jeweils in einem eigenen Modul mit Tests; hier nur Oberfläche und Übernahme in die Zeichnung.
  * Vorschau über livePreview (nicht in app().shapes), daher ergibt jede Übernahme genau einen Rückgängig-Schritt.
  */
+import { perforate, spotsOnPath, type PathSpot } from "./perforate";
 import { app, bedSizeMm, screenDist, toWorld } from "./editorState";
 import { checkpoint } from "./history";
 import { selectedShapes } from "./selection";
@@ -22,7 +23,7 @@ import { applyFit, fitProblem, orderMarks, twoPointFit } from "./printCut";
 import { machine } from "../machine";
 import { isLaser } from "../machineMode";
 import { CutDir, cutDirOf, cutMark, cutStartOf, effectiveDirection, fractionAt, isClimb } from "../cutSetting";
-import { MM_TO_PIXEL, Path, Pt, distanceToShape, groupBounds, rotateShape, shapeBounds, shapeToPaths, shearShape, translateShape, updatePolylineBounds } from "../shapeTransform";
+import { createPolyline, newId, MM_TO_PIXEL, Path, Pt, distanceToShape, groupBounds, rotateShape, shapeBounds, shapeToPaths, shearShape, translateShape, updatePolylineBounds } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
 import { t } from "../i18n/i18n";
 import { openToolPanel, rowCss, checkCss, ToolPanel } from "../ui/toolPanel";
@@ -211,6 +212,114 @@ export function openArrayDialog() {
       (panel.querySelector("#arr-cy") as HTMLInputElement).value = fmt(q.y / MM_TO_PIXEL);
       panel.dispatchEvent(new Event("change"));
     });
+  });
+}
+
+// =====================================================================
+// AUF STRECKE VERTEILEN und PERFORATION
+// =====================================================================
+
+const PATHCOPY_KEY = "cnc_craft_path_copies";
+const PERF_KEY = "cnc_craft_perforate";
+const MAX_PIECES = 20000;
+
+const pathLength = (q: Path) => q.pts.reduce((n, k, i) => (i ? n + Math.hypot(k.x - q.pts[i - 1].x, k.y - q.pts[i - 1].y) : 0), 0);
+
+/** Die Strecke ist die längste offene Linie der Auswahl, sonst die längste geschlossene; alles andere wird verteilt */
+function splitPathAndParts(sel: any[]): { path: any; parts: any[] } | null {
+  const inGroup = (s: any) => sel.filter(o => o.groupId && o.groupId === s.groupId).length > 1;
+  const single = sel.filter(s => s.type !== "image" && !inGroup(s));
+  const score = (s: any) => { const q = shapeToPaths(s)[0]; return q ? (q.closed ? 0 : 1e12) + pathLength(q) : -1; };
+  const path = single.reduce((a: any, s: any) => (!a || score(s) > score(a) ? s : a), null);
+  if (!path) return null;
+  const parts = sel.filter(s => s !== path);
+  return parts.length ? { path, parts } : null;
+}
+
+export function openCopiesOnPathDialog() {
+  const sel = selectedShapes();
+  const pick = splitPathAndParts(sel);
+  if (!pick) { log(t("pathcopy.selectFirst")); return; }
+  const q = shapeToPaths(pick.path)[0];
+  const b = groupBounds(pick.parts)!;
+  const from = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+  let o = { count: 8, rotate: true, remove: true };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(PATHCOPY_KEY) || "{}") }; } catch { /* egal */ }
+  const spots = (p: ToolPanel) => spotsOnPath(q.pts, q.closed, Math.max(1, Math.min(MAX_SETS, Math.round(p.num("#pc-count", 1)))));
+  const placeFor = (spot: PathSpot, first: number, rotate: boolean): Placement => s => {
+    translateShape(s, spot.x - from.x, spot.y - from.y);
+    if (rotate) rotateShape(s, spot.x, spot.y, spot.angle - first);
+  };
+  openToolPanel({
+    id: "pathcopy-panel", ico: "copiesOnPath", title: t("pathcopy.title"), ok: "✔ " + t("pathcopy.run"), redraw: redrawFn,
+    body: `
+      <div style="font-size:0.8rem;color:var(--text-muted);">${t("pathcopy.scope", { n: pick.parts.length })}</div>
+      <label style="${rowCss}">${t("array.count")}<input id="pc-count" type="number" value="${o.count}" min="1" max="${MAX_SETS}" step="1" style="width:90px;"></label>
+      <label style="${checkCss}"><input id="pc-rotate" type="checkbox" ${o.rotate ? "checked" : ""}> ${t("pathcopy.rotate")}</label>
+      <label style="${checkCss}"><input id="pc-remove" type="checkbox" ${o.remove ? "checked" : ""}> ${t("pathcopy.remove")}</label>`,
+    onChange: p => {
+      const list = spots(p), rotate = p.check("#pc-rotate"), base = pick.parts.flatMap(outlineOf), out: Path[] = [];
+      const carrier = { type: "polyline", points: [] as Pt[], closed: false, x: 0, y: 0, w: 0, h: 0 };
+      if (base.reduce((n, k) => n + k.pts.length, 0) * list.length <= MAX_PREVIEW_POINTS) for (const spot of list) for (const k of base) {
+        carrier.points = k.pts.map(c => ({ ...c }));
+        placeFor(spot, list[0]?.angle ?? 0, rotate)(carrier);
+        out.push({ pts: carrier.points, closed: k.closed });
+      }
+      livePreview.paths = out;
+      p.info(t("pathcopy.info", { n: list.length, l: (pathLength(q) / MM_TO_PIXEL).toFixed(0) }));
+    },
+    onOk: p => {
+      const list = spots(p), rotate = p.check("#pc-rotate"), remove = p.check("#pc-remove");
+      if (!list.length) return false;
+      try { localStorage.setItem(PATHCOPY_KEY, JSON.stringify({ count: list.length, rotate, remove })); } catch { /* egal */ }
+      const st = app(), copies: any[] = [];
+      for (const spot of list) { const set = makeCopies(pick.parts, 0); set.forEach(placeFor(spot, list[0].angle, rotate)); copies.push(...set); }
+      const gone = new Set(remove ? pick.parts.map((s: any) => s.id) : []);
+      st.shapes = [...st.shapes.filter((s: any) => !gone.has(s.id)), ...copies];
+      st.selectedShapeIds = copies.map(c => c.id);
+      log(t("pathcopy.done", { n: list.length }));
+      commit();
+    }
+  });
+}
+
+export function openPerforateDialog() {
+  const sel = selectedShapes().filter((s: any) => s.type !== "image");
+  if (!sel.length) { log(t("perf.selectFirst")); return; }
+  let o = { cut: 5, gap: 1 };
+  try { o = { ...o, ...JSON.parse(localStorage.getItem(PERF_KEY) || "{}") }; } catch { /* egal */ }
+  const pieces = (p: ToolPanel) => {
+    const cut = Math.max(0.1, p.num("#pf-cut", 5)) * MM_TO_PIXEL, gap = Math.max(0.05, p.num("#pf-gap", 1)) * MM_TO_PIXEL;
+    return sel.map((s: any) => ({ s, parts: shapeToPaths(s).flatMap(q => perforate(q.pts, q.closed, cut, gap)) }));
+  };
+  openToolPanel({
+    id: "perforate-panel", ico: "perforate", title: t("perf.title"), ok: "✔ " + t("perf.run"), redraw: redrawFn,
+    body: `
+      <div style="font-size:0.8rem;color:var(--text-muted);">${t("perf.hint")}</div>
+      <label style="${rowCss}">${t("perf.cut")}<input id="pf-cut" type="number" value="${o.cut}" min="0.1" step="0.5" style="width:90px;"></label>
+      <label style="${rowCss}">${t("perf.gap")}<input id="pf-gap" type="number" value="${o.gap}" min="0.05" step="0.1" style="width:90px;"></label>`,
+    onChange: p => {
+      const all = pieces(p), n = all.reduce((c, k) => c + k.parts.length, 0);
+      const tooMany = n > MAX_PIECES;
+      livePreview.paths = tooMany ? [] : all.flatMap(k => k.parts.map(pts => ({ pts, closed: false })));
+      p.info(tooMany ? t("perf.tooMany", { max: MAX_PIECES }) : t("perf.info", { n }), tooMany);
+    },
+    onOk: p => {
+      const all = pieces(p);
+      if (all.reduce((c, k) => c + k.parts.length, 0) > MAX_PIECES) return false;
+      try { localStorage.setItem(PERF_KEY, JSON.stringify({ cut: p.num("#pf-cut", 5), gap: p.num("#pf-gap", 1) })); } catch { /* egal */ }
+      const st = app(), made: any[] = [];
+      for (const { s, parts } of all) {
+        const groupId = "perf-" + newId();
+        const keep = { ...(s.laserLayerId ? { laserLayerId: s.laserLayerId } : {}), ...(s.millingDepth !== undefined ? { millingDepth: s.millingDepth } : {}), ...(s.toolId ? { toolId: s.toolId } : {}), ...(s.source ? { source: s.source } : {}), groupId };
+        for (const pts of parts) made.push(createPolyline(pts.map(c => ({ x: c.x, y: c.y })), false, "on-line", keep));
+      }
+      const gone = new Set(sel.map((s: any) => s.id));
+      st.shapes = [...st.shapes.filter((s: any) => !gone.has(s.id)), ...made];
+      st.selectedShapeIds = made.map(s => s.id);
+      log(t("perf.done", { n: made.length }));
+      commit();
+    }
   });
 }
 

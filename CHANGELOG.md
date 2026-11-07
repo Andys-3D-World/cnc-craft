@@ -2,6 +2,15 @@
 
 ## Next version (unreleased)
 
+**New**
+- **Try fonts:** your own text in every font as a preview with 2 to 10 columns, filled or as outlines. One click uses that font for the next new text.
+- **Generator presets:** save the values of any generator window under a name and load them again later (fonts aren't part of a preset).
+- **Copies on path:** spread selected parts evenly along a line or contour, turning with it if you like.
+- **Perforate:** turn any contour into short cuts with bridges between them, for folding or tearing.
+- **New generators:** label, keychain and a three-layer photo frame.
+
+These haven't been cut on a real machine yet: make a test piece first.
+
 **Improved**
 - **Generator checks:** after placing parts, a generator warns if they go past the bed or if a bridge between two cuts is thinner than a guide value (laser 0.8 mm, router 1.5 mm, plasma 3 mm). Points lying almost on top of each other are removed, which saves pointless tiny moves.
 - **G-code check:** *To machine* reads the finished G-code once more and warns about anything suspicious, such as a rapid move through material or a laser or torch left on. It only warns and changes nothing.
