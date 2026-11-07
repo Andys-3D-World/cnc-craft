@@ -5,6 +5,7 @@
  * Fehlerkorrektur). Doppelklick auf den Code öffnet ihn wieder. Platzhalter wie {n} im Text werden
  * erst bei „Seriennummern“ (serial.ts) ersetzt.
  */
+import { polishGenDialog } from "../ui/genDialog";
 import { icon } from "../ui/icons";
 import { matchDefaults } from "./genRun";
 import { app } from "./editorState";
@@ -123,4 +124,5 @@ export function openQrDialog(log: (s: string) => void, done: () => void, edit?: 
     done();
   };
   setTimeout(() => { const ta = $<HTMLTextAreaElement>("qr-text"); ta.focus(); ta.select(); }, 0);
+  polishGenDialog(edit ? "edit" : "new");
 }

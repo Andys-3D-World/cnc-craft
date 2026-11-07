@@ -1136,6 +1136,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     const target = e.target as HTMLElement;
     const typing = target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable);
     if (typing) return;
+    if (document.querySelector(".dlg-overlay")) return; // offenes Fenster: keine Kürzel für die Zeichnung dahinter
     if (document.querySelector("#text-dialog-overlay, #stl-dialog-overlay, #offset-dialog-overlay, #nest-dialog-overlay, #dup-dialog-overlay, #box-dialog-overlay, #mandala-dialog-overlay, #bird-dialog-overlay, #orn-dialog-overlay, #lt-dialog-overlay, #puzzle-dialog-overlay, #wt-dialog-overlay, #sbox-dialog-overlay, #slot-dialog-overlay, #face-overlay, #fillet-dialog-overlay, #pattern-dialog-overlay, #eng-dialog-overlay, #imguse-overlay, #tool-dialog-overlay, #stock-dialog-overlay")) return;
     // Nur reagieren, wenn der CAM-Tab sichtbar ist
     const camTab = document.getElementById("tab-cam");

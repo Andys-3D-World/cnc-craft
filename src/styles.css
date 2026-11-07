@@ -742,7 +742,7 @@ input:not([type]) {
 .box-grid { display: grid; grid-template-columns: 210px 1fr; gap: 12px; align-items: start; }
 .box-fields { display: flex; flex-direction: column; gap: 4px; }
 .box-prev { background: #0d0d12; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; min-height: 220px; display: flex; flex-direction: column; gap: 6px; }
-.box-prev svg { width: 100%; height: 230px; }
+.box-prev svg:not(.ico) { width: 100%; height: 230px; }
 .box-panel { fill: rgba(240, 140, 0, 0.12); stroke: #f08c00; stroke-width: 0.6; vector-effect: non-scaling-stroke; }
 .box-cut { fill: none; stroke: #4dabf7; stroke-width: 0.5; vector-effect: non-scaling-stroke; }
 .box-lbl { fill: #c9ced6; text-anchor: middle; dominant-baseline: middle; font-family: var(--font-ui); }
@@ -1936,3 +1936,27 @@ html.os-linux {
 .cmdk-row.active { background: var(--accent-glow); }
 .cmdk-row kbd { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
 .cmdk-none { padding: 14px; font-size: 0.85rem; color: var(--text-muted); text-align: center; }
+
+/* Generator-Fenster: einheitlich (ui/genDialog.ts) */
+.dlg-box.gen-dlg { width: min(1040px, calc(100vw - 32px)); height: min(740px, calc(100vh - 32px)); overflow: hidden; outline: none; }
+.gen-dlg > h3, .gen-dlg > .dlg-hint { flex-shrink: 0; }
+.gen-dlg > .dlg-buttons { flex-shrink: 0; justify-content: flex-end; margin-top: 0; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.gen-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(300px, 370px) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+.gen-left { min-height: 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding-right: 6px; }
+.gen-left > * { flex-shrink: 0; }
+.gen-right { min-height: 0; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+.gen-right > * { flex-shrink: 0; }
+.gen-right > .box-prev { flex: 1 0 auto; min-height: 280px !important; }
+.gen-stage { flex: 1 1 0; min-height: 210px; position: relative; }
+div.gen-stage { display: block !important; }
+.gen-stage > svg:not(.ico) { position: absolute; inset: 0; width: 100% !important; height: 100% !important; max-height: none !important; }
+svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
+.gen-left .prop-row, .gen-left .dlg-row { gap: 10px; }
+.gen-left .prop-row > select, .gen-left .dlg-row > select { flex: 0 1 210px; width: 210px !important; max-width: 62% !important; min-width: 0; }
+.gen-left .prop-row > input[type="number"], .gen-left .dlg-row > input[type="number"] { flex: 0 0 84px; width: 84px !important; }
+.gen-left .prop-row > input[type="text"], .gen-left .dlg-row > input[type="text"] { flex: 0 1 210px; width: 210px !important; max-width: 62% !important; min-width: 0; }
+@media (max-width: 760px), (max-height: 520px) {
+  .gen-body { display: block; overflow-y: auto; }
+  .gen-left, .gen-right { overflow: visible; }
+  .gen-right { margin-top: 12px; }
+}

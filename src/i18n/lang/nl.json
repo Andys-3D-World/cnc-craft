@@ -5817,5 +5817,7 @@
   "fly.fileLabel": "Bestand",
   "tip.cmdSearch": "Opdracht zoeken (Ctrl+K): typ de naam en druk op Enter",
   "cmdk.placeholder": "Opdracht zoeken …",
-  "cmdk.none": "Niets gevonden."
+  "cmdk.none": "Niets gevonden.",
+  "gen.okNew": "Op het bed leggen",
+  "gen.okEdit": "Wijzigingen toepassen"
 }

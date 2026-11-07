@@ -45,10 +45,13 @@ Not yet burnt on a real machine: test on scrap first.
   - **Main tabs:** *Design*, *Simulation*, *Library* and *Set up*; settings ($$), board flashing and wiring are sub-tabs of *Set up*.
   - **Find a command:** Ctrl+K (Cmd+K on Mac) or the magnifier: type a name and press Enter.
   - **Toolbar:** import, open, save and export are in a *File* menu, and *Delete everything* moved there, away from everyday buttons.
+- **Generator windows:** all generators, the QR code and the test cards now share one layout: the same size, fields on the left with their own scrolling, a larger preview on the right that stays in view, and Cancel and *Place on bed* always visible at the bottom right (*Apply changes* when editing). Enter in a field confirms and Esc cancels everywhere. Clicking beside a generator window no longer closes it, so your input isn't lost by accident.
 - **Generator menu:** the long list is now a board with three columns (boxes and storage, names and decoration, workshop and technology), so it always fits on the screen. All generator icons were redrawn in one style, and the generator windows use the same icons instead of system emoji.
 - **Icons everywhere:** system emoji across the whole program (tabs, buttons, windows, messages) are now replaced by our own icons that look the same on Windows, Mac and Linux. In dropdown lists, which cannot show graphics, the emoji is left out. The *Edit* and *Extras* menus are boards with columns like the generators, and all pop-out menus use the same icon tiles.
 
 **Fixed**
+- **Giant warning sign in generators:** icons inside a preview were stretched to the preview size, for example in the candy holder.
+- **Shortcuts behind open windows:** keys such as Del could reach the drawing behind an open window when no field had the focus.
 - **Rotary and "Take over as job":** the simulation button could load the flattened preview as the job for round rotary parts. It now always builds the real G-code from the drawing.
 
 ## 0.4.2 Beta

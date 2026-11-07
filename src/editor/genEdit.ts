@@ -9,6 +9,7 @@
 import { app } from "./editorState";
 import { bedCount, activeBed, bedShapes } from "./beds";
 import { t } from "../i18n/i18n";
+import { polishGenDialog } from "../ui/genDialog";
 import { carrySettings, checkRun, imageOfShape, readGen, replaceRun, roleOf, tagRun, takeSettings, withSettings, type EditImage, type GenInfo, type RunCheck } from "./genRun";
 import { openBoxDialog } from "./boxGen";
 import { openMandalaDialog } from "./mandalaGen";
@@ -61,6 +62,7 @@ export function openGenerator(type: string, log: Log, finish: () => void) {
     if (settings) tagRun(made, type, settings);
     finish();
   });
+  polishGenDialog();
 }
 
 /** Der eine Lauf in dieser Auswahl – null: keiner, mehrere oder unbekannter Generator (z. B. aus einer neueren Version) */
@@ -114,6 +116,7 @@ export function editRun(gen: GenInfo, log: Log, finish: () => void) {
     finish();
   }));
   st.selectedShapeIds = keep;
+  polishGenDialog("edit");
   // im Fenster anzeigen, dass bearbeitet wird (als Text, nur eigene Übersetzung)
   const title = [...document.querySelectorAll<HTMLElement>(".dlg-overlay h3")].pop();
   if (title) { const m = document.createElement("span"); m.textContent = " – " + t("gen.editing"); m.style.opacity = "0.7"; title.appendChild(m); }

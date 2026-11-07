@@ -5817,5 +5817,7 @@
   "fly.fileLabel": "Plik",
   "tip.cmdSearch": "Szukaj polecenia (Ctrl+K): wpisz nazwę i naciśnij Enter",
   "cmdk.placeholder": "Szukaj polecenia …",
-  "cmdk.none": "Nic nie znaleziono."
+  "cmdk.none": "Nic nie znaleziono.",
+  "gen.okNew": "Połóż na stole",
+  "gen.okEdit": "Zastosuj zmiany"
 }

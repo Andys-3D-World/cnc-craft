@@ -5817,5 +5817,7 @@
   "fly.fileLabel": "Fichier",
   "tip.cmdSearch": "Chercher une commande (Ctrl+K) : tape son nom puis Entrée",
   "cmdk.placeholder": "Chercher une commande …",
-  "cmdk.none": "Rien trouvé."
+  "cmdk.none": "Rien trouvé.",
+  "gen.okNew": "Placer sur le plateau",
+  "gen.okEdit": "Appliquer les modifications"
 }

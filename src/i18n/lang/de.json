@@ -5817,5 +5817,7 @@
   "fly.fileLabel": "Datei",
   "tip.cmdSearch": "Befehl suchen (Strg+K): Namen tippen und Enter drücken",
   "cmdk.placeholder": "Befehl suchen …",
-  "cmdk.none": "Nichts gefunden."
+  "cmdk.none": "Nichts gefunden.",
+  "gen.okNew": "Aufs Bett legen",
+  "gen.okEdit": "Änderungen übernehmen"
 }
