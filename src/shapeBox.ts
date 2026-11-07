@@ -19,7 +19,7 @@ import { simplifyPolygon, pointInPoly, polygonArea } from "./polyOffset.ts";
 import { offsetArea, type XY } from "./joints.ts";
 import { finishPanels, flexCuts, flat, tabsOn, type Panel, type V3 } from "./box.ts";
 import { ornamentBody, type OrnamentShape } from "./ornament.ts";
-import { ellipse, poly, starPoints, stroke } from "./seasonShapes.ts";
+import { ellipse, poly, starPoints, stroke, smoothLoop } from "./seasonShapes.ts";
 import { bounds, unionMany } from "./nameConnect.ts";
 
 type P = { x: number; y: number };
@@ -76,8 +76,10 @@ function regular(n: number): MultiPolygon {
 function ownShape(k: ShapeKind): MultiPolygon {
   const rect = (x0: number, y0: number, x1: number, y1: number): MultiPolygon => poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]);
   switch (k) {
-    case "mitten": return unionMany([rect(-0.3, 0, 0.3, 0.3), poly(ellipse(0, 0.68, 0.36, 0.48)), stroke([0.2, 0.52], [0.55, 0.82], 0.26)]);
-    case "stocking": return unionMany([rect(-0.2, 0.3, 0.2, 1.05), rect(-0.27, 0.86, 0.27, 1.1), stroke([0, 0.22], [0.5, 0.2], 0.42)]);
+    case "mitten": return poly(smoothLoop([[-0.32, 0, true], [0.32, 0, true], [0.32, 0.24, true], [0.27, 0.24, true], [0.33, 0.46], [0.5, 0.62], [0.66, 0.8], [0.57, 0.92], [0.42, 0.82], [0.34, 0.72, true],
+      [0.33, 0.95], [0.16, 1.14], [-0.1, 1.16], [-0.3, 0.98], [-0.36, 0.64], [-0.27, 0.24, true], [-0.32, 0.24, true]], 10));
+    case "stocking": return poly(smoothLoop([[-0.3, 1.1, true], [0.3, 1.1, true], [0.3, 0.86, true], [0.24, 0.86, true], [0.22, 0.55], [0.3, 0.42], [0.55, 0.36], [0.72, 0.22], [0.68, 0.06], [0.5, 0], [0.1, 0],
+      [-0.18, 0.1], [-0.24, 0.4], [-0.24, 0.86, true], [-0.3, 0.86, true]], 10));
     case "sweater": {
       const body = unionMany([rect(-0.42, 0, 0.42, 0.9), stroke([0.3, 0.76], [0.74, 0.22], 0.28), stroke([-0.3, 0.76], [-0.74, 0.22], 0.28)]);
       return polygonClipping.difference(body, poly(ellipse(0, 0.92, 0.17, 0.11)));

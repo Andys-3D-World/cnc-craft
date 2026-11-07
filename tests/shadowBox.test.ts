@@ -1,8 +1,9 @@
 // Tests für die Schattenbox – laufen mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { shadowBox, BOX_SHAPES, SLOT_CLEAR, type ShadowBoxOptions } from "../src/shadowBox.ts";
+import { shadowBox, fillCloseHoles, BOX_SHAPES, SLOT_CLEAR, type ShadowBoxOptions } from "../src/shadowBox.ts";
 import { bounds, inRegion, grow } from "../src/nameConnect.ts";
+import { thinnestWeb } from "../src/genCheck.ts";
 
 const base: ShadowBoxOptions = { shape: "bell", h: 200, layers: 3, frame: 8, scene: "village", seed: 4, sky: "engrave", bow: true, stand: true, t: 3, gap: 6, cable: true };
 
@@ -69,4 +70,25 @@ test("Text vorn: steht in der vordersten Schicht (ein Teil), Sterne halten Absta
 test("Text in Einzellinien-Schrift: wird als Linie auf die Grundplatte graviert", () => {
   const r = shadowBox({ ...base, textPos: "front" }, { area: [], lines: [{ pts: [[0, 0], [10, 10], [20, 0]], closed: false }] });
   assert.equal(r.backLines.length, 1);
+});
+
+test("Landschaft: keine Stege unter 1 mm zwischen den Ausschnitten, keine Krümel, eine Schicht bleibt ein Teil", () => {
+  for (const scene of ["trees", "village", "hills"] as const) for (const seed of [1, 2, 3, 4, 5]) {
+    const r = shadowBox({ shape: "bell", h: 220, layers: 3, frame: 9, scene, seed, sky: "engrave", bow: false, stand: true, t: 3, gap: 2, cable: false });
+    for (const layer of r.layers) {
+      assert.equal(layer.length, 1);
+      const paths = layer[0].map(ring => ({ closed: true, pts: ring.slice(0, -1).map(([x, y]) => ({ x, y })) }));
+      assert.ok(paths.length >= 2, "Fenster fehlt");
+      const web = thinnestWeb(paths, 0.99);
+      assert.equal(web, null, `${scene}/${seed}: Steg ${web}`);
+    }
+  }
+});
+
+test("Ausschnitte füllen: von Hand gerechnet", () => {
+  const sq = (x: number, y: number, s: number) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s], [x, y]] as [number, number][];
+  const outer = sq(0, 0, 100), win = sq(10, 10, 50);
+  // 0,5 mm neben dem Fenster: fällt weg. 5 mm daneben: bleibt. 1 × 1 mm: Krümel, fällt weg
+  const out = fillCloseHoles([[outer, win, sq(60.5, 20, 5), sq(70, 20, 5), sq(80, 80, 1)]]);
+  assert.deepEqual(out[0].map(r => r[0]), [outer[0], [70, 20], win[0]]);
 });

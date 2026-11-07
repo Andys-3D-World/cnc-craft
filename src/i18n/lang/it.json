@@ -5840,5 +5840,7 @@
   "wr.fn.foot": "Pedale avvio/pausa",
   "wr.fn.doorGuard": "Protezione sportello",
   "wr.fn.lasHand": "Laser manuale",
-  "wr.fn.spOn": "Mandrino acceso"
+  "wr.fn.spOn": "Mandrino acceso",
+  "gen.warnBed": "⚠ Insieme i pezzi misurano {w} × {h} mm e sporgono dal piano ({bw} × {bh} mm). Annidali o distribuiscili su più piani.",
+  "gen.warnWeb": "⚠ Ponte più sottile tra due tagli: {d} mm (valore indicativo da {min} mm). Il pezzo può rompersi lì: ingrandiscilo o cambia i valori."
 }

@@ -6,7 +6,10 @@
  * Abbrechen ändert nichts: Solange das Fenster offen ist, bleibt alles, wie es ist – erst done() ersetzt.
  * Die Logik selbst steht in genRun.ts.
  */
-import { app } from "./editorState";
+import { app, bedSizeMm } from "./editorState";
+import { cleanPoints, minWebFor, outsideBed, thinnestWeb } from "../genCheck";
+import { MM_TO_PIXEL, shapeToPaths } from "../shapeTransform";
+import { getMachineMode } from "../machineMode";
 import { bedCount, activeBed, bedShapes } from "./beds";
 import { t } from "../i18n/i18n";
 import { polishGenDialog } from "../ui/genDialog";
@@ -49,6 +52,23 @@ const GENERATORS: Record<string, Open> = {
   testCard: openTestCardDialog, shapeBox: openShapeBoxDialog, family: openFamilyDialog
 };
 
+/** Ergebnis aufräumen und prüfen: Punkte fast aufeinander weg, Warnung bei zu dünnen Stegen und über dem Bett */
+function checkMade(made: any[], log: Log) {
+  for (const q of made) {
+    if (q.type !== "polyline" || !Array.isArray(q.points)) continue;
+    // Listen, die zu den Punkten gehören (z. B. Griffe von Kurven), müssen zusammenpassen: dann nicht anfassen
+    if (Object.values(q).some(v => v !== q.points && Array.isArray(v) && v.length === q.points.length)) continue;
+    q.points = cleanPoints(q.points, !!q.closed, 0.01 * MM_TO_PIXEL);
+  }
+  const paths = made.filter(q => q.type !== "image").flatMap(q => shapeToPaths(q).map(p => ({ s: q, closed: p.closed, pts: p.pts.map(c => ({ x: c.x / MM_TO_PIXEL, y: c.y / MM_TO_PIXEL })) })));
+  const bed = bedSizeMm(), over = outsideBed(paths, bed.w, bed.h);
+  if (over) log(t("gen.warnBed", { w: over.w.toFixed(0), h: over.h.toFixed(0), bw: bed.w, bh: bed.h }));
+  const cuts = paths.filter(p => p.closed && (p.s.millingMode === "outside" || p.s.millingMode === "inside"));
+  const limit = minWebFor(getMachineMode());
+  const web = cuts.length <= 2000 ? thinnestWeb(cuts, limit) : null;
+  if (web !== null && web < limit) log(t("gen.warnWeb", { d: web.toFixed(1), min: limit }));
+}
+
 const knownType = (type: string) => Object.prototype.hasOwnProperty.call(GENERATORS, type);
 const idsOf = (list: any[]) => new Set<string>(list.map(s => s.id));
 const newShapes = (before: Set<string>) => app().shapes.filter((s: any) => !before.has(s.id));
@@ -59,6 +79,7 @@ export function openGenerator(type: string, log: Log, finish: () => void) {
   GENERATORS[type](log, () => {
     const settings = takeSettings();
     const made = newShapes(before);
+    checkMade(made, log);
     if (settings) tagRun(made, type, settings);
     finish();
   });
@@ -104,6 +125,7 @@ export function editRun(gen: GenInfo, log: Log, finish: () => void) {
   withSettings(gen.s, pics, () => GENERATORS[gen.type](log, () => {
     const settings = takeSettings();
     const made = newShapes(before);
+    checkMade(made, log);
     const old = partsNow();
     if (made.length && old.length) {
       const roles = made.map(roleOf);

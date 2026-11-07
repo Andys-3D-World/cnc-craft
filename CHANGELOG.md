@@ -2,6 +2,12 @@
 
 ## Next version (unreleased)
 
+**Improved**
+- **Generator checks:** after placing parts, a generator warns if they go past the bed or if a bridge between two cuts is thinner than a guide value (laser 0.8 mm, router 1.5 mm, plasma 3 mm). Points lying almost on top of each other are removed, which saves pointless tiny moves.
+- **Better motifs:** ghost, bat, shell, mushroom, mitten, stocking, cat ears and the small tree and bat cut-outs are redrawn with smooth, symmetric curves. Existing projects change when you edit them with the generator.
+- **Shadow box:** small cut-outs in the scenery closer than 1 mm to another cut-out are filled, so no thin strip can break and no crumbs fall out. An existing shadow box changes slightly when you edit it.
+- **Feel of the interface:** buttons react more clearly when pressed, and windows open with a short fade. Jog, Start, Pause and Stop deliberately react without any movement, and the jog and tool buttons no longer shift on hover. The system setting for reduced motion is now respected.
+
 ## 0.4.3 Beta
 
 **New**

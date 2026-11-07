@@ -361,7 +361,10 @@ export function motif(kind: OrnamentDeco, cx: number, cy: number, s: number): Mu
   switch (kind) {
     case "stars": return at(starPts(0, 0.03, 5, 0.5, 0.21));
     case "flakes": return at(starPts(0, 0, 6, 0.5, 0.15));
-    case "trees": return at([[0, 0.5], [0.38, -0.22], [0.09, -0.22], [0.09, -0.47], [-0.09, -0.47], [-0.09, -0.22], [-0.38, -0.22]]);
+    case "trees": { // Tanne mit drei Stufen
+      const right: XY[] = [[0.1, -0.47], [0.1, -0.3], [0.38, -0.3], [0.17, -0.06], [0.29, -0.06], [0.12, 0.2], [0.2, 0.2], [0, 0.5]];
+      return at([...right, ...right.slice(0, -1).reverse().map(([x, y]) => [-x, y] as XY)]);
+    }
     case "hearts": return at(Array.from({ length: 48 }, (_, i) => {
       const a = (i / 48) * Math.PI * 2, q = Math.sin(a);
       return [(16 * q * q * q) / 32, (13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a) + 2.5) / 32] as XY;

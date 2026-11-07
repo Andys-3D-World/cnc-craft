@@ -4,6 +4,7 @@
    ============================================================ */
 
 :root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   color-scheme: dark;   /* Linux (WebKitGTK): native dropdowns otherwise follow a light GTK theme -> white boxes */
   --bg-app: #17171c;
   --bg-panel: #1f1f26;
@@ -202,7 +203,7 @@ html, body {
   font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 .btn-clear:hover {
   border-color: var(--color-danger);
@@ -254,7 +255,7 @@ html, body {
 .menu-trigger::before {
   content: "▾";
   font-size: 0.8rem;
-  transition: transform 0.2s;
+  transition: transform 0.2s var(--ease-out);
 }
 .menu-section-unified.collapsed .menu-trigger::before { transform: rotate(-90deg); }
 .menu-section-unified.collapsed .menu-body { display: none; }
@@ -277,11 +278,11 @@ html, body {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: filter 0.15s, transform 0.05s, box-shadow 0.15s;
+  transition: filter 0.15s, transform 0.12s var(--ease-out), box-shadow 0.15s;
   box-shadow: 0 2px 10px var(--accent-glow);
 }
 .btn-primary:hover { filter: brightness(1.12); }
-.btn-primary:active { transform: translateY(1px); box-shadow: none; }
+.btn-primary:active { transform: scale(0.97); box-shadow: none; }
 .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; transform: none; }
 
 .btn-secondary {
@@ -293,13 +294,13 @@ html, body {
   font-family: var(--font-ui);
   font-size: 0.8rem;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s var(--ease-out);
 }
 .btn-secondary:hover {
   border-color: var(--accent-color);
   background: var(--bg-input);
 }
-.btn-secondary:active { transform: translateY(1px); }
+.btn-secondary:active { transform: scale(0.97); }
 .btn-compact { padding: 4px 8px; }
 
 /* ---------- WERKZEUG-GRID ---------- */
@@ -319,12 +320,12 @@ html, body {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s var(--ease-out);
 }
 .btn-tool-icon:hover {
   border-color: var(--accent-color);
-  transform: translateY(-1px);
 }
+.btn-tool-icon:active { transform: scale(0.95); }
 .btn-tool-icon.active {
   background: var(--accent-glow);
   border-color: var(--accent-color);
@@ -374,14 +375,12 @@ input[type="radio"] { accent-color: var(--accent-color); width: auto; }
   font-weight: 700;
   height: 42px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: border-color 0.12s, background 0.12s;
 }
 .btn-jog:hover, .btn-diag:hover {
   border-color: var(--accent-color);
   background: var(--bg-input);
-  transform: translateY(-1px);
 }
-.btn-jog:active, .btn-diag:active { transform: translateY(1px); }
 .btn-jog[disabled], .btn-jog.btn-locked { opacity: 0.35; pointer-events: none; }
 
 .btn-home, #jog-home {
@@ -404,7 +403,7 @@ input[type="radio"] { accent-color: var(--accent-color); width: auto; }
   padding: 4px 8px;
   cursor: pointer;
   font-family: var(--font-mono);
-  transition: all 0.15s;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 .btn-step.active {
   border-color: var(--accent-color);
@@ -508,11 +507,11 @@ input[type="radio"] { accent-color: var(--accent-color); width: auto; }
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.12s;
+  transition: border-color 0.12s, background 0.12s, transform 0.12s var(--ease-out);
   padding: 0;
 }
 .btn-cmd:hover { border-color: var(--accent-color); background: var(--bg-input); }
-.btn-cmd:active { transform: translateY(1px); }
+.btn-cmd:active { transform: scale(0.95); }
 .btn-tool-icon { color: var(--text-main); }
 .tool-options { display: flex; flex-direction: column; gap: 6px; padding: 4px 2px; }
 .opt-row { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-main); cursor: pointer; }
@@ -606,7 +605,7 @@ body.drop-active .canvas-holder { outline: 2px dashed var(--accent-color); outli
   font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim);
 }
 .rp-console-head:hover { color: var(--text-muted); }
-.rp-console-arrow { margin-left: auto; transition: transform 0.15s; }
+.rp-console-arrow { margin-left: auto; transition: transform 0.15s var(--ease-out); }
 .rp-console-body { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 8px 8px; }
 .rp-console-body #console-log { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg-input); border-radius: var(--radius-sm); padding: 6px 8px; }
 .rp-console-input { display: flex; gap: 4px; margin-top: 6px; }
@@ -1959,4 +1958,22 @@ svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
   .gen-body { display: block; overflow-y: auto; }
   .gen-left, .gen-right { overflow: visible; }
   .gen-right { margin-top: 12px; }
+}
+
+/* Machine controls react at once, without any movement */
+.job-bar-btns button, .sim-job-row button, .header-stop { transition: none; }
+.job-bar-btns button:active, .sim-job-row button:active, .header-stop:active { transform: none; }
+
+/* Windows open with a short fade; the command search stays instant */
+.dlg-overlay { animation: dlg-fade 150ms var(--ease-out); }
+.dlg-overlay > .dlg-box { animation: dlg-in 150ms var(--ease-out); }
+@keyframes dlg-fade { from { opacity: 0; } }
+@keyframes dlg-in { from { opacity: 0; transform: scale(0.98); } }
+
+/* System setting "reduce motion": no movement, fades stay */
+@media (prefers-reduced-motion: reduce) {
+  .dlg-overlay > .dlg-box { animation-name: dlg-fade; }
+  .btn-primary:active, .btn-secondary:active, .btn-cmd:active, .btn-tool-icon:active { transform: none; }
+  .support-toast { animation-name: dlg-fade; }
+  .menu-section-unified .menu-trigger::before, .rp-console-arrow { transition: none; }
 }

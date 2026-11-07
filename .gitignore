@@ -33,3 +33,7 @@ graphify-out/
 
 # Promo-Videos, Texte und Test-Firmware (nicht ins Repository)
 promo/
+
+# Local Claude Code skills (third-party, not part of CNC Craft)
+.claude/skills/
+skills-lock.json

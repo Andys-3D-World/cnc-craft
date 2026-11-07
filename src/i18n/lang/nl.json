@@ -5840,5 +5840,7 @@
   "wr.fn.foot": "Voetschakelaar start/pauze",
   "wr.fn.doorGuard": "Deurbeveiliging",
   "wr.fn.lasHand": "Laser met de hand",
-  "wr.fn.spOn": "Spindel aan"
+  "wr.fn.spOn": "Spindel aan",
+  "gen.warnBed": "⚠ Samen zijn de delen {w} × {h} mm en steken ze buiten het bed ({bw} × {bh} mm). Nest ze of verdeel ze over meerdere bedden.",
+  "gen.warnWeb": "⚠ Dunste brug tussen twee sneden: {d} mm (richtwaarde vanaf {min} mm). Het deel kan daar breken, dus maak het groter of wijzig de waarden."
 }

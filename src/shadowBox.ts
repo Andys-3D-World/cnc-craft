@@ -19,6 +19,7 @@
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon } from "polygon-clipping";
 import { bounds, union, unionMany, grow, type XY } from "./nameConnect.ts";
+import { thinnestWeb } from "./genCheck.ts";
 import { ornamentBody, motif, fitText, lineBaselines, type OrnamentShape, type OrnamentText } from "./ornament.ts";
 import { inRegion, type ScoreLine } from "./nameConnect.ts";
 import { scene, rng, type SceneKind } from "./landscape.ts";
@@ -73,6 +74,31 @@ function inset(m: MultiPolygon, d: number): MultiPolygon {
   return diff(m, grow(diff(rect(b.x0 - 5, b.y0 - 5, b.x1 + 5, b.y1 + 5), m), d, true));
 }
 
+/** Schmalste Stelle zwischen zwei Ausschnitten einer Schicht (mm) */
+const MIN_WEB = 1;
+/** Kleinere Ausschnitte (mm²) würden nur als Krümel herausfallen */
+const MIN_HOLE = 2;
+
+/**
+ * Kleine Ausschnitte, die zu nah an einem anderen liegen, füllen: Dazwischen stünde ein Steg, der bricht.
+ * Füllen statt Wegschneiden: So bleibt die Schicht aus einem Stück und nichts fällt ab.
+ */
+export function fillCloseHoles(layer: MultiPolygon): MultiPolygon {
+  const asPath = (r: XY[]) => ({ closed: true, pts: r.slice(0, -1).map(([x, y]) => ({ x, y })) });
+  const size = (r: XY[]) => { let a = 0; for (let i = 0; i + 1 < r.length; i++) a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1]; return Math.abs(a) / 2; };
+  return layer.map(poly => {
+    const [outer, ...holes] = poly;
+    let kept = [...holes].sort((a, b) => size(a) - size(b));
+    for (const h of [...kept]) {
+      const others = kept.filter(o => o !== h);
+      const close = [outer, ...others].some(o => thinnestWeb([asPath(h), asPath(o)], MIN_WEB) !== null);
+      // der größte Ausschnitt ist das Fenster selbst: der bleibt immer
+      if (others.length && (size(h) < MIN_HOLE || close)) kept = others;
+    }
+    return [outer, ...kept];
+  });
+}
+
 /** Spiel im Schlitz (mm) */
 export const SLOT_CLEAR = 0.15;
 
@@ -122,7 +148,7 @@ export function shadowBox(o: ShadowBoxOptions, text: OrnamentText = { area: [], 
     let layer = unionMany([ring, land.length ? polygonClipping.intersection(land, win) : [], tabArea]);
     // falls die Landschaft irgendwo frei schwebt (sehr schmale Formen): nur das größte Teil behalten
     if (layer.length > 1) layer = [layer.reduce((a, p) => (bounds([p]).y1 - bounds([p]).y0 > bounds([a]).y1 - bounds([a]).y0 ? p : a))];
-    layers.push(layer);
+    layers.push(fillCloseHoles(layer));
   }
   // Text vorn: Buchstaben im Fenster der vordersten Schicht, je Zeile ein Steg bis in die Mitte des Rahmens
   let dropped = 0, backLines: ScoreLine[] = [];

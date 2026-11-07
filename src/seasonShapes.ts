@@ -67,6 +67,39 @@ function polar(cx: number, cy: number, r: (a: number) => number, n = 120): XY[] 
 export type SeasonShape = "egg" | "bunny" | "pumpkin" | "ghost" | "bat" | "flower" | "butterfly" | "sun" | "shell" | "leaf" | "acorn" | "mushroom";
 export const SEASON_SHAPES: SeasonShape[] = ["egg", "bunny", "pumpkin", "ghost", "bat", "flower", "butterfly", "sun", "shell", "leaf", "acorn", "mushroom"];
 
+/**
+ * Glatte, spiegelgleiche Form aus der rechten Hälfte (von unten auf der Mittelachse nach oben auf der Mittelachse).
+ * Drittes Feld = true: Ecke (hier knickt die Kurve), sonst läuft sie weich durch den Punkt.
+ */
+type Ctrl = [number, number, boolean?];
+export function smoothHalf(right: Ctrl[], seg = 10): XY[] {
+  return smoothLoop([...right, ...right.slice(1, -1).reverse().map(([x, y, c]): Ctrl => [-x, y, c])], seg);
+}
+
+/** Glatte geschlossene Form durch die Punkte, Ecken wie bei smoothHalf */
+export function smoothLoop(loop: Ctrl[], seg = 10): XY[] {
+  const n = loop.length, out: XY[] = [];
+  const tan = (i: number): XY => {
+    const c = loop[i];
+    if (c[2]) return [0, 0];
+    const a = loop[(i + n - 1) % n], b = loop[(i + 1) % n];
+    return [(b[0] - a[0]) / 2, (b[1] - a[1]) / 2];
+  };
+  for (let i = 0; i < n; i++) {
+    const p = loop[i], q = loop[(i + 1) % n], m0 = tan(i), m1 = tan((i + 1) % n);
+    for (let k = 0; k < seg; k++) {
+      const t = k / seg, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      out.push([h00 * p[0] + h10 * m0[0] + h01 * q[0] + h11 * m1[0], h00 * p[1] + h10 * m0[1] + h01 * q[1] + h11 * m1[1]]);
+    }
+  }
+  return out;
+}
+
+/** Fledermaus: Bögen unter den Flügeln mit spitzen Fingern, Ohren */
+const BAT: Ctrl[] = [[0, -0.26], [0.05, -0.17], [0.07, -0.08, true], [0.14, -0.1], [0.21, -0.24, true], [0.28, -0.1], [0.37, -0.2, true], [0.43, -0.05], [0.5, 0.02, true],
+  [0.42, 0.17], [0.3, 0.24, true], [0.2, 0.17], [0.09, 0.15], [0.085, 0.3, true], [0.04, 0.2], [0, 0.19]];
+
 export function seasonOutline(s: SeasonShape): MultiPolygon {
   switch (s) {
     case "egg": // unten breiter
@@ -77,17 +110,11 @@ export function seasonOutline(s: SeasonShape): MultiPolygon {
     case "pumpkin": // fünf Rippen und Stiel
       return unionMany([poly(ellipse(0, 0, 0.26, 0.36)), poly(ellipse(-0.2, -0.01, 0.25, 0.34)), poly(ellipse(0.2, -0.01, 0.25, 0.34)),
         poly(ellipse(-0.36, -0.03, 0.17, 0.29)), poly(ellipse(0.36, -0.03, 0.17, 0.29)), poly([[-0.04, 0.3], [0.05, 0.3], [0.1, 0.5], [0.03, 0.52]])]);
-    case "ghost": { // runder Kopf, Körper, gewellter Saum (Bögen nach unten), kleine Arme
-      const parts: MultiPolygon[] = [poly(ellipse(0, 0.16, 0.32, 0.32, 0, 72)), poly([[-0.32, 0.16], [0.32, 0.16], [0.36, -0.36], [-0.36, -0.36]])];
-      for (let i = 0; i < 4; i++) parts.push(poly(ellipse(-0.27 + i * 0.18, -0.36, 0.09, 0.08, 0, 24)));
-      parts.push(poly(ellipse(-0.37, -0.02, 0.1, 0.05, 0.5, 24)), poly(ellipse(0.37, -0.02, 0.1, 0.05, -0.5, 24)));
-      return unionMany(parts);
-    }
-    case "bat": { // Flügel mit gezacktem Unterrand, Ohren
-      const right: XY[] = [[0, -0.14], [0.06, -0.12], [0.14, -0.2], [0.22, -0.1], [0.32, -0.2], [0.4, -0.06], [0.52, -0.12], [0.5, 0.14],
-        [0.36, 0.22], [0.2, 0.12], [0.1, 0.12], [0.08, 0.24], [0.04, 0.16], [0, 0.16]];
-      return poly(mirror(right));
-    }
+    case "ghost": // runder Kopf, kleine Arme, Saum mit drei Bögen
+      return poly(smoothHalf([[0, -0.5], [0.07, -0.47], [0.13, -0.37, true], [0.19, -0.47], [0.26, -0.5], [0.34, -0.45], [0.37, -0.32], [0.35, -0.1], [0.39, -0.03], [0.46, 0.03], [0.41, 0.1],
+        [0.34, 0.1], [0.32, 0.25], [0.24, 0.41], [0.12, 0.49], [0, 0.5]], 12));
+    case "bat":
+      return poly(smoothHalf(BAT, 12));
     case "flower": // fünf runde Blütenblätter um eine Mitte
       return petals(0, 0, 0.5, 5);
     case "butterfly": { // vier Flügel, Körper
@@ -95,11 +122,16 @@ export function seasonOutline(s: SeasonShape): MultiPolygon {
         poly(ellipse(0.17, -0.18, 0.16, 0.13, 0.5)), poly(ellipse(0, -0.02, 0.05, 0.3)), stroke([0, 0.24], [-0.1, 0.42], 0.03), stroke([0, 0.24], [0.1, 0.42], 0.03)]);
     }
     case "sun": return unionMany([poly(starPoints(0, 0, 12, 0.5, 0.33)), poly(ellipse(0, 0, 0.36, 0.36, 0, 72))]);
-    case "shell": { // Fächer mit Rippen-Rand, unten zwei Ecken
-      const pts: XY[] = [[-0.08, -0.42], [-0.2, -0.36], [-0.12, -0.3]];
-      for (let i = 0; i <= 90; i++) { const a = Math.PI * (0.92 - (0.84 * i) / 90), r = 0.6 + 0.03 * Math.cos(i * Math.PI * 2 / 10); pts.push([r * Math.cos(a), -0.36 + r * Math.sin(a)]); }
-      pts.push([0.12, -0.3], [0.2, -0.36], [0.08, -0.42]);
-      return poly(pts.reverse());
+    case "shell": { // Fächer mit sieben Rippen, zwei kleine Ohren am Gelenk
+      const right: Ctrl[] = [[0, -0.5], [0.09, -0.49, true], [0.2, -0.47], [0.21, -0.42], [0.13, -0.36, true]];
+      const ribs = 7, steps = 42, a0 = 0.32, a1 = Math.PI / 2;
+      // von der Seite zur Mitte; Rand aus Bögen, die Rillen dazwischen sind Ecken
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps, a = a0 + (a1 - a0) * u, w = Math.abs(Math.sin(((a - Math.PI / 2) * ribs) / (Math.PI - 2 * a0) * Math.PI + Math.PI / 2));
+        right.push([0.92 * (1 + 0.035 * w) * Math.cos(a) * 0.62, -0.42 + 0.92 * (1 + 0.035 * w) * Math.sin(a), w < 0.08]);
+      }
+      right[right.length - 1][0] = 0;
+      return poly(smoothHalf(right, 3));
     }
     case "leaf": { // Ahornblatt mit Stiel
       const right: XY[] = [[0, -0.5], [0.025, -0.5], [0.025, -0.3], [0.12, -0.27], [0.38, -0.2], [0.3, -0.1], [0.5, 0.08], [0.32, 0.12], [0.36, 0.3], [0.2, 0.2], [0.16, 0.36], [0.08, 0.3], [0, 0.5]];
@@ -108,12 +140,8 @@ export function seasonOutline(s: SeasonShape): MultiPolygon {
     case "acorn": // Nuss, Hütchen, Stiel
       return unionMany([poly(Array.from({ length: 80 }, (_, i) => { const t = (i / 80) * Math.PI * 2; const y = Math.sin(t); return [0.27 * Math.cos(t), -0.08 + 0.32 * y * (y < 0 ? 1.15 : 1)] as XY; })),
         poly(ellipse(0, 0.16, 0.34, 0.16)), poly([[-0.03, 0.28], [0.04, 0.28], [0.06, 0.44], [0, 0.45]])]);
-    case "mushroom": { // Hut und Stiel
-      const cap: XY[] = [];
-      for (let i = 0; i <= 40; i++) { const a = (i / 40) * Math.PI; cap.push([0.5 * Math.cos(a), 0.02 + 0.36 * Math.sin(a)]); }
-      cap.push([-0.5, -0.02], [-0.3, -0.06], [0.3, -0.06], [0.5, -0.02]);
-      return unionMany([poly(cap), poly([[-0.14, -0.04], [0.14, -0.04], [0.17, -0.42], [0.1, -0.48], [-0.1, -0.48], [-0.17, -0.42]])]);
-    }
+    case "mushroom": // Hut mit rundem Rand, Stiel unten etwas breiter
+      return poly(smoothHalf([[0, -0.5], [0.12, -0.49], [0.18, -0.42], [0.15, -0.25], [0.13, -0.08, true], [0.3, -0.05], [0.45, -0.04], [0.5, 0.04], [0.45, 0.2], [0.3, 0.38], [0.14, 0.47], [0, 0.5]], 12));
   }
 }
 
@@ -128,7 +156,7 @@ export function seasonMotif(kind: SeasonMotif): MultiPolygon {
   switch (kind) {
     case "eggs": return poly(Array.from({ length: 40 }, (_, i) => { const t = (i / 40) * Math.PI * 2; return [0.32 * Math.sin(t) * (1 + 0.15 * Math.cos(t)), -0.45 * Math.cos(t)] as XY; }));
     case "flowers": return petals(0, 0, 0.5, 5, 24);
-    case "bats": return poly(mirror([[0, -0.1], [0.08, -0.08], [0.16, -0.16], [0.24, -0.06], [0.36, -0.12], [0.48, 0.08], [0.32, 0.16], [0.14, 0.08], [0.08, 0.18], [0, 0.1]]));
+    case "bats": return poly(smoothHalf(BAT, 5));
     case "pumpkins": return unionMany([poly(ellipse(0, -0.04, 0.2, 0.3, 0, 32)), poly(ellipse(-0.18, -0.05, 0.2, 0.27, 0, 32)), poly(ellipse(0.18, -0.05, 0.2, 0.27, 0, 32)),
       poly([[-0.03, 0.2], [0.04, 0.2], [0.07, 0.45], [0.01, 0.46]])]);
     case "leaves": return poly(Array.from({ length: 40 }, (_, i) => { const t = (i / 40) * Math.PI * 2; return [0.24 * Math.sin(t) * Math.abs(Math.sin(t)) ** 0.3, 0.48 * Math.cos(t)] as XY; }));
@@ -152,9 +180,14 @@ export function seasonTopper(kind: SeasonTopper, top: number, S: number): MultiP
       // (Stege von der Mitte zu den Ohren halten sie auch auf spitzen Formen wie dem Stern fest)
       return unionMany([...[-1, 1].map(sd => poly(ellipse(sd * 0.1 * S, top + 0.2 * S, 0.075 * S, 0.27 * S, -sd * 0.22))),
         ...[-1, 1].map(sd => stroke(P(0, -0.12), P(sd * 0.09, 0), 0.06 * S))]);
-    case "cat": // zwei Dreiecksohren
-      return unionMany([...[-1, 1].map(sd => poly([P(sd * 0.04, -0.08), P(sd * 0.3, -0.08), P(sd * 0.24, 0.24)])),
-        poly([P(-0.06, -0.14), P(0.06, -0.14), P(0.06, -0.04), P(-0.06, -0.04)])]); // Steg in der Mitte: hält auch auf spitzen Formen
+    case "cat": { // zwei Ohren mit weichen Seiten auf einem flachen Scheitel (der hält sie auch auf spitzen Formen)
+      const ear = (sd: number) => { const q = (x: number, y: number): XY => [sd * x * S, top + y * S];
+        const pts: XY[] = [];
+        for (let i = 0; i <= 12; i++) { const t = i / 12; pts.push(q(0.06 + 0.18 * t - 0.03 * Math.sin(t * Math.PI), -0.08 + 0.34 * t)); }
+        for (let i = 1; i <= 12; i++) { const t = i / 12; pts.push(q(0.24 + 0.09 * t + 0.02 * Math.sin(t * Math.PI), 0.26 - 0.34 * t)); }
+        return poly(pts); };
+      return unionMany([ear(-1), ear(1), poly(ellipse(0, top - 0.08 * S, 0.34 * S, 0.1 * S))]);
+    }
     case "witch": { // Spitzhut mit Krempe und Band, schief
       const brim = poly(ellipse(0, top + 0.02 * S, 0.34 * S, 0.06 * S));
       const cone = poly([P(-0.2, 0.02), P(0.2, 0.02), P(0.12, 0.2), P(0.24, 0.42), P(-0.02, 0.24)]);
@@ -208,10 +241,8 @@ export function roundTree(x: number, y: number, h: number): Item {
 }
 
 export function mushroomItem(x: number, y: number, h: number): Item {
-  const cap: XY[] = [];
-  for (let i = 0; i <= 24; i++) { const a = (i / 24) * Math.PI; cap.push([x + h * 0.32 * Math.cos(a), y + h * 0.55 + h * 0.4 * Math.sin(a)]); }
-  return { area: unionMany([poly(cap), poly([[x - h * 0.1, y - h * 0.08], [x + h * 0.1, y - h * 0.08], [x + h * 0.08, y + h * 0.56], [x - h * 0.08, y + h * 0.56]])]),
-    lights: unionMany([poly(ellipse(x - h * 0.12, y + h * 0.72, h * 0.045, h * 0.04, 0, 16)), poly(ellipse(x + h * 0.1, y + h * 0.8, h * 0.05, h * 0.045, 0, 16))]) };
+  const area = seasonOutline("mushroom").map(p => p.map(r => r.map(([u, v]) => [x + u * h * 0.68, y - h * 0.08 + (v + 0.5) * h * 1.03] as XY)));
+  return { area, lights: unionMany([poly(ellipse(x - h * 0.12, y + h * 0.72, h * 0.045, h * 0.04, 0, 16)), poly(ellipse(x + h * 0.1, y + h * 0.8, h * 0.05, h * 0.045, 0, 16))]) };
 }
 
 export function palm(x: number, y: number, h: number): Item {

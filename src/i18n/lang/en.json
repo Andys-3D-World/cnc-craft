@@ -5840,5 +5840,7 @@
   "wr.fn.foot": "Foot switch start/pause",
   "wr.fn.doorGuard": "Door guard",
   "wr.fn.lasHand": "Laser by hand",
-  "wr.fn.spOn": "Spindle on"
+  "wr.fn.spOn": "Spindle on",
+  "gen.warnBed": "⚠ Together the parts are {w} × {h} mm and go past the bed ({bw} × {bh} mm). Nest them or spread them over several beds.",
+  "gen.warnWeb": "⚠ Thinnest bridge between two cuts: {d} mm (guide value from {min} mm). The part can break there, so make it larger or change the values."
 }

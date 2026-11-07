@@ -5840,5 +5840,7 @@
   "wr.fn.foot": "Pedal inicio/pausa",
   "wr.fn.doorGuard": "Protección de puerta",
   "wr.fn.lasHand": "Láser manual",
-  "wr.fn.spOn": "Husillo encendido"
+  "wr.fn.spOn": "Husillo encendido",
+  "gen.warnBed": "⚠ En conjunto las piezas miden {w} × {h} mm y se salen de la mesa ({bw} × {bh} mm). Anídalas o repártelas en varias mesas.",
+  "gen.warnWeb": "⚠ Puente más fino entre dos cortes: {d} mm (valor orientativo desde {min} mm). La pieza puede romperse ahí: hazla más grande o cambia los valores."
 }

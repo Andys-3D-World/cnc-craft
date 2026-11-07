@@ -5840,5 +5840,7 @@
   "wr.fn.foot": "Fußschalter Start/Pause",
   "wr.fn.doorGuard": "Tür-Schutz",
   "wr.fn.lasHand": "Laser von Hand",
-  "wr.fn.spOn": "Spindel ein"
+  "wr.fn.spOn": "Spindel ein",
+  "gen.warnBed": "⚠ Die Teile sind zusammen {w} × {h} mm und ragen über das Bett ({bw} × {bh} mm). Verschachteln oder auf mehrere Betten verteilen.",
+  "gen.warnWeb": "⚠ Dünnster Steg zwischen zwei Schnitten: {d} mm (Richtwert ab {min} mm). Dort kann das Teil brechen, also größer machen oder die Werte ändern."
 }
