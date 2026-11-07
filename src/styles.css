@@ -1891,3 +1891,48 @@ html.os-linux {
 .tc-head { width: 52px; font-size: 0.72rem; text-align: right; padding-right: 5px; opacity: 0.75; flex: none; }
 .tc-cell { min-width: 38px; height: 26px; padding: 0 3px; font-size: 0.72rem; border: 1px solid var(--border-color); border-radius: 4px; color: var(--text-main); background: rgba(201, 138, 75, var(--a, 0.3)); cursor: pointer; }
 .tc-cell.on { outline: 2px solid var(--accent, #3d8bff); outline-offset: 1px; font-weight: 700; }
+
+/* Unterreiter von „Einrichten“ (oben, neben den Hauptreitern) */
+.setup-nav { display: flex; align-items: center; gap: 3px; margin-left: -8px; padding-left: 10px; border-left: 1px solid var(--border-color); height: 26px; }
+.setup-tab { background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--text-muted); font-family: var(--font-ui); font-size: 0.76rem; font-weight: 600; padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.setup-tab:hover { color: var(--text-main); }
+.setup-tab.active { color: var(--text-main); background: var(--bg-panel-2); border-color: var(--border-color); }
+.tab-content-btn { white-space: nowrap; }
+.header-stop { background: var(--color-danger); color: #fff; border: none; border-radius: 13px; padding: 4px 11px; font-size: 0.76rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+/* Job-Leiste rechts: immer sichtbar */
+.job-bar { flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; padding: 7px 8px; border-bottom: 1px solid var(--border-color); }
+.job-bar .m-state-row { justify-content: flex-start; min-width: 0; }
+.job-bar .m-state { flex-shrink: 0; }
+.job-label { flex: 1; min-width: 0; font-size: 0.7rem; font-family: var(--font-mono); color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.job-bar-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+.job-bar-btns button { padding: 5px 7px; font-size: 0.76rem; white-space: nowrap; }
+.job-bar-btns .job-main { flex: 2 1 auto; }
+.job-bar-btns #btn-job-start, .job-bar-btns .job-stop { flex: 1 1 auto; }
+.job-bar-btns .job-icon { flex: 0 0 auto; }
+.job-bar-btns .job-stop { color: var(--color-danger); border-color: var(--color-danger); }
+
+/* „Erweitert“ in einem Abschnitt */
+.rp-adv { border-top: 1px solid var(--border-color); margin-top: 2px; padding-top: 5px; }
+.rp-adv > summary { cursor: pointer; font-size: 0.76rem; font-weight: 600; color: var(--text-muted); user-select: none; }
+.rp-adv > summary:hover { color: var(--text-main); }
+.rp-adv-body { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/* Konsole zugeklappt: letzte Meldung in der Kopfzeile */
+.rp-console-last { display: none; flex: 1; min-width: 0; margin-left: 8px; font-family: var(--font-mono); font-weight: 400; font-size: 0.7rem; text-transform: none; letter-spacing: 0; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rp-console.collapsed .rp-console-last { display: block; }
+
+/* Datei-Menü in der Werkzeugleiste */
+.editor-toolbar .fly-btn.fly-btn-text { width: auto; display: flex; align-items: center; gap: 5px; padding: 0 12px 0 6px; font-size: 0.78rem; font-weight: 600; color: var(--text-main); }
+.fly-sep { height: 1px; margin: 3px 2px; background: var(--border-color); }
+.fly-menu .fly-danger .fly-lbl { color: var(--color-danger); }
+
+/* Befehlssuche (Strg+K) */
+.cmdk-overlay { position: fixed; inset: 0; z-index: 6000; background: rgba(0,0,0,0.45); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; }
+.cmdk-box { width: 480px; max-width: calc(100vw - 32px); max-height: 60vh; display: flex; flex-direction: column; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 12px; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.55); font-family: var(--font-ui); }
+.cmdk-input { flex-shrink: 0; width: 100%; box-sizing: border-box; padding: 12px 14px; font-size: 0.95rem; background: transparent; border: none; border-bottom: 1px solid var(--border-color); border-radius: 0; color: var(--text-main); outline: none; }
+.cmdk-list { overflow-y: auto; padding: 5px; display: flex; flex-direction: column; gap: 1px; }
+.cmdk-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; background: transparent; border: none; border-radius: var(--radius-sm); color: var(--text-main); font-family: var(--font-ui); font-size: 0.85rem; text-align: left; cursor: pointer; flex-shrink: 0; }
+.cmdk-row.active { background: var(--accent-glow); }
+.cmdk-row kbd { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+.cmdk-none { padding: 14px; font-size: 0.85rem; color: var(--text-muted); text-align: center; }

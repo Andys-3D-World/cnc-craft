@@ -16,14 +16,19 @@
           <span class="brand-icon">🛠️</span> CNC<em>Craft</em>
         </div>
         <div class="tab-group">
-          <button class="tab-content-btn active" data-tab="tab-cam">🎨 <span data-i18n="nav.cam">CAM / Design</span></button>
+          <button class="tab-content-btn active" data-tab="tab-cam">🎨 <span data-i18n="nav.cam">Entwurf</span></button>
           <button class="tab-content-btn" data-tab="tab-sim">🎬 <span data-i18n="nav.sim">Simulation</span></button>
-          <button class="tab-content-btn" data-tab="tab-flash">⚡ <span data-i18n="nav.flash">Board flashen</span></button>
-          <button class="tab-content-btn" data-tab="tab-calibrate">⚙️ <span data-i18n="nav.calibrate">Einstellungen ($$)</span></button>
-          <button class="tab-content-btn" data-tab="tab-wiring">🔌 <span data-i18n="nav.wiring">Anschlüsse</span></button>
-          <button class="tab-content-btn" data-tab="tab-program"><span class="only-mill">🛠️ <span data-i18n="nav.tools">Werkzeuge</span></span><span class="only-laser">🔦 <span data-i18n="nav.laserLib">Laser-Bibliothek</span></span><span class="only-plasma">🔥 <span data-i18n="nav.plasmaLib">Plasma-Bibliothek</span></span></button>
+          <button class="tab-content-btn" data-tab="tab-program">📚 <span data-i18n="nav.library">Bibliothek</span></button>
+          <button class="tab-content-btn" id="nav-setup">⚙️ <span data-i18n="nav.setup">Einrichten</span></button>
+        </div>
+        <!-- Unterreiter von „Einrichten“: nur sichtbar, solange einer davon offen ist -->
+        <div class="setup-nav" id="setup-nav" style="display:none;">
+          <button class="setup-tab" data-tab="tab-calibrate"><span data-i18n="nav.calibrate">Einstellungen ($$)</span></button>
+          <button class="setup-tab" data-tab="tab-flash"><span data-i18n="nav.flash">Board flashen</span></button>
+          <button class="setup-tab" data-tab="tab-wiring"><span data-i18n="nav.wiring">Anschlüsse</span></button>
         </div>
         <div class="tab-status">
+          <button id="header-stop" class="header-stop" style="display:none;">⏹ <span data-i18n="rp.stop">Stopp</span></button>
           <button id="update-pill" class="update-pill" style="display:none;"></button>
           <button id="support-btn" class="about-btn support-btn" data-i18n-tip="support.btnTip">❤️</button>
           <button id="camera-btn" class="about-btn camera-btn" data-i18n-tip="cam.btnTip">📷</button>

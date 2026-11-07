@@ -240,7 +240,19 @@ export function machineLineHtml(): string {
 
 const supportBadge = (s: string) => `<span class="mw-sup mw-sup-${s}">${t("mw.sup." + s)}</span>`;
 
-export function openMachineWizard() {
+/** Erster Start ohne gewählte Maschine: Assistent einmal von selbst öffnen. Liegt schon ein Fenster offen, beim nächsten Start */
+export function welcomeOnFirstStart() {
+  const FIRST_KEY = "cnc_craft_first_start_done";
+  try {
+    if (localStorage.getItem(FIRST_KEY)) return;
+    if (document.querySelector(".dlg-overlay")) return;
+    localStorage.setItem(FIRST_KEY, "1");
+  } catch { return; }
+  if ((["laser", "mill", "plasma"] as MachineMode[]).some(k => load(k))) return;
+  openMachineWizard(true);
+}
+
+export function openMachineWizard(welcome = false) {
   $("mw-overlay")?.remove();
   // nur Maschinen der aktuellen Art zeigen (oben umschaltbar)
   let kind: MachineMode = getMachineMode();
@@ -255,7 +267,7 @@ export function openMachineWizard() {
   ov.className = "dlg-overlay";
   ov.innerHTML = `
     <div class="dlg-box mw-box" role="dialog">
-      <h3>🧭 ${t("mw.title")}</h3>
+      <h3>🧭 ${t(welcome ? "mw.welcomeTitle" : "mw.title")}</h3>
       <div class="mw-tabs" role="tablist">
         ${(["laser", "mill", "plasma"] as MachineMode[]).map(k => `<button class="mw-tab" data-kind="${k}">${{ laser: "🔦", mill: "🛠️", plasma: "🔥" }[k]} ${t("mode." + k)}</button>`).join("")}
       </div>
@@ -392,6 +404,8 @@ export function openMachineWizard() {
     const write = !!($("mw-write") as HTMLInputElement | null)?.checked && machine.connected;
     close();
     await applyMachine(result, write);
+    // Erster Start: als Nächstes kommt das Verbinden
+    if (welcome) document.querySelector<HTMLElement>('.rp-tab[data-rp="rp-machine"]')?.click();
   };
 
   renderLists();

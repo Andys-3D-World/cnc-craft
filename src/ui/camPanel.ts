@@ -50,12 +50,12 @@ export function renderCamPanel(container: HTMLElement) {
       ["check", [["materialTest", "materialTest", "tip.cmd.materialTest"], ["testCard", "testCard", "tip.cmd.testCard"], ["view3d", "view3d", "tip.cmd.view3d"], ["stlExport", "stlExport", "tip.cmd.stlExport"]]]
     ], 20)}
     <div class="strip-sep strip-push"></div>
-    ${action("generate-gcode", "gcode", "rp.genGcodeTip")}
+    ${action("to-machine", "gcode", "rp.toMachineTip")}
     ${action("save-gcode", "gcodeSave", "rp.saveGcodeTip")}
     ${action("simulate", "simulate", "rp.simulateTip")}
     ${action("cost", "cost", "cost.tip")}
   `;
-  // Abkürzungen zu den Knöpfen im rechten Panel (G-Code-Bereich) – gleiche Funktion
+  // Abkürzungen zu den Knöpfen rechts – gleiche Funktion
   container.querySelectorAll<HTMLElement>("[data-click]").forEach(b =>
     b.addEventListener("click", () => document.getElementById(b.dataset.click!)?.click()));
 }
@@ -64,10 +64,12 @@ export function renderCamPanel(container: HTMLElement) {
 export function renderEditorToolbar(container: HTMLElement) {
   container.innerHTML = `
     <div class="tb-group">
-      ${cmd("importFile", "import", "tip.cmd.importFile")}
-      ${cmd("openProject", "open", "tip.cmd.openProject")}
-      ${cmd("saveProject", "save", "tip.cmd.saveProject")}
-      ${cmd("exportVector", "export", "tip.cmd.exportVector")}
+      ${flyCmds("file", "open", [["importFile", "import", "tip.cmd.importFile"], ["openProject", "open", "tip.cmd.openProject"],
+        ["saveProject", "save", "tip.cmd.saveProject"], ["exportVector", "export", "tip.cmd.exportVector"]], "down", 18, {
+        label: T("fly.fileLabel"),
+        extra: `<div class="fly-sep"></div><button id="btn-clear-canvas" class="btn-cmd fly-item fly-danger" ${tip("tip.clearAll")}><span class="fly-chip">${icon("clear", 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`
+      })}
+      <button id="btn-cmd-search" class="btn-cmd" ${tip("tip.cmdSearch")}>${icon("search")}</button>
     </div>
     <div class="tb-group">
       ${cmd("undo", "undo", "tip.cmd.undo")}
@@ -103,7 +105,6 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${cmd("zoomFit", "zoomFit", "tip.cmd.zoomFit")}
       ${placeButtonHtml()}
-      <button id="btn-clear-canvas" class="btn-cmd btn-cmd-danger" ${tip("tip.clearAll")}>${icon("clear")}</button>
     </div>
     <div class="tb-group tb-options">
       <label class="tb-opt" ${tip("tip.material")}>🪵

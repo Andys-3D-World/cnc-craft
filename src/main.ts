@@ -4,7 +4,7 @@ import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
 import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
-import { handleGcodeGeneration, exportGcodeToFile, generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "./cam";
+import { exportGcodeToFile, generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
 import { openCostDialog } from "./ui/costCalc";
 import { initOpsPanel, refreshOps } from "./ui/opsPanel";
@@ -29,7 +29,7 @@ import { initPlasmaCuts } from "./plasmaCuts";
 import { initPlasmaPanel, refreshPlasmaPanel } from "./ui/plasmaPanel";
 import { initStock } from "./stock";
 import { initStockPanel } from "./ui/stockPanel";
-import { applySavedMachine, initMachineWizard } from "./ui/machineWizard";
+import { applySavedMachine, initMachineWizard, welcomeOnFirstStart } from "./ui/machineWizard";
 import { initJobTools } from "./ui/jobTools";
 import { initSpindlePanel } from "./ui/spindlePanel";
 import { initProbePanel } from "./ui/probePanel";
@@ -47,6 +47,8 @@ import { initUpdater } from "./update/updater";
 import { initProjectSafety } from "./projectSafety";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
+import { buildJob, okToStart } from "./jobFlow";
+import { initCommandPalette } from "./ui/commandPalette";
 import { setupToolsHandler } from "./toolsHandler";
 import { initMouseEngine } from "./mouseEngine";
 import { bindOffsetModes } from "./offsetModes";
@@ -159,7 +161,6 @@ window.addEventListener("DOMContentLoaded", async () => {
     const canvas = document.getElementById("cnc-canvas") as HTMLCanvasElement;
     const ctx = canvas.getContext("2d");
     const clearBtn = document.getElementById("btn-clear-canvas");
-    const generateGcodeBtn = document.getElementById("btn-generate-gcode");
     const saveGcodeBtn = document.getElementById("btn-save-gcode");
     const loadGcodeBtn = document.getElementById("btn-load-gcode");
     const jobStartBtn = document.getElementById("btn-job-start");
@@ -214,11 +215,12 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (!window.confirm(t("main.confirmClear"))) return;
       state.shapes = []; state.selectedShapeIds = []; redraw();
     });
-    if (generateGcodeBtn) generateGcodeBtn.addEventListener("click", () => handleGcodeGeneration(state.shapes, appendToConsole));
     if (saveGcodeBtn) saveGcodeBtn.addEventListener("click", () => exportGcodeToFile(state.shapes, appendToConsole, gcodeFileName()));
 
     if (loadGcodeBtn) loadGcodeBtn.addEventListener("click", () => loadGcodeFromFile(appendToConsole));
-    if (jobStartBtn) jobStartBtn.addEventListener("click", () => startStreaming(() => state.isDeviceConnected, appendToConsole));
+    if (jobStartBtn) jobStartBtn.addEventListener("click", async () => {
+      if (await okToStart(state.shapes, appendToConsole, showBuiltJob)) startStreaming(() => state.isDeviceConnected, appendToConsole);
+    });
     document.getElementById("btn-job-resume")?.addEventListener("click", () => openResumeDialog(appendToConsole));
     if (jobPauseBtn) jobPauseBtn.addEventListener("click", () => pauseStreaming(appendToConsole));
     if (jobStopBtn) jobStopBtn.addEventListener("click", () => stopStreaming());
@@ -263,6 +265,26 @@ window.addEventListener("DOMContentLoaded", async () => {
     attachConsoleResizer(document.getElementById("rp-console"));
     attachPanelResizer(document.querySelector<HTMLElement>("#tab-sim .sim-layout"), document.querySelector<HTMLElement>("#tab-sim .sim-side"), "sim");
     const openSimTab = () => (document.querySelector('.tab-navigation [data-tab="tab-sim"]') as HTMLElement | null)?.click();
+    // „Zur Maschine“: Job aus der Zeichnung, dann in der Simulation ansehen. Gestartet wird nie von selbst
+    function showBuiltJob() {
+      // runde Drehachse: die Simulation zeigt die abgewickelte Fläche, der Job bleibt der echte
+      if (rotary.on && !isPlasma() && !isPrism(rotary)) document.getElementById("btn-simulate")?.click();
+      else openSimTab();
+    }
+    document.getElementById("btn-to-machine")?.addEventListener("click", () => {
+      if (buildJob(state.shapes, appendToConsole)) showBuiltJob();
+    });
+    // Job-Leiste: was als Nächstes dran ist, ist der farbige Knopf. Stopp oben, solange ein Job läuft (auch in den anderen Reitern)
+    const toMachineBtn = document.getElementById("btn-to-machine"), headerStop = document.getElementById("header-stop");
+    headerStop?.addEventListener("click", () => jobStopBtn?.click());
+    setInterval(() => {
+      const hasJob = streamState.loadedLines.length > 0;
+      toMachineBtn?.classList.toggle("btn-primary", !hasJob);
+      toMachineBtn?.classList.toggle("btn-secondary", hasJob);
+      jobStartBtn?.classList.toggle("btn-primary", hasJob);
+      jobStartBtn?.classList.toggle("btn-secondary", !hasJob);
+      if (headerStop) headerStop.style.display = streamState.isRunning ? "" : "none";
+    }, 300);
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
       // Eckig/Vieleck: die Simulation braucht den echten G-Code mit den Drehungen auf die Flächen
       const prism = rotary.on && !isPlasma() && isPrism(rotary);
@@ -282,6 +304,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     });
     window.addEventListener("cnc-language-changed", () => { renderToolTable(); relabelBeds(); redraw(); });
     initCollapsibleMenus();
+    initCommandPalette();
+    setTimeout(welcomeOnFirstStart, 800);
     initLightBurnTooltips();
     initToolLibrary();
     initToolPage();                    // Reiter "Werkzeuge": Fräswerkzeuge

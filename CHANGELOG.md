@@ -35,8 +35,21 @@ Not yet cut on a real machine, so the fits of all new boxes are untested: cut a 
 Not yet burnt on a real machine: test on scrap first.
 
 **Improved**
+- **Simpler layout:** one clear way from the drawing to the machine.
+  - **To machine** replaces *Generate G-code*: it turns the drawing into the job and shows it in the simulation. The machine only starts when you click Start.
+  - **Job bar:** state, progress, *To machine*, Start, Pause and Stop are always visible on the right in Design, whichever tab is open. While a job runs, a Stop button also shows at the top in every main tab.
+  - **Warning before Start:** if the drawing or the settings changed after the job was made, you can rebuild the job, start the old version or cancel.
+  - **First start:** the machine wizard opens by itself once if no machine has been chosen.
+  - **Right side:** the tabs are now called *Object*, *Job* and *Machine* in every mode. Pocket strategy, feed in curves and arc fitting apply to all shapes and moved to *Job*. Finish allowance, milling direction and lead-in/out are under *Advanced*. Loading G-code moved to *Job*. Macros, spindle drive (VFD) and holding tabs start closed like probing, workshop and gamepad.
+  - **Console:** starts closed and shows the latest message in one line. It still opens by itself on errors, and stays the way you leave it.
+  - **Main tabs:** *Design*, *Simulation*, *Library* and *Set up*; settings ($$), board flashing and wiring are sub-tabs of *Set up*.
+  - **Find a command:** Ctrl+K (Cmd+K on Mac) or the magnifier: type a name and press Enter.
+  - **Toolbar:** import, open, save and export are in a *File* menu, and *Delete everything* moved there, away from everyday buttons.
 - **Generator menu:** the long list is now a board with three columns (boxes and storage, names and decoration, workshop and technology), so it always fits on the screen. All generator icons were redrawn in one style, and the generator windows use the same icons instead of system emoji.
 - **Icons everywhere:** system emoji across the whole program (tabs, buttons, windows, messages) are now replaced by our own icons that look the same on Windows, Mac and Linux. In dropdown lists, which cannot show graphics, the emoji is left out. The *Edit* and *Extras* menus are boards with columns like the generators, and all pop-out menus use the same icon tiles.
+
+**Fixed**
+- **Rotary and "Take over as job":** the simulation button could load the flattened preview as the job for round rotary parts. It now always builds the real G-code from the drawing.
 
 ## 0.4.2 Beta
 

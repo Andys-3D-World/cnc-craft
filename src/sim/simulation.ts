@@ -26,6 +26,7 @@ import { state as appState } from "../main";
 import { SimProgram, MOVE_CUT, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
+import { buildJob } from "../jobFlow";
 import { machine, setOverride, MACHINE_EVENT } from "../machine";
 import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
@@ -273,10 +274,8 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   });
 
   $("sim-to-job").addEventListener("click", () => {
-    if (!prog) return;
-    if (loadGcodeFromText(prog.lines.join("\n"), label, log)) {
-      // Job ersetzt die Vorschau (gleiche Zeilen wie die Maschine bekommt)
-    }
+    // echter G-Code aus der Zeichnung (die Vorschau kann bei der Drehachse abgewickelt sein)
+    if (prog) buildJob(appState.shapes, log);
   });
   $("sim-job-start").addEventListener("click", () => document.getElementById("btn-job-start")?.click());
   $("sim-job-pause").addEventListener("click", () => document.getElementById("btn-job-pause")?.click());

@@ -1,11 +1,11 @@
 /**
- * RECHTE SEITE: drei Reiter + Konsole (unten, einklappbar)
+ * RECHTE SEITE: Job-Leiste (immer sichtbar), drei Reiter, Konsole (unten, zu Beginn zugeklappt)
  *
- *   Objekt   – Position/Größe/Drehung der Auswahl, Werkzeug, Bahn-Korrektur, Frästiefe
- *   Fräsen   – G-Code erzeugen/speichern, Werkzeuge im Auftrag, Nullpunkt, Arbeitsraum
- *   Maschine – feste Leiste oben (Zustand, Position, Fortschritt, Start/Pause/Stopp), darunter Verbindung
- *              (klappt nach dem Verbinden zu), manuelle Fahrt, Maschine (Entsperren, Referenzfahrt …), Auftrag,
- *              Spindel/Laser/Brenner mit Overrides (spindlePanel.ts), Antasten
+ *   Job-Leiste – Zustand, Fortschritt, „Zur Maschine“, Start/Pause/Stopp: egal, welcher Reiter offen ist
+ *   Objekt     – Lage/Größe der Auswahl, Werkzeug, Bahn-Korrektur, Frästiefe; Selteneres unter „Erweitert“
+ *   Auftrag    – Simulation, G-Code speichern/laden, Werkzeuge im Auftrag, alles was für alle Formen gilt, Nullpunkt, Arbeitsraum
+ *   Maschine   – Position, Verbindung (klappt nach dem Verbinden zu), manuelle Fahrt, Maschine (Entsperren, Referenzfahrt …),
+ *                Spindel/Laser/Brenner mit Overrides (spindlePanel.ts), Antasten
  *   Objekt ohne Auswahl: nur Ebenen + Hinweis (Abschnitte .needs-sel sind dann versteckt)
  */
 import { icon } from "./icons";
@@ -32,15 +32,34 @@ import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt"
 import { arcFit, loadArcFit, saveArcFit, clampArcTol } from "../arcFit";
 
 const CONSOLE_KEY = "cnc_craft_console_collapsed";
+const ADV_KEY = "cnc_craft_mill_advanced";
 /** Meldungen, bei denen die zugeklappte Konsole von selbst aufgeht (alle Sprachen) */
 const ERROR_RE = /error|fehler|erreur|errore|fout|błąd|alarm|⚠|❌|⛔/i;
 
 export function renderRightPanel(container: HTMLElement) {
   container.innerHTML = `
     ${modeSwitchHtml()}
+    <div class="job-bar" id="job-bar">
+      <div class="m-state-row">
+        <span id="machine-state" class="m-state m-state-off">${T("m.state.Offline")}</span>
+        <span id="job-progress-label" class="job-label">${T("rp.noJob")}</span>
+        <span id="machine-fs" class="m-fs"></span>
+      </div>
+      <div id="machine-alarm" class="m-alarm" style="display:none;"></div>
+      <div id="job-progress-track" style="height: 5px; border-radius: 3px; overflow: hidden;">
+        <div id="job-progress-bar" style="height: 100%; width: 0%; transition: width 0.2s;"></div>
+      </div>
+      <div class="job-bar-btns">
+        <button id="btn-to-machine" class="btn-primary job-main" ${tip("rp.toMachineTip")}>🚀 ${T("rp.toMachine")}</button>
+        <button id="btn-job-start" class="btn-secondary">▶ ${T("rp.start")}</button>
+        <button id="btn-job-pause" class="btn-secondary job-icon" ${tip("m.pauseTip")}>⏸</button>
+        <button id="btn-job-stop" class="btn-secondary job-stop" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
+        <button id="btn-job-resume" class="btn-secondary job-icon" ${tip("res.btnTip")}>⏭</button>
+      </div>
+    </div>
     <div class="rp-tabs">
       <button class="rp-tab active" data-rp="rp-object">${T("rp.tabObject")}</button>
-      <button class="rp-tab" data-rp="rp-cam"><span class="only-mill">${T("rp.tabCam")}</span><span class="only-laser">${T("rp.tabLaser")}</span><span class="only-plasma">${T("rp.tabPlasma")}</span></button>
+      <button class="rp-tab" data-rp="rp-cam">${T("rp.tabJob")}</button>
       <button class="rp-tab" data-rp="rp-machine">${T("rp.tabMachine")}</button>
     </div>
 
@@ -86,6 +105,9 @@ export function renderRightPanel(container: HTMLElement) {
           <div class="menu-body rp-box">
             ${millProfilePickerHtml()}
             <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
+            <details class="rp-adv needs-sel" id="rp-adv-mill">
+              <summary>${T("rp.advanced")}</summary>
+              <div class="rp-adv-body">
             <div class="prop-row" ${tip("rp.finishTip")}>${T("rp.finish")}<input type="number" id="dim-finish" value="0" min="0" max="5" step="0.05" class="prop-input"></div>
             <div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}
               <select id="dim-mill-dir" class="prop-input" style="width: 110px;">
@@ -105,17 +127,8 @@ export function renderRightPanel(container: HTMLElement) {
                 <input type="number" id="dim-lead-len" value="3" min="0.1" max="50" step="0.5" class="prop-input" style="width: 54px;">
               </span>
             </div>
-            <div class="prop-row" ${tip("rp.pocketStrategyTip")}>${T("rp.pocketStrategy")}
-              <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
-                <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
-                <option value="spiral" data-i18n="rp.pocketContour">Kontur</option>
-                <option value="adaptive" data-i18n="rp.pocketAdaptive">Adaptiv</option>
-              </select>
-            </div>
-            <label class="prop-row" style="cursor:pointer;" ${tip("rp.feedAdaptTip")}><span>${T("rp.feedAdapt")}</span><input type="checkbox" id="feed-adapt-on" style="width:auto;"></label>
-            <div class="prop-row" ${tip("rp.feedAdaptTip")}>${T("rp.feedAdaptMin")}<input type="number" id="feed-adapt-min" min="10" max="100" step="5" class="prop-input"></div>
-            <label class="prop-row" style="cursor:pointer;" ${tip("rp.arcFitTip")}><span>${T("rp.arcFit")}</span><input type="checkbox" id="arc-fit-on" style="width:auto;"></label>
-            <div class="prop-row" ${tip("rp.arcFitTip")}>${T("rp.arcFitTol")}<input type="number" id="arc-fit-tol" min="0.001" max="0.1" step="0.005" class="prop-input"></div>
+              </div>
+            </details>
           </div>
         </div>
 
@@ -142,11 +155,14 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.gcode")}</h3>
           <div class="menu-body" style="display: flex; flex-direction: column; gap: 6px;">
-            <button id="btn-generate-gcode" class="btn-primary" ${tip("rp.genGcodeTip")}>🚀 ${T("rp.genGcode")}</button>
             <button id="btn-simulate" class="btn-secondary" ${tip("rp.simulateTip")}>🎬 ${T("rp.simulate")}</button>
             <button id="btn-cost" class="btn-secondary" ${tip("cost.tip")}>💶 ${T("cost.button")}</button>
             <button id="btn-save-gcode" class="btn-secondary" ${tip("rp.saveGcodeTip")}>💾 ${T("rp.saveGcode")}</button>
             <button id="btn-save-rd" class="btn-secondary only-ruida" ${tip("rd.saveTip")}>💾 ${T("rd.save")}</button>
+            <div style="display: flex; gap: 5px;">
+              <button id="btn-load-gcode" class="btn-secondary" style="flex: 1;" ${tip("rp.loadGcodeTip")}>📂 ${T("rp.loadGcode")}</button>
+              <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
+            </div>
           </div>
         </div>
 
@@ -155,6 +171,23 @@ export function renderRightPanel(container: HTMLElement) {
         ${laserSettingsHtml()}
         ${rotarySectionHtml()}
         ${plasmaSettingsHtml()}
+
+        <div class="menu-section-unified only-mill">
+          <h3 class="menu-trigger">${T("rp.gcodeAdv")}</h3>
+          <div class="menu-body rp-box">
+            <div class="prop-row" ${tip("rp.pocketStrategyTip")}>${T("rp.pocketStrategy")}
+              <select id="dim-pocket-strategy" class="prop-input" style="width: 90px;">
+                <option value="linear" data-i18n="rp.pocketParallel">Parallel</option>
+                <option value="spiral" data-i18n="rp.pocketContour">Kontur</option>
+                <option value="adaptive" data-i18n="rp.pocketAdaptive">Adaptiv</option>
+              </select>
+            </div>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.feedAdaptTip")}><span>${T("rp.feedAdapt")}</span><input type="checkbox" id="feed-adapt-on" style="width:auto;"></label>
+            <div class="prop-row" ${tip("rp.feedAdaptTip")}>${T("rp.feedAdaptMin")}<input type="number" id="feed-adapt-min" min="10" max="100" step="5" class="prop-input"></div>
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.arcFitTip")}><span>${T("rp.arcFit")}</span><input type="checkbox" id="arc-fit-on" style="width:auto;"></label>
+            <div class="prop-row" ${tip("rp.arcFitTip")}>${T("rp.arcFitTol")}<input type="number" id="arc-fit-tol" min="0.001" max="0.1" step="0.005" class="prop-input"></div>
+          </div>
+        </div>
 
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.origin")}</h3>
@@ -182,26 +215,11 @@ export function renderRightPanel(container: HTMLElement) {
       <!-- ================= REITER: MASCHINE ================= -->
       <div id="rp-machine" class="rp-page">
         <div class="m-dock">
-            <div class="m-state-row">
-              <span id="machine-state" class="m-state m-state-off">${T("m.state.Offline")}</span>
-              <span id="machine-fs" class="m-fs"></span>
-            </div>
-            <div id="machine-alarm" class="m-alarm" style="display:none;"></div>
             <div class="dro">
               <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
               <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
               <div style="color: var(--lt-amber, #ffc043);">Z <span id="pos-z">0.00</span></div>
             </div>
-            <div id="job-progress-track" style="height: 8px; border-radius: 4px; overflow: hidden;">
-              <div id="job-progress-bar" style="height: 100%; width: 0%; transition: width 0.2s;"></div>
-            </div>
-            <div id="job-progress-label" style="font-size: 0.7rem; text-align: center; color: var(--text-muted); font-family: var(--font-mono);">${T("rp.noJob")}</div>
-            <div style="display: flex; gap: 5px;">
-              <button id="btn-job-start" class="btn-primary" style="flex: 1; padding: 6px;">▶ ${T("rp.start")}</button>
-              <button id="btn-job-pause" class="btn-secondary" style="flex: 1; padding: 6px;" ${tip("m.pauseTip")}>⏸ ${T("rp.pause")}</button>
-              <button id="btn-job-stop" class="btn-secondary" style="flex: 1; padding: 6px; color: var(--color-danger); border-color: var(--color-danger);" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
-            </div>
-            <button id="btn-job-resume" class="btn-secondary btn-compact" style="width: 100%;" ${tip("res.btnTip")}>⏭ ${T("res.btn")}</button>
         </div>
 
         <div class="menu-section-unified">
@@ -291,10 +309,6 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.positionJob")}</h3>
           <div class="menu-body rp-box">
-            <div style="display: flex; gap: 5px;">
-              <button id="btn-load-gcode" class="btn-secondary" style="flex: 1;" ${tip("rp.loadGcodeTip")}>📂 ${T("rp.loadGcode")}</button>
-              <button id="btn-sim-job" class="btn-secondary" ${tip("rp.simJobTip")}>🎬</button>
-            </div>
             <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
             <button id="btn-job-here" class="btn-secondary not-ruida not-k40" ${tip("jobhere.tip")}>${icon("jobHere", 14)} ${T("jobhere.title")}</button>
             <button id="btn-setup-sheet" class="btn-secondary" ${tip("sheet.tip")}>📋 ${T("sheet.btn")}</button>
@@ -319,7 +333,7 @@ export function renderRightPanel(container: HTMLElement) {
     <!-- ================= KONSOLE (immer sichtbar) ================= -->
     <div class="rp-console" id="rp-console">
       <div class="rp-console-head" id="rp-console-toggle" ${tip("rp.consoleTip")}>
-        ${icon("console", 15)} ${T("rp.console")}<span class="rp-console-new" id="rp-console-new"></span><span class="rp-console-arrow">▾</span>
+        ${icon("console", 15)} ${T("rp.console")}<span class="rp-console-last" id="rp-console-last"></span><span class="rp-console-new" id="rp-console-new"></span><span class="rp-console-arrow">▾</span>
       </div>
       <div class="rp-console-body">
         <div id="console-log">
@@ -347,6 +361,11 @@ export function renderRightPanel(container: HTMLElement) {
   faOn.addEventListener("change", () => { feedAdapt.on = faOn.checked; saveFeedAdapt(); faShow(); });
   faMin.addEventListener("change", () => { const v = parseFloat(faMin.value); if (Number.isFinite(v)) feedAdapt.minPct = clampPct(v); saveFeedAdapt(); faShow(); });
 
+  // „Erweitert“ offen oder zu: gemerkt
+  const adv = container.querySelector<HTMLDetailsElement>("#rp-adv-mill")!;
+  try { adv.open = localStorage.getItem(ADV_KEY) === "1"; } catch { /* egal */ }
+  adv.addEventListener("toggle", () => { try { localStorage.setItem(ADV_KEY, adv.open ? "1" : "0"); } catch { /* egal */ } });
+
   // Reiter umschalten
   const tabs = container.querySelectorAll<HTMLButtonElement>(".rp-tab");
   tabs.forEach(t => t.addEventListener("click", () => {
@@ -363,13 +382,20 @@ export function renderRightPanel(container: HTMLElement) {
     if (!c) { unseen = 0; badge.textContent = ""; }
     try { localStorage.setItem(CONSOLE_KEY, c ? "1" : "0"); } catch { /* egal */ }
   };
-  try { if (localStorage.getItem(CONSOLE_KEY) === "1") con.classList.add("collapsed"); } catch { /* egal */ }
+  // Zu Beginn zugeklappt: die letzte Meldung steht in der Kopfzeile, bei Fehlern geht sie von selbst auf
+  let startCollapsed = true;
+  try { startCollapsed = localStorage.getItem(CONSOLE_KEY) !== "0"; } catch { /* egal */ }
+  con.classList.toggle("collapsed", startCollapsed);
   container.querySelector("#rp-console-toggle")!.addEventListener("click", () => setCollapsed(!con.classList.contains("collapsed")));
   const log = container.querySelector("#console-log");
+  const lastLine = container.querySelector<HTMLElement>("#rp-console-last")!;
+  lastLine.textContent = t("rp.ready");
   if (log) new MutationObserver(recs => {
-    if (!con.classList.contains("collapsed")) return;
     const added = recs.flatMap(r => [...r.addedNodes]).map(n => n.textContent || "");
     if (!added.length) return;
+    const text = added.join("\n").split("\n").map(l => l.trim()).filter(Boolean).pop();
+    if (text) lastLine.textContent = text; // nur als Text: Meldungen können Antworten vom Board enthalten
+    if (!con.classList.contains("collapsed")) return;
     if (added.some(x => ERROR_RE.test(x))) { setCollapsed(false); log.scrollTop = log.scrollHeight; return; }
     unseen += added.length;
     badge.textContent = String(Math.min(unseen, 99)) + (unseen > 99 ? "+" : "");

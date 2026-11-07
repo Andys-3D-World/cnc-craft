@@ -32,12 +32,12 @@ export function flyTools(group: string, items: Item[], size = 20): string {
 }
 
 /** Gruppe mit Befehlen (data-cmd); side = wohin die Liste aufklappt */
-export function flyCmds(group: string, ico: string, items: Item[], side: "down" | "left" = "down", size = 18): string {
+export function flyCmds(group: string, ico: string, items: Item[], side: "down" | "left" = "down", size = 18, more: { label?: string; extra?: string } = {}): string {
   const btnCls = side === "left" ? "btn-tool-icon" : "btn-cmd";
   return `<div class="fly fly-${side}" data-fly="${group}">
-    <button class="${btnCls} fly-btn" data-fly-btn ${tip("fly." + group)}>${icon(ico, size)}<i class="fly-tri"></i></button>
+    <button class="${btnCls} fly-btn${more.label ? " fly-btn-text" : ""}" data-fly-btn ${tip("fly." + group)}>${icon(ico, size)}${more.label || ""}<i class="fly-tri"></i></button>
     <div class="fly-menu">${items.map(([id, i, k]) =>
-      `<button class="btn-cmd fly-item" data-cmd="${id}" ${tip(k)}><span class="fly-chip">${icon(i, 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}</div>
+      `<button class="btn-cmd fly-item" data-cmd="${id}" ${tip(k)}><span class="fly-chip">${icon(i, 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`).join("")}${more.extra || ""}</div>
   </div>`;
 }
 
@@ -57,7 +57,7 @@ export function flyGroups(group: string, ico: string, cols: [string, Item[]][], 
 }
 
 /** Name + Tastenkürzel aus dem Hinweis: "Rechteck (R) – Shift = Quadrat" → "Rechteck", "R" */
-function labelOf(tipText: string): { name: string; key: string } {
+export function labelOf(tipText: string): { name: string; key: string } {
   // nur echte Tastenkürzel: einzelner Buchstabe, F-Taste oder Strg/Shift/Alt+… (nicht „(Fase)“)
   const key = (tipText.match(/\(((?:Strg|Ctrl|Cmd|Shift|Alt)\+[^()]{1,16}|[A-Z]|F\d{1,2}|Entf|Del)\)/) || [])[1] || "";
   const name = tipText.split(/\s+[–—-]\s+|:\s|\s\(/)[0].trim();

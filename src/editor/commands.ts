@@ -276,7 +276,7 @@ export const commands: Record<string, () => void> = {
   saveProject: () => { saveProject(false); },
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),
-  exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-cmd="exportVector"]')),
+  exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-fly="file"] [data-fly-btn]')),
 
   toolSelect: () => setTool("select"),
   toolPan: () => setTool("pan"),

@@ -1226,19 +1226,6 @@ function showWarnings(appendToConsole: (t: string) => void) {
 /**
  * G-Code erzeugen und in der Konsole anzeigen.
  */
-export const handleGcodeGeneration = (shapes: any, appendToConsole: (t: string) => void) => {
-  const gcode = generateGcode(shapes);
-  if (!gcode) { appendToConsole(noGcodeMessage()); return; }
-  // Langer G-Code: nur Anfang und Ende in die Konsole (hunderttausende Zeilen machten sie und das Programm zäh)
-  const lines = gcode.split("\n");
-  if (lines.length > 400) {
-    appendToConsole(lines.slice(0, 100).join("\n"));
-    appendToConsole(t("gcw.shortened", { n: lines.length - 200, sim: t("rp.simulate"), save: t("rp.saveGcode") }));
-    appendToConsole(lines.slice(-100).join("\n"));
-  } else appendToConsole(gcode);
-  showWarnings(appendToConsole);
-};
-
 /**
  * G-Code erzeugen und per Speichern-Dialog als .gcode-Datei ablegen.
  */
