@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code: {n} trayectoria(s) de {lines} líneas (se ignoran las alturas Z)",
   "gcodeImp.warn": "El G-code se cargó como contornos (2D). Las trayectorias ya están desplazadas por el radio de la herramienta – mejor usarlas «sobre la línea».",
   "svg.errInvalid": "El archivo no es un SVG válido.",
+  "svg.errTooBig": "El archivo SVG es demasiado grande o se referencia a sí mismo demasiadas veces (use). No se ha abierto.",
   "svg.textSkipped": "Se omitieron {n} elemento(s) de texto – usa «Objeto a trayecto» en tu programa gráfico y vuelve a exportar.",
   "svg.imageSkipped": "Se omitieron {n} imagen(es) incrustada(s) – importa las imágenes directamente (vectorizar).",
   "svg.info": "SVG: {paths} trazado(s), {circles} círculo(s)",

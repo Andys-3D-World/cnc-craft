@@ -16,6 +16,8 @@ import {
 import { t } from "../i18n/i18n";
 
 const PX_PER_INCH = 96; // Inkscape / Browser-Standard
+/** Höchstens so viele Elemente (mit allen <use>-Kopien) – echte Zeichnungen bleiben weit darunter */
+export const SVG_MAX_VISITS = 300_000;
 
 const UNIT_MM: Record<string, number> = {
   mm: 1, cm: 10, in: 25.4, pt: 25.4 / 72, pc: 25.4 / 6, px: 25.4 / PX_PER_INCH, "": 25.4 / PX_PER_INCH, q: 0.25
@@ -57,9 +59,13 @@ export function parseSvg(text: string): ImportResult {
   const ids = new Map<string, Element>();
   svg.querySelectorAll("[id]").forEach(el => ids.set(el.getAttribute("id")!, el));
   let skippedText = 0, skippedImage = 0;
+  // <use> kann auf Gruppen zeigen, die wieder <use> enthalten: jede Ebene verdoppelt die Arbeit.
+  // Ohne Obergrenze friert eine präparierte Datei von wenigen KB das Programm ein.
+  let visits = 0, tooBig = false;
 
   const walk = (el: Element, m: Mat, depth: number) => {
-    if (depth > 50) return;
+    if (depth > 50 || tooBig) return;
+    if (++visits > SVG_MAX_VISITS) { tooBig = true; return; }
     const tag = el.localName.toLowerCase();
     if (["defs", "clippath", "mask", "symbol", "metadata", "title", "desc", "style", "script", "marker", "pattern", "lineargradient", "radialgradient", "filter"].includes(tag)) return;
     if (isHidden(el)) return;
@@ -165,6 +171,7 @@ export function parseSvg(text: string): ImportResult {
   };
 
   walk(svg, root, 0);
+  if (tooBig) throw new Error(t("svg.errTooBig"));
 
   if (skippedText) res.warnings.push(t("svg.textSkipped", { n: skippedText }));
   if (skippedImage) res.warnings.push(t("svg.imageSkipped", { n: skippedImage }));

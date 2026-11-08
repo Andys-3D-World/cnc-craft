@@ -15,7 +15,7 @@ import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { bounds, type XY } from "../nameConnect";
 import { fitText, type OrnamentText } from "../ornament";
-import { labelPart, keychainPart, framePart, KEY_SHAPES, FRAME_STYLES, type SmallResult, type LabelOptions, type KeychainOptions, type FrameOptions } from "../smallParts";
+import { labelPart, keychainPart, framePart, rowLayout, KEY_SHAPES, FRAME_STYLES, type SmallResult, type LabelOptions, type KeychainOptions, type FrameOptions } from "../smallParts";
 
 type Kind = "label" | "keychain" | "frame";
 type Field = { id: string; key: string; type: "num" | "sel" | "check"; def: number | string | boolean; min?: number; max?: number; step?: string; opts?: [string, string][] };
@@ -174,17 +174,16 @@ function place(r: SmallResult, eng: OrnamentText[], source: string) {
   const lineL = layers.filter(l => l.mode === "line").sort((a, c) => c.power - a.power);
   const cutL = lineL[0], markL = lineL[lineL.length - 1], engL = layers.find(l => l.mode === "fill");
   const made: any[] = [];
-  const W = r.parts.reduce((s, p) => { const b = bounds(p.cut); return s + b.x1 - b.x0 + 5; }, -5);
-  let x = Math.max(5, (bed.w - W) / 2);
+  // Teile nebeneinander; passt die Reihe nicht aufs Bett (z. B. Bilderrahmen), in mehrere Reihen umbrechen
+  const spots = rowLayout(r.parts.map(p => bounds(p.cut)), bed.w, bed.h);
   r.parts.forEach((p, i) => {
-    const b = bounds(p.cut), dx = x - b.x0, dy = Math.max(5, (bed.h - (b.y1 - b.y0)) / 2) - b.y0, groupId = "part-" + newId();
+    const b = bounds(p.cut), dx = spots[i].x - b.x0, dy = spots[i].y - b.y0, groupId = "part-" + newId();
     const px = (m: MultiPolygon): MultiPolygon => m.map(q => q.map(rg => rg.map(([qx, qy]) => [(qx + dx) * MM_TO_PIXEL, (qy + dy) * MM_TO_PIXEL] as [number, number])));
     made.push(...toShapes(px(p.cut), cutL ? { laserLayerId: cutL.id } : {}).map(s => ({ ...s, groupId, source })));
     const e = eng[i];
     if (e?.area.length) made.push(...toShapes(px(e.area), engL ? { laserLayerId: engL.id } : {}).map(s => ({ ...s, groupId, source, millingMode: "pocket", millingDepth: -0.5 })));
     for (const l of e?.lines || []) made.push(createPolyline(l.pts.map(([qx, qy]) => ({ x: (qx + dx) * MM_TO_PIXEL, y: (qy + dy) * MM_TO_PIXEL })), l.closed, "on-line",
       { ...(markL ? { laserLayerId: markL.id } : {}), millingDepth: -0.3, isScore: true, groupId, source }));
-    x += b.x1 - b.x0 + 5;
   });
   st.shapes = [...st.shapes, ...made];
   st.selectedShapeIds = made.map(s => s.id);

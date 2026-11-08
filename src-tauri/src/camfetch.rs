@@ -18,6 +18,10 @@ pub const MAX_BYTES: usize = 8 * 1024 * 1024;
 /// "http://host[:port]/pfad" zerlegen -> (host, port, pfad)
 pub fn parse_url(url: &str) -> Result<(String, u16, String), String> {
     let u = url.trim();
+    // Leer- und Steuerzeichen (z. B. Zeilenumbrüche) würden eigene Kopfzeilen in die Anfrage einschleusen
+    if u.chars().any(|c| c.is_control() || c == ' ') {
+        return Err("bad-url".into());
+    }
     let rest = if let Some(r) = u.strip_prefix("http://") {
         r
     } else if u.starts_with("https://") {
@@ -194,6 +198,8 @@ mod tests {
         assert_eq!(parse_url("http://cam.local:8080").unwrap(), ("cam.local".into(), 8080, "/".into()));
         assert_eq!(parse_url("https://x/y").unwrap_err(), "https-not-supported");
         assert_eq!(parse_url("http://a:b@x/y").unwrap_err(), "auth-not-supported");
+        assert_eq!(parse_url("http://x/a\r\nX-Evil: 1").unwrap_err(), "bad-url");
+        assert_eq!(parse_url("http://x/a b").unwrap_err(), "bad-url");
         assert!(parse_url("rtsp://x/y").is_err());
     }
 

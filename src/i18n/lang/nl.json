@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code: {n} freesbaan/-banen uit {lines} regels (Z-hoogtes worden genegeerd)",
   "gcodeImp.warn": "G-code is als contouren geladen (2D). Freesbanen zijn al met de gereedschapsradius verschoven – gebruik ze bij voorkeur „op de lijn”.",
   "svg.errInvalid": "Het bestand is geen geldige SVG.",
+  "svg.errTooBig": "Het SVG-bestand is te groot of verwijst te vaak naar zichzelf (use). Het is niet geopend.",
   "svg.textSkipped": "{n} tekstelement(en) overgeslagen – gebruik „Object naar pad” in je tekenprogramma en exporteer opnieuw.",
   "svg.imageSkipped": "{n} ingesloten afbeelding(en) overgeslagen – importeer afbeeldingen direct (overtrekken).",
   "svg.info": "SVG: {paths} pad(en), {circles} cirkel(s)",

@@ -290,7 +290,8 @@ pub fn web_title(ip: Ipv4Addr, timeout: Duration) -> String {
 }
 
 pub fn title_of(html: &str) -> String {
-    let lower = html.to_lowercase();
+    // nur ASCII klein machen: gleiche Byte-Längen, die Stellen passen dann auch im Original (sonst Absturz bei „İ“)
+    let lower = html.to_ascii_lowercase();
     let Some(a) = lower.find("<title") else { return String::new() };
     let Some(b) = lower[a..].find('>') else { return String::new() };
     let start = a + b + 1;
@@ -357,7 +358,7 @@ fn add_titles(v: &mut [Found]) {
 
 /// "FW version:1.0.4 # FW target:grbl-embedded # hostname:laser-garage # axis:3" -> "laser-garage"
 pub fn hostname_of(text: &str) -> String {
-    let lower = text.to_lowercase();
+    let lower = text.to_ascii_lowercase();
     let Some(i) = lower.find("hostname:") else { return String::new() };
     text[i + 9..]
         .trim_start()
@@ -459,6 +460,9 @@ mod tests {
         assert_eq!(title_of("<html><head><TITLE>  MKS  DLC32\n</TITLE>"), "MKS DLC32");
         assert_eq!(title_of("<title lang=x>FluidNC</title>"), "FluidNC");
         assert_eq!(title_of("no title"), "");
+        // „İ“ wird beim normalen Kleinschreiben länger – darf nicht abstürzen
+        assert_eq!(title_of("İİ<title>Laser</title>"), "Laser");
+        assert_eq!(hostname_of("İ FW target:grbl # hostname:laser-garage # axis:3"), "laser-garage");
     }
 
     #[test]

@@ -22,14 +22,24 @@ struct Progress {
     total: Option<u64>,
 }
 
+/// Prüft die Adresse erst NACH dem Zerlegen: „%2e%2e“ wird dabei zu „..“ aufgelöst und darf nicht aus den Releases führen
+fn manifest_url(manifest: &str) -> Option<tauri::Url> {
+    if !manifest.starts_with(RELEASE_PREFIX) || manifest.contains("..") || manifest.contains('%') {
+        return None;
+    }
+    let url = tauri::Url::parse(manifest).ok()?;
+    let ok = url.as_str().starts_with(RELEASE_PREFIX)
+        && url.path().ends_with("/latest.json")
+        && url.query().is_none()
+        && url.fragment().is_none();
+    ok.then_some(url)
+}
+
 /// Lädt und installiert das Update aus `manifest` (…/latest.json). Rückgabe: installierte Version,
 /// leer = nichts Neueres gefunden.
 #[tauri::command]
 pub async fn update_install(app: AppHandle, manifest: String) -> Result<String, String> {
-    if !manifest.starts_with(RELEASE_PREFIX) || !manifest.ends_with("/latest.json") || manifest.contains("..") {
-        return Err("bad-url".into());
-    }
-    let url = tauri::Url::parse(&manifest).map_err(|e| e.to_string())?;
+    let url = manifest_url(&manifest).ok_or_else(|| "bad-url".to_string())?;
     let updater = app
         .updater_builder()
         .endpoints(vec![url])
@@ -60,4 +70,20 @@ pub async fn update_install(app: AppHandle, manifest: String) -> Result<String, 
 pub fn update_restart(app: AppHandle) {
     crate::close_all();
     app.restart();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn manifest_only_from_own_releases() {
+        let ok = "https://github.com/Andys-3D-World/cnc-craft/releases/download/v0.4.3/latest.json";
+        assert!(manifest_url(ok).is_some());
+        assert!(manifest_url("https://github.com/Andys-3D-World/cnc-craft/releases/download/v1/../../../other/latest.json").is_none());
+        assert!(manifest_url("https://github.com/Andys-3D-World/cnc-craft/releases/download/%2e%2e/%2e%2e/x/latest.json").is_none());
+        assert!(manifest_url("https://github.com/Andys-3D-World/cnc-craft/releases/download/v1/latest.json?x=1").is_none());
+        assert!(manifest_url("https://evil.example/Andys-3D-World/cnc-craft/releases/download/v1/latest.json").is_none());
+        assert!(manifest_url("https://github.com/Andys-3D-World/cnc-craft/releases/download/v1/other.json").is_none());
+    }
 }

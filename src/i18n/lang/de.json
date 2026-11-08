@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-Code: {n} Fräsbahn(en) aus {lines} Zeilen (Z-Höhen werden ignoriert)",
   "gcodeImp.warn": "G-Code wurde als Konturen geladen (2D). Fräsbahnen sind bereits um den Werkzeugradius versetzt – am besten mit „Mitte“ weiterverwenden.",
   "svg.errInvalid": "Die Datei ist kein gültiges SVG.",
+  "svg.errTooBig": "Die SVG-Datei ist zu groß oder verweist zu oft auf sich selbst (use). Sie wurde nicht geöffnet.",
   "svg.textSkipped": "{n} Text-Element(e) übersprungen – im Grafikprogramm „Objekt in Pfad umwandeln“, dann neu exportieren.",
   "svg.imageSkipped": "{n} eingebettete(s) Bild(er) übersprungen – Bilder bitte direkt importieren (Nachzeichnen).",
   "svg.info": "SVG: {paths} Pfad(e), {circles} Kreis(e)",

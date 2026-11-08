@@ -10,6 +10,7 @@
  */
 import { ImportResult, emptyResult, Mat, matMul, matApply, flattenCubic, CURVE_TOL, Pt } from "./common";
 import { t } from "../i18n/i18n";
+import { inflateLimited } from "./inflateLimit";
 
 const PT_TO_MM = 25.4 / 72;
 
@@ -68,11 +69,9 @@ export async function parsePdf(bytes: Uint8Array): Promise<ImportResult> {
 }
 
 async function inflate(data: Uint8Array): Promise<Uint8Array> {
-  const DS = (globalThis as any).DecompressionStream;
-  if (!DS) throw new Error(t("pdf.errInflate"));
-  const ds = new DS("deflate");
-  const stream = new Blob([data as BlobPart]).stream().pipeThrough(ds);
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  if (!(globalThis as any).DecompressionStream) throw new Error(t("pdf.errInflate"));
+  // Obergrenze: eine präparierte Seite darf sich nicht auf Gigabytes aufblähen
+  return inflateLimited(data, "deflate");
 }
 
 function ascii85(src: Uint8Array): Uint8Array {

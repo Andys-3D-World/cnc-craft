@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code: {n} toolpath(s) from {lines} lines (Z heights are ignored)",
   "gcodeImp.warn": "G-code was loaded as contours (2D). Toolpaths are already offset by the tool radius – best keep using them with \"on line\".",
   "svg.errInvalid": "The file is not a valid SVG.",
+  "svg.errTooBig": "The SVG file is too large or refers to itself too often (use). It was not opened.",
   "svg.textSkipped": "{n} text element(s) skipped – use \"Object to path\" in your graphics program, then export again.",
   "svg.imageSkipped": "{n} embedded image(s) skipped – please import images directly (trace).",
   "svg.info": "SVG: {paths} path(s), {circles} circle(s)",

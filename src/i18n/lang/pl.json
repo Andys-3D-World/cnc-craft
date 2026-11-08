@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code: ścieżek {n} z {lines} linii (wysokości Z są pomijane)",
   "gcodeImp.warn": "G-code wczytano jako kontury (2D). Ścieżki są już przesunięte o promień narzędzia – najlepiej używać ich „po linii”.",
   "svg.errInvalid": "Plik nie jest prawidłowym SVG.",
+  "svg.errTooBig": "Plik SVG jest za duży lub zbyt często odwołuje się do siebie (use). Nie został otwarty.",
   "svg.textSkipped": "Pominięto elementy tekstowe: {n} – użyj „Obiekt na ścieżkę” w programie graficznym i wyeksportuj ponownie.",
   "svg.imageSkipped": "Pominięto osadzone obrazy: {n} – importuj obrazy bezpośrednio (wektoryzacja).",
   "svg.info": "SVG: ścieżek {paths}, okręgów {circles}",

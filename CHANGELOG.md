@@ -22,6 +22,15 @@ These haven't been cut on a real machine yet: make a test piece first.
 **Fixed**
 - **Stop button when no job runs:** Stop did nothing during other moves. It now halts a move to zero, homing or a macro, and cancels jogging. Not yet tried on a real machine.
 - **Wording:** the Stop button's hint called it an emergency stop. It now says plainly that software can't replace a real emergency stop switch.
+- **Photo frame on smaller beds:** when the parts don't fit side by side, they now wrap into further rows instead of running off the right edge of the bed.
+
+**Security**
+- **Crafted SVG files:** an SVG whose `use` elements point at each other again and again could freeze the program. It's now refused with a message; normal drawings aren't affected.
+- **Packed data with a limit:** PDF pages and Fusion `.tools` files are unpacked up to 64 MB, so a tiny crafted file can no longer fill the memory.
+- **Camera and workshop addresses** with spaces or line breaks are refused, because they could slip extra lines into the request.
+- **Network search:** a device page with certain letters in its title (such as the Turkish "İ") no longer makes the search fail.
+- **Update address:** it's checked after decoding, so an encoded `..` can't point outside this project's releases. The signature check stays as before.
+- **Ruida export** writes only `.rd` files or new files without an ending, never over another existing file.
 
 ## 0.4.3 Beta
 

@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code: {n} percorso/i da {lines} righe (le altezze Z vengono ignorate)",
   "gcodeImp.warn": "Il G-code è stato caricato come contorni (2D). I percorsi sono già spostati del raggio utensile – meglio usarli «sulla linea».",
   "svg.errInvalid": "Il file non è un SVG valido.",
+  "svg.errTooBig": "Il file SVG è troppo grande o fa riferimento a sé stesso troppe volte (use). Non è stato aperto.",
   "svg.textSkipped": "{n} elemento/i di testo ignorato/i – usa «Da oggetto a tracciato» nel programma di grafica, poi esporta di nuovo.",
   "svg.imageSkipped": "{n} immagine/i incorporata/e ignorata/e – importa le immagini direttamente (vettorializza).",
   "svg.info": "SVG: {paths} tracciato/i, {circles} cerchio/i",

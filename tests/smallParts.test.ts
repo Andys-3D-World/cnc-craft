@@ -1,7 +1,7 @@
 // Etikett, Schlüsselanhänger, Fotorahmen, Perforation, Vorlagen – läuft mit `npm test`
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { labelPart, keychainPart, framePart, roundedRect } from "../src/smallParts.ts";
+import { labelPart, keychainPart, framePart, roundedRect, rowLayout } from "../src/smallParts.ts";
 import { bounds } from "../src/nameConnect.ts";
 import { thinnestWeb } from "../src/genCheck.ts";
 import { perforate, spotsOnPath } from "../src/editor/perforate.ts";
@@ -98,4 +98,18 @@ test("Vorlagen: gleicher Name ersetzt, sortiert, Grenze, kaputte Daten fallen we
   assert.equal(s.length, 1);
   assert.equal(s[0].values.c, undefined);
   assert.deepEqual(sanitizePresets("kaputt"), []);
+});
+
+test("Teile aufs Bett: eine Reihe mittig wie bisher, zu breit -> neue Reihe, nichts überlappt", () => {
+  const box = (w: number, h: number) => ({ x0: 0, y0: 0, x1: w, y1: h });
+  // passt in eine Reihe: mittig, jedes Teil mittig in der Höhe
+  const one = rowLayout([box(80, 30), box(40, 20)], 300, 300);
+  assert.deepEqual(one, [{ x: 87.5, y: 135 }, { x: 172.5, y: 140 }]);
+  // drei Rahmenteile je 140 mm auf 300 mm: zwei oben, eins darunter, alles auf dem Bett
+  const three = rowLayout([box(140, 190), box(140, 190), box(140, 190)].map(b => ({ ...b, y1: 100 })), 300, 300);
+  assert.equal(three[0].y, three[1].y);
+  assert.ok(three[2].y < three[0].y - 100 + 1e-9, "dritte Reihe liegt darunter");
+  for (const p of three) { assert.ok(p.x >= 5 && p.x + 140 <= 295); assert.ok(p.y >= 5 && p.y + 100 <= 295); }
+  // ein Teil breiter als das Bett: eigene Reihe, links am Rand
+  assert.deepEqual(rowLayout([box(400, 50)], 300, 300)[0], { x: 5, y: 125 });
 });

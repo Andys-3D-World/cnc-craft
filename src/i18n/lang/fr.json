@@ -797,6 +797,7 @@
   "gcodeImp.info": "G-code : {n} trajectoire(s) sur {lines} lignes (les hauteurs Z sont ignorées)",
   "gcodeImp.warn": "Le G-code a été chargé comme contours (2D). Les trajectoires sont déjà décalées du rayon d'outil – utilisez-les de préférence « sur la ligne ».",
   "svg.errInvalid": "Le fichier n'est pas un SVG valide.",
+  "svg.errTooBig": "Le fichier SVG est trop grand ou se référence trop souvent lui-même (use). Il n'a pas été ouvert.",
   "svg.textSkipped": "{n} élément(s) texte ignoré(s) – utilisez « Objet en chemin » dans votre logiciel graphique, puis exportez à nouveau.",
   "svg.imageSkipped": "{n} image(s) intégrée(s) ignorée(s) – importez les images directement (vectorisation).",
   "svg.info": "SVG : {paths} tracé(s), {circles} cercle(s)",

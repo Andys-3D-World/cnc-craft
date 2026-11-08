@@ -91,3 +91,32 @@ export function framePart(o: FrameOptions): SmallResult {
   const back: MultiPolygon = [[close(outline), ...hangers]];
   return { warnings, parts: [{ key: "front", cut: front, textBox: null }, { key: "middle", cut: middle, textBox: null }, { key: "back", cut: back, textBox: null }] };
 }
+
+export interface Box { x0: number; y0: number; x1: number; y1: number }
+
+/**
+ * Teile aufs Bett legen: nebeneinander, mittig. Ist die Reihe breiter als das Bett, in weitere Reihen umbrechen
+ * (erste Reihe oben). Rückgabe: linke untere Ecke je Teil in mm. Passt alles in eine Reihe, liegt jedes Teil
+ * mittig in der Höhe – wie bisher.
+ */
+export function rowLayout(parts: Box[], bedW: number, bedH: number, gap = 5, margin = 5): { x: number; y: number }[] {
+  const rows: { items: number[]; w: number; h: number }[] = [];
+  parts.forEach((b, i) => {
+    const w = b.x1 - b.x0, h = b.y1 - b.y0, row = rows[rows.length - 1];
+    if (row && row.w + gap + w <= bedW - 2 * margin) { row.items.push(i); row.w += gap + w; row.h = Math.max(row.h, h); }
+    else rows.push({ items: [i], w, h });
+  });
+  const total = rows.reduce((s, r) => s + r.h, 0) + gap * Math.max(0, rows.length - 1);
+  let top = total <= bedH - 2 * margin ? (bedH + total) / 2 : margin + total;
+  const out: { x: number; y: number }[] = [];
+  for (const row of rows) {
+    let x = Math.max(margin, (bedW - row.w) / 2);
+    for (const i of row.items) {
+      const b = parts[i], h = b.y1 - b.y0;
+      out[i] = { x, y: top - row.h + (row.h - h) / 2 };
+      x += b.x1 - b.x0 + gap;
+    }
+    top -= row.h + gap;
+  }
+  return out;
+}

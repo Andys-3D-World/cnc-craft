@@ -13,6 +13,7 @@
  */
 import type { ToolType } from "./toolGraphics";
 import { coatingFromText } from "./toolCoating.ts";
+import { inflateLimited } from "./importers/inflateLimit.ts";
 
 /** Fusion-Werkzeugart -> unsere Art (fehlt = wird übersprungen) */
 const TYPE_MAP: Record<string, ToolType> = {
@@ -143,8 +144,9 @@ export async function unzipJson(bytes: Uint8Array): Promise<string> {
     const raw = bytes.subarray(start, start + size);
     if (method === 0) return new TextDecoder().decode(raw);
     if (method !== 8 || typeof DecompressionStream === "undefined") throw new Error("lib-invalid");
-    const stream = new Blob([raw.slice()]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-    return await new Response(stream).text();
+    // Obergrenze beim Entpacken: eine winzige präparierte Datei darf den Speicher nicht füllen
+    const out = await inflateLimited(raw, "deflate-raw").catch(() => { throw new Error("lib-invalid"); });
+    return new TextDecoder().decode(out);
   }
   throw new Error("lib-invalid");
 }

@@ -422,6 +422,15 @@ struct RdInfo {
     h: f64,
 }
 
+/// Zusätzliche Sicherung: nur .rd-Dateien schreiben, oder eine NEUE Datei ohne Endung (Linux hängt sie im
+/// Dialog nicht immer an). So kann diese Funktion nie eine bestehende fremde Datei überschreiben.
+fn rd_path_ok(p: &std::path::Path) -> bool {
+    match p.extension() {
+        Some(e) => e.eq_ignore_ascii_case("rd"),
+        None => !p.exists() && !p.file_name().map(|n| n.to_string_lossy().starts_with('.')).unwrap_or(true),
+    }
+}
+
 #[tauri::command]
 async fn ruida_export(lines: Vec<String>, path: String, bed_w: f64, bed_h: f64, origin: String, s_max: f64, magic: u8, min_power: f64) -> Result<RdInfo, String> {
     let opt = rd_options(bed_w, bed_h, &origin, s_max, magic, min_power);
@@ -429,6 +438,7 @@ async fn ruida_export(lines: Vec<String>, path: String, bed_w: f64, bed_h: f64, 
     let job = ruida::build_rd(&segs, &opt)?;
     if job.outside { return Err("outside".into()); }
     let data = job.file(opt.magic);
+    if !rd_path_ok(std::path::Path::new(&path)) { return Err("bad-path".into()); }
     std::fs::write(&path, &data).map_err(|e| e.to_string())?;
     Ok(RdInfo {
         bytes: data.len(),
@@ -1015,7 +1025,22 @@ pub fn run() {
 
 #[cfg(test)]
 mod multi_tests {
-    use super::{slot_id, tcp_addrs};
+    use super::{rd_path_ok, slot_id, tcp_addrs};
+
+    #[test]
+    fn rd_export_only_writes_rd_or_new_files() {
+        let dir = std::env::temp_dir();
+        assert!(rd_path_ok(&dir.join("job.rd")));
+        assert!(rd_path_ok(&dir.join("job.RD")));
+        assert!(!rd_path_ok(&dir.join("job.plist")));
+        assert!(!rd_path_ok(&dir.join(".zshrc")));
+        assert!(rd_path_ok(&dir.join("cnc-craft-new-file-without-ending-4711")));
+        // vorhandene Datei ohne Endung: nie überschreiben
+        let existing = dir.join("cnc-craft-existing-4711");
+        std::fs::write(&existing, b"x").unwrap();
+        assert!(!rd_path_ok(&existing));
+        let _ = std::fs::remove_file(&existing);
+    }
 
     #[test]
     fn tcp_addrs_only_for_network_targets() {
