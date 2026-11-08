@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.4.3 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.4.4 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -21,8 +21,8 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   3D-Steckanhänger, Wort-Kachel-Anhänger, Schattenboxen / Lichterbögen mit LED-Ausschnitten und Ständer, Buchstaben-Topper,
   Geburtsbuchstaben (Name, Datum und Geburtsdaten mit eigenen Bildern), Vogelhäuser, Mandalas, Namen aus einem Stück
   mit Symbolen, Zahnräder (Stirnräder, Zahnstangen, Riemenscheiben, Kettenräder – mit Bohrung und Passfedernut),
-  Flex-Scharniere, Lineale und Zifferblätter, Holzverbindungen (Fingerzinken, Schwalbenschwanz), Steckregale und
-  Lüftungsgitter
+  Flex-Scharniere, Lineale und Zifferblätter, Holzverbindungen (Fingerzinken, Schwalbenschwanz), Steckregale,
+  Lüftungsgitter, Schilder, Schlüsselanhänger und dreilagige Bilderrahmen
 - Import von SVG, DXF, PDF, PLT und Bildern (Umriss oder Mittellinie nachzeichnen), 3D-Modelle als STL, 3MF, OBJ und STEP –
   große Dateien werden im Hintergrund gelesen
 - 3D-Ansicht der fertigen Teile, Node-Graph für wiederverwendbare Abläufe

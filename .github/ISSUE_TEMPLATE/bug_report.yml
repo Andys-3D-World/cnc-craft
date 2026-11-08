@@ -14,7 +14,7 @@ body:
     attributes:
       label: CNC Craft version
       description: Click ⓘ at the top right of CNC Craft.
-      placeholder: "0.4.3 Beta"
+      placeholder: "0.4.4 Beta"
     validations:
       required: true
 

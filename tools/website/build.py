@@ -26,7 +26,7 @@ T = {
   feats=[
    ("✏️", "Design &amp; import", "Draw shapes, text and Bézier curves or import SVG, DXF, PDF, PLT, images and 3D models (STL, 3MF, OBJ, STEP)."),
    ("🖼️", "Image engraving", "Photos for the laser: 14 engraving styles (photo, lines, dot screen, newspaper, spiral …), auto enhance, remove background."),
-   ("🧩", "23 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles and QR codes."),
+   ("🧩", "26 generators", "Ready-made projects in one click: boxes with finger joints, gears and pulleys, living hinges, wood joints, shelves, puzzles, names, birdhouses, mandalas, decoration ornaments for every season, word tiles, shadow boxes, 3D slot ornaments, birth letters, rulers, vent grilles, QR codes, labels, keychains and photo frames."),
    ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
    ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill, dimensions that stay attached and a right-click menu on the canvas."),
    ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.3", nl="A simpler layout with one clear way from the drawing to the machine: To machine, a job bar with Stop always in view, and Ctrl+K to find any command. All generators share one window. New tools: array, text on path, trim, line dimensions, Print &amp; Cut, laser test card and more.",
+  nh="New in 0.4.4", nl="Try your text in every font at once, save generator values as presets, spread parts along a path and perforate contours for folding. New generators for labels, keychains and three-layer photo frames. Before the machine starts, the G-code is checked once more, and the program runs lighter on older computers.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -102,7 +102,7 @@ T = {
   feats=[
    ("✏️", "Zeichnen &amp; Importieren", "Formen, Text und Bézier-Kurven zeichnen oder SVG, DXF, PDF, PLT, Bilder und 3D-Modelle (STL, 3MF, OBJ, STEP) laden."),
    ("🖼️", "Bildgravur", "Fotos für den Laser: 14 Gravurtypen (Foto, Linien, Punktraster, Zeitung, Spirale …), automatisch verbessern, Hintergrund entfernen."),
-   ("🧩", "23 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter und QR-Codes."),
+   ("🧩", "26 Generatoren", "Fertige Projekte mit einem Klick: Kisten mit Fingerzinken, Zahnräder und Riemenscheiben, Biegescharniere, Holzverbindungen, Steckregale, Puzzles, Namen, Vogelhäuser, Mandalas, Deko-Anhänger für jede Jahreszeit, Wort-Kacheln, Schattenboxen, 3D-Steckanhänger, Geburtsbuchstaben, Lineale, Lüftungsgitter, QR-Codes, Schilder, Schlüsselanhänger und Bilderrahmen."),
    ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),
    ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung, Maße, die mitwandern, und ein Rechtsklick-Menü auf der Arbeitsfläche."),
    ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.3", nl="Einfacheres Layout mit einem klaren Weg von der Zeichnung zur Maschine: Zur Maschine, Job-Leiste mit immer sichtbarem Stopp und Strg+K, um jeden Befehl zu finden. Alle Generatoren haben dasselbe Fenster. Neue Werkzeuge: Array, Text auf Pfad, Trimmen, Linien bemaßen, Print &amp; Cut, Laser-Testkarte und mehr.",
+  nh="Neu in 0.4.4", nl="Deinen Text in allen Schriften auf einmal ausprobieren, Generator-Werte als Vorlage speichern, Teile entlang eines Pfads verteilen und Konturen zum Falten perforieren. Neue Generatoren für Schilder, Schlüsselanhänger und dreilagige Bilderrahmen. Vor dem Start wird der G-Code noch einmal geprüft, und das Programm läuft auf älteren Rechnern leichter.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.3</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.4</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

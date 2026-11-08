@@ -2,6 +2,8 @@
 
 ## Next version (unreleased)
 
+## 0.4.4 Beta
+
 **New**
 - **Try fonts:** your own text in every font as a preview with 2 to 10 columns, filled or as outlines. One click uses that font for the next new text.
 - **Generator presets:** save the values of any generator window under a name and load them again later (fonts aren't part of a preset).
