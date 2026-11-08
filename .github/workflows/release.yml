@@ -9,7 +9,50 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Legt den Entwurf EINMAL an, bevor die vier Builds starten. Vorher hat jeder Build selbst nach dem
+  # Release gesucht – laufen zwei gleichzeitig los, entstehen zwei Entwürfe mit halben Dateien (0.4.4).
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.draft.outputs.id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Entwurf anlegen (oder vorhandenen Entwurf wiederverwenden)
+        id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          V=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          TAG="v$V-beta"
+          # schon veröffentlicht? Dann erst die Version erhöhen – nie über ein fertiges Release bauen
+          if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --silent 2>/dev/null; then
+            echo "::error::$TAG is already published. Raise the version first."; exit 1
+          fi
+          ID=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id" | head -n 1)
+          if [ -z "$ID" ]; then
+            cat > body.md <<'BODY'
+          Beta von CNC Craft – bitte testen und Fehler melden. Was neu ist: siehe CHANGELOG.md im Repository.
+          Schon Version 0.2.6 oder neuer installiert? Einfach in CNC Craft oben rechts ⓘ → „Jetzt aktualisieren“ – kein Download nötig.
+          Kostenlos & Open Source (GPL-3.0). Windows: Free code signing provided by SignPath.io, certificate by SignPath Foundation.
+          Code Signing Policy: https://github.com/Andys-3D-World/cnc-craft#code-signing-policy · Privacy: https://github.com/Andys-3D-World/cnc-craft/blob/main/PRIVACY.md
+
+          macOS: .dmg öffnen und CNC Craft in „Programme“ ziehen. Beim ersten Start meldet macOS „nicht verifiziert“:
+          Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“.
+          Windows: …-setup.exe ausführen (SmartScreen: „Weitere Informationen“ → „Trotzdem ausführen“).
+          Linux: .AppImage ausführbar machen und starten, oder .deb installieren. Anleitung (ins Menü eintragen, serielle Ports): README → „Installieren“. Serielle Ports: Gruppe „dialout“ (Arch/CachyOS: „uucp“).
+          BODY
+            ID=$(gh api --method POST "repos/$GITHUB_REPOSITORY/releases" -f tag_name="$TAG" -f target_commitish="$GITHUB_SHA" \
+              -f name="CNC Craft v$V Beta" -F body=@body.md -F draft=true -F prerelease=true --jq .id)
+            echo "Created draft $ID for $TAG"
+          else
+            echo "Reusing draft $ID for $TAG"
+          fi
+          echo "id=$ID" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: create-release
     permissions:
       contents: write
     strategy:
@@ -69,18 +112,44 @@ jobs:
           # latest.json ins Release legen (die App liest daraus Version, Dateien und Unterschriften)
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
-          tagName: v__VERSION__-beta
-          releaseName: "CNC Craft v__VERSION__ Beta"
-          releaseBody: |
-            Beta von CNC Craft – bitte testen und Fehler melden. Was neu ist: siehe CHANGELOG.md im Repository.
-            Schon Version 0.2.6 oder neuer installiert? Einfach in CNC Craft oben rechts ⓘ → „Jetzt aktualisieren“ – kein Download nötig.
-            Kostenlos & Open Source (GPL-3.0). Windows: Free code signing provided by SignPath.io, certificate by SignPath Foundation.
-            Code Signing Policy: https://github.com/Andys-3D-World/cnc-craft#code-signing-policy · Privacy: https://github.com/Andys-3D-World/cnc-craft/blob/main/PRIVACY.md
-
-            macOS: .dmg öffnen und CNC Craft in „Programme“ ziehen. Beim ersten Start meldet macOS „nicht verifiziert“:
-            Systemeinstellungen → Datenschutz & Sicherheit → „Trotzdem öffnen“.
-            Windows: …-setup.exe ausführen (SmartScreen: „Weitere Informationen“ → „Trotzdem ausführen“).
-            Linux: .AppImage ausführbar machen und starten, oder .deb installieren. Anleitung (ins Menü eintragen, serielle Ports): README → „Installieren“. Serielle Ports: Gruppe „dialout“ (Arch/CachyOS: „uucp“).
-          releaseDraft: true
-          prerelease: true
+          # alle Builds laden in denselben Entwurf (angelegt von create-release)
+          releaseId: ${{ needs.create-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+  # Prüft am Ende, ob der Entwurf vollständig ist: alle Dateien da, latest.json mit jedem System,
+  # jede Adresse in latest.json zeigt auf eine Datei in genau diesem Entwurf. Sonst wird der Lauf rot.
+  check-release:
+    needs: [create-release, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Entwurf prüfen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ID: ${{ needs.create-release.outputs.release_id }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/$ID" > release.json
+          LJ=$(jq -r '.assets[] | select(.name == "latest.json") | .id' release.json)
+          [ -n "$LJ" ] || { echo "::error::latest.json is missing"; exit 1; }
+          gh api "repos/$GITHUB_REPOSITORY/releases/assets/$LJ" -H "Accept: application/octet-stream" > latest.json
+          python3 - <<'PY'
+          import json, sys
+          rel = json.load(open("release.json")); lj = json.load(open("latest.json"))
+          ids = {str(a["id"]): a["name"] for a in rel["assets"]}
+          names = set(ids.values())
+          bad = []
+          want = ["darwin-aarch64", "darwin-x86_64", "linux-x86_64", "windows-x86_64"]
+          bad += [f"latest.json has no {p}" for p in want if p not in lj.get("platforms", {})]
+          for p, v in lj.get("platforms", {}).items():
+              aid = v["url"].rstrip("/").rsplit("/", 1)[-1]
+              name = ids.get(aid) or (aid if aid in names else None)  # asset id or file name in the address
+              if not name: bad.append(f"{p}: {v['url']} is not a file of this draft")
+              elif name + ".sig" not in names: bad.append(f"{p}: {name} has no .sig")
+          for ext in (".dmg", ".AppImage", ".deb", ".rpm", "-setup.exe", ".msi"):
+              if not any(n.endswith(ext) for n in names): bad.append(f"no {ext} file")
+          if sum(n.endswith(".dmg") for n in names) < 2: bad.append("expected two .dmg files (Apple chip + Intel)")
+          for b in bad: print("::error::" + b)
+          print(f"{len(names)} files, platforms: {sorted(lj.get('platforms', {}))}")
+          sys.exit(1 if bad else 0)
+          PY

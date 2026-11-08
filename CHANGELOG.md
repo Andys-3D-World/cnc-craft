@@ -2,6 +2,9 @@
 
 ## Next version (unreleased)
 
+**Improved**
+- **Release build:** the draft is created once before the four builds start, so they can no longer make two drafts with half the files each (this happened with 0.4.4 and was fixed by hand). A final check fails the build if any download, signature or update entry is missing.
+
 ## 0.4.4 Beta
 
 **New**
