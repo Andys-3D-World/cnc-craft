@@ -2355,6 +2355,8 @@
   "upd.installing": "Update wordt gedownload en geïnstalleerd …",
   "upd.restarting": "Update geïnstalleerd – CNC Craft start opnieuw …",
   "upd.installErr": "Update mislukt ({e}). Je kunt de nieuwe versie ook downloaden en met de hand installeren.",
+  "upd.keptOld": "De vorige versie blijft ernaast staan: {f}",
+  "upd.keepErr": "Update afgebroken: de vorige versie kon niet als kopie bewaard worden ({e}). Er is niets veranderd.",
   "upd.jobRunning": "Bijwerken kan niet terwijl een job loopt. Rond eerst de job af.",
   "upd.log.installed": "[Update] Versie {v} geïnstalleerd – herstart.",
   "upd.noAsset": "Er zit geen passend bestand voor je systeem bij – kijk op de releasepagina.",

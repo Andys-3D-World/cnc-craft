@@ -173,13 +173,21 @@ export async function openAboutDialog(log: (s: string) => void) {
         prog.textContent = t("upd.installing") + " " + (total ? Math.round(done / total * 100) + " %" : mb(done));
       });
       try {
-        const v = await invoke<string>("update_install", { manifest: manifest.browser_download_url });
+        // kept = Name der Kopie der bisherigen Version (nur Linux-AppImage, sonst leer)
+        const res = await invoke<{ version: string; kept: string }>("update_install", { manifest: manifest.browser_download_url });
+        const v = res.version;
         if (!v) { prog.textContent = t("upd.upToDate", { v: r.current }); return; }
         log(t("upd.log.installed", { v }));
-        prog.textContent = t("upd.restarting");
-        setTimeout(() => { void invoke("update_restart"); }, 1200);
+        const kept = res.kept ? t("upd.keptOld", { f: res.kept }) : "";
+        if (kept) log(kept);
+        prog.textContent = t("upd.restarting") + (kept ? " " + kept : "");
+        // mit Kopie etwas länger warten, damit man den Dateinamen lesen kann
+        setTimeout(() => { void invoke("update_restart"); }, kept ? 5000 : 1200);
       } catch (e) {
-        prog.textContent = t("upd.installErr", { e: String(e) });
+        const m = String(e);
+        prog.textContent = m.startsWith("keep-copy:")
+          ? t("upd.keepErr", { e: m.slice("keep-copy:".length).trim() })
+          : t("upd.installErr", { e: m });
         inst.disabled = false;
       } finally {
         off();

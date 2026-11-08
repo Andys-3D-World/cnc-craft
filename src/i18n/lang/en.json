@@ -2530,6 +2530,8 @@
   "upd.installing": "Downloading and installing update …",
   "upd.restarting": "Update installed – CNC Craft is restarting …",
   "upd.installErr": "Update failed ({e}). You can also download the new version and install it by hand.",
+  "upd.keptOld": "The previous version stays next to it: {f}",
+  "upd.keepErr": "Update cancelled: the previous version could not be kept as a copy ({e}). Nothing was changed.",
   "upd.jobRunning": "Can't update while a job is running. Please finish the job first.",
   "upd.log.installed": "[Update] Version {v} installed – restarting.",
   "upd.noAsset": "There is no matching file for your system – have a look on the release page.",

@@ -4,6 +4,7 @@
 
 **Improved**
 - **Release build:** the draft is created once before the four builds start, so they can no longer make two drafts with half the files each (this happened with 0.4.4 and was fixed by hand). A final check fails the build if any download, signature or update entry is missing.
+- **Update keeps the old AppImage (Linux):** *Update now* first puts a copy of the running version next to the AppImage (`CNC.Craft_<old version>_previous.AppImage`), so you can go back if the new version gives trouble. Only the latest copy is kept; older copies made by CNC Craft are removed after the update. If the copy can't be made (for example the disk is full), nothing is installed. Suggested by the AppImage catalog maintainer. Not yet tried on a real Linux update.
 
 ## 0.4.4 Beta
 

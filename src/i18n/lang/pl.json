@@ -2355,6 +2355,8 @@
   "upd.installing": "Pobieranie i instalowanie aktualizacji …",
   "upd.restarting": "Aktualizacja zainstalowana – CNC Craft uruchamia się ponownie …",
   "upd.installErr": "Aktualizacja nie powiodła się ({e}). Możesz też pobrać nową wersję i zainstalować ją ręcznie.",
+  "upd.keptOld": "Poprzednia wersja zostaje obok: {f}",
+  "upd.keepErr": "Aktualizacja przerwana: nie udało się zachować kopii poprzedniej wersji ({e}). Nic nie zostało zmienione.",
   "upd.jobRunning": "Nie można aktualizować podczas trwającego zadania. Najpierw zakończ zadanie.",
   "upd.log.installed": "[Aktualizacja] Zainstalowano wersję {v} – ponowne uruchamianie.",
   "upd.noAsset": "Brak pliku dla twojego systemu – zajrzyj na stronę wydania.",

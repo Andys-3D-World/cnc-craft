@@ -2355,6 +2355,8 @@
   "upd.installing": "Téléchargement et installation de la mise à jour …",
   "upd.restarting": "Mise à jour installée – CNC Craft redémarre …",
   "upd.installErr": "Échec de la mise à jour ({e}). Vous pouvez aussi télécharger la nouvelle version et l'installer à la main.",
+  "upd.keptOld": "La version précédente reste à côté : {f}",
+  "upd.keepErr": "Mise à jour annulée : impossible de conserver une copie de la version précédente ({e}). Rien n'a été modifié.",
   "upd.jobRunning": "Mise à jour impossible pendant un travail. Terminez d'abord le travail.",
   "upd.log.installed": "[Mise à jour] Version {v} installée – redémarrage.",
   "upd.noAsset": "Aucun fichier adapté à ton système – regarde sur la page de la version.",
