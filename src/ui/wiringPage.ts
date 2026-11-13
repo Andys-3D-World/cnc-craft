@@ -53,7 +53,8 @@ const FN_KEYS: Record<string, string> = {
   "Wasserschutz (24 V)": "wr.fn.water", "Laserleistung PWM": "wr.fn.lasPwm", "Laser ein (aktiv low)": "wr.fn.lasOn",
   "Puls (OC)": "wr.fn.pulse", "Richtung (OC)": "wr.fn.dirOc", "Läuft (OC)": "wr.fn.runOc",
   "Luft/Gebläse (OC)": "wr.fn.airOc", "Fußschalter Start/Pause": "wr.fn.foot", "Tür-Schutz": "wr.fn.doorGuard",
-  "Laser von Hand": "wr.fn.lasHand", "Spindel ein": "wr.fn.spOn"
+  "Laser von Hand": "wr.fn.lasHand", "Spindel ein": "wr.fn.spOn",
+  "Spindel-Rückmeldung": "wr.fn.spFb", "MOSFET-Ausgang": "wr.fn.mosOut"
 };
 function fnText(fn: string): string { const k = FN_KEYS[fn]; return k ? t(k) : fn; }
 
@@ -68,6 +69,7 @@ function guessBoard(): string {
     if (BOARDS.some(b => b.id === fl)) return fl;   // gleiche Kennung im Reiter „Board flashen“ (6pack, jackpot, mega-ramps …)
     if (fl === "mks-dlc32-max") return "mks-dlc32-max";
     if (fl === "mks-dlc32") return "mks-dlc32-v21";
+    if (fl === "arduino-nano") return "nano-shield-v4";
     if (/V5\.?88/i.test(name) || fl === "pibot-v588-ultra") return "pibot-v588-ultra";
     if (/PiBot|V49PB/i.test(name) || fl === "pibot-v496-pro") return "pibot-v496-pro";
   } catch { /* egal */ }
@@ -348,7 +350,7 @@ function boardSvg(b: Board, active: Set<string>, connComp: Map<string, CompId> |
     s += connBody(c, x0, y0, w, h, stroke, sw);
     c.pins.forEach((p, i) => {
       const pp = pinPos(c, i);
-      const tipTxt = `${c.label} · ${p.label}${p.mcu ? " · " + p.mcu : ""}${p.fn ? " · " + fnText(p.fn) : ""}`;
+      const tipTxt = `${c.label ? c.label + " · " : ""}${p.label}${p.mcu ? " · " + p.mcu : ""}${p.fn ? " · " + fnText(p.fn) : ""}`;
       const screw = c.style === "screw";
       s += `<circle cx="${pp.x}" cy="${pp.y}" r="${screw ? 5.6 : 4.3}" class="wr-pin${screw ? " wr-pin-screw" : ""}" data-end="b:${esc(c.id)}.${esc(p.k)}"><title>${esc(tipTxt)}</title></circle>`;
       if (screw) s += `<line x1="${pp.x - 3.5}" y1="${pp.y}" x2="${pp.x + 3.5}" y2="${pp.y}" stroke="#555" stroke-width="1.4" pointer-events="none"/>`;
@@ -609,7 +611,7 @@ export function initWiringPage() {
           const bp = boardPin(b, w.to);
           if (!bp) continue;
           const pin = bp.c.pins[bp.i];
-          rows.push(`<tr><td><i style="background:${w.color}"></i>${esc(partName(p))} · ${esc(w.from)}</td><td>${esc(bp.c.label)} · ${esc(pin.label)}</td><td>${esc(pin.mcu || "–")}</td><td>${esc(fnText(pin.fn || ""))}</td></tr>`);
+          rows.push(`<tr><td><i style="background:${w.color}"></i>${esc(partName(p))} · ${esc(w.from)}</td><td>${bp.c.label ? esc(bp.c.label) + " · " : ""}${esc(pin.label)}</td><td>${esc(pin.mcu || "–")}</td><td>${esc(fnText(pin.fn || ""))}</td></tr>`);
         }
         side += `<h4>${esc(t("wr.pinTable"))}</h4><table class="wr-table"><thead><tr><th>${esc(t("wr.col.part"))}</th><th>${esc(t("wr.col.board"))}</th><th>${esc(t("wr.col.mcu"))}</th><th>${esc(t("wr.col.fn"))}</th></tr></thead><tbody>${rows.join("")}</tbody></table>`;
         if (hk.pro.length) side += `<h4>${esc(t("wr.proNotes"))}</h4><ul class="wr-pro">${hk.pro.map(s => `<li>${tx(s)}</li>`).join("")}</ul>`;

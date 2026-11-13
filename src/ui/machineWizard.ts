@@ -359,7 +359,7 @@ export function openMachineWizard(welcome = false) {
     $("mw-flash")?.addEventListener("click", () => {
       ($("mw-apply") as HTMLElement).click(); // Maschine übernehmen …
       (document.querySelector('.tab-navigation [data-tab="tab-flash"]') as HTMLElement | null)?.click(); // … zum Flashen
-      selectBundledGrbl(p.id === "estlcam-nano" ? "arduino-nano" : "arduino-uno");
+      selectBundledGrbl(p.id === "estlcam-nano" || p.id === "nano-shield-v4" ? "arduino-nano" : "arduino-uno");
     });
     ov.querySelector<HTMLElement>(".mw-src")?.addEventListener("click", (e) => {
       e.preventDefault();

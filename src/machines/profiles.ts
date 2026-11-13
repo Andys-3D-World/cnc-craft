@@ -85,6 +85,19 @@ export const PROFILES: MachineProfile[] = [
   { id: "custom-mill", brand: "custom", modelKey: "mw.m.customMill", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "ok", grbl: true, notes: ["mw.note.custom"] },
   { id: "custom-plasma", brand: "custom", modelKey: "mw.m.customPlasma", kind: "plasma", w: 1250, h: 1250, z: 80, ...M, support: "ok", grbl: true, notes: ["mw.note.plasma", "mw.note.custom"] },
   { id: "mks-dlc32", brand: "custom", modelKey: "mw.m.dlc32", kind: "laser", w: 400, h: 400, ...L, support: "ok", grbl: true, notes: ["mw.note.dlc32", "mw.note.custom"] },
+  // BTT Rodent (router board, FluidNC): settings live in config.yaml, so CNC Craft writes no $$ values (grbl: false).
+  // Bed/Z like "own mill" (BTT's rodent.yaml only has 300 mm placeholders). Not tested on a real board -> "check".
+  { id: "btt-rodent", brand: "custom", modelKey: "mw.m.rodent", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "check", grbl: false,
+    notes: ["mw.note.rodent"], src: "https://github.com/bigtreetech/Rodent" },
+  // Arduino Nano + CNC Shield V4 (GRBL 1.1h, flashed by CNC Craft) and OpenBuilds BlackBox X32 (grblHAL) – board profiles, bed like "own"
+  { id: "nano-shield-v4", brand: "custom", modelKey: "mw.m.nanoV4", kind: "laser", w: 400, h: 400, ...L, support: "ok", grbl: true, action: "flash-grbl",
+    notes: ["mw.note.nanoV4", "mw.note.custom"] },
+  { id: "openbuilds-bbx32", brand: "custom", modelKey: "mw.m.bbx32", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "check", grbl: true,
+    notes: ["mw.note.bbx32", "mw.note.custom"], src: "https://github.com/OpenBuilds/OpenBuilds-CONTROL" },
+  { id: "openbuilds-bb4x", brand: "custom", modelKey: "mw.m.bb4x", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "check", grbl: true,
+    notes: ["mw.note.bb4x", "mw.note.custom"], src: "https://github.com/OpenBuilds/OpenBuilds-CONTROL" },
+  { id: "sienci-slb", brand: "custom", modelKey: "mw.m.slb", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "check", grbl: true,
+    notes: ["mw.note.slb", "mw.note.custom"], src: "https://resources.sienci.com/view/slb-manual/" },
 
   // ---------------- xTool ----------------
   { id: "xtool-d1", brand: "xtool", model: "D1 (5 W / 10 W)", kind: "laser", w: 432, h: 406, ...L, support: "check", grbl: false, notes: ["mw.note.xtoolUsb"], src: SRC_XTOOL_D1 },

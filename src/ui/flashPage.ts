@@ -63,25 +63,51 @@ interface Board {
   halGuide?: string;
   /** Eigene Anleitung „Original-Firmware aufspielen“: Texte fl.orig.<origGuide>.howto / .after */
   origGuide?: string;
+  /** Own title and button text for that guide (i18n keys) – without them the MKS texts fl.orig.title / fl.orig.open are used */
+  origTitle?: string;
+  origOpen?: string;
   /** kind "manual": Schlüssel der Anleitung, wie man die Firmware ohne CNC Craft aufspielt */
   manualGuide?: string;
+  /** Own title for that guide (i18n key), e.g. a board without any firmware – default fl.manual.title */
+  manualTitle?: string;
 }
 
 const BOARDS: Board[] = [
   { id: "mks-dlc32-max", name: "MKS DLC32 MAX (V1.0 / V1.2)", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, max: true, links: ["fl.link.mksMax", "fl.link.grblhal"],
     fwExpect: "MKS DLC32 MAX", halGuide: "max", origGuide: "max" },
   { id: "mks-dlc32", name: "MKS DLC32 (V2.0 / V2.1)", kind: "esp", chipId: 0, chip: "ESP32", max: false, links: ["fl.link.mks", "fl.link.fluidnc", "fl.link.grblhal"],
-    fwExpect: "MKS DLC32 2." },
-  { id: "pibot-v588-ultra", name: "PiBot Controller V5.88 Ultra", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, links: ["fl.link.pibot588", "fl.link.fluidnc", "fl.link.grblhal"] },
-  { id: "pibot-v496-pro", name: "PiBot FluidNC V4.96 Pro", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.pibot", "fl.link.fluidnc", "fl.link.grblhal"] },
-  { id: "6pack", name: "6 Pack CNC Controller", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.6pack", "fl.link.fluidnc"] },
-  { id: "jackpot", name: "Jackpot CNC Controller (V1 Engineering)", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.jackpot", "fl.link.fluidnc"] },
+    fwExpect: "MKS DLC32 2.", origGuide: "dlc32" },
+  // FluidNC boards: own guides (fl.orig.<guide>.howto/.after) – install with the FluidNC Web Installer, update here at 0x10000
+  { id: "pibot-v588-ultra", name: "PiBot Controller V5.88 Ultra", kind: "esp", chipId: 9, chip: "ESP32-S3", flash: 8 * 1048576, links: ["fl.link.pibot588", "fl.link.fluidnc", "fl.link.grblhal"],
+    origGuide: "pb588", origTitle: "fl.orig.pb588.title", origOpen: "fl.orig.pibot.open" },
+  { id: "pibot-v496-pro", name: "PiBot FluidNC V4.96 Pro", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.pibot", "fl.link.fluidnc", "fl.link.grblhal"],
+    origGuide: "pb496", origTitle: "fl.orig.pb496.title", origOpen: "fl.orig.pibot.open" },
+  { id: "6pack", name: "6 Pack CNC Controller (DevKit / Integrated ESP32)", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.6pack", "fl.link.fluidnc"],
+    origGuide: "6pack", origTitle: "fl.orig.6pack.title", origOpen: "fl.orig.6pack.open" },
+  { id: "jackpot", name: "Jackpot CNC Controller (V1 Engineering)", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.jackpot", "fl.link.fluidnc"],
+    origGuide: "jackpot", origTitle: "fl.orig.jackpot.title", origOpen: "fl.orig.jackpot.open" },
+  { id: "jackpot3", name: "Jackpot3 CNC Controller (V1 Engineering)", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.jackpot3", "fl.link.fluidnc"],
+    origGuide: "jp3", origTitle: "fl.orig.jp3.title", origOpen: "fl.orig.jp3.open" },
+  // OpenBuilds BlackBox X32: grblHAL from OpenBuilds (bootloader 0x1000, partitions 0x8000, program 0x10000 – OpenBuilds CONTROL)
+  { id: "openbuilds-bbx32", name: "OpenBuilds BlackBox X32", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.bbx32", "fl.link.grblhal"],
+    origGuide: "bbx32", origTitle: "fl.orig.bbx32.title", origOpen: "fl.orig.bbx32.open" },
+  // BTT Rodent: ships with FluidNC. 4 MB flash: header of BTT's firmware files + partitions.bin, V1.1 module …-N4
+  { id: "btt-rodent", name: "BIGTREETECH Rodent (V1.0 / V1.1)", kind: "esp", chipId: 0, chip: "ESP32", flash: 4 * 1048576, links: ["fl.link.rodent", "fl.link.fluidnc"],
+    origGuide: "rodent", origTitle: "fl.orig.rodent.title", origOpen: "fl.orig.rodent.open" },
   { id: "mega-ramps", name: "Arduino Mega 2560 + RAMPS 1.4", kind: "manual", chip: "ATmega2560", links: ["fl.link.grblMega5x"], manualGuide: "fl.manual.mega" },
   { id: "btt-skr-pro", name: "BTT SKR Pro V1.1 / V1.2", kind: "manual", chip: "STM32F407", links: ["fl.link.grblhal"], manualGuide: "fl.manual.skr" },
+  // Sienci SuperLongBoard (STM32F412): flashed with Sienci's gSender (.hex over USB DFU) – CNC Craft only shows the guide
+  { id: "sienci-slb", name: "Sienci SuperLongBoard", kind: "manual", chip: "STM32F412", links: ["fl.link.slb"], manualGuide: "fl.manual.slb" },
+  // OpenBuilds BlackBox 4X: ATmega328P with Arduino-style auto reset – OpenBuilds' GRBL .hex files (repo root of OpenBuilds CONTROL)
+  { id: "openbuilds-bb4x", name: "OpenBuilds BlackBox 4X (GRBL)", kind: "avr", chip: "ATmega328P", maxHex: 32256, links: ["fl.link.bb4x", "fl.link.grbl"],
+    origGuide: "bb4x", origTitle: "fl.orig.bb4x.title", origOpen: "fl.orig.bb4x.open" },
   { id: "esp32", nameKey: "fl.board.esp32", kind: "esp", chipId: 0, chip: "ESP32", links: ["fl.link.fluidnc", "fl.link.grblhal"] },
   { id: "esp32s3", nameKey: "fl.board.esp32s3", kind: "esp", chipId: 9, chip: "ESP32-S3", links: ["fl.link.grblhal"] },
   { id: "arduino-uno", nameKey: "fl.board.uno", kind: "avr", chip: "ATmega328P", maxHex: 32256, links: ["fl.link.grbl"] },
-  { id: "arduino-nano", nameKey: "fl.board.nano", kind: "avr", chip: "ATmega328P", maxHex: 30720, links: ["fl.link.grbl"] }
+  { id: "arduino-nano", nameKey: "fl.board.nano", kind: "avr", chip: "ATmega328P", maxHex: 30720, links: ["fl.link.grbl"] },
+  // UNO R4 (Minima / WiFi): Renesas RA4M1 – no GRBL and no grblHAL driver (Nov 2026), so only a warning, no links
+  { id: "arduino-uno-r4", name: "Arduino UNO R4 (Minima / WiFi)", kind: "manual", chip: "Renesas RA4M1", links: [],
+    manualGuide: "fl.manual.unoR4", manualTitle: "fl.manual.unoR4.title" }
 ];
 
 const BACKUP_KEY = "cnc_craft_settings_backup";
@@ -98,6 +124,13 @@ const LINKS: Record<string, string> = {
   // 6 Pack und Jackpot (FluidNC), Mega + RAMPS (grbl-Mega-5X)
   "fl.link.6pack": "https://github.com/bdring/6-Pack_CNC_Controller/wiki",
   "fl.link.jackpot": "https://docs.v1e.com/electronics/jackpot/",
+  "fl.link.jackpot3": "https://docs.v1e.com/electronics/jackpot3/",
+  // BTT Rodent: manual, schematic, rodent.yaml and BTT's FluidNC files (folder Firmware)
+  "fl.link.rodent": "https://github.com/bigtreetech/Rodent",
+  // OpenBuilds CONTROL (contains the firmware flashing tool for the BlackBox X32)
+  "fl.link.bbx32": "https://github.com/OpenBuilds/OpenBuilds-CONTROL/releases",
+  "fl.link.bb4x": "https://github.com/OpenBuilds/OpenBuilds-CONTROL",
+  "fl.link.slb": "https://resources.sienci.com/view/slb-firmware-flashing/",
   "fl.link.grblMega5x": "https://github.com/fra589/grbl-Mega-5X",
   // Weboberfläche für grblHAL (ESP3D-WebUI v3) – muss nach jedem Flashen neu aufs Board
   "fl.link.webuiFile": "https://github.com/luc-github/ESP3D-WEBUI/tree/3.0/dist/CNC/GRBLHal"
@@ -324,7 +357,7 @@ function render() {
         </select>
       </div>
       ${board?.manualGuide ? `<div class="sp-warn">⚠ ${t("fl.chk.manual", { board: esc(boardName(board)) })}</div>
-        <details class="fl-help fl-hal" open><summary>🛠️ ${t("fl.manual.title")}</summary><div>${t(board.manualGuide)}</div></details>`
+        <details class="fl-help fl-hal" open><summary>🛠️ ${t(board.manualTitle || "fl.manual.title")}</summary><div>${t(board.manualGuide)}</div></details>`
         : board ? `<div class="tool-scope">${t("fl.board.accepts", { files: accept, chip: board.chip })}</div>` : `<div class="sp-warn">⚠ ${t("fl.chk.noBoard")}</div>`}
       ${boardCompareHtml()}
     </section>
@@ -352,9 +385,9 @@ function render() {
       ${chk.blocks.map(w => `<div class="fl-block">⛔ ${esc(w)}</div>`).join("")}
       ${file.warnings.concat(chk.warns).map(w => `<div class="sp-warn">⚠ ${esc(w)}</div>`).join("")}
       ${file.kind === "esp" && file.merged ? `<div class="sp-warn">⚠ ${t("fl.warn.mergedResets")}</div>` : ""}` : ""}
-      ${board?.origGuide ? `<details class="fl-help fl-hal"><summary>🏭 ${t("fl.orig.title")}</summary>
+      ${board?.origGuide ? `<details class="fl-help fl-hal"><summary>🏭 ${t(board.origTitle || "fl.orig.title")}</summary>
         <div>${t(`fl.orig.${board.origGuide}.howto`)}</div>
-        ${board.links[0] ? `<button class="btn-secondary btn-compact" data-url="${LINKS[board.links[0]]}">🌐 ${t("fl.orig.open")}</button>` : ""}
+        ${board.links[0] ? `<button class="btn-secondary btn-compact" data-url="${LINKS[board.links[0]]}">🌐 ${t(board.origOpen || "fl.orig.open")}</button>` : ""}
         <h4 class="fl-hal-h">${t("fl.hal.afterTitle")}</h4>
         <div>${t(`fl.orig.${board.origGuide}.after`)}</div>
       </details>` : ""}
@@ -367,7 +400,7 @@ function render() {
         <div>${t(`fl.hal.${board.halGuide}.web`)}</div>
         <button class="btn-secondary btn-compact" data-url="${LINKS["fl.link.webuiFile"]}">⬇ ${t("fl.hal.webuiFile")}</button>
       </details>` : ""}
-      <div class="fl-links">${t("fl.where")} ${links.map(k => `<a href="#" data-url="${LINKS[k]}">${t(k)}</a>`).join(" · ")}</div>
+      ${links.length ? `<div class="fl-links">${t("fl.where")} ${links.map(k => `<a href="#" data-url="${LINKS[k]}">${t(k)}</a>`).join(" · ")}</div>` : ""}
     </section>
 
     <section class="sp-card">
