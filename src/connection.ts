@@ -18,6 +18,8 @@ import { noteManualLine } from "./wcsSync";
 import { liveMachinePos } from "./render";
 import { handleJogClick } from "./jogSimulator";
 import { clampJog } from "./jogLimit";
+import { holdPress, holdRelease, holdJogStop } from "./holdJog";
+import { normalizePrefs, setLevelFeed, holdSupported, dirFromCmd, JogPrefs, SpeedLevel } from "./holdJogLogic";
 import { bedSizeMm } from "./editor/editorState";
 import { t } from "./i18n/i18n";
 import {
@@ -523,6 +525,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
       void scan();
     });
     slotsBox.querySelector("#m-stop-all")?.addEventListener("click", async () => {
+      holdJogStop();
       const k = await stopAllMachines();
       appendToConsole(t("ms.stopped", { n: k }));
     });
@@ -650,7 +653,46 @@ export function initConnection(appendToConsole: (text: string) => void) {
   const stepButtons = document.querySelectorAll<HTMLElement>(".btn-step");
   const feedSlider = $("jog-feed-slider") as HTMLInputElement;
   const feedDisplay = $("jog-feed-display");
-  feedSlider?.addEventListener("input", () => { if (feedDisplay) feedDisplay.textContent = `${feedSlider.value} mm/min`; });
+  const holdBox = $("jog-hold") as HTMLInputElement | null;
+  const levelButtons = document.querySelectorAll<HTMLElement>(".jog-level");
+
+  // Tempo-Stufen und „fahren, solange gedrückt“ – werden gemerkt (holdJogLogic.ts prüft die Werte)
+  const PREFS_KEY = "cnc_craft_jog";
+  let prefs: JogPrefs = normalizePrefs(null);
+  try { prefs = normalizePrefs(JSON.parse(get(PREFS_KEY) || "null")); } catch { /* Standard */ }
+  const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* egal */ } };
+  const showPrefs = () => {
+    if (feedSlider) feedSlider.value = String(prefs.feeds[prefs.level]);
+    if (feedDisplay) feedDisplay.textContent = `${feedSlider?.value ?? prefs.feeds[prefs.level]} mm/min`;
+    levelButtons.forEach(b => b.classList.toggle("active", b.dataset.level === prefs.level));
+    if (holdBox) holdBox.checked = prefs.hold;
+    $("jog-steps")?.classList.toggle("jog-steps-off", prefs.hold);
+    $("jog-pad")?.classList.toggle("jog-hold-mode", prefs.hold);
+    syncHoldNote();
+  };
+  // Haltemodus an, aber die Steuerung kann ihn nicht (Marlin, Ruida, K40): Hinweis statt stiller Knöpfe
+  function syncHoldNote() {
+    const note = $("jog-hold-note");
+    if (note) note.style.display = prefs.hold && machine.connected && !holdSupported(machine.protocol, machine.firmware) ? "" : "none";
+  }
+  window.addEventListener(MACHINE_EVENT, syncHoldNote);
+  feedSlider?.addEventListener("input", () => {
+    if (feedDisplay) feedDisplay.textContent = `${feedSlider.value} mm/min`;
+    prefs = setLevelFeed(prefs, parseInt(feedSlider.value, 10));
+    savePrefs();
+  });
+  levelButtons.forEach(b => b.addEventListener("click", () => {
+    prefs = { ...prefs, level: (b.dataset.level || "medium") as SpeedLevel };
+    savePrefs();
+    showPrefs();
+  }));
+  holdBox?.addEventListener("change", () => {
+    holdRelease();
+    prefs = { ...prefs, hold: holdBox.checked };
+    savePrefs();
+    showPrefs();
+  });
+  showPrefs();
   stepButtons.forEach(btn => btn.addEventListener("click", () => {
     stepButtons.forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
@@ -669,7 +711,29 @@ export function initConnection(appendToConsole: (text: string) => void) {
   let jogEnd: number[] | null = null; // Ziel des zuletzt geschickten Schritts
 
   document.querySelectorAll<HTMLElement>(".btn-jog[data-cmd]").forEach(btn => {
+    // ---- Haltemodus: fahren, solange gedrückt (holdJog.ts). Jedes „Loslassen“ hält sofort an. ----
+    const press = () => {
+      if (!prefs.hold || btn.classList.contains("holding")) return;
+      if (holdPress(dirFromCmd(btn.dataset.cmd || ""), feed, () => btn.classList.remove("holding"))) btn.classList.add("holding");
+    };
+    btn.addEventListener("pointerdown", (e: PointerEvent) => {
+      if (!prefs.hold || e.button !== 0) return;
+      e.preventDefault(); // kein Markieren, kein Scrollen
+      press();
+    });
+    // Maus raus, Maustaste los, Berührung abgebrochen, Kontextmenü: anhalten
+    for (const ev of ["pointerup", "pointerleave", "pointercancel", "lostpointercapture", "contextmenu"]) btn.addEventListener(ev, () => holdRelease());
+    // Tastatur: Leertaste/Enter halten fährt, Loslassen oder Fokus weg hält an
+    btn.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (!prefs.hold || (e.key !== " " && e.key !== "Enter")) return;
+      e.preventDefault();
+      if (!e.repeat) press();
+    });
+    btn.addEventListener("keyup", (e: KeyboardEvent) => { if (e.key === " " || e.key === "Enter") holdRelease(); });
+    btn.addEventListener("blur", () => holdRelease());
+
     btn.addEventListener("click", async () => {
+      if (prefs.hold) return; // im Haltemodus fährt nur das Gedrückthalten
       if (!machine.connected) {
         // Demo: Position nur anzeigen
         handleJogClick(btn, distance, feed, true, appendToConsole, redraw);
@@ -695,6 +759,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
   });
   // Mitte: Joggen sofort abbrechen
   $("jog-home")?.addEventListener("click", async () => {
+    holdJogStop();
     if (machine.connected) { await realtime(RT.jogCancel).catch(() => {}); appendToConsole(t("m.jogCancelled")); }
   });
 

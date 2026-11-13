@@ -322,9 +322,10 @@ async function activate(id: string, s: MachineState, mode: MachineMode | null, f
 /** Darf gerade nicht gewechselt werden? (Werkzeugwechsel läuft – Befehle gingen sonst an die andere Maschine) */
 let switchGuard: () => boolean = () => false;
 export function setSwitchGuard(fn: () => boolean) { switchGuard = fn; }
-/** Läuft vor jedem Wechsel, solange Befehle noch an die bisherige Maschine gehen (Gamepad: laufende Fahrt abbrechen) */
-let beforeSwitch: () => Promise<void> = async () => {};
-export function setBeforeSwitch(fn: () => Promise<void>) { beforeSwitch = fn; }
+/** Läuft vor jedem Wechsel, solange Befehle noch an die bisherige Maschine gehen (Gamepad, Halte-Fahren: Fahrt abbrechen) */
+const beforeSwitchFns: (() => Promise<void>)[] = [];
+export function addBeforeSwitch(fn: () => Promise<void>) { beforeSwitchFns.push(fn); }
+async function beforeSwitch() { for (const fn of beforeSwitchFns) await fn().catch(() => undefined); }
 
 export async function selectMachine(id: string): Promise<void> {
   if (id === activeId) return;

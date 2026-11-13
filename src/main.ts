@@ -49,6 +49,7 @@ import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
 import { buildJob, okToStart } from "./jobFlow";
 import { stopPlanFor, holdSettled } from "./stopPlan";
+import { initHoldJog, holdJogStop } from "./holdJog";
 import { macroRunning, cancelMacro } from "./macroRun";
 import { machine, realtime, RT, jobStop } from "./machine";
 import { initCommandPalette } from "./ui/commandPalette";
@@ -229,6 +230,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btn-job-resume")?.addEventListener("click", () => openResumeDialog(appendToConsole));
     if (jobPauseBtn) jobPauseBtn.addEventListener("click", () => pauseStreaming(appendToConsole));
     if (jobStopBtn) jobStopBtn.addEventListener("click", async () => {
+      holdJogStop(); // fährt gerade ein gedrückter Pfeil: sofort anhalten (0x85), egal was sonst noch läuft
       if (streamState.isRunning) { stopStreaming(); return; }
       if (machine.job.active) { await jobStop().catch(e => appendToConsole(`${t("log.error")} ${e}`)); return; }
       // kein Job, aber die Maschine fährt (Nullpunkt, Referenzfahrt, Makro …): auch das muss der Knopf anhalten
@@ -268,6 +270,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initMacroPanel(appendToConsole);   // eigene G-Code-Knöpfe
     initWcsPanel(appendToConsole);     // Koordinatensystem G54–G59
     initGamepadPanel(appendToConsole); // Gamepad: fahren mit Totmann-Knopf, Knöpfe belegen
+    initHoldJog(appendToConsole);      // Pfeile gedrückt halten = fahren, Loslassen = sofort anhalten
     initPinLeds(appendToConsole);      // Lämpchen für Endschalter, Taster/WLS, Tür, Not-Aus …
     initWiringPage();                  // Reiter "Anschlüsse": Anschlusspläne für die Boards
     initAboutDialog(appendToConsole);  // ⓘ oben rechts: Version + Updates

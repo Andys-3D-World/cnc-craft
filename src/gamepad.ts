@@ -17,12 +17,13 @@ import { invoke } from "@tauri-apps/api/core";
 import { t } from "./i18n/i18n";
 import { zeroCommand } from "./wcs";
 import { macroRunning } from "./macroRun";
-import { machine, MACHINE_EVENT, RT, send, sendAndWait, realtime, activeMachineId, setBeforeSwitch } from "./machine";
+import { machine, MACHINE_EVENT, RT, send, sendAndWait, realtime, activeMachineId, addBeforeSwitch } from "./machine";
 import { streamState, startStreaming, pauseStreaming } from "./machineStream";
 import { bedSizeMm } from "./editor/editorState";
 import { toolChangeBusy, tcAbort } from "./toolChange";
 import { probeRunning, abortProbe } from "./probe";
 import { askChoice } from "./ui/unsavedDialog";
+import { holdJogStop } from "./holdJog";
 import {
   GamepadConfig, GamepadAction, GamepadCommand, GamepadContext, BlockReason, ACTIONS, SPEED_LEVELS, DEFAULT_LEVEL, TICK_MS, STEP_S, MAX_INFLIGHT,
   normalizeConfig, stickValue, updateArmed, velocity, limitToMachine, lookahead, planStep, blockReason, isDriving, canStartDrive, resolveAction,
@@ -221,6 +222,7 @@ function run(cmd: GamepadCommand) {
 /** Stopp-Knopf: was gerade fährt, hält an – egal woher die Fahrt kommt */
 function stopNow() {
   stopDrive();
+  holdJogStop(); // auch ein gedrückt gehaltener Pfeil auf dem Bildschirm
   armed = [false, false, false];
   const guard = (p: Promise<unknown>) => p.catch(e => log(`${t("log.error")} ${e}`));
   if (toolChangeBusy()) { tcAbort(t("tc.why.user"), false); return; }
@@ -319,7 +321,7 @@ export function initGamepad(logFn: (s: string) => void) {
     else if (type === "job-progress" && machine.job.active) stopDrive();
   });
   // Abbruch muss noch an die bisherige Maschine gehen
-  setBeforeSwitch(async () => {
+  addBeforeSwitch(async () => {
     const was = driving;
     driving = false;
     generation++;

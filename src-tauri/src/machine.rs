@@ -15,7 +15,7 @@
 
 use crate::grbl::{classify, clean_line, comment_of, is_m6, is_tool_change, tool_word, CharCounter, Incoming, Sender, Status};
 use std::io::{ErrorKind, Read, Write};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -26,6 +26,8 @@ pub const RT_STATUS: u8 = b'?';
 pub const RT_HOLD: u8 = b'!';
 pub const RT_RESUME: u8 = b'~';
 pub const RT_RESET: u8 = 0x18;
+/// Joggen abbrechen: GRBL leert sofort alle Jog-Fahrten (ohne Reset, die Position bleibt gültig)
+pub const RT_JOG_CANCEL: u8 = 0x85;
 /// Wartet eine Handzeile länger als das auf "ok", obwohl die Maschine steht, ging die Antwort verloren
 pub const STALE_MANUAL: Duration = Duration::from_secs(5);
 /// Live-Bearbeitung: so viele Zeilen hinter der nächsten zu sendenden bleiben gesperrt (Sicherheitsabstand)
@@ -63,6 +65,9 @@ struct Shared {
     inner: Mutex<Inner>,
     alive: AtomicBool,
     emit: Emit,
+    /// Zählt Jog-Abbrüche (0x85, Reset). Ein `$J=`, der noch auf Platz im Puffer wartet, während abgebrochen wird,
+    /// geht NICHT mehr hinaus – sonst führe die Maschine nach dem Loslassen noch ein Stück.
+    jog_cancels: AtomicU64,
 }
 
 #[derive(Clone)]
@@ -123,6 +128,7 @@ impl Machine {
                 next_id: 1,
             }),
             alive: AtomicBool::new(true),
+            jog_cancels: AtomicU64::new(0),
             emit,
         });
         let m = Machine { sh };
@@ -536,12 +542,15 @@ impl Machine {
         let Some(clean) = clean_line(line) else { return Ok(0) };
         let len = clean.len() + 1;
         let t0 = Instant::now();
+        // Jog-Schritt: gilt nur, solange seitdem nicht abgebrochen wurde (geprüft unter derselben Sperre wie realtime)
+        let jog_gen = clean.starts_with("$J=").then(|| self.sh.jog_cancels.load(Ordering::SeqCst));
         loop {
             {
                 let mut inner = self.sh.inner.lock().unwrap();
                 if let Some(j) = inner.job.as_ref() {
                     if !j.paused { return Err("job running".into()); }
                 }
+                if jog_gen.is_some_and(|g| g != self.sh.jog_cancels.load(Ordering::SeqCst)) { return Err("jog cancelled".into()); }
                 if inner.counter.can_send(len) {
                     let mut data = clean.clone().into_bytes();
                     data.push(b'\n');
@@ -563,7 +572,15 @@ impl Machine {
 
     /// Echtzeit-Befehl (ein Byte, wird sofort ausgeführt, ohne "ok")
     pub fn realtime(&self, byte: u8) -> Result<(), String> {
+        if byte == RT_JOG_CANCEL {
+            // Unter der Sperre von send_line: ein wartender `$J=` sieht den Abbruch, bevor er schreibt,
+            // oder er ist schon vor dem 0x85 beim Board (dann löscht 0x85 ihn mit). Nie danach.
+            let _guard = self.sh.inner.lock();
+            self.sh.jog_cancels.fetch_add(1, Ordering::SeqCst);
+            return self.write_raw(&[byte]);
+        }
         if byte == RT_RESET {
+            self.sh.jog_cancels.fetch_add(1, Ordering::SeqCst);
             // Reset leert den Puffer des Boards -> unsere Zählung auch
             self.write_raw(&[byte])?;
             self.abort_job_internal("reset");
@@ -631,6 +648,7 @@ mod tests {
                     Ok(b'!') => hold = true,
                     Ok(b'~') => hold = false,
                     Ok(0x18) => { queue.clear(); used = 0; hold = false; running = 0; send("\r\nGrbl 1.1h ['$' for help]\r\n"); }
+                    Ok(0x85) => board.received.lock().unwrap().push("<jog-cancel>".into()),
                     Ok(b'\n') => {
                         let l = String::from_utf8_lossy(&line).to_string();
                         line.clear();
@@ -786,6 +804,39 @@ mod tests {
         assert!(done.contains("\"aborted\":true"), "{}", done);
         // nach Stopp ist die Zählung leer -> neue Befehle gehen sofort
         thread::sleep(Duration::from_millis(100));
+        assert!(m.send_line("$$").is_ok());
+        m.shutdown();
+    }
+
+    /// Gedrückt halten zum Fahren: ein Schritt, der beim Loslassen noch auf Platz im Puffer wartet,
+    /// darf nach dem Jog-Abbruch nicht mehr beim Board ankommen
+    #[test]
+    fn jog_cancel_drops_waiting_jog_step() {
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let (r, w) = spawn_board(Board { max_used: Arc::new(Mutex::new(0)), received: received.clone(), error_on: None, silent_on: None });
+        let (emit, ev) = collect();
+        let m = Machine::start(r, w, emit);
+        wait_for(&ev, "machine-status", 2).unwrap();
+        // Board arbeitet nichts ab -> der Puffer (128 Zeichen) läuft voll
+        m.realtime(RT_HOLD).unwrap();
+        thread::sleep(Duration::from_millis(50));
+        let step = "$J=G21 G91 X0.500 F3000"; // 24 Zeichen mit Zeilenende
+        for _ in 0..5 { m.send_line(step).unwrap(); }
+        // der sechste passt nicht mehr und wartet
+        let m2 = m.clone();
+        let waiting = thread::spawn(move || m2.send_line(step));
+        thread::sleep(Duration::from_millis(100));
+        m.realtime(RT_JOG_CANCEL).unwrap();
+        m.realtime(RT_RESUME).unwrap(); // jetzt wird wieder Platz frei
+        assert_eq!(waiting.join().unwrap(), Err("jog cancelled".to_string()));
+        thread::sleep(Duration::from_millis(100));
+        let got = received.lock().unwrap().clone();
+        let cancel_at = got.iter().position(|l| l == "<jog-cancel>").expect("0x85 sent");
+        assert!(!got[cancel_at..].iter().any(|l| l.starts_with("$J=")), "{:?}", got);
+        assert_eq!(got.iter().filter(|l| l.starts_with("$J=")).count(), 5);
+        // eine neue Fahrt nach dem Abbruch geht ganz normal
+        assert!(m.send_line(step).is_ok());
+        // andere Zeilen sind vom Abbruch nicht betroffen
         assert!(m.send_line("$$").is_ok());
         m.shutdown();
     }

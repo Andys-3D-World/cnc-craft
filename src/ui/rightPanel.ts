@@ -257,14 +257,16 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="menu-section-unified">
           <h3 class="menu-trigger">${T("rp.jog")}</h3>
           <div class="menu-body">
-            <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+            <div id="jog-steps" style="display: flex; gap: 4px; margin-bottom: 6px;">
               <button class="btn-step" data-step="0.1">0.1</button>
               <button class="btn-step active" data-step="1">1mm</button>
               <button class="btn-step" data-step="10">10mm</button>
               <button class="btn-step" data-step="100">100</button>
               <input type="number" id="jog-step-custom" placeholder="mm" style="width: 48px; padding: 2px; font-size: 0.75rem; text-align: center;">
             </div>
-            <div style="display: flex; gap: 14px; align-items: center; justify-content: center; margin-bottom: 5px;">
+            <label class="prop-row" style="cursor:pointer; margin-bottom: 4px;" ${tip("hj.holdTip")}><span>✋ ${T("hj.hold")}</span><input type="checkbox" id="jog-hold" style="width:auto;"></label>
+            <div id="jog-hold-note" class="jog-hold-note" style="display: none;">${T("hj.unsupported")}</div>
+            <div id="jog-pad" style="display: flex; gap: 14px; align-items: center; justify-content: center; margin-bottom: 5px;">
               <div style="width: 140px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
                 <button class="btn-jog btn-diag" data-cmd="X-1 Y1">↖</button>
                 <button id="jog-y-plus" class="btn-jog" data-cmd="Y1">Y+</button>
@@ -282,8 +284,13 @@ export function renderRightPanel(container: HTMLElement) {
                 <button class="btn-jog btn-z" data-cmd="Z-1">Z−</button>
               </div>
             </div>
+            <div class="jog-levels" ${tip("hj.levelTip")}>
+              <button type="button" class="btn-step jog-level" data-level="slow">${T("hj.slow")}</button>
+              <button type="button" class="btn-step jog-level active" data-level="medium">${T("hj.medium")}</button>
+              <button type="button" class="btn-step jog-level" data-level="fast">${T("hj.fast")}</button>
+            </div>
             <div style="display: flex; align-items: center; gap: 8px; padding: 2px 4px;">
-              <input type="range" id="jog-feed-slider" min="100" max="5000" step="100" value="1000" style="flex: 1; min-width: 0; accent-color: var(--accent-color);">
+              <input type="range" id="jog-feed-slider" min="50" max="5000" step="50" value="1000" style="flex: 1; min-width: 0; accent-color: var(--accent-color);">
               <span id="jog-feed-display" style="font-size: 0.72rem; font-family: var(--font-mono); color: var(--text-muted); width: 80px; text-align: right;">1000 mm/min</span>
             </div>
           </div>
