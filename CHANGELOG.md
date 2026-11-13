@@ -2,6 +2,9 @@
 
 ## Next version (unreleased)
 
+**Fixed**
+- **Release build:** the final check of the draft may now read it. With read-only rights GitHub hides drafts, so the check failed with 0.4.5 although the draft was complete (checked by hand: 17 files, all update entries and signatures match).
+
 ## 0.4.5 Beta
 
 **New**

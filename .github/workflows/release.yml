@@ -122,7 +122,8 @@ jobs:
     needs: [create-release, build]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # Entwürfe sieht GitHub nur mit Schreibrecht (mit „read“: 403, so bei 0.4.5). Geschrieben wird hier nichts
+      contents: write
     steps:
       - name: Entwurf prüfen
         env:
