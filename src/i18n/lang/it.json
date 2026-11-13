@@ -958,6 +958,7 @@
   "cost.csvFile": "calcolo.csv",
   "rp.simJobTip": "Visualizza il lavoro caricato nella simulazione (segue in diretta durante la lavorazione)",
   "sim.noProgram": "Nessun G-code caricato",
+  "sim.preparing": "Preparazione della simulazione … (programma grande, la finestra resta utilizzabile)",
   "sim.emptyHint": "In Disegno, clicca su «Alla macchina» a destra, oppure carica un G-code.",
   "sim.viewTop": "Sopra",
   "sim.viewTopTip": "Vista dall'alto",

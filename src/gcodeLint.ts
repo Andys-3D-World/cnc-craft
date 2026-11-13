@@ -18,52 +18,85 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
   let x: number | null = null, y: number | null = null, z: number | null = null;
   let motion = "", feed = 0, on = false, s = 0, relative = false, cut = false, everOn = false, ended = false, inch = false;
   const cutAt = new Map<string, number>(); // tiefste gefräste Stelle je Punkt
-  const here = (a: number | null, b: number | null) => (a ?? 0).toFixed(2) + "," + (b ?? 0).toFixed(2);
+  // Schlüssel je Punkt (auf 0,01 mm); bleibt X/Y gleich (z. B. Eintauchen), wird der letzte wiederverwendet
+  let keyX: number | null = NaN, keyY: number | null = NaN, key = "";
+  const here = (a: number | null, b: number | null) => {
+    if (a !== keyX || b !== keyY) { keyX = a; keyY = b; key = (a ?? 0).toFixed(2) + "," + (b ?? 0).toFixed(2); }
+    return key;
+  };
   const lines = code.split(/\r?\n/);
+  // Wörter der aktuellen Zeile – je Zeile neu gefüllt statt neu angelegt (schneller bei Millionen Zeilen)
+  const G: number[] = [], M: number[] = [];
+  const hasG = (v: number) => G.includes(v), hasM = (v: number) => M.includes(v);
 
-  lines.forEach((raw, idx) => {
-    const n = idx + 1;
+  for (let idx = 0; idx < lines.length; idx++) {
+    const raw = lines[idx], n = idx + 1;
     if (/[^\x20-\x7e\t]/.test(raw)) add("not-ascii", n, raw);
     if (/undefined|NaN|Infinity|null|\[object/i.test(raw)) add("broken-value", n, raw);
-    const opens = (raw.match(/\(/g) || []).length, closes = (raw.match(/\)/g) || []).length;
-    // verschachtelte Klammern verwirren manche Steuerungen; mehrere Kommentare nacheinander sind in Ordnung
-    let depth = 0, nested = false;
-    for (const ch of raw) { if (ch === "(") { if (++depth > 1) nested = true; } else if (ch === ")") depth--; }
-    if (opens !== closes || nested) add("bad-comment", n, raw);
-    const text = raw.replace(/\([^)]*\)/g, "").replace(/;.*$/, "").toUpperCase().trim();
-    if (!text || text.startsWith("%")) return;
+    const paren = raw.includes("(") || raw.includes(")");
+    if (paren) {
+      const opens = (raw.match(/\(/g) || []).length, closes = (raw.match(/\)/g) || []).length;
+      // verschachtelte Klammern verwirren manche Steuerungen; mehrere Kommentare nacheinander sind in Ordnung
+      let depth = 0, nested = false;
+      for (const ch of raw) { if (ch === "(") { if (++depth > 1) nested = true; } else if (ch === ")") depth--; }
+      if (opens !== closes || nested) add("bad-comment", n, raw);
+    }
+    let text = paren ? raw.replace(/\([^)]*\)/g, "") : raw;
+    if (text.includes(";")) text = text.replace(/;.*$/, "");
+    text = text.toUpperCase().trim();
+    if (!text || text.startsWith("%")) continue;
     // GRBL zählt Kommentare nicht mit: Grenze gilt für den Befehl selbst
     if (text.length >= maxLine) add("line-too-long", n, raw);
     if (ended) add("after-end", n, raw);
 
-    const w: Record<string, number[]> = {};
+    // Wörter lesen: G und M alle, sonst gilt der erste Wert eines Buchstabens
+    G.length = 0; M.length = 0;
+    let wF: number | undefined, wS: number | undefined, wX: number | undefined, wY: number | undefined, wZ: number | undefined;
     WORD.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = WORD.exec(text))) (w[m[1]] ||= []).push(parseFloat(m[2]));
-    const has = (l: string, v: number) => (w[l] || []).includes(v);
+    while ((m = WORD.exec(text))) {
+      const v = parseFloat(m[2]);
+      switch (m[1]) {
+        case "G": G.push(v); break;
+        case "M": M.push(v); break;
+        case "F": if (wF === undefined) wF = v; break;
+        case "S": if (wS === undefined) wS = v; break;
+        case "X": if (wX === undefined) wX = v; break;
+        case "Y": if (wY === undefined) wY = v; break;
+        case "Z": if (wZ === undefined) wZ = v; break;
+      }
+    }
 
-    if (has("G", 20)) inch = true;
-    if (has("G", 21)) inch = false;
-    if (has("G", 91)) relative = true;
-    if (has("G", 90)) relative = false;
-    if (w.F) { feed = w.F[0]; if (!(feed > 0)) add("bad-feed", n, raw); }
-    if (w.S) { s = w.S[0]; if (s < 0 || (o.kind === "laser" && s > sMax)) add("s-out-of-range", n, raw); }
-    if (has("M", 3) || has("M", 4)) { on = true; everOn = true; }
-    if (has("M", 5)) on = false;
-    if (has("M", 2) || has("M", 30)) {
-      if (on) add("end-tool-on", n, raw);
-      ended = true;
+    if (G.length) {
+      if (hasG(20)) inch = true;
+      if (hasG(21)) inch = false;
+      if (hasG(91)) relative = true;
+      if (hasG(90)) relative = false;
+    }
+    if (wF !== undefined) { feed = wF; if (!(feed > 0)) add("bad-feed", n, raw); }
+    if (wS !== undefined) { s = wS; if (s < 0 || (o.kind === "laser" && s > sMax)) add("s-out-of-range", n, raw); }
+    if (M.length) {
+      if (hasM(3) || hasM(4)) { on = true; everOn = true; }
+      if (hasM(5)) on = false;
+      if (hasM(2) || hasM(30)) {
+        if (on) add("end-tool-on", n, raw);
+        ended = true;
+      }
     }
     // Maschinen-Koordinaten und Nullpunkt-Befehle bewegen nicht wie normale Fahrten
-    const special = has("G", 53) || has("G", 10) || has("G", 92) || has("G", 28) || has("G", 30);
-    for (const g of [0, 1, 2, 3]) if (has("G", g)) motion = "G" + g;
-    const moves = (w.X || w.Y || w.Z) && !special;
+    let special = false;
+    if (G.length) {
+      special = hasG(53) || hasG(10) || hasG(92) || hasG(28) || hasG(30);
+      // bei mehreren gilt die höchste Nummer (wie bisher: G0, G1, G2, G3 der Reihe nach geprüft)
+      if (hasG(3)) motion = "G3"; else if (hasG(2)) motion = "G2"; else if (hasG(1)) motion = "G1"; else if (hasG(0)) motion = "G0";
+    }
+    const moves = (wX !== undefined || wY !== undefined || wZ !== undefined) && !special;
     if (!moves || !motion || relative || inch) {
       if (moves && !motion) add("move-without-mode", n, raw);
-      return;
+      continue;
     }
-    const nx = w.X ? w.X[0] : x, ny = w.Y ? w.Y[0] : y, nz = w.Z ? w.Z[0] : z;
-    const xyMoves = (w.X && w.X[0] !== x) || (w.Y && w.Y[0] !== y);
+    const nx: number | null = wX !== undefined ? wX : x, ny: number | null = wY !== undefined ? wY : y, nz: number | null = wZ !== undefined ? wZ : z;
+    const xyMoves = (wX !== undefined && wX !== x) || (wY !== undefined && wY !== y);
 
     if (motion !== "G0") {
       if (!(feed > 0)) add("cut-without-feed", n, raw);
@@ -86,7 +119,7 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
     if (o.bedH && ny !== null && (ny < -0.01 || ny > o.bedH + 0.01)) add("off-bed", n, raw);
     if (motion !== "G0" && nz !== null) { const k = here(nx, ny); if (nz < (cutAt.get(k) ?? Infinity)) cutAt.set(k, nz); }
     x = nx; y = ny; z = nz;
-  });
+  }
 
   if (!ended) add("no-end", lines.length, "(no M2/M30)");
   if (on && !ended) add("end-tool-on", lines.length, "(tool still on)");

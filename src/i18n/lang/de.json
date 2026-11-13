@@ -958,6 +958,7 @@
   "cost.csvFile": "kalkulation.csv",
   "rp.simJobTip": "Geladenen Job in der Simulation ansehen (läuft beim Fräsen live mit)",
   "sim.noProgram": "Kein G-Code geladen",
+  "sim.preparing": "Simulation wird vorbereitet … (großes Programm, das Fenster bleibt bedienbar)",
   "sim.emptyHint": "Im Entwurf rechts auf „Zur Maschine“ klicken, oder einen G-Code laden.",
   "sim.viewTop": "Oben",
   "sim.viewTopTip": "Ansicht von oben",

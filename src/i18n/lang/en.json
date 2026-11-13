@@ -958,6 +958,7 @@
   "cost.csvFile": "calculation.csv",
   "rp.simJobTip": "View the loaded job in the simulation (follows live while cutting)",
   "sim.noProgram": "No G-code loaded",
+  "sim.preparing": "Preparing the simulation … (large program, the window stays usable)",
   "sim.emptyHint": "In Design, click \"To machine\" on the right, or load a G-code file.",
   "sim.viewTop": "Top",
   "sim.viewTopTip": "View from above",

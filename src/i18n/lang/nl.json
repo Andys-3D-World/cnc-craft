@@ -958,6 +958,7 @@
   "cost.csvFile": "calculatie.csv",
   "rp.simJobTip": "Geladen job in de simulatie bekijken (loopt live mee tijdens het frezen)",
   "sim.noProgram": "Geen G-code geladen",
+  "sim.preparing": "Simulatie wordt voorbereid … (groot programma, het venster blijft bruikbaar)",
   "sim.emptyHint": "Klik in Ontwerp rechts op „Naar machine”, of laad een G-code.",
   "sim.viewTop": "Boven",
   "sim.viewTopTip": "Bovenaanzicht",

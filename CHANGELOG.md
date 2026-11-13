@@ -19,6 +19,7 @@
 - **Release build:** the draft is created once before the four builds start, so they can no longer make two drafts with half the files each (this happened with 0.4.4 and was fixed by hand). A final check fails the build if any download, signature or update entry is missing.
 - **Update keeps the old AppImage (Linux):** *Update now* first puts a copy of the running version next to the AppImage (`CNC.Craft_<old version>_previous.AppImage`), so you can go back if the new version gives trouble. Only the latest copy is kept; older copies made by CNC Craft are removed after the update. If the copy can't be made (for example the disk is full), nothing is installed. Suggested by the AppImage catalog maintainer. Not yet tried on a real Linux update.
 - **Wiring pin table:** connectors without a printed name (e.g. the SCL pin on the CNC Shield V3) no longer show a lone " · " before the pin name.
+- **Big jobs freeze the window for less time:** the simulation now reads programs with 100,000 lines or more in the background, so the window stays usable (5,000 shapes, 2.4 million lines: about 1.3 s of standstill became 0.15 s). The G-code check before the machine is about 1.6 times faster and gives exactly the same warnings (compared on every generator in all three modes). Smaller programs are read as before. Generating the G-code itself still runs in the foreground (about 1.7 s for 5,000 shapes on a recent Mac).
 
 ## 0.4.4 Beta
 

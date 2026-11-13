@@ -51,3 +51,15 @@ test("Bett: außerhalb wird gemeldet, Nullpunkt-Befehl G10 nicht", () => {
   assert.ok(rules("G21\nG0 X400 Y0\nM30", "mill", { bedW: 300, bedH: 300 })["off-bed"]);
   assert.deepEqual(rules("G21\nG10 L20 P0 X400 Y0\nG0 X0 Y0\nM30", "mill", { bedW: 300, bedH: 300 }), {});
 });
+
+test("Lesen der Zeile: mehrere G-Befehle, Kommentar mit Semikolon, Kleinbuchstaben", () => {
+  // mehrere Bewegungsarten in einer Zeile: die höchste Nummer gilt (G1), also Schneiden mit ausgeschaltetem Laser
+  assert.ok(rules("G21\nG0 G1 X5 Y5 F1000\nM30", "laser")["cut-tool-off"]);
+  // ";" im Kommentar und dahinter ein Befehl: der Befehl zählt, der Kommentar nicht
+  assert.deepEqual(rules("G21\nG90\nM3 S1000\n(a;b) G0 X5 Y5\nG1 Z-1 F100\nG0 Z5\nM5\nM30", "mill"), {});
+  // Kleinbuchstaben werden wie Großbuchstaben gelesen
+  assert.ok(rules("g21\nm3\ng1 z-2 f100\ng0 x10\nm5\nm30", "mill")["rapid-in-material"]);
+  // Eintauchen ohne X/Y-Angabe gilt am letzten Punkt: zurück ins gebohrte Loch ist erlaubt
+  assert.equal(rules("G21\nM3\nG0 X5 Y5\nG1 Z-2 F100\nG0 Z1\nG0 X9\nG0 X5\nG0 Z-1.5\nG0 Z5\nM5\nM30", "mill")["rapid-into-material"], undefined);
+  assert.ok(rules("G21\nM3\nG0 X5 Y5\nG1 Z-2 F100\nG0 Z1\nG0 X9\nG0 Z-1.5\nM5\nM30", "mill")["rapid-into-material"]);
+});

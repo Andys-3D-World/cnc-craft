@@ -958,6 +958,7 @@
   "cost.csvFile": "kalkulacja.csv",
   "rp.simJobTip": "Zobacz wczytane zadanie w symulacji (śledzi na żywo podczas obróbki)",
   "sim.noProgram": "Brak wczytanego G-code",
+  "sim.preparing": "Przygotowywanie symulacji … (duży program, okno pozostaje dostępne)",
   "sim.emptyHint": "W zakładce Projekt kliknij po prawej „Do maszyny” albo wczytaj G-code.",
   "sim.viewTop": "Góra",
   "sim.viewTopTip": "Widok z góry",

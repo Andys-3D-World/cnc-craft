@@ -24,6 +24,7 @@ import { getMachineMode } from "../machineMode";
 import { zonesFromShapes } from "../keepOutShapes";
 import { state as appState } from "../main";
 import { SimProgram, MOVE_CUT, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
+import { parseGcodeAsync, WORKER_MIN_LINES } from "./parseAsync";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
 import { buildJob } from "../jobFlow";
@@ -62,6 +63,8 @@ let log: (s: string) => void = () => {};
 let $: <T extends HTMLElement>(id: string) => T;
 let hiLine = -1;            // hervorgehobene Zeile (Bahn gelb)
 let keepViewOnce = false;   // nächstes geladenes Programm: Kamera nicht neu einpassen (nach „Übernehmen“)
+let loadSeq = 0;            // jede neue Ladung zählt hoch – ein älteres Ergebnis aus dem Hintergrund wird dann verworfen
+let preparing = false;      // großes Programm wird gerade im Hintergrund gelesen (parseAsync.ts)
 
 // Live mit echter Maschine: „ok“ heißt bei GRBL nur „im Puffer“, nicht „gefahren“ – grblHAL puffert viele Zeilen voraus.
 // Deshalb folgt das Werkzeug der gemeldeten Position (Statusbericht, ~5× pro Sekunde). Dazwischen läuft es mit dem
@@ -425,7 +428,14 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
  * G-Code mit A-Achse immer, die Zeichnung (noch nicht umgerechnet) wenn die Drehachse an ist
  */
 function parseSim(lines: string[], src: Source = source): SimProgram {
-  const p = parseGcodeProgram(lines, { motion: motionLimits() });
+  // sofort gelesen: ein noch laufendes Lesen im Hintergrund ist damit überholt
+  loadSeq++;
+  preparing = false;
+  return finishSim(parseGcodeProgram(lines, { motion: motionLimits() }), src);
+}
+
+/** Gelesenes Programm für die Anzeige fertig machen (Drehachse: wickeln) */
+function finishSim(p: SimProgram, src: Source): SimProgram {
   const R = refRadius(rotary);
   if (!(R > 0)) return p;
   // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
@@ -435,12 +445,41 @@ function parseSim(lines: string[], src: Source = source): SimProgram {
   return p;
 }
 
-/** Neues Programm anzeigen */
+/**
+ * Neues Programm anzeigen. Große Programme (ab WORKER_MIN_LINES Zeilen) werden im Hintergrund gelesen:
+ * bis dahin gibt es kein Programm (Live-Anzeige und Tasten warten) und die Anzeige sagt „wird vorbereitet“.
+ */
 export function setSimProgram(lines: string[], name: string, src: Source) {
+  if (lines.length < WORKER_MIN_LINES) { showSimProgram(parseSim(lines, src), name, src); return; }
+  const seq = ++loadSeq;
+  preparing = true;
+  prog = null;
+  source = src;
+  label = name;
+  playing = false;
+  started = false;
+  live = false;
+  view.live = false;
+  hiLine = -1;
+  if (!keepViewOnce) view.setProgram(null);
+  rebuildCarve(false);
+  updateInfo();
+  updateUI();
+  updateJobState();
+  updateEditUI();
+  renderCodeList();
+  void parseGcodeAsync(lines, { motion: motionLimits() }).then(p => {
+    if (seq !== loadSeq) return; // inzwischen etwas anderes geladen
+    preparing = false;
+    showSimProgram(finishSim(p, src), name, src);
+  });
+}
+
+function showSimProgram(p: SimProgram, name: string, src: Source) {
   const b = bedSizeMm();
   view.setBed(b.w, b.h);
   view.setZones(getMachineMode() === "mill" ? zonesFromShapes(appState.shapes) : []);
-  prog = parseSim(lines, src);
+  prog = p;
   source = src;
   label = name;
   simTime = 0;
@@ -610,7 +649,7 @@ function updateUI() {
 function updateInfo() {
   if (!$) return;
   const el = $("sim-info");
-  if (!prog) { el.innerHTML = `<div class="sim-muted">${t("sim.noProgram")}</div>`; return; }
+  if (!prog) { el.innerHTML = `<div class="sim-muted">${t(preparing ? "sim.preparing" : "sim.noProgram")}</div>`; return; }
   // Drehachse: Maße vor dem Wickeln (wie im G-Code), dazu Durchmesser und Drehbereich
   const rot = prog.rotary;
   const b = rot ? rot.flat : prog.bounds;
