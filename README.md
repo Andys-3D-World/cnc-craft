@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app, so you no longer switch between three programs. Runs on macOS, Windows and Linux.
 
-**Status: 0.4.4 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.4.5 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -72,8 +72,10 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - Network search for machines on Wi-Fi/LAN, Wi-Fi setup right from the app (incl. the board's own Wi-Fi)
 - Machine settings ($$) explained in plain words, with backup/restore and factory reset
 - Flash boards (ESP32/ESP32-S3 incl. grblHAL Web Builder .zip, Arduino UNO/Nano with GRBL 1.1h)
-- **Wiring diagrams for 10 boards** – Arduino CNC Shield V3, MKS DLC32 V2.1 and MAX, PiBot V4.96 Pro and V5.88 Ultra,
-  6 Pack, Jackpot, BTT SKR Pro, Arduino Mega + RAMPS, Ruida – drawn like the real boards, with external drivers,
+- **Wiring diagrams for 18 boards** – Arduino CNC Shield V3, Nano + CNC Shield V4, MKS DLC32 V2.1 and MAX,
+  PiBot V4.96 Pro and V5.88 Ultra, 6 Pack and 6 Pack Integrated, Jackpot and Jackpot3, BTT SKR Pro and Rodent,
+  OpenBuilds BlackBox 4X and X32, Sienci SuperLongBoard, Arduino Mega + RAMPS, Ruida RDC6445G and RDC6442G –
+  drawn like the real boards, with external drivers,
   inductive NPN/PNP sensors, rotary, displays and VFD wiring
 
 **Everything else**

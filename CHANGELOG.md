@@ -2,6 +2,8 @@
 
 ## Next version (unreleased)
 
+## 0.4.5 Beta
+
 **New**
 - **Move while held:** tick *✋ Move while held* under the jog arrows and the machine moves for as long as an arrow is held down. Letting go stops it at once with jog cancel (no reset, the position stays valid). It also stops when the pointer leaves the button, the window loses focus or is hidden, the connection drops, an alarm comes, a job starts, a window opens or Stop is pressed. It never moves past the bed or, once homed, past the machine travel ($130–$132), and Z is limited at the top too. GRBL controllers only (GRBL, grblHAL, FluidNC …): Marlin, Ruida and K40 can't cancel a move instantly, so there the option shows a note and the arrows don't move. Tested on a real machine.
 - **Jog speed levels:** Slow, Medium and Fast buttons above the speed slider. The slider sets the value of the chosen level, and the level and its values are remembered.

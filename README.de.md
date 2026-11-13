@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.4.4 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.4.5 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -77,8 +77,10 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Netzwerk-Suche für Maschinen im WLAN/LAN, WLAN einrichten direkt aus der App (auch über das WLAN des Boards)
 - Maschinen-Einstellungen ($$) verständlich erklärt, mit Sichern/Laden und Werkseinstellung
 - Board flashen (ESP32/ESP32-S3 inkl. grblHAL-Web-Builder-.zip, Arduino UNO/Nano mit GRBL 1.1h)
-- **Anschlusspläne für 10 Boards** – Arduino CNC Shield V3, MKS DLC32 V2.1 und MAX, PiBot V4.96 Pro und V5.88 Ultra,
-  6 Pack, Jackpot, BTT SKR Pro, Arduino Mega + RAMPS, Ruida – wie die echten Boards gezeichnet, mit externen Treibern,
+- **Anschlusspläne für 18 Boards** – Arduino CNC Shield V3, Nano + CNC Shield V4, MKS DLC32 V2.1 und MAX,
+  PiBot V4.96 Pro und V5.88 Ultra, 6 Pack und 6 Pack Integrated, Jackpot und Jackpot3, BTT SKR Pro und Rodent,
+  OpenBuilds BlackBox 4X und X32, Sienci SuperLongBoard, Arduino Mega + RAMPS, Ruida RDC6445G und RDC6442G –
+  wie die echten Boards gezeichnet, mit externen Treibern,
   induktiven NPN/PNP-Sensoren, Drehachse, Displays und Frequenzumrichter
 
 **Und sonst**
