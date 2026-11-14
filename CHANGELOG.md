@@ -3,6 +3,7 @@
 ## Next version (unreleased)
 
 **Fixed**
+- **Notices:** the README and the website no longer say that every change is tested on real machines; they point to the changelog, which states for each change what was and wasn't tested. The third-party notices now credit MeerK40t (MIT), whose sources the K40 and Ruida drivers were written after, and the trademark notes name the newer board makers.
 - **Release build:** the final check of the draft may now read it. With read-only rights GitHub hides drafts, so the check failed with 0.4.5 although the draft was complete (checked by hand: 17 files, all update entries and signatures match).
 
 ## 0.4.5 Beta

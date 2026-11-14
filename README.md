@@ -179,8 +179,9 @@ or [Discussions](https://github.com/Andys-3D-World/cnc-craft/discussions), impro
 
 **Developed with AI:** CNC Craft is developed by Andreas Piaszek (Andys 3D World). The AI tool
 [Claude Code](https://claude.com/claude-code) by Anthropic helps with the programming – CNC Craft wouldn't be this far
-without it. Ideas, planning and decisions are mine. Every change is reviewed by me and tested on real machines and
-boards. Commits co-written by the AI are marked with “Co-Authored-By: Claude”.
+without it. Ideas, planning and decisions are mine. Every change is reviewed by me. What has been tested on a real machine or
+board, and what hasn't yet, is stated for each change in the [changelog](CHANGELOG.md) and the release notes.
+Commits co-written by the AI are marked with “Co-Authored-By: Claude”.
 
 ## Building from source
 
@@ -211,7 +212,8 @@ the GRBL firmware (`src-tauri/firmware/`, GPLv3) and the STEP import with
 (`public/occt/`, LGPL 2.1), plus 26 free fonts for the text tool (`public/fonts/`, SIL Open Font License 1.1 or
 Apache 2.0, licence texts next to the files). The text tool can also use every font installed on your computer.
 
-Product and company names mentioned (e.g. LightBurn, Estlcam, OpenBuilds, MKS, xTool, Ruida) belong to their
+Product and company names mentioned (e.g. LightBurn, Estlcam, OpenBuilds, MKS, BIGTREETECH, Sienci Labs,
+V1 Engineering, Keyestudio, Arduino, xTool, Ruida) belong to their
 respective owners and are only used to describe which programs and machines CNC Craft is comparable or compatible
 with. CNC Craft is not affiliated with any of these manufacturers.
 

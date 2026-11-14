@@ -82,9 +82,9 @@ T = {
   suh="Support CNC Craft", sul="CNC Craft is free and stays free. If it helps you, you can support the development – or simply give it a star and tell others about it.",
   kofi="☕ Ko-fi", spons="💜 GitHub Sponsors", issues="🐞 Report a bug",
   foot=['Made by Andreas Piaszek – <a href="https://www.youtube.com/results?search_query=Andys+3D+World">Andys 3D World</a> on YouTube, TikTok and Instagram.',
-        'Developed with the help of the AI tool <a href="https://claude.com/claude-code">Claude Code</a> by Anthropic; every change is reviewed and tested on real machines.',
+        'Developed with the help of the AI tool <a href="https://claude.com/claude-code">Claude Code</a> by Anthropic; every change is reviewed. What has been tested on a real machine, and what has not yet, is stated in the <a href="' + GH + '/blob/main/CHANGELOG.md">changelog</a>.',
         'Free software under the <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="{legal}">Privacy</a>: no tracking and no cookies on this page.{imprint}',
-        'Product names (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) belong to their owners and are only used to describe similar workflows and compatibility. CNC Craft is not affiliated with or endorsed by them.'],
+        'Product names (LightBurn, Estlcam, OpenBuilds, MKS, BIGTREETECH, Sienci, Arduino, Ruida …) belong to their owners and are only used to describe similar workflows and compatibility. CNC Craft is not affiliated with or endorsed by them.'],
  ),
  "de": dict(
   base="../", path="de/", ogimg="assets/og-de.png", shots="de",
@@ -158,9 +158,9 @@ T = {
   suh="CNC Craft unterstützen", sul="CNC Craft ist kostenlos und bleibt es. Wenn es dir hilft, kannst du die Entwicklung unterstützen – oder einfach einen Stern geben und es weitererzählen.",
   kofi="☕ Ko-fi", spons="💜 GitHub Sponsors", issues="🐞 Fehler melden",
   foot=['Gemacht von Andreas Piaszek – <a href="https://www.youtube.com/results?search_query=Andys+3D+World">Andys 3D World</a> auf YouTube, TikTok und Instagram.',
-        'Entwickelt mit Hilfe des KI-Werkzeugs <a href="https://claude.com/claude-code">Claude Code</a> von Anthropic; jede Änderung wird geprüft und an echten Maschinen getestet.',
+        'Entwickelt mit Hilfe des KI-Werkzeugs <a href="https://claude.com/claude-code">Claude Code</a> von Anthropic; jede Änderung wird geprüft. Was an einer echten Maschine getestet ist und was noch nicht, steht im <a href="' + GH + '/blob/main/CHANGELOG.md">Changelog</a>.',
         'Freie Software unter der <a href="' + GH + '/blob/main/LICENSE">GNU GPL v3</a>. <a href="{legal}">Datenschutz</a>: kein Tracking und keine Cookies auf dieser Seite.{imprint}',
-        'Produktnamen (LightBurn, Estlcam, OpenBuilds, MKS, Ruida …) gehören ihren Inhabern und beschreiben nur ähnliche Arbeitsweisen und Kompatibilität. CNC Craft ist mit ihnen nicht verbunden und wird von ihnen nicht unterstützt.'],
+        'Produktnamen (LightBurn, Estlcam, OpenBuilds, MKS, BIGTREETECH, Sienci, Arduino, Ruida …) gehören ihren Inhabern und beschreiben nur ähnliche Arbeitsweisen und Kompatibilität. CNC Craft ist mit ihnen nicht verbunden und wird von ihnen nicht unterstützt.'],
  ),
 }
 

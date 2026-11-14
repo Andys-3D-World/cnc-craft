@@ -69,8 +69,40 @@ libusb is linked statically. occt-import-js and Open CASCADE are included as sep
 Because the complete source code of CNC Craft is public, anyone can rebuild the program with a modified libusb,
 occt-import-js or Open CASCADE (LGPL-2.1 section 6).
 
+## Code written after other open-source projects
+
+The K40 driver (`src-tauri/src/k40.rs`, `usb_k40.rs`) and the Ruida driver (`src-tauri/src/ruida.rs`) are new Rust
+code written after the Python sources of **MeerK40t** (https://github.com/meerk40t/meerk40t, MIT licence): the
+LHYMICRO-GL commands and speed codes of the Lihuiyu boards, the CH341 access, and the Ruida job format and transport.
+
+> MIT License
+>
+> Copyright (c) 2021 meerk40t
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
+Facts about the Ruida protocol also come from the protocol description in https://github.com/jnweiger/ruida-laser
+(documentation only, no code was taken over).
+
 ## Trademarks
 
-LightBurn, Estlcam, OpenBuilds, Fusion 360, Makerbase/MKS, xTool, Ruida, FluidNC, grblHAL and other names
-mentioned are trademarks or names of their respective owners. They are only used to describe compatibility;
+LightBurn, Estlcam, OpenBuilds, Fusion 360, Makerbase/MKS, BIGTREETECH, Sienci Labs, V1 Engineering, Keyestudio,
+PiBot, Arduino, xTool, Ruida, FluidNC, grblHAL and other names mentioned are trademarks or names of their respective
+owners. They are only used to describe compatibility;
 CNC Craft is not affiliated with or endorsed by these manufacturers.
