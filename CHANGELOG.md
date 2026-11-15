@@ -6,6 +6,9 @@
 - **Notices:** the README and the website no longer say that every change is tested on real machines; they point to the changelog, which states for each change what was and wasn't tested. The third-party notices now credit MeerK40t (MIT), whose sources the K40 and Ruida drivers were written after, and the trademark notes name the newer board makers.
 - **Release build:** the final check of the draft may now read it. With read-only rights GitHub hides drafts, so the check failed with 0.4.5 although the draft was complete (checked by hand: 17 files, all update entries and signatures match).
 
+**Security**
+- **Release build:** the build now runs its GitHub Actions (checkout, Node, Rust toolchain, Rust cache, tauri-action) at fixed commits instead of names like `v4` or `stable`, which their owners, or someone who took over an owner's account, can point at other code at any time. The build holds the key that signs updates, so only code that was looked at should run there. The fixed commits are exactly those the 0.4.5 build used. Not yet run: the first build with them is the next release.
+
 ## 0.4.5 Beta
 
 **New**
