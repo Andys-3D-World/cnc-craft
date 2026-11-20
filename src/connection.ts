@@ -32,6 +32,7 @@ import { openWifiSetup, wifiFirmware } from "./ui/wifiSetup";
 import { openPortScanDialog } from "./ui/portScanDialog";
 import { analyze, isDefaultHost } from "./wifiCodec";
 import { releaseMachine } from "./ui/pinLeds";
+import { fmtLen, fmtFeed, isInch, unitName, jogStepsMm, jogStepLabels, jogStepIndex } from "./units";
 
 /** Text sicher in HTML einsetzen (Gerätenamen, Antworten des Boards …) */
 function escHtml(s: string): string {
@@ -438,7 +439,17 @@ export function initConnection(appendToConsole: (text: string) => void) {
     el.className = "m-state " + (machine.job.toolChange && s === "Idle" ? "m-state-hold" : stateClass(s));
   };
 
-  const fmt = (v: number) => (Math.round(v * 100) / 100).toFixed(2);
+  // Position zeigen: mm mit 2 Stellen, Zoll mit 4 (die Werte selbst bleiben mm)
+  const fmt = (v: number) => fmtLen(Math.round(v * 100) / 100, 2);
+  const showPos = () => {
+    const px = $("pos-x"), py = $("pos-y"), pz = $("pos-z"), un = $("dro-unit");
+    if (px) px.textContent = fmt(liveMachinePos.x);
+    if (py) py.textContent = fmt(liveMachinePos.y);
+    if (pz) pz.textContent = fmt(liveMachinePos.z);
+    if (un) un.textContent = unitName();
+  };
+  showPos();
+  window.addEventListener("cnc-unit-changed", showPos);
   const updateButtons = () => {
     const can = canCommand();
     const alarm = machine.status.state === "Alarm";
@@ -454,15 +465,12 @@ export function initConnection(appendToConsole: (text: string) => void) {
     if (type === "status") {
       const s = machine.status;
       liveMachinePos.x = s.wpos[0]; liveMachinePos.y = s.wpos[1]; liveMachinePos.z = s.wpos[2];
-      const px = $("pos-x"), py = $("pos-y"), pz = $("pos-z");
-      if (px) px.textContent = fmt(s.wpos[0]);
-      if (py) py.textContent = fmt(s.wpos[1]);
-      if (pz) pz.textContent = fmt(s.wpos[2]);
+      showPos();
       const mp = $("machine-mpos");
       // ausgelöste Eingänge zeigt ui/pinLeds.ts als Lämpchen
       if (mp) mp.textContent = t("m.mpos", { x: fmt(s.mpos[0]), y: fmt(s.mpos[1]), z: fmt(s.mpos[2]) });
       const fs = $("machine-fs");
-      if (fs) fs.textContent = s.state === "Run" || s.state === "Jog" ? `F${Math.round(s.feed)} S${Math.round(s.spindle)}` : "";
+      if (fs) fs.textContent = s.state === "Run" || s.state === "Jog" ? `${isInch() ? fmtFeed(s.feed) : "F" + Math.round(s.feed)} S${Math.round(s.spindle)}` : "";
       // Vorschub-/Spindel-Override zeigt ui/spindlePanel.ts (mit Schiebereglern)
       document.querySelectorAll<HTMLElement>("[data-rt^=rapid]").forEach(b => b.classList.toggle("active", b.textContent === `${s.ov[1]}%`));
       setStateBadge(s.state);
@@ -650,7 +658,8 @@ export function initConnection(appendToConsole: (text: string) => void) {
   // ---------------- Manuelles Fahren ----------------
   let activeStep = 1;
   const customStep = $("jog-step-custom") as HTMLInputElement;
-  const stepButtons = document.querySelectorAll<HTMLElement>(".btn-step");
+  // nur die Schritt-Knöpfe: die Tempo-Stufen tragen dieselbe Klasse, sind aber keine Schritte
+  const stepButtons = document.querySelectorAll<HTMLElement>("#jog-steps .btn-step");
   const feedSlider = $("jog-feed-slider") as HTMLInputElement;
   const feedDisplay = $("jog-feed-display");
   const holdBox = $("jog-hold") as HTMLInputElement | null;
@@ -663,7 +672,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
   const savePrefs = () => { try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch { /* egal */ } };
   const showPrefs = () => {
     if (feedSlider) feedSlider.value = String(prefs.feeds[prefs.level]);
-    if (feedDisplay) feedDisplay.textContent = `${feedSlider?.value ?? prefs.feeds[prefs.level]} mm/min`;
+    if (feedDisplay) feedDisplay.textContent = fmtFeed(Number(feedSlider?.value ?? prefs.feeds[prefs.level]));
     levelButtons.forEach(b => b.classList.toggle("active", b.dataset.level === prefs.level));
     if (holdBox) holdBox.checked = prefs.hold;
     $("jog-steps")?.classList.toggle("jog-steps-off", prefs.hold);
@@ -677,7 +686,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
   }
   window.addEventListener(MACHINE_EVENT, syncHoldNote);
   feedSlider?.addEventListener("input", () => {
-    if (feedDisplay) feedDisplay.textContent = `${feedSlider.value} mm/min`;
+    if (feedDisplay) feedDisplay.textContent = fmtFeed(Number(feedSlider.value));
     prefs = setLevelFeed(prefs, parseInt(feedSlider.value, 10));
     savePrefs();
   });
@@ -699,6 +708,24 @@ export function initConnection(appendToConsole: (text: string) => void) {
     activeStep = parseFloat(btn.dataset.step || "1");
     if (customStep) customStep.value = "";
   }));
+  // Zoll gewählt: die Knöpfe heißen 0.001 / 0.01 / 0.1 / 1 in. In data-step und activeStep stehen immer Millimeter,
+  // und der gewählte Knopf bestimmt den Schritt neu – nie bleibt ein alter mm-Wert unter einer Zoll-Beschriftung stehen
+  const labelSteps = () => {
+    const mm = jogStepsMm(), names = jogStepLabels();
+    // gewählt bleibt der größte Schritt, der nicht größer ist als der bisherige (nie unbemerkt ein größerer Sprung)
+    const hadButton = Array.from(stepButtons).some(b => b.classList.contains("active"));
+    const pick = jogStepIndex(activeStep);
+    stepButtons.forEach((b, i) => {
+      if (mm[i] === undefined) return;
+      b.dataset.step = String(mm[i]);
+      b.textContent = names[i];
+      b.classList.toggle("active", hadButton && i === pick);
+    });
+    if (hadButton) activeStep = mm[pick];
+    showPrefs();
+  };
+  labelSteps();
+  window.addEventListener("cnc-unit-changed", labelSteps);
   customStep?.addEventListener("input", () => {
     const v = parseFloat(customStep.value);
     if (v > 0) { stepButtons.forEach(b => b.classList.remove("active")); activeStep = v; }

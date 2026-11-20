@@ -18,7 +18,7 @@
  * Rückgängig (Strg+Z). „Übernehmen“ macht den Text zum Job. Läuft der Job schon, darf nur geändert werden,
  * was die Maschine noch nicht bekommen hat (Sicherheitsabstand, siehe liveEditFloor) – mit Rückfrage.
  */
-import { t, T, tip } from "../i18n/i18n";
+import { t, T, tip, tMm } from "../i18n/i18n";
 import { motionLimits } from "./motionLimits";
 import { getMachineMode } from "../machineMode";
 import { zonesFromShapes } from "../keepOutShapes";
@@ -43,6 +43,7 @@ import { getTools, activeTool } from "../toolLibrary";
 import { materialView, materialById } from "../materialView";
 import { ascii as gcAscii, allBuiltinTexts } from "../i18n/i18n";
 import type { ToolGeom } from "../toolGraphics";
+import { fmtLen, fmtLenU, fmtLong, unitName } from "../units";
 
 type Source = "design" | "job" | "none";
 
@@ -657,12 +658,12 @@ function updateInfo() {
   el.innerHTML =
     row(t("sim.estTime"), fmtTime(prog.totalTime)) +
     row(t("sim.timeBasis"), t("sim.timeBasis." + (motionLimits().source || "default"))) +
-    row(t("sim.cutLength"), `${(prog.cutLength / 1000).toFixed(2)} m`) +
-    row(t("sim.rapidLength"), `${(prog.rapidLength / 1000).toFixed(2)} m`) +
-    row("X", `${b.minX.toFixed(1)} … ${b.maxX.toFixed(1)} mm`) +
-    row("Y", `${b.minY.toFixed(1)} … ${b.maxY.toFixed(1)} mm`) +
-    row("Z", `${b.minZ.toFixed(2)} … ${b.maxZ.toFixed(2)} mm`) +
-    (rot ? row("⟳", (rot.stock.shape === "round" ? `Ø ${(rot.R * 2).toFixed(1)} mm` : t("rot.shape." + rot.stock.shape)) + " · " + t("sim.rotaryInfo", { a0: Math.round(rot.aMin), a1: Math.round(rot.aMax) })) : "") +
+    row(t("sim.cutLength"), fmtLong(prog.cutLength)) +
+    row(t("sim.rapidLength"), fmtLong(prog.rapidLength)) +
+    row("X", `${fmtLen(b.minX, 1)} … ${fmtLen(b.maxX, 1)} ${unitName()}`) +
+    row("Y", `${fmtLen(b.minY, 1)} … ${fmtLen(b.maxY, 1)} ${unitName()}`) +
+    row("Z", `${fmtLen(b.minZ, 2)} … ${fmtLen(b.maxZ, 2)} ${unitName()}`) +
+    (rot ? row("⟳", (rot.stock.shape === "round" ? `Ø ${fmtLenU(rot.R * 2, 1)}` : t("rot.shape." + rot.stock.shape)) + " · " + t("sim.rotaryInfo", { a0: Math.round(rot.aMin), a1: Math.round(rot.aMax) })) : "") +
     row(t("sim.moves"), String(prog.n)) +
     `<div class="sim-muted">${t("sim.estNote")}</div>`;
   const bed = bedSizeMm();
@@ -1004,7 +1005,7 @@ function insertLine(kind: string) {
   closeInput(true);
   const at = selLine >= 0 ? selLine + 1 : draft.length;
   if (lockedMsg(at)) return;
-  const text = kind === "M0" ? `M0 (${ascii(t("sim.ed.insPause"))})` : kind === "G4" ? "G4 P1" : kind === "F" ? "F" + guessFeed(at) : "";
+  const text = kind === "M0" ? `M0 (${ascii(tMm("sim.ed.insPause"))})` : kind === "G4" ? "G4 P1" : kind === "F" ? "F" + guessFeed(at) : "";
   const next = draft.slice();
   next.splice(at, 0, text);
   change(next, at);

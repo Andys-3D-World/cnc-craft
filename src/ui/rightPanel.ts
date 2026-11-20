@@ -78,7 +78,7 @@ export function renderRightPanel(container: HTMLElement) {
             <div class="prop-row">${T("rp.width")}<input type="number" id="dim-w" class="prop-input"></div>
             <div class="prop-row">${T("rp.height")}<input type="number" id="dim-h" class="prop-input"></div>
             <label class="prop-row" style="cursor: pointer;"><span>🔒 ${T("rp.lockRatio")}</span><input type="checkbox" id="dim-lock-ratio" checked style="width: auto;"></label>
-            <div class="prop-row" ${tip("rp.rotateTip")}>${T("rp.rotate")}<input type="number" id="dim-angle" value="0" step="15" class="prop-input"></div>
+            <div class="prop-row" ${tip("rp.rotateTip")}>${T("rp.rotate")}<input type="number" id="dim-angle" data-unit="none" value="0" step="15" class="prop-input"></div>
           </div>
         </div>
 
@@ -104,7 +104,7 @@ export function renderRightPanel(container: HTMLElement) {
           <h3 class="menu-trigger">${T("rp.millParams")}</h3>
           <div class="menu-body rp-box">
             ${millProfilePickerHtml()}
-            <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
+            <div class="prop-row" style="color: var(--color-warning); font-weight: 700;">${T("rp.depth")}<input type="number" id="dim-depth" data-unit="mm" value="-2.0" step="0.5" class="prop-input" style="border-color: var(--color-warning);"></div>
             <details class="rp-adv needs-sel" id="rp-adv-mill">
               <summary>${T("rp.advanced")}</summary>
               <div class="rp-adv-body">
@@ -207,6 +207,7 @@ export function renderRightPanel(container: HTMLElement) {
             ${machineLineHtml()}
             <div class="prop-row">${T("rp.bedW")}<input type="number" id="bed-w" value="300" class="prop-input"></div>
             <div class="prop-row">${T("rp.bedH")}<input type="number" id="bed-h" value="300" class="prop-input"></div>
+            <div class="prop-row" ${tip("unit.selectTip")}>${T("unit.select")}<select class="unit-select prop-input" style="width:auto;"><option value="mm" data-i18n="unit.mm">Millimeter (mm)</option><option value="in" data-i18n="unit.in">Zoll (in)</option></select></div>
             <button id="btn-sync-bed" class="btn-secondary btn-compact" style="font-size: 0.75rem;">🤖 ${T("rp.syncBed")}</button>
           </div>
         </div>
@@ -219,6 +220,7 @@ export function renderRightPanel(container: HTMLElement) {
               <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
               <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
               <div style="color: var(--lt-amber, #ffc043);">Z <span id="pos-z">0.00</span></div>
+              <div id="dro-unit" class="dro-unit">mm</div>
             </div>
         </div>
 
@@ -262,7 +264,7 @@ export function renderRightPanel(container: HTMLElement) {
               <button class="btn-step active" data-step="1">1mm</button>
               <button class="btn-step" data-step="10">10mm</button>
               <button class="btn-step" data-step="100">100</button>
-              <input type="number" id="jog-step-custom" placeholder="mm" style="width: 48px; padding: 2px; font-size: 0.75rem; text-align: center;">
+              <input type="number" id="jog-step-custom" data-unit="mm" placeholder="mm" style="width: 48px; padding: 2px; font-size: 0.75rem; text-align: center;">
             </div>
             <label class="prop-row" style="cursor:pointer; margin-bottom: 4px;" ${tip("hj.holdTip")}><span>✋ ${T("hj.hold")}</span><input type="checkbox" id="jog-hold" style="width:auto;"></label>
             <div id="jog-hold-note" class="jog-hold-note" style="display: none;">${T("hj.unsupported")}</div>

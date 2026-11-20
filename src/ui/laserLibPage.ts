@@ -15,6 +15,7 @@ import {
   duplicateLayer, moveLayer, activeLayer, setActiveLayer, layerInfo, laserSettings, setLaserSettings
 } from "../laserLayers";
 import { openLaserPresetDialog } from "./laserPresetDialog";
+import { fmtLenShort, unitName } from "../units";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -62,7 +63,7 @@ function swatch(l: LaserLayer): string {
 }
 
 function infoLine(l: LaserLayer): string {
-  const mat = [l.thickness > 0 ? `${f2(l.thickness)} mm` : "", l.material].filter(Boolean).join(" ");
+  const mat = [l.thickness > 0 ? `${fmtLenShort(l.thickness, 2)} ${unitName()}` : "", l.material].filter(Boolean).join(" ");
   return layerInfo(l) + (mat ? ` · ${mat}` : "");
 }
 

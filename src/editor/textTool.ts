@@ -19,6 +19,7 @@ import { FALLBACK_FONT, resolveFont } from "./fonts";
 import { createFontPicker } from "./fontPicker";
 import { traceSingleLine } from "./singleLine";
 import { openTextOnPathEdit } from "./textOnPathTool";
+import { fmtLen, unitName } from "../units";
 
 export interface TextParams {
   text: string;
@@ -371,7 +372,7 @@ function showDialog(initial: TextParams, onOk: (p: TextParams, t: TracedText) =>
     warn.textContent = res.missing ? t("text.fontMissing", { font: p.font, fallback: FALLBACK_FONT }) : "";
     drawPreview($<HTMLCanvasElement>("txt-preview"), traced);
     $<HTMLDivElement>("txt-info").textContent = traced.loops.length
-      ? `${traced.width.toFixed(1)} × ${traced.height.toFixed(1)} mm · ${t("text.contours", { n: traced.loops.length })}`
+      ? `${fmtLen(traced.width, 1)} × ${fmtLen(traced.height, 1)} ${unitName()} · ${t("text.contours", { n: traced.loops.length })}`
       : t("text.empty");
   }
   ov.querySelectorAll("input:not(.fp-search), textarea, select").forEach(el => {

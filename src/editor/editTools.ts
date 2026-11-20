@@ -643,8 +643,8 @@ export function openPrintCutDialog() {
     <div style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border-color);border-radius:8px;">
       <div style="font-size:0.85rem;font-weight:600;">${t("pc.mark", { n })} <span style="font-weight:400;color:var(--text-muted);">${t("pc.inDrawing", { x: mm(q.x), y: mm(q.y) })}</span></div>
       <div style="display:flex;gap:6px;align-items:center;">
-        <label style="font-size:0.8rem;">X <input id="pc-x${n}" type="number" step="0.05" style="width:72px;"></label>
-        <label style="font-size:0.8rem;">Y <input id="pc-y${n}" type="number" step="0.05" style="width:72px;"></label>
+        <label style="font-size:0.8rem;">X <input id="pc-x${n}" type="number" data-unit="mm" step="0.05" style="width:72px;"></label>
+        <label style="font-size:0.8rem;">Y <input id="pc-y${n}" type="number" data-unit="mm" step="0.05" style="width:72px;"></label>
         <button id="pc-read${n}" type="button" class="btn-secondary" style="flex:1;">${t("pc.read")}</button>
       </div>
     </div>`;

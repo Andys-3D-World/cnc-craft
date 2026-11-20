@@ -25,7 +25,7 @@ import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
 import { foldLayersFirst } from "./foldBox";
-import { t, ascii } from "./i18n/i18n";
+import { t, ascii, tMm } from "./i18n/i18n";
 import { imageGcode } from "./raster/imageShape";
 import { scanOffsetAt, shiftSeg } from "./scanOffset";
 import { orderByStage } from "./testCard";
@@ -37,7 +37,7 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   const warnings: string[] = [];
   if (!shapes.length) return { gcode: null, warnings };
 
-  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
+  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(tMm(key, p))})`;
   const n = (v: number) => String(+v.toFixed(3));
   const sOf = (power: number) => Math.round((power / 100) * laserSettings.sMax);
   // Ecken-Leistung nur ohne M4 (mit M4 regelt das Board selbst)

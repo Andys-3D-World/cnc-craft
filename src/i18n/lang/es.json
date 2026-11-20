@@ -6120,5 +6120,12 @@
   "hj.why.dialog": "hay una ventana abierta",
   "hj.why.focus": "CNC Craft ya no es la ventana activa",
   "hj.why.state": "la máquina no está en reposo",
-  "hj.why.protocol": "no es posible con este controlador"
+  "hj.why.protocol": "no es posible con este controlador",
+  "unit.select": "Unidad",
+  "unit.mm": "Milímetros (mm)",
+  "unit.in": "Pulgadas (in)",
+  "unit.selectTip": "Milímetros o pulgadas – solo para mostrar e introducir valores. Los archivos de proyecto, el G-code y todo lo que va a la máquina siguen en milímetros. Los campos en pulgadas también aceptan 1/4, 1 1/2 o 6mm.",
+  "unit.tipMm": "Unidad: milímetros – clic para pulgadas",
+  "unit.tipIn": "Unidad: pulgadas – clic para milímetros. El G-code y los archivos de proyecto siguen siempre en mm.",
+  "unit.board13": "⚠ El controlador informa las posiciones en pulgadas ($13=1). CNC Craft calcula en milímetros: la posición mostrada, los límites de la mesa y la protección contra choques no son correctos así. Envía $13=0 (solo cambia los informes del controlador, no la máquina). La unidad de la pantalla se cambia arriba a la derecha (mm / in)."
 }

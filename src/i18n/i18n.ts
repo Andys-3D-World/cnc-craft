@@ -22,6 +22,7 @@ import es from "./lang/es.json";
 import it from "./lang/it.json";
 import nl from "./lang/nl.json";
 import pl from "./lang/pl.json";
+import { unitTemplate } from "../units";
 
 export type Dict = Record<string, string>;
 
@@ -89,6 +90,21 @@ export function currentLanguage(): string {
 }
 
 export function t(key: string, params?: Record<string, string | number>): string {
+  let s = dict[key] ?? (en as Dict)[key] ?? (de as Dict)[key] ?? key;
+  if (params) {
+    // Zoll gewählt: "{w} × {h} mm" wird samt Einheit umgestellt (units.ts). In mm passiert hier nichts
+    s = unitTemplate(s, params);
+    for (const [k, v] of Object.entries(params)) s = s.split(`{${k}}`).join(String(v));
+  }
+  return s;
+}
+
+/**
+ * Wie t(), aber immer in Millimetern – egal, welche Einheit gewählt ist.
+ * Für alles, was in den G-Code oder in eine Datei geht: der G-Code ist in mm (G21), also auch seine Kommentare,
+ * und er muss in beiden Einstellungen Zeichen für Zeichen gleich sein.
+ */
+export function tMm(key: string, params?: Record<string, string | number>): string {
   let s = dict[key] ?? (en as Dict)[key] ?? (de as Dict)[key] ?? key;
   if (params) {
     for (const [k, v] of Object.entries(params)) s = s.split(`{${k}}`).join(String(v));

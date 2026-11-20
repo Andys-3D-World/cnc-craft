@@ -8,6 +8,7 @@ import { state } from "../main";
 import { joinChains } from "../joinPaths";
 import { replaceWithJoined } from "../offsetModes";
 import { isClosedShape, shapeToPaths, MM_TO_PIXEL } from "../shapeTransform";
+import { fmtLenU } from "../units";
 
 const KEY = "cnc_craft_heal_tol";
 const MIN_TOL = 0.001, MAX_TOL = 5;   // mehr wäre keine Lücke, sondern ein anderer Weg
@@ -72,7 +73,7 @@ export function openHealDialog(log: (s: string) => void, onChange: () => void) {
     const leftShapes = r.left.flatMap(l => l.from);
     const lines = [t("heal.done", { k: made.length, n: from })];
     if (r.left.length) {
-      const gaps = r.left.slice(0, 8).map(l => `${(l.gap / MM_TO_PIXEL).toFixed(2)} mm`).join(", ");
+      const gaps = r.left.slice(0, 8).map(l => fmtLenU(l.gap / MM_TO_PIXEL, 2)).join(", ");
       lines.push(t("heal.left", { n: r.left.length, gaps: gaps + (r.left.length > 8 ? " …" : "") }));
     }
     lines.forEach(l => log(l));

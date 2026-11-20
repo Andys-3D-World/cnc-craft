@@ -17,6 +17,7 @@ import { livePreview } from "./livePreview";
 import { trimHover } from "./trimTool";
 import { cutMark, hasCutSetting, MachineKind } from "../cutSetting";
 import { isLaser } from "../machineMode";
+import { unitName } from "../units";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -201,7 +202,7 @@ function drawSelectionFrame(ctx: CanvasRenderingContext2D) {
   // Größe unter dem Rahmen
   ctx.font = "11px monospace";
   ctx.fillStyle = "rgba(52, 209, 123, 0.95)";
-  const txt = `${fmtMm(b.maxX - b.minX)} × ${fmtMm(b.maxY - b.minY)} mm`;
+  const txt = `${fmtMm(b.maxX - b.minX)} × ${fmtMm(b.maxY - b.minY)} ${unitName()}`;
   ctx.fillText(txt, nw.sx, se.sy + 16);
 }
 
@@ -324,7 +325,7 @@ function drawStatusBar(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement,
   const w = live.mode === "idle" && (tool === "select" || tool === "pan") ? toWorld(live.screen.x, live.screen.y) : live.world;
   ctx.font = "11px monospace";
   ctx.fillStyle = "#e6e6ee";
-  const pos = `X ${(w.x / MM_TO_PIXEL).toFixed(2).padStart(8)}  Y ${(w.y / MM_TO_PIXEL).toFixed(2).padStart(8)} mm`;
+  const pos = `X ${fmtMm(w.x).padStart(8)}  Y ${fmtMm(w.y).padStart(8)} ${unitName()}`;
   ctx.fillText(pos, 8, y + 15);
   const posW = ctx.measureText(pos).width;
   ctx.fillStyle = "#8d8d9c";

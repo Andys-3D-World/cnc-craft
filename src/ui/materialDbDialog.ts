@@ -12,6 +12,7 @@ import { t } from "../i18n/i18n";
 import { MATERIALS, materialName, materialEdited, setMaterial, resetMaterial, addMaterial, removeMaterial, calcCutData,
   typeGeom, toolSettings, getTools, getTool, activeTool, toolLabel, toolForShape } from "../toolLibrary";
 import { getMillProfiles, addMillProfile, updateMillProfile, removeMillProfile, MillProfile } from "../millProfiles";
+import { fmtFeed, fmtLenShort, isInch, unitName } from "../units";
 
 function esc(s: string): string {
   return s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -70,7 +71,7 @@ export function openMaterialDb() {
   const example = (id: string) => {
     const r = calcCutData(SAMPLE, id);
     // an die Grenzen der Maschine gestoßen (Werkzeug-Einstellungen)? Dann sieht man Änderungen hier kaum
-    return `S${r.rpm} · F${r.feedrate} · ${r.stepZ} mm` + (r.limited ? ` (${t("matdb.limited")})` : "");
+    return `S${r.rpm} · ${isInch() ? fmtFeed(r.feedrate) : "F" + r.feedrate} · ${fmtLenShort(r.stepZ, 2)} ${unitName()}` + (r.limited ? ` (${t("matdb.limited")})` : "");
   };
   const render = () => {
     const cell = (id: string, k: string, v: number, step: string) =>

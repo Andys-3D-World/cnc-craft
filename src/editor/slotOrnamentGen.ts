@@ -15,6 +15,7 @@ import { ORNAMENT_DECOS, type OrnamentDeco, type OrnamentHanger } from "../ornam
 import { themeList, type Theme } from "../themes";
 import { themeSelectHtml, fillSelect, isTheme } from "./themePicker";
 import { slotOrnament, SLOT_SHAPES, type SlotOrnamentOptions, type SlotResult, type SlotShape } from "../slotOrnament";
+import { asLength } from "../units";
 
 const KEY = "cnc_craft_slotornament";
 type Opts = SlotOrnamentOptions & { theme: Theme };
@@ -74,7 +75,7 @@ export function openSlotOrnamentDialog(log: (s: string) => void, done: () => voi
           ${num("so-t", "box.t", o.t, "0.1", "0.5")}
           ${num("so-clear", "so.clear", o.clear, "0.05", "0")}
           ${sel("so-hang", "orn.hanger", HANGERS, "orn.hang.")}
-          ${num("so-hd", "orn.holeD", o.holeD, "0.5", "1")}
+          ${asLength(num("so-hd", "orn.holeD", o.holeD, "0.5", "1"))}
           ${sel("so-deco", "orn.deco", ORNAMENT_DECOS, "orn.deco.")}
           <label class="prop-row" style="cursor:pointer;"><span>${t("orn.border")}</span><input id="so-border" type="checkbox" ${o.border ? "checked" : ""} style="width:auto;"></label>
         </div>

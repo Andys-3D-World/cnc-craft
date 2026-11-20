@@ -26,6 +26,7 @@ import { MM_TO_PIXEL, groupBounds, shapeToPaths, translateShape } from "../shape
 import { drawImageShape, imageSizeMm } from "../raster/imageShape";
 import { layerForShape } from "../laserLayers";
 import { updateDimensionInputs } from "../uiInputs";
+import { fmtLen, unitName } from "../units";
 
 const PORT_COLOR: Record<PortType, string> = { shapes: "#4dabf7", image: "#f59f00", number: "#69db7c" };
 const esc = (s: string) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -188,7 +189,7 @@ export function openNodeEditor(log: (s: string) => void) {
     if (s.image) { const m = imageSizeMm(s.image); bits.push(t("ng.imgInfo", { w: m.w.toFixed(0), h: m.h.toFixed(0) })); }
     if (s.shapes.length || (!s.image && s.value === undefined)) {
       const b = groupBounds(s.shapes);
-      bits.push(t("ng.count", { n: s.shapes.length }) + (b ? ` · ${((b.maxX - b.minX) / MM_TO_PIXEL).toFixed(0)}×${((b.maxY - b.minY) / MM_TO_PIXEL).toFixed(0)} mm` : ""));
+      bits.push(t("ng.count", { n: s.shapes.length }) + (b ? ` · ${fmtLen((b.maxX - b.minX) / MM_TO_PIXEL, 0)}×${fmtLen((b.maxY - b.minY) / MM_TO_PIXEL, 0)} ${unitName()}` : ""));
     }
     if (r.ms > 50) bits.push(`${Math.round(r.ms)} ms`);
     return { text: bits.join(" · "), cls: "" };

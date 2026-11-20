@@ -608,10 +608,12 @@ body.drop-active .canvas-holder { outline: 2px dashed var(--accent-color); outli
 .rp-box { display: flex; flex-direction: column; gap: 6px; padding: 8px; border-radius: var(--radius-md); background: var(--bg-input); }
 .rp-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .dro {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; text-align: center;
+  display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 4px; text-align: center;
   font-family: var(--font-mono); font-size: 0.95rem; font-weight: bold;
   padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
 }
+
+.dro-unit { align-self: center; font-size: 0.68rem; font-weight: 600; color: var(--text-muted); padding: 0 4px; }
 
 /* Konsole unten rechts */
 .rp-console { position: relative; flex-shrink: 0; border-top: 1px solid var(--border-color); display: flex; flex-direction: column; height: clamp(120px, 22vh, 240px); }
@@ -980,7 +982,7 @@ body.mode-plasma #cam-mode-pocket { display: none !important; }   /* Tasche gibt
 .mw-warn { font-size: 0.78rem; color: var(--lt-red, #ff6b6b); }
 .mw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
 .mw-grid label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; }
-.mw-grid input[type=number] { width: 70px; text-align: right; }
+.mw-grid input[type=number], .mw-grid input[data-unit-on] { width: 70px; text-align: right; }
 .mw-grid select { max-width: 150px; }
 .mw-pair { display: inline-flex; align-items: center; gap: 4px; }
 .mw-check input { width: auto; }
@@ -1258,6 +1260,8 @@ body:not(.proto-marlin) .only-marlin { display: none !important; }
    ===================================================================== */
 .about-btn { background: transparent; border: 1px solid var(--border-color); color: var(--text-muted); border-radius: 50%; width: 26px; height: 26px; padding: 0; cursor: pointer; font-size: 0.9rem; line-height: 1; }
 .about-btn:hover { color: var(--text-main); border-color: var(--text-muted); }
+/* mm / in: Knopf oben rechts (units.ts) */
+.unit-btn { width: auto; min-width: 30px; padding: 0 7px; border-radius: 13px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-mono); }
 .update-pill { background: var(--accent-color); color: #fff; border: none; border-radius: 13px; padding: 4px 11px; font-size: 0.76rem; font-weight: 700; cursor: pointer; box-shadow: 0 0 10px rgba(109, 74, 255, 0.5); }
 .about-box { width: 460px !important; }
 .about-head { display: flex; gap: 14px; align-items: center; }
@@ -1971,7 +1975,8 @@ div.gen-stage { display: block !important; }
 svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
 .gen-left .prop-row, .gen-left .dlg-row { gap: 10px; }
 .gen-left .prop-row > select, .gen-left .dlg-row > select { flex: 0 1 210px; width: 210px !important; max-width: 62% !important; min-width: 0; }
-.gen-left .prop-row > input[type="number"], .gen-left .dlg-row > input[type="number"] { flex: 0 0 84px; width: 84px !important; }
+.gen-left .prop-row > input[type="number"], .gen-left .dlg-row > input[type="number"],
+.gen-left .prop-row > input[data-unit-on], .gen-left .dlg-row > input[data-unit-on] { flex: 0 0 84px; width: 84px !important; }
 .gen-left .prop-row > input[type="text"], .gen-left .dlg-row > input[type="text"] { flex: 0 1 210px; width: 210px !important; max-width: 62% !important; min-width: 0; }
 @media (max-width: 760px), (max-height: 520px) {
   .gen-body { display: block; overflow-y: auto; }

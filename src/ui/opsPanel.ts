@@ -12,6 +12,7 @@ import { t, T, tip } from "../i18n/i18n";
 import { getTools, getTool, toolForShape, toolLabel } from "../toolLibrary";
 import { OP_KINDS, OpKind, ShapeOp, extraOps } from "../ops";
 import { cleanMillDir, type MillDir } from "../millDir";
+import { fmtLenShort, unitName } from "../units";
 
 const MILL_DIRS: MillDir[] = ["", "climb", "conventional"];
 /** Arten, bei denen die Fräsrichtung etwas bedeutet (Gewinde läuft immer im Gleichlauf, siehe threadMill.ts) */
@@ -149,7 +150,7 @@ export function refreshOps(force = false) {
   const depth0 = typeof s0.millingDepth === "number" ? s0.millingDepth : -2;
   const first = `
     <div class="ops-row ops-first" style="padding:4px 0;border-bottom:1px solid rgba(255,255,255,0.06);" ${tip("ops.firstTip")}>
-      <b>1.</b> ${esc(kindLabel(s0.millingMode || "outside"))} · ${esc(main ? toolLabel(main) : "–")} · ${depth0} mm
+      <b>1.</b> ${esc(kindLabel(s0.millingMode || "outside"))} · ${esc(main ? toolLabel(main) : "–")} · ${fmtLenShort(Number(depth0), 3)} ${unitName()}
     </div>`;
   const rows = extraOps(s0).map((o, i) => `
     <div class="ops-row" data-i="${i}" style="padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;flex-direction:column;gap:3px;">
@@ -162,13 +163,13 @@ export function refreshOps(force = false) {
       ${o.kind === "chamfer"
         ? `<div class="prop-row" ${tip("ops.cwTip")}>${T("ops.cw")}<input type="number" class="prop-input ops-cw" min="0.05" step="0.1" value="${o.chamferW}"></div>`
         : o.kind === "thread"
-        ? `<div class="prop-row" ${tip("ops.threadLenTip")}>${T("ops.threadLen")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>
-           <div class="prop-row" ${tip("ops.threadDTip")}>${T("ops.threadD")}<input type="number" class="prop-input ops-td" min="0" step="0.5" value="${o.threadD || 0}"></div>
-           <div class="prop-row" ${tip("ops.threadPitchTip")}>${T("ops.threadPitch")}<input type="number" class="prop-input ops-tp" min="0" step="0.05" value="${o.threadPitch || 0}"></div>
+        ? `<div class="prop-row" ${tip("ops.threadLenTip")}>${T("ops.threadLen")}<input type="number" data-unit="mm" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>
+           <div class="prop-row" ${tip("ops.threadDTip")}>${T("ops.threadD")}<input type="number" data-unit="mm" class="prop-input ops-td" min="0" step="0.5" value="${o.threadD || 0}"></div>
+           <div class="prop-row" ${tip("ops.threadPitchTip")}>${T("ops.threadPitch")}<input type="number" data-unit="mm" class="prop-input ops-tp" min="0" step="0.05" value="${o.threadPitch || 0}"></div>
            <div class="prop-row" ${tip("ops.threadPassesTip")}>${T("ops.threadPasses")}<input type="number" class="prop-input ops-tn" min="1" max="10" step="1" value="${o.threadPasses || 1}"></div>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadSpringTip")}>${T("ops.threadSpring")}<input type="checkbox" class="ops-spring" style="width:auto;"${o.threadSpring ? " checked" : ""}></label>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadLeftTip")}>${T("ops.threadLeft")}<input type="checkbox" class="ops-left" style="width:auto;"${o.threadLeft ? " checked" : ""}></label>`
-        : `<div class="prop-row">${T("rp.depth")}<input type="number" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
+        : `<div class="prop-row">${T("rp.depth")}<input type="number" data-unit="mm" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
       ${DIR_KINDS.includes(o.kind) ? `<div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}<select class="prop-input ops-dir" style="width:110px;">
         ${MILL_DIRS.map(d => `<option value="${d}"${d === (o.millDir || "") ? " selected" : ""}>${esc(t("rp.millDir." + (d || "default")))}</option>`).join("")}</select></div>` : ""}
     </div>`).join("");

@@ -18,8 +18,9 @@ function esc(v: string): string {
 }
 
 export function toolChangeSettingsHtml(): string {
-  const num = (id: string, key: string, step = "0.1", min = "") =>
-    `<div class="prop-row" ${tip(key + "Tip")}>${T(key)}<input type="number" id="${id}" step="${step}" ${min ? `min="${min}"` : ""} class="prop-input"></div>`;
+  // unit "mm": Länge ohne Einheit in der Beschriftung (mit "(mm)" im Text stellt sich das Feld von selbst um, siehe unitFields.ts)
+  const num = (id: string, key: string, step = "0.1", min = "", unit = "") =>
+    `<div class="prop-row" ${tip(key + "Tip")}>${T(key)}<input type="number" id="${id}" step="${step}" ${min ? `min="${min}"` : ""} ${unit ? `data-unit="${unit}"` : ""} class="prop-input"></div>`;
   return `
         <div class="pr-sub">${T("tc.title")}</div>
         <div class="prop-row" ${tip("tc.modeTip")}>${T("tc.mode")}<select id="tc-mode" class="prop-input" style="width:auto;">
@@ -27,15 +28,15 @@ export function toolChangeSettingsHtml(): string {
         <div class="prop-row" ${tip("tc.liftTip")}>${T("tc.lift")}<select id="tc-lift" class="prop-input" style="width:auto;">
           <option value="3">${T("tc.lift3")}</option><option value="1">${T("tc.lift1")}</option><option value="0">${T("tc.lift0")}</option><option value="2">${T("tc.lift2")}</option></select></div>
         <div id="tc-workz-row">${num("tc-workz", "tc.workZ", "1", "0")}</div>
-        <div id="tc-safe-row">${num("tc-safe", "tc.safe", "0.5")}</div>
+        <div id="tc-safe-row">${num("tc-safe", "tc.safe", "0.5", "", "mm")}</div>
         ${num("tc-feed", "tc.feed", "100", "100")}
         <div id="tc-auto">
           ${num("tc-travel", "tc.travel", "1", "1")}
-          <div id="tc-sensor-only">${num("tc-sz", "tc.sz", "0.5")}</div>
+          <div id="tc-sensor-only">${num("tc-sz", "tc.sz", "0.5", "", "mm")}</div>
           <div class="prop-row" ${tip("tc.posTip")}>${T("tc.pos")}<select id="tc-pos" class="prop-input" style="width:auto;">
             <option value="0">${T("tc.pos0")}</option><option value="1">${T("tc.pos1")}</option></select></div>
           <div id="tc-pos-box">
-            <div class="rp-grid2">${num("tc-x", "tc.x")}${num("tc-y", "tc.y")}</div>
+            <div class="rp-grid2">${num("tc-x", "tc.x", "0.1", "", "mm")}${num("tc-y", "tc.y", "0.1", "", "mm")}</div>
             <button id="tc-here" class="btn-secondary btn-compact" ${tip("tc.hereTip")}>📍 ${T("tc.here")}</button>
           </div>
           <div class="tool-scope" id="tc-reuse"></div>

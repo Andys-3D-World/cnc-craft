@@ -6120,5 +6120,12 @@
   "hj.why.dialog": "er is een venster open",
   "hj.why.focus": "CNC Craft is niet meer het actieve venster",
   "hj.why.state": "de machine staat niet stil",
-  "hj.why.protocol": "niet mogelijk met deze besturing"
+  "hj.why.protocol": "niet mogelijk met deze besturing",
+  "unit.select": "Eenheid",
+  "unit.mm": "Millimeter (mm)",
+  "unit.in": "Inch (in)",
+  "unit.selectTip": "Millimeter of inch – alleen voor weergave en invoer. Projectbestanden, G-code en alles wat naar de machine gaat blijven in millimeters. In inch-velden kan ook 1/4, 1 1/2 of 6mm.",
+  "unit.tipMm": "Eenheid: millimeter – klik voor inch",
+  "unit.tipIn": "Eenheid: inch – klik voor millimeter. G-code en projectbestanden blijven altijd in mm.",
+  "unit.board13": "⚠ De besturing meldt posities in inch ($13=1). CNC Craft rekent in millimeters: de positieweergave, bedgrenzen en botsbeveiliging kloppen zo niet. Stuur $13=0 (dat verandert alleen de meldingen van de besturing, niet de machine). De weergave-eenheid stel je rechtsboven in (mm / in)."
 }

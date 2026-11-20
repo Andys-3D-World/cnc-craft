@@ -10,6 +10,7 @@ import { MATERIALS, materialName, calcCutData, toolForShape, toolSettings, TOOLS
 import { getMillProfiles, makeCutData, cleanCutData, cutDataFits, profileFitsDiameter, MILL_PROFILES_CHANGED } from "../millProfiles";
 import { extraOps } from "../ops";
 import { openMaterialDb } from "./materialDbDialog";
+import { fmtDia } from "../units";
 
 const MIXED = "__mixed__";
 const OTHER = "__other__";
@@ -122,7 +123,7 @@ export function refreshMillProfilePicker(force = false) {
   opts.push(`<option value="">${esc(t("mprof.useTool"))}</option>`);
   if (profiles.length) {
     opts.push(`<optgroup label="${esc(t("mprof.own"))}">`
-      + profiles.map(p => `<option value="p:${esc(p.id)}">${esc(p.name)}${p.diameter ? ` · Ø${p.diameter}` : ""}</option>`).join("")
+      + profiles.map(p => `<option value="p:${esc(p.id)}">${esc(p.name)}${p.diameter ? ` · ${fmtDia(p.diameter)}` : ""}</option>`).join("")
       + "</optgroup>");
   }
   opts.push(`<optgroup label="${esc(t("mprof.builtin"))}">`

@@ -20,6 +20,7 @@ import { hasUsedArea, newPlate, getStock } from "../stock";
 import { machine, sendAndWait, setRuidaOptionsProvider, syncRuidaOptions } from "../machine";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { selectBundledGrbl } from "./flashPage";
+import { fmtLenShort, unitName } from "../units";
 
 const KEY = "cnc_craft_machine_profile";
 
@@ -222,7 +223,7 @@ export function refreshMachineLine() {
   if (saved) {
     const p = profileById(saved.id);
     const name = p ? profileName(p) : saved.name;
-    text = `${t("mw.current", { name: esc(name) })} · ${saved.w} × ${saved.h} mm`;
+    text = `${t("mw.current", { name: esc(name) })} · ${fmtLenShort(saved.w, 1)} × ${fmtLenShort(saved.h, 1)} ${unitName()}`;
   } else {
     text = `<span class="mw-none">${t("mw.none")}</span>`;
   }
@@ -329,7 +330,7 @@ export function openMachineWizard(welcome = false) {
       ${notes ? `<ul class="mw-notes">${notes}</ul>` : ""}
       ${!canSend ? `<div class="mw-warn">${t("mw.noSend")}</div>` : ""}
       <div class="mw-grid">
-        <label>${t("mw.area")}<span class="mw-pair"><input type="number" id="mw-w" min="1" value="${val.w}"> × <input type="number" id="mw-h" min="1" value="${val.h}"> mm</span></label>
+        <label>${t("mw.area")}<span class="mw-pair"><input type="number" id="mw-w" data-unit="mm" min="1" value="${val.w}"> × <input type="number" id="mw-h" data-unit="mm" min="1" value="${val.h}"> mm</span></label>
         <label class="mw-mill">${t("mw.zTravel")}<span class="mw-pair"><input type="number" id="mw-z" min="0" value="${val.z}"> mm</span></label>
         <label>${t("mw.baud")}<select id="mw-baud">${bauds.sort((a, b) => b - a).map(b => `<option value="${b}" ${b === val.baud ? "selected" : ""}>${b}</option>`).join("")}</select></label>
         <label class="mw-laser" ${tip("laser.sMaxTip")}>${t("mw.sMax")}<input type="number" id="mw-smax" min="1" value="${val.sMax}"></label>

@@ -35,6 +35,7 @@ import { machine, MACHINE_EVENT, sendAndWait, jobResume, jobStop, setSwitchGuard
 import { probeSettings as s, setProbeLog, step, settled, startGuard, stopGuard, freshStatus, touchAt, liftUp, abortProbe,
   guard, sleep } from "./probe";
 import { getTools } from "./toolLibrary";
+import { fmtLenShort, unitName } from "./units";
 
 export enum TcState {
   Idle = "idle",
@@ -562,7 +563,7 @@ export async function measureReference(): Promise<void> {
 
 export function toolLabel(): string {
   const w = tc.tool;
-  return (w.num ? `T${w.num} · ` : "") + (w.name || "?") + (w.d !== null ? ` · Ø ${w.d} mm` : "");
+  return (w.num ? `T${w.num} · ` : "") + (w.name || "?") + (w.d !== null ? ` · Ø ${fmtLenShort(w.d, 3)} ${unitName()}` : "");
 }
 
 export function initToolChange(logFn: (s: string) => void) {

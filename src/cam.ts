@@ -15,7 +15,7 @@ import { spindleCode } from "./spindleDir";
 import { cleanMillDir, orientLoop, circleCmd, arcNeedsReverse } from "./millDir";
 import { arcFit, fitArcs } from "./arcFit";
 import { leadOptions, leadAtPoint, planLead, planLeadAtStart, distToPath, LeadMove, LeadOpts, LeadPlan } from "./millLead";
-import { t, ascii } from "./i18n/i18n";
+import { t, ascii, tMm } from "./i18n/i18n";
 import { isLaser, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
@@ -163,7 +163,7 @@ function applyZones(g: string, used: any[]): string {
   if (!zones.length) return g;
   if (rotary.on) { lastGcodeWarnings.push(t("ko.rotary")); return g; }
   const dia = Math.max(0, ...used.map((s: any) => { const tl = toolForShape(s); return tl ? cutDiameter(tl) : 3; }));
-  const r = applyKeepOuts(g, zones, { radius: dia / 2, note: `(${ascii(t("gc.keepOut"))})` });
+  const r = applyKeepOuts(g, zones, { radius: dia / 2, note: `(${ascii(tMm("gc.keepOut"))})` });
   if (r.raised) lastGcodeNotes.push(t("ko.raised", { n: r.raised }));
   if (r.unsure) lastGcodeWarnings.push(t("ko.unsure"));
   for (const h of r.hits) {
@@ -385,7 +385,7 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 5. G-CODE HEADER ----
   let gcode = "";
-  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
+  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(tMm(key, p))})`;
   gcode += `G21 ${c("gc.unitMm")}\n`;
   gcode += `G90 ${c("gc.absolute")}\n`;
   gcode += `G0 Z${SAFE_Z.toFixed(2)} ${c("gc.safeZ")}\n`;

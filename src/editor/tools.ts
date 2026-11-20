@@ -35,6 +35,7 @@ import { openEngraveDialog } from "../raster/engraveDialog";
 import { addLineDim, addSize, dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue, lastLineDimCrossed, lineDimPick } from "./dims";
 import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
 import { t } from "../i18n/i18n";
+import { unitName } from "../units";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 import { toolLog, trimClick, trimMouseMove } from "./trimTool";
 import { centerArc, CenterArc, ringInner, slotPoints, starPoints } from "./drawShapes";
@@ -468,7 +469,7 @@ function doScale() {
   applyFromOriginals(s => scaleShape(s, anchor.x, anchor.y, sx, sy));
 
   const b = live.startBounds!;
-  live.label = `${fmtMm((b.maxX - b.minX) * sx)} × ${fmtMm((b.maxY - b.minY) * sy)} mm`;
+  live.label = `${fmtMm((b.maxX - b.minX) * sx)} × ${fmtMm((b.maxY - b.minY) * sy)} ${unitName()}`;
 }
 
 function doRotate() {
@@ -496,30 +497,30 @@ function updateLabel() {
     const last = live.points[live.points.length - 1];
     const len = Math.hypot(w.x - last.x, w.y - last.y);
     const ang = (Math.atan2(w.y - last.y, w.x - last.x) * 180) / Math.PI;
-    live.label = `${fmtMm(len)} mm  ${ang.toFixed(1)}°`;
+    live.label = `${fmtMm(len)} ${unitName()}  ${ang.toFixed(1)}°`;
   } else if (live.mode === "dragDraw" && live.dragStart) {
     const r = dragRect();
     if (tool === "rect" || tool === "ellipse" || tool === "slot") {
-      live.label = `${fmtMm(Math.abs(r.x1 - r.x0))} × ${fmtMm(Math.abs(r.y1 - r.y0))} mm`;
+      live.label = `${fmtMm(Math.abs(r.x1 - r.x0))} × ${fmtMm(Math.abs(r.y1 - r.y0))} ${unitName()}`;
     } else if (tool === "polygon") {
       const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
-      live.label = `Ø ${fmtMm(rad * 2)} mm · ${t("label.corners", { n: options.polygonSides })}`;
+      live.label = `Ø ${fmtMm(rad * 2)} ${unitName()} · ${t("label.corners", { n: options.polygonSides })}`;
     } else if (tool === "star") {
       const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
-      live.label = `Ø ${fmtMm(rad * 2)} mm · ${t("label.tips", { n: options.starTips })}`;
+      live.label = `Ø ${fmtMm(rad * 2)} ${unitName()} · ${t("label.tips", { n: options.starTips })}`;
     } else if (tool === "ring") {
       const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
-      live.label = `Ø ${fmtMm(rad * 2)} mm · ${ringInner(rad, options.ringWall * MM_TO_PIXEL) === null ? t("ring.wallTooThick") : `Ø ${fmtMm((rad - options.ringWall * MM_TO_PIXEL) * 2)} mm`}`;
+      live.label = `Ø ${fmtMm(rad * 2)} ${unitName()} · ${ringInner(rad, options.ringWall * MM_TO_PIXEL) === null ? t("ring.wallTooThick") : `Ø ${fmtMm((rad - options.ringWall * MM_TO_PIXEL) * 2)} ${unitName()}`}`;
     } else if (tool === "measure") {
       live.label = measureText(live.dragStart, w);
     }
   } else if (tool === "arcCenter" && live.points.length === 1) {
-    live.label = `R ${fmtMm(Math.hypot(w.x - live.points[0].x, w.y - live.points[0].y))} mm`;
+    live.label = `R ${fmtMm(Math.hypot(w.x - live.points[0].x, w.y - live.points[0].y))} ${unitName()}`;
   } else if (tool === "arcCenter" && live.points.length === 2) {
     const a = previewCenterArc();
-    live.label = a ? `R ${fmtMm(a.radius)} mm · ${Math.abs((a.sweep * 180) / Math.PI).toFixed(1)}°` : "";
+    live.label = a ? `R ${fmtMm(a.radius)} ${unitName()} · ${Math.abs((a.sweep * 180) / Math.PI).toFixed(1)}°` : "";
   } else if (live.mode === "moving") {
-    live.label = `Δ ${fmtMm(live.moveDelta.x)} / ${fmtMm(live.moveDelta.y)} mm`;
+    live.label = `Δ ${fmtMm(live.moveDelta.x)} / ${fmtMm(live.moveDelta.y)} ${unitName()}`;
   }
 }
 
@@ -527,7 +528,7 @@ export function measureText(a: Pt, b: Pt): string {
   const dx = b.x - a.x, dy = b.y - a.y;
   const len = Math.hypot(dx, dy);
   const ang = (Math.atan2(dy, dx) * 180) / Math.PI;
-  return `${fmtMm(len)} mm · ${ang.toFixed(1)}° · ΔX ${fmtMm(dx)} · ΔY ${fmtMm(dy)}`;
+  return `${fmtMm(len)} ${unitName()} · ${ang.toFixed(1)}° · ΔX ${fmtMm(dx)} · ΔY ${fmtMm(dy)}`;
 }
 
 /** Rechteck aus Ziehpunkt und Maus, mit Shift (quadratisch) und Strg/Alt (von der Mitte) */

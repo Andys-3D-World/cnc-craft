@@ -18,6 +18,7 @@ import { listen } from "@tauri-apps/api/event";
 import { t } from "./i18n/i18n";
 import { getMachineMode, setMachineMode, MachineMode } from "./machineMode";
 import { parseHalLine } from "./grblhalInfo";
+import { reportsInches } from "./units";
 
 export interface MachineStatus {
   state: string;          // Idle, Run, Hold, Jog, Alarm, Door, Check, Home, Sleep
@@ -417,6 +418,16 @@ export function alarmText(code: number, firmware = machine.firmware): string {
   return s === k ? t("grbl.alarmUnknown") : s;
 }
 
+/**
+ * $13=1: die Steuerung meldet Position und Vorschub in Zoll. CNC Craft rechnet mit Millimetern (Anzeige, Bett-Grenzen,
+ * Endschalter-Prüfung, Antasten) – die Zahlen wären 25,4-mal zu klein. Deshalb deutlich warnen, sobald die Einstellung
+ * gelesen wird (einmal je Wechsel). Umgerechnet wird bewusst nicht: zu viele Stellen lesen Positionen, eine vergessene
+ * wäre gefährlich. $13=0 ändert nur die Meldungen, nicht die Maschine.
+ */
+function warnInchReports(before: string | undefined, key: string, value: string, tag: string) {
+  if (key === "$13" && reportsInches(value) && !reportsInches(before)) log(tag + t("unit.board13"));
+}
+
 export async function initMachine(logFn: (s: string) => void) {
   log = logFn;
   const on = async (name: string, fn: (p: any) => void) => {
@@ -494,7 +505,7 @@ export async function initMachine(logFn: (s: string) => void) {
     const { m, own, tag } = r;
     if (!own) {
       // Hintergrund: nur Einstellungen mitschreiben und Fehler melden
-      if (p.kind === "setting") m.settings.set(p.key, p.value);
+      if (p.kind === "setting") { warnInchReports(m.settings.get(p.key), p.key, p.value, tag); m.settings.set(p.key, p.value); }
       else if (p.kind === "error") log(tag + t("m.error", { code: p.code, text: errorText(p.code) }));
       return;
     }
@@ -511,6 +522,7 @@ export async function initMachine(logFn: (s: string) => void) {
         resolveAck(p.id, { ok: false, code: -3 });
         break;
       case "setting":
+        warnInchReports(machine.settings.get(p.key), p.key, p.value, "");
         machine.settings.set(p.key, p.value);
         fire("setting", p);
         break;

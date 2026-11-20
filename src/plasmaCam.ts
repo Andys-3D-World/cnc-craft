@@ -28,7 +28,7 @@
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { offsetPolygon, polygonArea, pointInPoly } from "./polyOffset";
 import { getCuts, cutForShape, plasmaSettings, PlasmaCut } from "./plasmaCuts";
-import { t, ascii } from "./i18n/i18n";
+import { t, ascii, tMm } from "./i18n/i18n";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
@@ -269,7 +269,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   shapes = noFolds;
   if (!shapes.length) return { gcode: null, warnings };
   const S = plasmaSettings;
-  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
+  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(tMm(key, p))})`;
   const n = (v: number) => String(+v.toFixed(3));
 
   const byCut = new Map<string, any[]>();

@@ -23,6 +23,7 @@ import {
 import { COATINGS, COATING_LABEL } from "../toolCoating";
 import { openMaterialDb } from "./materialDbDialog";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
+import { fmtDia, fmtFeed, isInch } from "../units";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -412,7 +413,7 @@ export function renderToolPage(withEditor = true) {
         <div class="tlp-ico">${toolIconSvg(tl, 22, 44, toolColor(tl))}</div>
         <div class="tlp-txt">
           <div class="tlp-name"><b style="color:${toolColor(tl)}">T${toolNumber(tl)}</b> ${esc(tl.name)}</div>
-          <div class="tlp-info">${esc(toolTypeName(tl))} · Ø${fmt(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))}${tl.type === "threadmill" ? ` · ${esc(tl.threadSingle ? t("tl.single") : `P${fmt(tl.pitch || 1)}`)}` : ""}${tl.coating && tl.coating !== "none" ? ` · ${COATING_LABEL[tl.coating]}` : ""} · S${tl.rpm} · F${tl.feedrate}</div>
+          <div class="tlp-info">${esc(toolTypeName(tl))} · ${fmtDia(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))}${tl.type === "threadmill" ? ` · ${esc(tl.threadSingle ? t("tl.single") : `P${fmt(tl.pitch || 1)}`)}` : ""}${tl.coating && tl.coating !== "none" ? ` · ${COATING_LABEL[tl.coating]}` : ""} · S${tl.rpm} · ${isInch() ? fmtFeed(tl.feedrate) : "F" + tl.feedrate}</div>
         </div>
         <button class="tlp-star${def ? " on" : ""}" data-act="default" data-tip="${esc(t(def ? "tl.isDefault" : "tl.makeDefault"))}">${def ? "★" : "☆"}</button>
       </div>`;

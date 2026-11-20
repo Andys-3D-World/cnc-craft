@@ -6120,5 +6120,12 @@
   "hj.why.dialog": "a window is open",
   "hj.why.focus": "CNC Craft is no longer the active window",
   "hj.why.state": "the machine is not idle",
-  "hj.why.protocol": "not possible with this controller"
+  "hj.why.protocol": "not possible with this controller",
+  "unit.select": "Units",
+  "unit.mm": "Millimetres (mm)",
+  "unit.in": "Inches (in)",
+  "unit.selectTip": "Millimetres or inches – for display and input only. Project files, G-code and everything sent to the machine stay in millimetres. Inch fields also take 1/4, 1 1/2 or 6mm.",
+  "unit.tipMm": "Units: millimetres – click for inches",
+  "unit.tipIn": "Units: inches – click for millimetres. G-code and project files always stay in mm.",
+  "unit.board13": "⚠ The controller reports positions in inches ($13=1). CNC Craft works in millimetres: the position display, bed limits and crash protection are wrong this way. Please send $13=0 (it only changes the controller's reports, not the machine). Change the display unit at the top right (mm / in)."
 }

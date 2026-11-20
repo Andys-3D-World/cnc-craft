@@ -20,6 +20,7 @@ import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
 import { drawCameraUnderlay } from "./camera/cameraOverlay";
 import { drawImageShape } from "./raster/imageShape";
 import { materialView, drawMaterialBed, drawMaterialShapes } from "./materialView";
+import { isInch, MM_PER_IN } from "./units";
 
 export const liveMachinePos = { x: 0, y: 0, z: 0 };
 
@@ -82,8 +83,10 @@ export function drawEverything(
 
   // 3. Raster: Abstand passt sich dem Zoom an
   const pxPerMm = scale * MM_TO_PIXEL;
-  const steps = [0.1, 0.5, 1, 5, 10, 50, 100, 500];
-  const minor = steps.find(s => s * pxPerMm >= 8) || 500;
+  // Zoll gewählt: Raster und Lineal in runden Zoll-Schritten (gerechnet wird weiter in mm)
+  const inch = isInch(), unitMm = inch ? MM_PER_IN : 1;
+  const steps = (inch ? [0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50] : [0.1, 0.5, 1, 5, 10, 50, 100, 500]).map(s => s * unitMm);
+  const minor = steps.find(s => s * pxPerMm >= 8) || steps[steps.length - 1];
   const major = steps.find(s => s >= minor * 5 && s * pxPerMm >= 50) || minor * 10;
 
   ctx.save();
@@ -123,12 +126,12 @@ export function drawEverything(
   ctx.textAlign = "center";
   for (let mm = Math.ceil(visX0 / major) * major; mm <= visX1 + 1e-9; mm += major) {
     const x = sx(mm * MM_TO_PIXEL);
-    ctx.fillText(String(+mm.toFixed(1)), x, by1 + 12);
+    ctx.fillText(String(+(mm / unitMm).toFixed(inch ? 2 : 1)), x, by1 + 12);
   }
   ctx.textAlign = "right";
   for (let mm = Math.ceil(visY0 / major) * major; mm <= visY1 + 1e-9; mm += major) {
     const y = sy(mm * MM_TO_PIXEL);
-    ctx.fillText(String(+mm.toFixed(1)), bx0 - 4, y + 3);
+    ctx.fillText(String(+(mm / unitMm).toFixed(inch ? 2 : 1)), bx0 - 4, y + 3);
   }
   ctx.textAlign = "left";
 

@@ -1,5 +1,6 @@
 import { liveMachinePos } from "./render";
 import { t } from "./i18n/i18n";
+import { fmtLen } from "./units";
 
 export function handleJogClick(
   btn: HTMLElement,
@@ -63,7 +64,7 @@ export function handleJogClick(
   let axisCommands: string[] = parts.map(part => {
     const axis = part.charAt(0);
     const dir = parseInt(part.substring(1));
-    return `${axis}${(dir * distance).toFixed(2)}`;
+    return `${axis}${(dir * distance).toFixed(3)}`;
   });
 
   // G21: Schritte sind mm – auch wenn ein Zoll-Job (G20) die Maschine in Zoll gelassen hat
@@ -74,9 +75,9 @@ export function handleJogClick(
   const posXEl = document.getElementById("pos-x");
   const posYEl = document.getElementById("pos-y");
   const posZEl = document.getElementById("pos-z");
-  if (posXEl) posXEl.textContent = liveMachinePos.x.toFixed(2);
-  if (posYEl) posYEl.textContent = liveMachinePos.y.toFixed(2);
-  if (posZEl) posZEl.textContent = liveMachinePos.z.toFixed(2);
+  if (posXEl) posXEl.textContent = fmtLen(liveMachinePos.x, 2);
+  if (posYEl) posYEl.textContent = fmtLen(liveMachinePos.y, 2);
+  if (posZEl) posZEl.textContent = fmtLen(liveMachinePos.z, 2);
 
   triggerRedraw();
 

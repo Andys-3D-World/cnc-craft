@@ -19,6 +19,7 @@ import { app, toScreen } from "./editorState";
 import { Pt, Bounds, MM_TO_PIXEL, shapeBounds, translateShape, scaleShape, shapeToPaths, pointInPath, pathArea, convertToPolyline, updatePolylineBounds } from "../shapeTransform";
 import { dimSide, pickSegment, Segment, setSegmentLength } from "./lineDim";
 import { intersections } from "./trim";
+import { fmtLenShort, unitName } from "../units";
 
 type KX = "l" | "c" | "r";
 type KY = "b" | "c" | "t";
@@ -122,7 +123,8 @@ let labels: Label[] = [];
 export const dimSel = { cur: null as DimRef | null };
 
 const same = (a: DimRef | null, b: DimRef) => !!a && a.kind === b.kind && a.shapeId === b.shapeId && a.idx === b.idx;
-const fmt = (px: number) => String(+(px / MM_TO_PIXEL).toFixed(2)).replace(".", ",");
+// Maßzahl in der gewählten Einheit (mm: 2 Stellen, Zoll: 4)
+const fmt = (px: number) => fmtLenShort(px / MM_TO_PIXEL, 2).replace(".", ",");
 
 /** Maßzahl unter der Maus (Bildschirm-Pixel) */
 export function dimAt(sx: number, sy: number): DimRef | null {
@@ -415,7 +417,7 @@ export function drawDimPreview(ctx: CanvasRenderingContext2D) {
     ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke();
     ctx.setLineDash([]);
     ctx.font = "600 11px system-ui"; ctx.textAlign = "center";
-    ctx.fillText(fmt(Math.abs(ub - ua)) + " mm", (pa.x + pb.x) / 2, (pa.y + pb.y) / 2 - 8);
+    ctx.fillText(fmt(Math.abs(ub - ua)) + " " + unitName(), (pa.x + pb.x) / 2, (pa.y + pb.y) / 2 - 8);
   }
   ctx.restore();
 }
@@ -430,6 +432,7 @@ export function editDimValue(ref: DimRef, canvas: HTMLCanvasElement, done: () =>
   document.getElementById("dim-edit")?.remove();
   const inp = document.createElement("input");
   inp.id = "dim-edit"; inp.type = "number"; inp.step = "0.1"; inp.min = "0";
+  inp.setAttribute("data-unit", "mm"); // Länge: bei Zoll wird in Zoll getippt, gelesen wird weiter mm (unitFields.ts)
   inp.value = String(+v.toFixed(3));
   inp.className = "dim-edit";
   inp.style.left = `${r.left + (lab ? lab.r.x + lab.r.w / 2 : 0) * k - 45}px`;

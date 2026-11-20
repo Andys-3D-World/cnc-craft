@@ -10,6 +10,7 @@ import { t } from "../i18n/i18n";
 import { addLayer, getLayers, moveLayer } from "../laserLayers";
 import { PRESETS, LaserKind, LaserPreset, presetValues, REF_WATT, LASER_KINDS, LINE_INTERVAL } from "../laserPresets";
 import { mountOwnPresets } from "./ownPresetSection";
+import { fmtFeed } from "../units";
 
 const KEY = "cnc_craft_laser_presets";
 
@@ -80,7 +81,7 @@ export function openLaserPresetDialog(onAdded: (id: string) => void) {
     list.innerHTML = sorted.map(p => {
       const v = presetValues(p, kind, watt);
       const vals = v
-        ? `${v.power} % · ${v.speed} mm/min${v.passes > 1 ? ` · ${v.passes}×` : ""}`
+        ? `${v.power} % · ${fmtFeed(v.speed)}${v.passes > 1 ? ` · ${v.passes}×` : ""}`
         : esc(t("llib.pre.unsuited"));
       const warn = v?.weak ? ` <span style="color:var(--color-warning);">${esc(t("llib.pre.weak"))}</span>` : "";
       const note = p.note ? `<div class="tool-scope">${esc(t(p.note))}</div>` : "";

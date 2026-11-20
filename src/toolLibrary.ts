@@ -20,6 +20,7 @@ import { t } from "./i18n/i18n";
 import { ToolType, Helix, ToolGeom } from "./toolGraphics";
 import { Coating, COATINGS } from "./toolCoating";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
+import { fmtDia } from "./units";
 
 export type { ToolType, Helix } from "./toolGraphics";
 export type ToolMat = "carbide" | "hss";
@@ -467,7 +468,7 @@ export function toolColor(tool: MillingTool): string {
 
 /** Kurzer Text für Auswahllisten: "T1 · Ø3 · 3 mm Schaftfräser" */
 export function toolLabel(tool: MillingTool): string {
-  return `T${toolNumber(tool)} · Ø${fmt(tool.diameter)} · ${tool.name}`;
+  return `T${toolNumber(tool)} · ${fmtDia(tool.diameter)} · ${tool.name}`;
 }
 
 /** Kurzinfo: "Schaftfräser · 2 Schneiden · Ø 3 mm · 1.5 mm/Durchgang · F1200 · S18000" */

@@ -6,6 +6,7 @@
  * - Umrechnung Bildschirm <-> Welt
  */
 import { MM_TO_PIXEL } from "../shapeTransform";
+import { fmtLen } from "../units";
 
 export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim";
 
@@ -66,6 +67,7 @@ export function screenDist(px: number): number {
   return px / app().scale;
 }
 
+/** Länge (in Zeichen-Pixeln) als Zahl in der gewählten Einheit – mm oder Zoll (units.ts). Die Einheit dazu: unitName() */
 export function fmtMm(px: number, digits = 2): string {
-  return (px / MM_TO_PIXEL).toFixed(digits);
+  return fmtLen(px / MM_TO_PIXEL, digits);
 }

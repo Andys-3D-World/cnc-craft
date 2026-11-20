@@ -5,7 +5,7 @@
  * „Als Auftrag laden“ – dann: Seite 1 fräsen, Platte wenden, Z neu nullen, denselben Auftrag noch einmal fräsen.
  * Die Bahn selbst entsteht in facing.ts.
  */
-import { t, ascii } from "../i18n/i18n";
+import { t, ascii, tMm } from "../i18n/i18n";
 import { getTools, MillingTool, DEFAULT_PLUNGE, cutDiameter } from "../toolLibrary";
 import { spindleCode } from "../spindleDir";
 import { loadGcodeFromText } from "../machineStream";
@@ -37,7 +37,7 @@ function pickTool(tools: MillingTool[]): MillingTool | null {
 export function facingGcode(p: FacingParams, tool: MillingTool, rpm: number): string | null {
   const res = facingPath(p);
   if (!res.lines.length) return null;
-  const c = (key: string, v?: Record<string, string | number>) => `(${ascii(t(key, v))})`;
+  const c = (key: string, v?: Record<string, string | number>) => `(${ascii(tMm(key, v))})`;
   return [
     c("face.gcHead", { d: p.depth, w: p.w, h: p.h }),
     c("gc.tool", { name: tool.name, d: tool.diameter.toFixed(1) }),

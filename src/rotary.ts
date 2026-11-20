@@ -17,7 +17,7 @@
  * Die Umrechnung selbst (Bögen zerlegen, Vorschub) steht in rotaryWrap.ts.
  */
 import { MM_TO_PIXEL } from "./shapeTransform";
-import { t, ascii } from "./i18n/i18n";
+import { t, ascii, tMm } from "./i18n/i18n";
 import { machine } from "./machine";
 import { isLaser } from "./machineMode";
 import { wrapGcode, WrapOptions } from "./rotaryWrap";
@@ -115,7 +115,7 @@ export function aAxisRefused(lines: string[]): string | null {
 /** Einstellungen für die Umrechnung (rotaryWrap.ts) */
 export function wrapOptions(s: RotarySettings = rotary): WrapOptions {
   return { axis: s.axis, driveDia: driveDia(s), partDia: s.diameter, mmPerRot: s.mmPerRot, depthFeed: !isLaser(), along: s.along, reverse: s.reverse,
-    stock: s, overrun: isLaser() ? 15 : 5, laser: isLaser(), faceLabel: k => ascii(t("rot.gcFace", { k: k + 1 })) };
+    stock: s, overrun: isLaser() ? 15 : 5, laser: isLaser(), faceLabel: k => ascii(tMm("rot.gcFace", { k: k + 1 })) };
 }
 
 /**
@@ -126,10 +126,10 @@ export function applyRotary(gcode: string, s: RotarySettings = rotary, input: "m
   const r = wrapGcode(gcode.split("\n"), { ...wrapOptions(s), input });
   if (!r.ok) return { error: t("rot.err." + r.error, { n: r.line }) };
   const port = s.axis === "a" ? "A" : s.along === "y" ? "X" : "Y";
-  const head = [`(${ascii(t("rot.gcHeader", { d: +(refRadius(s) * 2).toFixed(2), axis: port, kind: t("rot.kind." + kindOf(s)).replace(/\s*\(.*\)\s*/, "") }))})`];
-  if (s.along === "y" || s.reverse) head.push(`(${ascii(t("rot.gcLayout", { along: s.along.toUpperCase(), dir: t(s.reverse ? "rot.dirRev" : "rot.dirNormal") }))})`);
-  if (s.shape !== "round") head.push(`(${ascii(t("rot.gcStock", { name: t("rot.shape." + s.shape).replace(/\s*\(.*\)\s*/, ""), z: isPrism(s) ? t("rot.gcFace", { k: 1 }) : "X 0" }))})`);
-  if (!isLaser()) head.push(`(${ascii(t("rot.gcMill"))})`);
+  const head = [`(${ascii(tMm("rot.gcHeader", { d: +(refRadius(s) * 2).toFixed(2), axis: port, kind: t("rot.kind." + kindOf(s)).replace(/\s*\(.*\)\s*/, "") }))})`];
+  if (s.along === "y" || s.reverse) head.push(`(${ascii(tMm("rot.gcLayout", { along: s.along.toUpperCase(), dir: t(s.reverse ? "rot.dirRev" : "rot.dirNormal") }))})`);
+  if (s.shape !== "round") head.push(`(${ascii(tMm("rot.gcStock", { name: t("rot.shape." + s.shape).replace(/\s*\(.*\)\s*/, ""), z: isPrism(s) ? tMm("rot.gcFace", { k: 1 }) : "X 0" }))})`);
+  if (!isLaser()) head.push(`(${ascii(tMm("rot.gcMill"))})`);
   return { gcode: [...head, ...r.lines].join("\n") };
 }
 

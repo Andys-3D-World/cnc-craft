@@ -5,6 +5,7 @@
  */
 import type { WeldedMesh, ViewCoords, SliceResult } from "./stlLoader";
 import { t } from "./i18n/i18n";
+import { fmtLenU } from "./units";
 
 const AZ = (-35 * Math.PI) / 180;  // Drehung um die Hochachse
 const EL = (35 * Math.PI) / 180;   // Blick schräg von oben
@@ -206,10 +207,10 @@ export function render2D(canvas: HTMLCanvasElement, slice: SliceResult | null, s
   ctx.fillStyle = "#cfcfe0";
   ctx.font = "12px monospace";
   ctx.textAlign = "center";
-  ctx.fillText(`${(spanU * f).toFixed(2)} mm`, W / 2, H - 8);
+  ctx.fillText(fmtLenU(spanU * f, 2), W / 2, H - 8);
   ctx.save();
   ctx.translate(12, H / 2);
   ctx.rotate(-Math.PI / 2);
-  ctx.fillText(`${(spanV * f).toFixed(2)} mm`, 0, 0);
+  ctx.fillText(fmtLenU(spanV * f, 2), 0, 0);
   ctx.restore();
 }

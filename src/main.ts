@@ -75,6 +75,8 @@ import { initCamera } from "./camera/camera";
 import { restoreSettings, startSettingsMirror } from "./settingsStore";
 import type { ToolName } from "./editor/editorState";
 import { t, initI18n, applyTranslations } from "./i18n/i18n";
+import { initUnits, initUnitButton } from "./unitSetting";
+import { fmtLenShort, unitName } from "./units";
 
 export const state = {
   shapes: [] as any[],
@@ -146,6 +148,7 @@ window.addEventListener("DOMContentLoaded", async () => {
   const restored = await restoreSettings();
   startSettingsMirror();
   initI18n();
+  initUnits();         // mm oder Zoll (nur Anzeige und Eingabe – innen bleibt alles mm)
   initMachineMode();   // Fräse oder Laser (setzt die CSS-Klasse am <body>)
   initLaserLayers();
   initPlasmaCuts();
@@ -283,6 +286,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initFlashPage(appendToConsole);    // Firmware flashen (Reiter "Board flashen")
     initLanguageMenu(document.getElementById("language-menu"), appendToConsole);
     initThemeButton(document.getElementById("theme-btn")); // ☀️/🌙 oben rechts: hell / dunkel
+    initUnitButton(document.getElementById("unit-btn"));   // mm / in oben rechts
 
     // ---- Simulation ----
     initSimulation(document.getElementById("tab-sim"), appendToConsole);
@@ -348,7 +352,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initJobTools(appendToConsole);      // Rahmen abfahren, .rd speichern
 
     const updateBedInfo = () => {
-      if (bedInfo) bedInfo.textContent = `${bedWInput?.value || 300} × ${bedHInput?.value || 300} mm`;
+      if (bedInfo) bedInfo.textContent = `${fmtLenShort(Number(bedWInput?.value) || 300, 1)} × ${fmtLenShort(Number(bedHInput?.value) || 300, 1)} ${unitName()}`;
       redraw();
     };
 

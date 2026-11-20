@@ -6120,5 +6120,12 @@
   "hj.why.dialog": "otwarte jest okno",
   "hj.why.focus": "CNC Craft nie jest już aktywnym oknem",
   "hj.why.state": "maszyna nie jest bezczynna",
-  "hj.why.protocol": "niemożliwe z tym sterownikiem"
+  "hj.why.protocol": "niemożliwe z tym sterownikiem",
+  "unit.select": "Jednostka",
+  "unit.mm": "Milimetry (mm)",
+  "unit.in": "Cale (in)",
+  "unit.selectTip": "Milimetry lub cale – tylko do wyświetlania i wpisywania. Pliki projektu, G-code i wszystko, co trafia do maszyny, pozostają w milimetrach. W polach calowych można też wpisać 1/4, 1 1/2 lub 6mm.",
+  "unit.tipMm": "Jednostka: milimetry – kliknij, aby przejść na cale",
+  "unit.tipIn": "Jednostka: cale – kliknij, aby przejść na milimetry. G-code i pliki projektu zawsze pozostają w mm.",
+  "unit.board13": "⚠ Sterownik podaje pozycje w calach ($13=1). CNC Craft liczy w milimetrach: wyświetlana pozycja, granice stołu i ochrona przed kolizją są wtedy błędne. Wyślij $13=0 (zmienia to tylko komunikaty sterownika, nie maszynę). Jednostkę wyświetlania zmienisz w prawym górnym rogu (mm / in)."
 }

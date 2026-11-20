@@ -118,15 +118,15 @@ export function renderEditorToolbar(container: HTMLElement) {
         <input type="checkbox" id="opt-snap-objects">${icon("magnet", 16)}</label>
       <label class="tb-opt" ${tip("tip.snapGrid")}>
         <input type="checkbox" id="opt-snap-grid">${icon("grid", 16)}
-        <input type="number" id="opt-grid-step" min="0.1" step="0.5" class="tb-num"></label>
+        <input type="number" id="opt-grid-step" data-unit="mm" min="0.1" step="0.5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="rect" ${tip("tip.rectRadius")}>
-        ${icon("rect", 16)}<span class="tb-lbl">R</span><input type="number" id="opt-rect-radius" min="0" step="0.5" class="tb-num"></label>
+        ${icon("rect", 16)}<span class="tb-lbl">R</span><input type="number" id="opt-rect-radius" data-unit="mm" min="0" step="0.5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="star" ${tip("tip.starTips")}>
         ${icon("star", 16)}<input type="number" id="opt-star-tips" min="3" max="100" step="1" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="star" ${tip("tip.starInner")}>
         <span class="tb-lbl">%</span><input type="number" id="opt-star-inner" min="5" max="95" step="5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="ring" ${tip("tip.ringWall")}>
-        ${icon("ring", 16)}<input type="number" id="opt-ring-wall" min="0.01" step="0.5" class="tb-num"></label>
+        ${icon("ring", 16)}<input type="number" id="opt-ring-wall" data-unit="mm" min="0.01" step="0.5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="polygon" ${tip("tip.polySides")}>
         ${icon("polygon", 16)}<input type="number" id="opt-poly-sides" min="3" max="100" step="1" class="tb-num"></label>
     </div>

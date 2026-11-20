@@ -18,6 +18,7 @@ import { t } from "./i18n/i18n";
 import { recognizeFeatures, FeatureResult } from "./meshFeatures";
 import { openCam3D } from "./ui/cam3dDialog";
 import { isLaser, isPlasma } from "./machineMode";
+import { fmtLen, fmtLenShort, unitName } from "./units";
 
 export function setupStlLoader(
   btn: HTMLElement | null,
@@ -98,7 +99,7 @@ function showStlDialog(
     <div class="stl-dlg">
       <div class="stl-dlg-head">
         <h3>📐 ${t("stl.title")}</h3>
-        <span class="stl-dlg-file">${escapeHtml(fileName)} · ${size[0]} × ${size[1]} × ${size[2]} mm</span>
+        <span class="stl-dlg-file">${escapeHtml(fileName)} · ${[0, 1, 2].map(i => fmtLenShort(Number(size[i]), 2)).join(" × ")} ${unitName()}</span>
       </div>
 
       <div class="stl-dlg-cols">
@@ -226,7 +227,7 @@ function showStlDialog(
       : `<b style="color:#3aa0ff">${slice.outerCount}</b> ${t("stl.outer")}, ` +
         `<b style="color:var(--lt-amber, #ffc107)">${slice.holeCount}</b> ${t("stl.holesCount")}` +
         (slice.openCount ? `, <b style="color:#ff4d4d">${slice.openCount}</b> ${t("stl.open")}` : "") +
-        `<br>${t("stl.size")}: ${((slice.maxU - slice.minU) * f).toFixed(2)} × ${((slice.maxV - slice.minV) * f).toFixed(2)} mm`;
+        `<br>${t("stl.size")}: ${fmtLen((slice.maxU - slice.minU) * f, 2)} × ${fmtLen((slice.maxV - slice.minV) * f, 2)} ${unitName()}`;
 
     if (slice.openCount > 0) {
       warning.style.display = "block";

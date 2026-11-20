@@ -6120,5 +6120,12 @@
   "hj.why.dialog": "ein Fenster ist offen",
   "hj.why.focus": "CNC Craft ist nicht mehr das aktive Fenster",
   "hj.why.state": "die Maschine steht nicht still",
-  "hj.why.protocol": "geht bei dieser Steuerung nicht"
+  "hj.why.protocol": "geht bei dieser Steuerung nicht",
+  "unit.select": "Einheit",
+  "unit.mm": "Millimeter (mm)",
+  "unit.in": "Zoll (in)",
+  "unit.selectTip": "Millimeter oder Zoll – nur für Anzeige und Eingabe. Projektdateien, G-Code und alles, was zur Maschine geht, bleiben in Millimetern. In Zoll-Feldern geht auch 1/4, 1 1/2 oder 6mm.",
+  "unit.tipMm": "Einheit: Millimeter – klicken für Zoll",
+  "unit.tipIn": "Einheit: Zoll – klicken für Millimeter. G-Code und Projektdateien bleiben immer in mm.",
+  "unit.board13": "⚠ Die Steuerung meldet Positionen in Zoll ($13=1). CNC Craft rechnet mit Millimetern: Positionsanzeige, Bett-Grenzen und Crash-Schutz stimmen so nicht. Bitte $13=0 senden (ändert nur die Meldungen der Steuerung, nicht die Maschine). Die Einheit der Anzeige stellst du oben rechts um (mm / in)."
 }

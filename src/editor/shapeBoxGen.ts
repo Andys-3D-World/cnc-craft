@@ -17,6 +17,7 @@ import { Box3DView } from "./box3d";
 import { panelsPreview, panelsToBed } from "./boxGen";
 import { shapeBox, shapeOutline, sizedArea, packArea, unpackArea, shapeLabelKey, SHAPE_GROUPS, SHAPE_KINDS, WALL_KINDS, type ShapeBoxResult, type ShapeKind, type WallKind } from "../shapeBox";
 import type { XY } from "../joints";
+import { asLength } from "../units";
 
 const KEY = "cnc_craft_shape_box";
 const VIEW_KEY = "cnc_craft_box_view";
@@ -84,7 +85,7 @@ export function openShapeBoxDialog(log: (s: string) => void, done: () => void) {
           ${num("fbx-t", "box.t", o.t, "0.1", "0.5")}
           <label class="prop-row">${t("fbx.wall")}<select id="fbx-wall" class="prop-input" style="width:auto;">${WALL_KINDS.map(k => `<option value="${k}">${t("fbx.wall." + k)}</option>`).join("")}</select></label>
           <div class="fbx-w" data-for="flex">${num("fbx-bend", "fbx.bend", o.bend, "0.5", "2")}</div>
-          <div class="fbx-w" data-for="segments">${num("fbx-tool", "box.tool", o.tool, "0.5", "0")}</div>
+          <div class="fbx-w" data-for="segments">${asLength(num("fbx-tool", "box.tool", o.tool, "0.5", "0"))}</div>
           <label class="prop-row" style="cursor:pointer;"><span>${t("fbx.lid")}</span><input id="fbx-lid" type="checkbox" ${o.lid ? "checked" : ""} style="width:auto;"></label>
           ${num("fbx-f", "fbx.finger", o.finger, "0.5", "1")}
           ${num("fbx-rim", "fbx.rim", o.rim, "0.5", "1")}

@@ -8,7 +8,7 @@
  */
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { t, ascii } from "./i18n/i18n";
+import { ascii, tMm } from "./i18n/i18n";
 import { spindleCode } from "./spindleDir";
 import { DEFAULT_PLUNGE, MillingTool, toolNumber, cutDiameter } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
@@ -127,7 +127,7 @@ export function stats3d(paths: Path3D[], job: Job3D): { rough: number; finish: n
 
 /** G-Code für Schruppen + Schlichten */
 export function gcode3d(paths: Path3D[], job: Job3D, opts: Gcode3dOpts = {}): string {
-  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(t(key, p))})`;
+  const c = (key: string, p?: Record<string, string | number>) => `(${ascii(tMm(key, p))})`;
   const f3 = (v: number) => v.toFixed(3);
   const ops = ([[job.rough, 0], [job.finish, 1]] as [Op3D | null, number][])
     .filter(([o, k]) => o && paths.some(p => p.kind === k)) as [Op3D, number][];

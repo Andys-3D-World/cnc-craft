@@ -37,8 +37,9 @@ const save = (_s: ProbeSettings) => saveProbe();
 
 
 export function probePanelHtml(): string {
-  const num = (id: string, key: string, step = "0.1", min = "") =>
-    `<div class="prop-row" ${tip(key + "Tip")}>${T(key)}<input type="number" id="${id}" step="${step}" ${min ? `min="${min}"` : ""} class="prop-input"></div>`;
+  // unit "mm": Länge ohne Einheit in der Beschriftung (mit "(mm)" im Text stellt sich das Feld von selbst um, siehe unitFields.ts)
+  const num = (id: string, key: string, step = "0.1", min = "", unit = "") =>
+    `<div class="prop-row" ${tip(key + "Tip")}>${T(key)}<input type="number" id="${id}" step="${step}" ${min ? `min="${min}"` : ""} ${unit ? `data-unit="${unit}"` : ""} class="prop-input"></div>`;
   return `
     <div class="menu-section-unified only-mill not-ruida not-k40 not-marlin" id="probe-section">
       <h3 class="menu-trigger">${T("pr.title")}</h3>
@@ -50,8 +51,8 @@ export function probePanelHtml(): string {
 
         <div class="pr-sub">${T("pr.sensorTitle")}</div>
         <div class="rp-grid2">
-          ${num("pr-sx", "pr.sx", "0.1")}
-          ${num("pr-sy", "pr.sy", "0.1")}
+          ${num("pr-sx", "pr.sx", "0.1", "", "mm")}
+          ${num("pr-sy", "pr.sy", "0.1", "", "mm")}
         </div>
         <button id="pr-here" class="btn-secondary btn-compact" ${tip("pr.hereTip")}>📍 ${T("pr.here")}</button>
         ${num("pr-sensorh", "pr.sensorH", "0.01")}
@@ -61,12 +62,12 @@ export function probePanelHtml(): string {
 
         <div class="pr-sub">${T("hm.title")}</div>
         <div class="rp-grid2">
-          ${num("pr-mx", "hm.mx", "1", "1")}
-          ${num("pr-my", "hm.my", "1", "1")}
+          ${num("pr-mx", "hm.mx", "1", "1", "mm")}
+          ${num("pr-my", "hm.my", "1", "1", "mm")}
           ${num("pr-mnx", "hm.mnx", "1", "2")}
           ${num("pr-mny", "hm.mny", "1", "2")}
         </div>
-        ${num("pr-hop", "hm.hop", "0.5", "1")}
+        ${num("pr-hop", "hm.hop", "0.5", "1", "mm")}
         <label class="prop-row" style="cursor:pointer;" ${tip("hm.mzeroTip")}>${T("hm.mzero")}<input type="checkbox" id="pr-mzero" style="width:auto;"></label>
         <button id="pr-map-go" class="btn-secondary" ${tip("hm.goTip")}>🗺 ${T("hm.go")}</button>
         <canvas id="pr-map-view" width="220" height="70" style="width:100%;height:70px;display:none;border-radius:4px;margin-top:4px;"></canvas>

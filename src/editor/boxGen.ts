@@ -8,6 +8,7 @@ import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
 import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, BOX_GROUPS, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
 import { Box3DView } from "./box3d";
+import { asLength } from "../units";
 
 /** Vieleck-Kiste: Wände brauchen Platz für mindestens einen Zapfen (3 t breit) */
 const hexWallTooSmall = (b: BoxOptions) => !boxPanels(b).some(p => p.name === "hexWall" && p.w >= 3 * b.t && p.h > 3 * b.t);
@@ -99,7 +100,7 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
           <div class="box-x" data-for="shelf cabinet">${num("box-sh", "box.shelves", o.shelves ?? 2, "1", "0")}</div>
           <div class="box-x" data-for="flex flexcup">${num("box-rad", "box.radius", o.radius ?? 15, "1", "2")}</div>
           <div class="box-x" data-for="hex">${num("box-sides", "box.sides", o.sides ?? 6, "1", "3")}</div>
-          <div class="box-x" data-not="flex flexcup money">${num("box-tool", "box.tool", o.tool ?? 0, "0.5", "0")}</div>
+          <div class="box-x" data-not="flex flexcup money">${asLength(num("box-tool", "box.tool", o.tool ?? 0, "0.5", "0"))}</div>
           ${num("box-kerf", "box.kerf", o.kerf, "0.01", "0")}
         </div>
         <div class="box-prev">

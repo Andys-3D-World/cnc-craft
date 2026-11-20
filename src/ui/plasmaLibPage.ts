@@ -15,6 +15,7 @@ import {
 } from "../plasmaCuts";
 import { LAYER_COLORS } from "../laserLayers";
 import { openPlasmaPresetDialog } from "./plasmaPresetDialog";
+import { fmtLenShort, unitName } from "../units";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
@@ -77,7 +78,7 @@ export function plasmaPreviewSvg(c: Pick<PlasmaCut, "color" | "pierceHeight" | "
 }
 
 function infoLine(c: PlasmaCut): string {
-  const mat = [c.thickness > 0 ? `${f2(c.thickness)} mm` : "", c.material, c.amps > 0 ? `${f2(c.amps)} A` : ""].filter(Boolean).join(" ");
+  const mat = [c.thickness > 0 ? `${fmtLenShort(c.thickness, 2)} ${unitName()}` : "", c.material, c.amps > 0 ? `${f2(c.amps)} A` : ""].filter(Boolean).join(" ");
   return (mat ? mat + " · " : "") + cutInfo(c);
 }
 
