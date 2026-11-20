@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.5", nl="Move the machine for as long as you hold an arrow, with slow, medium and fast jog levels. Many more controller boards with wiring plans and flash guides: BIGTREETECH Rodent, OpenBuilds BlackBox X32 and 4X, Sienci SuperLongBoard, Jackpot3, Nano + CNC Shield V4 and more. Big jobs hold up the window for less time, and on Linux an update keeps the previous AppImage.",
+  nh="New in 0.4.6", nl="Switch the whole program between millimetres and inches with one button: fields, rulers, the position display and jog steps follow, and inch fields also take 1/4 or 6mm. Project files and G-code stay in millimetres. CNC Craft now warns when the controller reports in inches ($13=1), and choosing a jog speed level no longer resets the jog step.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.5", nl="Die Maschine fährt, solange du einen Pfeil gedrückt hältst, mit den Stufen langsam, mittel und schnell. Viele weitere Steuerplatinen mit Anschlussplan und Flash-Anleitung: BIGTREETECH Rodent, OpenBuilds BlackBox X32 und 4X, Sienci SuperLongBoard, Jackpot3, Nano + CNC Shield V4 und mehr. Große Jobs halten das Fenster kürzer auf, und unter Linux behält ein Update die vorige AppImage.",
+  nh="Neu in 0.4.6", nl="Das ganze Programm mit einem Knopf zwischen Millimeter und Zoll umschalten: Felder, Lineale, Positionsanzeige und Jog-Schritte ziehen mit, und Zoll-Felder verstehen auch 1/4 oder 6mm. Projektdateien und G-Code bleiben in Millimetern. CNC Craft warnt jetzt, wenn die Steuerung in Zoll meldet ($13=1), und die Wahl einer Jog-Tempo-Stufe setzt den Jog-Schritt nicht mehr zurück.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.5</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.6</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>
