@@ -30,7 +30,7 @@ T = {
    ("📤", "Export", "Save your drawing as SVG (with Inkscape layers), DXF, PDF or PLT – the whole drawing or just the selection."),
    ("✂️", "Shape tools", "Combine, subtract and split shapes, round corners, pattern fill, dimensions that stay attached and a right-click menu on the canvas."),
    ("🗂️", "Several beds", "One project, many beds – spread parts like in a slicer and work through them bed by bed."),
-   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, dogbones, drilling and thread milling with a tool library."),
+   ("🛠️", "CAM for CNC routers", "Outside, inside, pocket, adaptive clearing, V-carve &amp; inlay, holding tabs, onion skin, dogbones, two-sided milling, drilling and thread milling with a tool library."),
    ("🧊", "3D milling", "Rough and finish 3D models from STL, tool change with tool length measurement, probing and height map."),
    ("🌀", "Rotary axis", "Laser and router on round parts: engrave tumblers, mill contours and pockets around a cylinder, or a 3D model all around or from several sides."),
    ("🔦", "Laser layers", "Fill, line and cut with their own power and speed, lead-ins for cuts – like layers in LightBurn."),
@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.6", nl="Switch the whole program between millimetres and inches with one button: fields, rulers, the position display and jog steps follow, and inch fields also take 1/4 or 6mm. Project files and G-code stay in millimetres. CNC Craft now warns when the controller reports in inches ($13=1), and choosing a jog speed level no longer resets the jog step.",
+  nh="New in 0.4.7", nl="Two-sided milling: mill the front, turn the workpiece over on dowel pins, mill the back, with one checked program per side and a setup sheet for both. Onion skin: a cut-out can stop a little above the underside, so a thin skin holds the part instead of holding tabs. Both are new and not yet cut on a real machine, so try them in scrap first.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -106,7 +106,7 @@ T = {
    ("📤", "Exportieren", "Zeichnung als SVG (mit Inkscape-Ebenen), DXF, PDF oder PLT speichern – alles oder nur die Auswahl."),
    ("✂️", "Form-Werkzeuge", "Formen verbinden, abziehen und zerschneiden, Ecken abrunden, Musterfüllung, Maße, die mitwandern, und ein Rechtsklick-Menü auf der Arbeitsfläche."),
    ("🗂️", "Mehrere Betten", "Ein Projekt, viele Betten – Teile wie im Slicer verteilen und Bett für Bett abarbeiten."),
-   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Dogbones, Bohren und Gewindefräsen mit Werkzeug-Bibliothek."),
+   ("🛠️", "CAM für CNC-Fräsen", "Außen, innen, Tasche, adaptives Räumen, V-Carve &amp; Inlay, Haltestege, Zwiebelhaut, Dogbones, zweiseitig fräsen, Bohren und Gewindefräsen mit Werkzeug-Bibliothek."),
    ("🧊", "3D-Fräsen", "3D-Modelle aus STL schruppen und schlichten, Werkzeugwechsel mit Längenmessung, Antasten und Höhenkarte."),
    ("🌀", "Drehachse", "Laser und Fräse auf runden Teilen: Becher gravieren, Konturen und Taschen rund um einen Zylinder fräsen oder ein 3D-Modell rundherum bzw. von mehreren Seiten."),
    ("🔦", "Laser-Ebenen", "Füllen, Linie und Schneiden mit eigener Leistung und Geschwindigkeit, Freischnitt – wie Ebenen in LightBurn."),
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.6", nl="Das ganze Programm mit einem Knopf zwischen Millimeter und Zoll umschalten: Felder, Lineale, Positionsanzeige und Jog-Schritte ziehen mit, und Zoll-Felder verstehen auch 1/4 oder 6mm. Projektdateien und G-Code bleiben in Millimetern. CNC Craft warnt jetzt, wenn die Steuerung in Zoll meldet ($13=1), und die Wahl einer Jog-Tempo-Stufe setzt den Jog-Schritt nicht mehr zurück.",
+  nh="Neu in 0.4.7", nl="Zweiseitig fräsen: Vorderseite fräsen, das Werkstück auf Passstiften wenden, Rückseite fräsen, mit einem geprüften Programm je Seite und einem Einrichteblatt für beide. Zwiebelhaut: Ein Ausschnitt kann kurz über der Unterseite enden, sodass eine dünne Haut das Teil hält statt Haltestegen. Beides ist neu und noch nicht an einer echten Maschine geschnitten, also erst in Restholz probieren.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.6</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.7</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

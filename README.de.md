@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.4.6 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.4.7 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -30,9 +30,10 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 **Fräse (CAM)**
 - Werkzeug-Bibliothek wie in Estlcam (Schaft-, Kugel-, V-, Fasenfräser, Bohrer, Gewindefräser …), Import von
   Fusion-360-Werkzeugen, Material-Datenbank mit Schnittdaten, Verschleiß-Ausgleich, Beschichtung
-- Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Dogbones, Bohren, Fasen,
+- Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Zwiebelhaut, Dogbones, Bohren, Fasen,
   Planfräsen und Opferplatte planen, V-Carve & Inlay, Restmaterial, Gewindefräsen (innen/außen), mehrere
   Bearbeitungen pro Form
+- Zweiseitig fräsen: Vorderseite, Werkstück auf Passstiften wenden, Rückseite (2,5D)
 - 3D-Fräsen aus 3D-Modellen und Reliefs aus Bildern oder Text (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
   Rohteil beidseitig planen
 - **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;
