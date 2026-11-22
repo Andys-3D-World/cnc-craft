@@ -11,6 +11,7 @@ import { MM_TO_PIXEL, groupBounds, translateShape, scaleShape, rotateShape } fro
 import { cleanMillDir } from "./millDir";
 import { leadOptions, LEAD_MIN, LEAD_MAX, LEAD_DEFAULT_LEN } from "./millLead";
 import { autoFractions } from "./tabs";
+import { skinFits, skinSettings, SKIN_DEFAULT, SKIN_MIN, SKIN_MAX, SKIN_FEED_MIN } from "./onionSkin";
 
 function getState(): any {
   return (window as any).cncState;
@@ -131,6 +132,31 @@ export function setupUiInputs(redraw: () => void) {
     redraw();
   }));
 
+  // Zwiebelhaut je Form (onionSkin.ts): ohne Häkchen keine Angaben an der Form, alles wie bisher.
+  // Gesetzt wird sie nur an Formen, bei denen sie wirken kann (geschlossen, außen/innen) – die anderen bleiben, wie sie sind.
+  const skinOn = document.getElementById("dim-skin-on") as HTMLInputElement | null;
+  const skinH = document.getElementById("dim-skin-h") as HTMLInputElement | null;
+  const skinCut = document.getElementById("dim-skin-cut") as HTMLInputElement | null;
+  const skinFeedEl = document.getElementById("dim-skin-feed") as HTMLInputElement | null;
+  const applySkin = (from: HTMLInputElement) => {
+    const state = getState();
+    if (!state || !skinOn || !skinH) return;
+    const h = parseFloat(skinH.value);
+    // Dicke 0 (oder leer) heißt: keine Haut
+    const on = skinOn.checked && (from !== skinH || h > 0);
+    const thick = h > 0 ? Math.max(SKIN_MIN, Math.min(SKIN_MAX, h)) : SKIN_DEFAULT;
+    const feed = parseFloat(skinFeedEl?.value || "");
+    for (const s of selected(state)) {
+      if (!on || !skinFits(s)) { delete s.skinH; delete s.skinCut; delete s.skinFeed; continue; }
+      s.skinH = thick;
+      if (skinCut?.checked) s.skinCut = true; else delete s.skinCut;
+      if (s.skinCut && feed > 0) s.skinFeed = Math.max(SKIN_FEED_MIN, feed); else delete s.skinFeed;
+    }
+    updateDimensionInputs(null);
+    redraw();
+  };
+  [skinOn, skinH, skinCut, skinFeedEl].forEach(el => el?.addEventListener("change", () => applySkin(el)));
+
   [dimX, dimY, dimW, dimH, dimAngle, dimDepth, dimFinish, ...tabInputs].forEach(input => {
     if (!input) return;
     input.addEventListener("change", () => apply(input));
@@ -188,5 +214,23 @@ export function updateDimensionInputs(_shape: any) {
     set("dim-tab-w", s0.tabLen); set("dim-tab-h", s0.tabH);
     const m = document.getElementById("dim-tab-mode") as HTMLSelectElement | null;
     if (m) m.value = s0.tabMode === "manual" ? "manual" : "auto";
+  }
+  // Zwiebelhaut: die erste Form der Auswahl, die eine hat (sonst aus; die zuletzt getippte Dicke bleibt stehen)
+  const skinOn = document.getElementById("dim-skin-on") as HTMLInputElement | null;
+  if (skinOn) {
+    const withSkin = shapes.find(s => skinFits(s) && skinSettings(s));
+    const sk = withSkin ? skinSettings(withSkin) : null;
+    const hEl = document.getElementById("dim-skin-h") as HTMLInputElement | null;
+    const cutEl = document.getElementById("dim-skin-cut") as HTMLInputElement | null;
+    const feedEl = document.getElementById("dim-skin-feed") as HTMLInputElement | null;
+    skinOn.checked = !!sk;
+    // an offenen Linien, Taschen, Bohrungen … gibt es nichts auszuschneiden: Häkchen gesperrt
+    skinOn.disabled = !shapes.some(skinFits);
+    if (hEl) { if (sk) hEl.value = String(sk.h); else if (!(parseFloat(hEl.value) > 0)) hEl.value = String(SKIN_DEFAULT); hEl.disabled = skinOn.disabled; }
+    if (cutEl) cutEl.checked = !!sk?.cut;
+    if (feedEl) feedEl.value = sk && sk.cut && sk.feed > 0 ? String(sk.feed) : "";
+    const show = (id: string, on: boolean) => { const el = document.getElementById(id); if (el) el.style.display = on ? "" : "none"; };
+    show("dim-skin-cut-row", !!sk);
+    show("dim-skin-feed-row", !!sk?.cut);
   }
 }

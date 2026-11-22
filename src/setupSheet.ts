@@ -123,6 +123,7 @@ export interface SheetData {
   ops: SheetOp[]; changes: SheetChange[];
   warnings: string[]; zones: string[];
   svg: string;
+  skin?: string;                      // Zwiebelhaut: bleibt stehen / wird am Ende durchgefräst (leer = keine)
   two?: SheetTwo;
 }
 
@@ -130,6 +131,7 @@ export interface SheetData {
 export interface SheetSide {
   name: string; time: string; partSize: string;
   tools: SheetTool[]; ops: SheetOp[]; changes: SheetChange[]; warnings: string[]; svg: string;
+  skin?: string;
 }
 /** Zweiseitig fräsen: was für beide Seiten gilt, die Schritte am Tisch und beide Programme */
 export interface SheetTwo {
@@ -172,7 +174,7 @@ ${w.pins.length ? `<h2>${esc(t("sheet.two.pins"))}</h2><table><thead><tr><th>#</
       w.pins.map(p => `<tr><td>${esc(p.no)}</td><td>${esc(p.x)}</td><td>${esc(p.y)}</td></tr>`).join("")}</tbody></table>` : ""}
 <h2>${esc(t("sheet.two.steps"))}</h2><ol>${w.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
 ${w.sides.map(sd => `<h2 class="side">${esc(sd.name)}</h2>
-<div class="two"><div><table>${row(t("sheet.part"), sd.partSize) + row(t("sheet.time"), sd.time)}</table>
+<div class="two"><div><table>${row(t("sheet.part"), sd.partSize) + row(t("sheet.time"), sd.time) + (sd.skin ? row(t("sheet.skin"), sd.skin) : "")}</table>
 <h3>${esc(t("sheet.tools"))}</h3>${toolsTable(sd.tools)}</div>${sd.svg ? `<div class="pic">${sd.svg}</div>` : ""}</div>
 <h3>${esc(t("sheet.ops"))}</h3>${opsTable(sd.ops)}
 ${sd.changes.length ? `<h3>${esc(t("sheet.changes"))}</h3>${list(sd.changes.map(c => `${c.code}${c.note ? " – " + c.note : ""}`))}` : ""}
@@ -182,7 +184,7 @@ ${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d
   }
   return `<h1>${esc(d.title)}</h1><p class="sub">${esc(d.date)}</p>
 <div class="two"><div><h2>${esc(t("sheet.setup"))}</h2><table>${
-    row(t("sheet.stock"), d.stock) + row(t("sheet.part"), d.partSize) + row(t("sheet.zero"), d.zero) + row(t("sheet.zeroZ"), d.zeroZ)
+    row(t("sheet.stock"), d.stock) + (d.skin ? row(t("sheet.skin"), d.skin) : "") + row(t("sheet.part"), d.partSize) + row(t("sheet.zero"), d.zero) + row(t("sheet.zeroZ"), d.zeroZ)
     + row(t("sheet.wcs"), d.wcs) + row(t("sheet.time"), d.time) + row(t("sheet.timeBasis"), d.timeBasis)
   }</table></div>${d.svg ? `<div class="pic">${d.svg}</div>` : ""}</div>
 <h2>${esc(t("sheet.tools"))}</h2>${tools}

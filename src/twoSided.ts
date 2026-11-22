@@ -214,6 +214,7 @@ export interface Removal {
   width: number;           // groove: cutter Ø
   outline: boolean;        // cut around a part (mode "outside", closed): cutting it through sets the part free
   tabH: number;            // height of holding tabs above the bottom of this cut, 0 = none
+  skin?: number;           // onion skin this cut leaves on purpose (mm, onionSkin.ts) – depth already ends above it
 }
 
 export type DepthIssueCode = "looseFront" | "loose" | "tabsThin" | "through" | "thin";
@@ -255,6 +256,7 @@ function sharedShare(a: Removal, b: Removal): number {
  *  through:    two cuts that each stop inside the material meet – a hole appears
  *  thin:       less than MIN_WEB is left between them
  * Tabs: where one side leaves a tab of height h and the cuts overlap by `over`, h − over of it is left.
+ * Onion skin: a cut that leaves a skin on purpose is not "thin" as long as the whole skin is still there.
  */
 export function depthIssues(list: Removal[], T: number): DepthIssue[] {
   const out: DepthIssue[] = [];
@@ -270,6 +272,7 @@ export function depthIssues(list: Removal[], T: number): DepthIssue[] {
       const fThrough = f.depth >= T - EPS, bThrough = b.depth >= T - EPS;
       const fb = sharedShare(f, b), bf = sharedShare(b, f);
       if (fb <= 0 && bf <= 0) continue;
+      if ([f, b].some(r => (r.skin ?? 0) > 0 && left >= r.skin! - 1e-6)) continue;   // the wanted skin, untouched
       if (f.outline && b.outline && Math.min(fb, bf) > 0.95) {
         // the same outline from both sides
         if (fThrough && !(f.tabH > 0)) continue;   // already reported as looseFront

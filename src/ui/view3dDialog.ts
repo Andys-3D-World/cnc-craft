@@ -8,7 +8,7 @@ import { t } from "../i18n/i18n";
 import { Viewer3D } from "../view3d/viewer3d";
 import { partsScene, cylinderScene, carveScene, cylinderCarveScene, carveAlongY } from "../view3d/scenes";
 import { carve, CarveResult } from "../view3d/carveSim";
-import { generateGcode, noGcodeMessage, orderToolGroups, lastThreads } from "../cam";
+import { generateGcode, noGcodeMessage, lastSectionTools, lastThreads } from "../cam";
 import { threadMeshes } from "../view3d/threadMesh";
 import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { rotary } from "../rotary";
@@ -98,12 +98,14 @@ export function openView3D(want: "auto" | Mode = "auto") {
       // G-Code wie für die Maschine (ohne Drehachse), Fräser je Abschnitt in derselben Reihenfolge wie im G-Code
       const g = generateGcode(shapes, { flat: true });
       if (!g) { viewer.setMeshes([], keepView); info.textContent = noGcodeMessage(); return; }
-      const key = g + "|" + JSON.stringify(orderToolGroups(shapes).map(x => x.tool));
+      // Fräser je Abschnitt, wie cam.ts sie eingesetzt hat (die Zwiebelhaut kann am Ende noch einmal ein früheres Werkzeug holen)
+      const sectionTools = [...lastSectionTools];
+      const key = g + "|" + JSON.stringify(sectionTools);
       let res: CarveResult | null;
       if (carveCache?.key === key) res = carveCache.res;
       else {
         info.textContent = t("v3d.carving", { p: 0 });
-        const tools = orderToolGroups(shapes).map(x => x.tool);
+        const tools = sectionTools;
         res = await carve(g.split("\n"), tools, f => {
           if (my !== run || closed) return false;
           info.textContent = t("v3d.carving", { p: Math.round(f * 100) });

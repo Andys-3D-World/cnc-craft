@@ -182,7 +182,7 @@ function rigidFit(pairs: { from: Pt; to: Pt }[]): { moved: boolean; angle: numbe
 }
 
 /** Bearbeitungs-Einstellungen, die von Hand gesetzt sein können und das neue Teil behalten soll */
-const KEEP = ["millingMode", "millingDepth", "toolId", "laserLayerId", "plasmaCutId", "tabN", "tabLen", "tabH"];
+const KEEP = ["millingMode", "millingDepth", "toolId", "laserLayerId", "plasmaCutId", "tabN", "tabLen", "tabH", "skinH", "skinCut", "skinFeed"];
 
 /**
  * Einstellungen von den alten auf die neuen Formen übertragen.

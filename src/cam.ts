@@ -35,6 +35,7 @@ import { optimizeCutOrder, CutItem } from "./cutOrder";
 import { applyCut, applyCutClosed, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSetting";
 import { twoSidedJob } from "./twoSidedJob";
 import type { Side } from "./twoSided";
+import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan, type SkinSettings } from "./onionSkin";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -61,6 +62,12 @@ export let lastGcodeWarnings: string[] = [];
 export let lastGcodeNotes: string[] = [];
 /** Gewinde des letzten G-Codes (für die 3D-Ansicht: Gewindegänge einzeichnen) */
 export let lastThreads: ThreadInfo[] = [];
+
+/**
+ * Fräser je Abschnitt des letzten G-Codes (ein Abschnitt endet am Werkzeugwechsel). Meist die Werkzeug-Gruppen der
+ * Reihe nach; der letzte Gang der Zwiebelhaut kann am Ende noch einmal ein früheres Werkzeug holen.
+ */
+export let lastSectionTools: (MillingTool | null)[] = [];
 
 /** Formen, die mit demselben Werkzeug gefräst werden */
 export interface ToolGroup { tool: MillingTool | null; shapes: any[] }
@@ -138,6 +145,8 @@ function withRestGroups(groups: ToolGroup[]): ToolGroup[] {
 let flatOnly = false;
 /** Zweiseitig: Sperrzonen der Seite, deren Programm gerade entsteht (null = die gezeigte Zeichnung) */
 let zoneSource: any[] | null = null;
+/** Zweiseitig: wie viel Material an der Stelle einer Form noch unter der Oberseite liegt (für die Zwiebelhaut), je Form-Kennung */
+let skinStock: Map<string, number> | null = null;
 /**
  * side: nur bei „Zweiseitig fräsen“ (twoSidedJob.ts) – Programm dieser Seite statt der gezeigten.
  * Ohne Zweiseitig ändert sich nichts: derselbe G-Code wie immer.
@@ -147,6 +156,7 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   const two = twoSidedJob(allShapes, opts.side);
   if (two) allShapes = two.shapes;
   zoneSource = two ? two.shapes : null;
+  skinStock = two ? two.stockUnder : null;
   // Sperrzonen werden nie geschnitten; sie gelten auch, wenn nur ein Teil der Zeichnung erzeugt wird
   const shapes = allShapes.filter((s: any) => !isKeepOut(s));
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
@@ -226,6 +236,7 @@ function usedAreaShapes(shapes: any[]): Set<any> {
 const generateGcodeInner = (shapes: any): string | null => {
   lastGcodeWarnings = [];
   lastThreads = [];
+  lastSectionTools = [];
   if (shapes.length === 0) return null;
 
   // LASER: eigener G-Code (Ebenen, Leistung %, Füllen) – siehe laserCam.ts
@@ -325,16 +336,15 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 4. ZUSTELLUNGEN BERECHNEN (pro Form, weil jede Form ihre eigene Tiefe hat) ----
   let passes: number[] = [];
-  const computePasses = (targetDepth: number) => {
-    passes = [];
-    if (targetDepth >= 0) {
-      passes.push(targetDepth === 0 ? 0 : targetDepth);
-    } else {
-      let z = -stepZ;
-      while (z > targetDepth + 0.001) { passes.push(z); z -= stepZ; }
-      passes.push(targetDepth);
-    }
-  };
+  const computePasses = (targetDepth: number) => { passes = depthPasses(targetDepth, stepZ); };
+  /**
+   * ZWIEBELHAUT (onionSkin.ts): Beim Ausschneiden bleibt unten eine dünne Haut stehen, die das Teil hält.
+   * passTop   = Z, bei dem der erste Durchgang anfängt: 0 = Oberseite; beim letzten Gang (Haut durchfräsen) die Haut
+   * skinDepth = Frästiefe der Form, solange eine Form mit Haut gefräst wird (Haltestege zählen weiter ab dem Boden)
+   * Ohne Haut bleiben beide auf 0 / null und der G-Code Zeichen für Zeichen wie bisher.
+   */
+  let passTop = 0;
+  let skinDepth: number | null = null;
 
   /**
    * EINTAUCHEN von zTop auf z am Anfang der Bahn pts. Mit Eintauchwinkel als Rampe: schräg entlang der Bahn ein
@@ -420,7 +430,9 @@ const generateGcodeInner = (shapes: any): string | null => {
   };
   const leadPass = (plan: LeadPlan, top: number, z: number, plungeHere: () => void, contour: () => void) => {
     const p0 = plan.in ? plan.in.from : plan.start;
-    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${p0.x.toFixed(3)} Y${p0.y.toFixed(3)}\nG0 Z${(top + 0.5).toFixed(3)}\n`;
+    // letzter Gang der Zwiebelhaut: nur bis über die Oberseite im Eilgang (mit Schlicht-Aufmaß liegt die Anfahrbahn
+    // etwas anders als beim Schruppen – dort ist nicht sicher schon alles frei), der Rest im Eintauch-Vorschub
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${p0.x.toFixed(3)} Y${p0.y.toFixed(3)}\nG0 Z${((passTop < 0 ? 0 : top) + 0.5).toFixed(3)}\n`;
     if (plan.in) { plungeTo(plan.in.arc ? plan.in.pts : [plan.in.from, plan.in.to], false, top, z); emitLead(plan.in); }
     else plungeHere();
     contour();
@@ -451,7 +463,7 @@ const generateGcodeInner = (shapes: any): string | null => {
    */
   /** Geschlossene Kontur mit Haltestegen fräsen; false = ging nicht (dann normal fräsen, Hinweis steht schon da) */
   const millTabbed = (loop: P[], shape: any, tab: TabSettings, lead: P[][] | null = null): boolean => {
-    const target = passes[passes.length - 1];
+    const target = skinDepth ?? passes[passes.length - 1];
     const zTab = target + tab.h;
     if (zTab >= -0.001) { lastGcodeWarnings.push(t("gcw.tabsTooHigh", { n: formCounter, h: tab.h })); return false; }
     const cum = cumulative(loop);
@@ -497,7 +509,7 @@ const generateGcodeInner = (shapes: any): string | null => {
       }
       if (!plan) warnNoLead();
     }
-    const ramp = (z: number, pi: number) => plungeTo(seq.map(q => q.p), false, pi > 0 ? passes[pi - 1] : 0, z, Math.max(0, gap / 2 - half - toolRadius)); // Rampe nur bis kurz vor den ersten Steg
+    const ramp = (z: number, pi: number) => plungeTo(seq.map(q => q.p), false, pi > 0 ? passes[pi - 1] : passTop, z, Math.max(0, gap / 2 - half - toolRadius)); // Rampe nur bis kurz vor den ersten Steg
     const round = (z: number) => {
       let up = false;
       for (let j = 1; j < seq.length; j++) {
@@ -509,7 +521,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     };
     if (plan) {
       const pl = plan;
-      passes.forEach((z, pi) => leadPass(pl, pi > 0 ? passes[pi - 1] : 0, z, () => ramp(z, pi), () => round(z)));
+      passes.forEach((z, pi) => leadPass(pl, pi > 0 ? passes[pi - 1] : passTop, z, () => ramp(z, pi), () => round(z)));
       gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
       return true;
     }
@@ -534,7 +546,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     const start = pts[0];
     if (plan) {
       passes.forEach((z, pi) => {
-        const top = pi > 0 ? passes[pi - 1] : 0;
+        const top = pi > 0 ? passes[pi - 1] : passTop;
         leadPass(plan, top, z, () => plungeTo(pts, closed, top, z), () => {
           for (let i = 1; i < pts.length; i++) gcode += `G1 X${pts[i].x.toFixed(3)} Y${pts[i].y.toFixed(3)}\n`;
           if (closed) gcode += `G1 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
@@ -552,7 +564,7 @@ const generateGcodeInner = (shapes: any): string | null => {
         gcode += `G0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)}\n`;
       }
       if (entry && passIdx === 0) gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 X${start.x.toFixed(3)} Y${start.y.toFixed(3)} F${feedXY}\n`;
-      else plungeTo(pts, closed, passIdx > 0 ? passes[passIdx - 1] : 0, z);
+      else plungeTo(pts, closed, passIdx > 0 ? passes[passIdx - 1] : passTop, z);
       for (let i = 1; i < pts.length; i++) {
         gcode += `G1 X${pts[i].x.toFixed(3)} Y${pts[i].y.toFixed(3)}\n`;
       }
@@ -915,20 +927,37 @@ const generateGcodeInner = (shapes: any): string | null => {
     return !(mode === "pocket" && pocketStrategy === "adaptive");
   };
 
+  /**
+   * Zwiebelhaut durchfräsen: der letzte Gang jeder Form mit Haut läuft erst ganz am Ende des Programms (danach ist
+   * das Teil lose). Gemerkt wird alles, was die Fräs-Routinen brauchen – so wie es beim Fräsen der Form galt.
+   */
+  interface SkinJob {
+    rank: number; plan: SkinPlan; set: SkinSettings; cut: () => void; gi: number; n: number;
+    tool: MillingTool | null; dia: number; stepZ: number; feed: number; rpm: number; plunge: number; rampTan: number; lead: LeadOpts | null;
+  }
+  const skinJobs: SkinJob[] = [];
+  let skinIgnored = 0;
+
+  /** Werkzeug einsetzen (index = Nummer in der Liste oben, change = mit Werkzeugwechsel) und Spindel starten */
+  const toolStart = (index: number, change: boolean) => {
+    const toolName = curTool ? curTool.name : "Standard";
+    if (change) {
+      // ---- WERKZEUGWECHSEL ----
+      gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\n`;
+      gcode += `M5 ${c("gc.spindleOff")}\n`;
+      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolChange", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
+    }
+    gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
+    // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
+    gcode += `${spindleCode("M3")} S${rpm} ${c("gc.spindleOn", { rpm })}\n`;
+    if (change) gcode += `G4 P2 ${c("gc.spinUp")}\n`;
+    gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
+    lastSectionTools.push(curTool);
+  };
+
   groups.forEach((group, gi) => {
   useTool(group.tool);
-  const toolName = curTool ? curTool.name : "Standard";
-  if (gi > 0) {
-    // ---- WERKZEUGWECHSEL ----
-    gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\n`;
-    gcode += `M5 ${c("gc.spindleOff")}\n`;
-    gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolChange", { i: gi + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
-  }
-  gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
-  // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
-  gcode += `${spindleCode("M3")} S${rpm} ${c("gc.spindleOn", { rpm })}\n`;
-  if (gi > 0) gcode += `G4 P2 ${c("gc.spinUp")}\n`;
-  gcode += `F${feedXY} ${c("gc.feed", { f: feedXY })}\n`;
+  toolStart(gi, gi > 0);
 
   const vDone = new Set<any>();
   // Schnittwerte der Form (Material-Profil, millProfiles.ts) – ohne Profil bleibt der G-Code Zeichen für Zeichen wie bisher
@@ -970,16 +999,45 @@ const generateGcodeInner = (shapes: any): string | null => {
     convertToPolyline(copy);
     return copy;
   };
+  /**
+   * Zwiebelhaut dieser Form (onionSkin.ts): der Plan, null = wie immer fräsen, "skip" = gar nicht fräsen.
+   * warn = Hinweise melden (bei der Restbearbeitung derselben Form nicht noch einmal)
+   */
+  type Skin = SkinPlan & { set: SkinSettings };
+  const skinFor = (shape: any, warn: boolean): Skin | "skip" | null => {
+    const use = skinRole(shape);
+    if (use === "ignored" && warn) skinIgnored++;
+    if (use !== "skin") return null;
+    const set = skinSettings(shape)!, depth = Math.abs(computeDepth(shape)), under = skinStock?.get(String(shape.id));
+    const r = skinPlan(computeDepth(shape), stepZ, set, under);
+    if (warn && r.problem === "tooThick") lastGcodeWarnings.push(t("gcw.skinTooThick", { n: formCounter, h: set.h, d: depth }));
+    if (warn && r.problem === "notThrough") lastGcodeWarnings.push(t("gcw.skinNotThrough", { n: formCounter, d: depth, t: +(under ?? 0).toFixed(2) }));
+    if (warn && r.problem === "thick") lastGcodeWarnings.push(t("gcw.skinThick", { n: formCounter, h: set.h, z: stepZ }));
+    if (r.problem === "tooThick") return "skip";
+    return r.plan ? { ...r.plan, set } : null;
+  };
+  /** Den letzten Gang durch die Haut für das Ende des Programms vormerken (nur wenn „am Ende durchfräsen“ gewählt ist) */
+  const skinLater = (skin: Skin, mode: string, cut: () => void) => {
+    if (!skin.final.length) return;
+    skinJobs.push({ rank: mode === "inside" ? 0 : 1, plan: skin, set: skin.set, cut, gi, n: formCounter,
+      tool: curTool, dia: toolDiameter, stepZ, feed: feedXY, rpm, plunge: PLUNGE_FEED, rampTan, lead: curLead });
+  };
   const millShape = (input: any) => {
     const shape = cutReady(input);
+    skinDepth = null;
     if (vDone.has(shape)) return;
     if (shape.restOf) {
       useCut(shape);
       formCounter++;
       curLead = null;
       computePasses(computeDepth(shape.restOf));
+      // Form mit Zwiebelhaut: auch der kleine Fräser hört auf der Haut auf (Hinweise kamen schon bei der Form selbst)
+      const rest = shape.restOf, restSkin = skinFor(rest, false);
+      if (restSkin === "skip") return;
+      if (restSkin) { passes = restSkin.passes; skinDepth = restSkin.through; }
       gcode += `\n${c("gc.rest", { n: formCounter })}\n`;
-      millRest(shape.restOf);
+      millRest(rest);
+      if (restSkin) skinLater(restSkin, rest.millingMode, () => millRest(rest));
       return;
     }
     if (shape.parentChainId && alreadyChained.has(shape.parentChainId)) return;
@@ -989,6 +1047,11 @@ const generateGcodeInner = (shapes: any): string | null => {
     formCounter++;
     computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
+    // Zwiebelhaut (onionSkin.ts): geschlossene Konturen außen/innen hören über dem Boden auf. Ohne Haut ändert sich nichts
+    const skin = skinFor(shape, true);
+    // Haut so dick wie die Frästiefe: nichts zu fräsen. Die Form bleibt ganz – sicherer, als sie ohne Haut durchzufräsen
+    if (skin === "skip") return;
+    if (skin) { passes = skin.passes; skinDepth = skin.through; }
     // Zweiseitig: Loch für einen Passstift (twoSidedJob.ts) – heißt im G-Code und im Einrichteblatt auch so
     const pinMark = shape.pin ? `(--- ${ascii(tMm("two.gc.pin", { n: shape.pin }))} ---)` : "";
     // An-/Wegfahren nur an geschlossenen Konturen mit Seite (Kreis und geschlossener Linienzug)
@@ -1032,6 +1095,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (mode === "inside") offset = -toolRadius;
 
     gcode += `\n${pinMark || c("gc.shape", { n: formCounter, type: shape.type.toUpperCase(), mode })}\n`;
+    // die Simulation und das Einrichteblatt lesen aus diesem Hinweis die Materialdicke (onionSkin.ts)
+    if (skin) gcode += `${c("gc.skin", { h: skin.skin.toFixed(2), t: skin.stock.toFixed(2) })}\n`;
 
     const pocketOuter = mode === "pocket" ? closedMm(shape) : null;
     if (pocketOuter) {
@@ -1049,11 +1114,13 @@ const generateGcodeInner = (shapes: any): string | null => {
       gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
     }
     else if (shape.type === "circle") {
+      // last = letzter Gang der Zwiebelhaut (am Ende des Programms): nur die Kontur auf Maß, ohne Schlicht-Aufmaß
+      const cutCircle = (last: boolean) => {
       const center = toMachine(shape.x, shape.y);
       const radiusPx = Math.abs(shape.w);
       const radiusFinal = radiusPx / MM_TO_PIXEL + offset;
       // Schlichtgang: erst mit Aufmaß (außen größer, innen kleiner), danach auf Maß
-      let allow = mode === "outside" || mode === "inside" ? finishAllow(shape) : 0;
+      let allow = !last && (mode === "outside" || mode === "inside") ? finishAllow(shape) : 0;
       if (allow > 0 && mode === "inside" && radiusFinal - allow <= 0.05) { lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow })); allow = 0; }
       const radiusMm = radiusFinal + (mode === "outside" ? allow : -allow);
       const tab = mode !== "on-line" ? tabSettings(shape) : null;
@@ -1083,7 +1150,7 @@ const generateGcodeInner = (shapes: any): string | null => {
           const entryX = center.x;
           const entryY = center.y + radiusMm;
           const full = (zz?: number) => `${cmd} X${entryX.toFixed(3)} Y${entryY.toFixed(3)}${zz === undefined ? "" : ` Z${zz.toFixed(3)}`} I0.000 J${(-radiusMm).toFixed(3)}\n`;
-          const zTop = pi > 0 ? passes[pi - 1] : 0, drop = zTop - z;
+          const zTop = pi > 0 ? passes[pi - 1] : passTop, drop = zTop - z;
           if (plan) {
             leadPass(plan, zTop, z, () => { gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\nG1 F${feedXY}\n`; }, () => { gcode += full(); });
             return;
@@ -1111,6 +1178,9 @@ const generateGcodeInner = (shapes: any): string | null => {
         gcode += `${c("gc.circleTooSmall")}\n`;
         lastGcodeWarnings.push(t("gcw.circleTooSmall", { n: formCounter }));
       }
+      };
+      cutCircle(false);
+      if (skin) skinLater(skin, mode, () => cutCircle(true));
     }
     else if (shape.type === "arc") {
       const bogen = berechne3PunktBogen(shape.x, shape.y, shape.x + shape.w, shape.y + shape.h, shape.midX, shape.midY);
@@ -1155,7 +1225,9 @@ const generateGcodeInner = (shapes: any): string | null => {
       if (!shape.closed || mode === "on-line" || mode === "pocket") {
         millPath(mode === "pocket" ? pts : applyCut(pts, !!shape.closed, shape), !!shape.closed);
       } else {
-        let allow = finishAllow(shape);
+        // last = letzter Gang der Zwiebelhaut (am Ende des Programms): nur die Kontur auf Maß, ohne Schlicht-Aufmaß
+        const cutLoops = (last: boolean) => {
+        let allow = last ? 0 : finishAllow(shape);
         let loops = offsetPolygon(pts, offset + Math.sign(offset) * allow);
         if (allow > 0 && loops.length === 0) {
           lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow }));
@@ -1191,6 +1263,9 @@ const generateGcodeInner = (shapes: any): string | null => {
             if (!tab || !millTabbed(path, shape, tab, rough)) millPath(path, true, rough.map(l => ({ pts: l, closed: true })));
           });
         }
+        };
+        cutLoops(false);
+        if (skin) skinLater(skin, mode, () => cutLoops(true));
       }
     }
     else if (shape.type === "rect" || shape.type === "path") {
@@ -1211,6 +1286,52 @@ const generateGcodeInner = (shapes: any): string | null => {
     } else millShape(shape);
   });
   });
+
+  // ---- 6b. ZWIEBELHAUT DURCHFRÄSEN (onionSkin.ts) ----
+  // Ganz am Ende, nach allen anderen Formen und Werkzeugen: zuerst der Abfall in den Löchern (innen), dann die
+  // Teile selbst (außen). Danach ist jedes Teil lose. Langsamer Vorschub; Stege, Rampe, An-/Wegfahren wie bei der Form.
+  if (skinJobs.length) {
+    // innerhalb „innen“ und „außen“ zuerst das Werkzeug, das gerade eingesetzt ist (spart Werkzeugwechsel)
+    const skinOrder: SkinJob[] = [];
+    let inUse = curTool;
+    for (const rank of [0, 1]) {
+      const rest = skinJobs.filter(j => j.rank === rank);
+      while (rest.length) {
+        const next = rest.some(j => j.tool === inUse) ? inUse : rest[0].tool;
+        skinOrder.push(...rest.filter(j => j.tool === next));
+        inUse = next;
+        for (let i = rest.length - 1; i >= 0; i--) if (rest[i].tool === next) rest.splice(i, 1);
+      }
+    }
+    if (driftOn) gcode += DRIFT_SLOT + "\n";
+    gcode += `\n${c("gc.skinCutAll")}\n`;
+    for (const j of skinOrder) {
+      // anderes Werkzeug als gerade eingesetzt (z. B. weil danach noch Gewinde gefräst wurden): noch einmal wechseln
+      if (j.tool !== curTool) { useTool(j.tool); toolStart(j.gi, true); }
+      toolDiameter = j.dia; toolRadius = j.dia / 2; stepZ = j.stepZ; rampTan = j.rampTan;
+      if (j.rpm !== rpm) {
+        gcode += `G0 Z${SAFE_Z.toFixed(2)}\n${spindleCode("M3")} S${j.rpm} ${c("gc.spindleOn", { rpm: j.rpm })}\nG4 P2 ${c("gc.spinUp")}\n`;
+        rpm = j.rpm;
+      }
+      const f = skinFeed(j.set, j.feed);
+      feedXY = f;
+      PLUNGE_FEED = Math.min(j.plunge, f);
+      gcode += `\n${c("gc.skinCut", { n: j.n })}\n`;
+      gcode += `G0 Z${SAFE_Z.toFixed(2)}\nF${f} ${c("gc.feed", { f })}\n`;
+      passes = j.plan.final.slice();
+      passTop = j.plan.floor;
+      skinDepth = j.plan.through;
+      curLead = j.lead;
+      formCounter = j.n;
+      // Hinweise, die schon beim Fräsen der Form kamen (Stege passen nicht, kein Platz zum Anfahren …), nicht doppelt
+      const known = lastGcodeWarnings.slice();
+      j.cut();
+      lastGcodeWarnings = lastGcodeWarnings.filter((w, i) => i < known.length || !known.includes(w));
+      passTop = 0;
+      skinDepth = null;
+    }
+  }
+  if (skinIgnored) lastGcodeWarnings.push(t("gcw.skinIgnored", { n: skinIgnored }));
 
   // ---- 7. FOOTER ----
   gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;

@@ -29,6 +29,7 @@ import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
 import { buildJob, okToBuild } from "../jobFlow";
 import { activeSetup } from "../twoSidedJob";
+import { skinInfo } from "../skinNotes";
 import { machine, setOverride, MACHINE_EVENT } from "../machine";
 import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
@@ -760,6 +761,9 @@ function rebuildCarve(sync = true) {
       // was die andere Seite von unten schon weggenommen hat, ist hier nicht zu sehen
       const two = prog.rotary ? null : activeSetup();
       if (two) auto = two.thickness;
+      // Zwiebelhaut: das Programm nennt die Materialdicke, von der aus die Haut zählt – sonst sähe der tiefste Gang
+      // wie die Unterseite aus und die Haut wäre nicht zu sehen
+      else if (!prog.rotary) { const sk = skinInfo(prog.lines); if (sk) auto = Math.max(auto, sk.stock); }
     } else if (kind === "laser") auto = activeLayer?.thickness || 3;
     else auto = activeCut?.thickness || 2;
     c = LiveCarve.create(prog, {

@@ -20,6 +20,7 @@ import {
   depthIssues, mirrorPoint, otherSideDepth, pinCut, pinIssues, throughDepth,
   type PinObstacle, type Pt, type Removal, type Side, type TwoSidedSetup,
 } from "./twoSided";
+import { skinPlan, skinRole, skinSettings, type SkinSettings } from "./onionSkin";
 
 /** Setup of the active bed when two-sided milling applies (router only, no rotary axis) */
 export function activeSetup(): TwoSidedSetup | null {
@@ -58,7 +59,8 @@ export function pinShapes(s: TwoSidedSetup): { shapes: any[]; tooBig: boolean } 
   };
 }
 
-interface Cut { removal: Removal; label: string }
+/** id = the shape (or its further operation) this cut comes from; skin = its onion skin, if it gets one */
+interface Cut { removal: Removal; label: string; id: string; skin: SkinSettings | null }
 
 /** What each side removes, all in the front frame (back shapes are turned back) */
 function cutsOf(front: any[], back: any[], s: TwoSidedSetup): Cut[] {
@@ -96,7 +98,7 @@ function cutsOf(front: any[], back: any[], s: TwoSidedSetup): Cut[] {
           outline: path.closed && mode === "outside", tabH: mode === "outside" || mode === "inside" ? tabSettings(e)?.h ?? 0 : 0 };
       }
       r.n = out.length + 1;
-      out.push({ removal: r, label });
+      out.push({ removal: r, label, id: String(e.id), skin: skinRole(e) === "skin" ? skinSettings(e) : null });
     }
   };
   add(front, "front");
@@ -141,11 +143,33 @@ export function pinWarnings(s: TwoSidedSetup): string[] {
   return out;
 }
 
+/**
+ * Onion skin (onionSkin.ts): the material left under the top where a cut with a skin runs – the stock thickness
+ * minus what the other side removes at the same place. The skin is measured from there, not from the cut depth,
+ * so the little extra of "cut through" does not eat it.
+ */
+const underOf = (c: Cut, all: Removal[], T: number) => Math.max(0, T - otherSideDepth(c.removal, all));
+
+function stockUnder(cuts: Cut[], side: Side, T: number): Map<string, number> {
+  const all = cuts.map(c => c.removal), out = new Map<string, number>();
+  for (const c of cuts) if (c.skin && c.removal.side === side) out.set(c.id, underOf(c, all, T));
+  return out;
+}
+
+/** The cuts as they really end: a cut with a skin that stays stops above the underside (it does not free the part) */
+function withSkin(cuts: Cut[], T: number): Removal[] {
+  const all = cuts.map(c => c.removal);
+  return cuts.map(c => {
+    if (!c.skin || c.skin.cut) return c.removal;
+    const plan = skinPlan(-c.removal.depth, 1, c.skin, underOf(c, all, T)).plan;
+    return plan ? { ...c.removal, depth: -plan.floor, skin: plan.skin } : c.removal;
+  });
+}
+
 /** Warnings about the depths of both sides together */
-export function depthWarnings(s: TwoSidedSetup): string[] {
-  const cuts = cutsOf(sideShapes("front"), sideShapes("back"), s);
+export function depthWarnings(s: TwoSidedSetup, cuts = cutsOf(sideShapes("front"), sideShapes("back"), s)): string[] {
   const name = (n: number) => cuts[n - 1]?.label ?? "?";
-  return depthIssues(cuts.map(c => c.removal), s.thickness).map(i =>
+  return depthIssues(withSkin(cuts, s.thickness), s.thickness).map(i =>
     t("two.w.depth." + i.code, { a: name(i.front), b: i.back ? name(i.back) : "", left: i.left.toFixed(2), t: s.thickness }));
 }
 
@@ -172,6 +196,7 @@ export function setThroughDepth(selected: any[]): number {
 export interface TwoSidedJob {
   side: Side;
   shapes: any[];      // the shapes of this side (as given for the shown side, the stored list for the other)
+  stockUnder: Map<string, number>;   // onion skin: material left under each cut of this side that has one (by shape id)
   pins: any[];        // pin holes (front program only)
   header: string;     // comment lines for the top of the program
   warnings: string[];
@@ -198,5 +223,6 @@ export function twoSidedJob(viewShapes: any[], side?: Side): TwoSidedJob | null 
     header += c("two.gc.zero");
   }
   header += c(s.zRef === "spoil" ? "two.gc.zSpoil" : "two.gc.zTop", { t: s.thickness });
-  return { side: sd, shapes, pins, header, warnings: [...pinWarnings(s), ...depthWarnings(s)] };
+  const cuts = cutsOf(sideShapes("front"), sideShapes("back"), s);
+  return { side: sd, shapes, stockUnder: stockUnder(cuts, sd, s.thickness), pins, header, warnings: [...pinWarnings(s), ...depthWarnings(s, cuts)] };
 }

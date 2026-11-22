@@ -31,6 +31,7 @@ import { setSectionOpen } from "../ui";
 import { MACHINE_EVENT } from "../machine";
 import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt";
 import { arcFit, loadArcFit, saveArcFit, clampArcTol } from "../arcFit";
+import { SKIN_DEFAULT, SKIN_MIN, SKIN_MAX, SKIN_FEED_MIN } from "../onionSkin";
 
 const CONSOLE_KEY = "cnc_craft_console_collapsed";
 const ADV_KEY = "cnc_craft_mill_advanced";
@@ -147,6 +148,15 @@ export function renderRightPanel(container: HTMLElement) {
             <button id="btn-tab-tool" class="btn-secondary" style="width:100%;margin:4px 0;" ${tip("rp.tabsToolTip")}>✋ ${T("rp.tabsTool")}</button>
             <div class="prop-row" ${tip("rp.tabsTip")}>${T("rp.tabsLen")}<input type="number" id="dim-tab-w" value="5" min="0.5" step="0.5" class="prop-input"></div>
             <div class="prop-row only-mill" ${tip("rp.tabsTip")}>${T("rp.tabsH")}<input type="number" id="dim-tab-h" value="1.5" min="0.1" step="0.5" class="prop-input"></div>
+            <!-- Zwiebelhaut (onionSkin.ts): nur Fräse, nur geschlossene Formen außen/innen -->
+            <div class="prop-row only-mill" id="dim-skin-row" ${tip("rp.skinTip")}>${T("rp.skin")}
+              <span style="display:flex;gap:6px;align-items:center;">
+                <input type="checkbox" id="dim-skin-on" style="width:auto;">
+                <input type="number" id="dim-skin-h" value="${SKIN_DEFAULT}" min="${SKIN_MIN}" max="${SKIN_MAX}" step="0.05" class="prop-input" style="width: 64px;">
+              </span>
+            </div>
+            <label class="prop-row only-mill" id="dim-skin-cut-row" style="cursor:pointer;" ${tip("rp.skinCutTip")}>${T("rp.skinCut")}<input type="checkbox" id="dim-skin-cut" style="width:auto;"></label>
+            <div class="prop-row only-mill" id="dim-skin-feed-row" ${tip("rp.skinFeedTip")}>${T("rp.skinFeed")}<input type="number" id="dim-skin-feed" min="${SKIN_FEED_MIN}" step="50" class="prop-input" ${ph("rp.skinAuto")}></div>
           </div>
         </div>
       </div>

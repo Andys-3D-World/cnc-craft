@@ -23,6 +23,7 @@ import { zonesFromShapes } from "../keepOutShapes";
 import { limitReport } from "./limitGuard";
 import { jobSvg, sheetDocument, sheetHtml, summarizeJob, zeroPosition, SheetData, SheetMarks, SheetSide, SheetTool, SheetTwo, SHEET_CSS } from "../setupSheet";
 import { activeSetup, depthWarnings, pinTool, pinWarnings } from "../twoSidedJob";
+import { skinInfo } from "../skinNotes";
 import { sideShapes } from "../editor/beds";
 import { flipLine, mirrorPoint, type Side, type TwoSidedSetup } from "../twoSided";
 
@@ -77,8 +78,12 @@ function programInfo(lines: string[], zones: { pts: { x: number; y: number }[] }
   }
   const has = minX !== Infinity;
   const { ops, changes } = summarizeJob(lines);
+  // Zwiebelhaut (onionSkin.ts): steht im Programm – bleibt sie stehen, hängen die Teile nach dem Job noch daran
+  const sk = skinInfo(lines);
+  const h = sk ? (sk.hMax - sk.hMin > 0.005 ? `${sk.hMin.toFixed(2)}–${sk.hMax.toFixed(2)}` : sk.hMax.toFixed(2)) : "";
+  const skin = sk ? [sk.shapes - sk.cut > 0 ? t("sheet.skinStay", { n: sk.shapes - sk.cut, h }) : "", sk.cut > 0 ? t("sheet.skinCut", { n: Math.min(sk.cut, sk.shapes), h }) : ""].filter(Boolean).join(" · ") : "";
   return {
-    prog, motion, has, minX, minY, maxX, maxY, ops, changes,
+    prog, motion, has, minX, minY, maxX, maxY, ops, changes, skin, skinStock: sk ? sk.stock : 0,
     partSize: has ? `${(maxX - minX).toFixed(1)} × ${(maxY - minY).toFixed(1)} mm` : "–",
     time: `~ ${fmtTime(prog.totalTime)}`,
     svg: jobSvg({ n: prog.n, x0: prog.x0, y0: prog.y0, x1: prog.x1, y1: prog.y1, cut: isCut }, zones, 6000, marks),
@@ -105,7 +110,7 @@ function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): { part: Sh
     const list = sideShapes(side);
     const info = programInfo(lines, zonesFromShapes(list), { rect: two.stock, line, pins });
     sides.push({
-      name, time: info.time, partSize: info.partSize, ops: info.ops, changes: info.changes, warnings: own, svg: info.svg,
+      name, time: info.time, partSize: info.partSize, ops: info.ops, changes: info.changes, warnings: own, svg: info.svg, skin: info.skin,
       tools: toolRows(true, list, side === "front" && two.pinsOn ? [pinTool(two)] : []),
     });
   }
@@ -153,7 +158,8 @@ export function openSetupSheet(log: (s: string) => void) {
   const info = programInfo(lines, zones);
   const { prog, motion, has, minX, minY, maxX, maxY, ops, changes } = info;
   const st = getStock();
-  const deep = Math.max(0, -prog.cutMinZ);
+  // mit Zwiebelhaut ist das Material dicker als der tiefste Schnitt
+  const deep = Math.max(0, -prog.cutMinZ, info.skinStock);
   if (!two) warnings.push(...limitReport(lines));
   const zero = has ? zeroPosition({ minX, minY, maxX, maxY }) : "other";
   const zeroText = zero === "other" && has
@@ -177,6 +183,7 @@ export function openSetupSheet(log: (s: string) => void) {
       return t("sheet.zoneRow", { n: i + 1, h: v.height, z: (v.height + v.margin).toFixed(1) });
     }),
     svg: info.svg,
+    ...(info.skin ? { skin: info.skin } : {}),
     ...(two ? { two: two.part } : {}),
   };
   const body = sheetHtml(data, t);
