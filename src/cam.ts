@@ -36,6 +36,8 @@ import { applyCut, applyCutClosed, cutStartOf, hasCutSetting, overridesMillDir }
 import { twoSidedJob } from "./twoSidedJob";
 import type { Side } from "./twoSided";
 import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan, type SkinSettings } from "./onionSkin";
+import { postCtx } from "./post/postContext";
+import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -289,7 +291,8 @@ const generateGcodeInner = (shapes: any): string | null => {
   /** Planfräsen: 60 % des Fräserdurchmessers (die Zeilen überlappen nur wenig, die Fläche wird nur abgezogen) */
   const FACE_STEPOVER = 0.6;
   /** Werkzeug während langer Jobs nachmessen (Einstellung im Abschnitt Werkzeugwechsel, Standard aus) */
-  const driftOn = probeSettings.drOn === 1;
+  // nicht in Dateien für andere Steuerungen (Post-Prozessor): das Nachmessen kann nur CNC Craft selbst beim Senden
+  const driftOn = probeSettings.drOn === 1 && !postCtx.foreign;
 
   // Weltkoordinate -> Maschinen-mm.
   // FIX: Y zeigt im Speicher schon nach oben (wie an der Maschine). Vorher wurde hier
@@ -945,7 +948,10 @@ const generateGcodeInner = (shapes: any): string | null => {
       // ---- WERKZEUGWECHSEL ----
       gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\n`;
       gcode += `M5 ${c("gc.spindleOff")}\n`;
-      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolChange", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
+      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c(postCtx.toolTable ? "gc.toolLoad" : "gc.toolChange", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
+    } else if (postCtx.toolTable) {
+      // Datei für eine Steuerung mit Werkzeugtabelle: auch das erste Werkzeug mit Nummer (der Post-Prozessor setzt es an den Anfang)
+      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolLoad", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
     }
     gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
     // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
@@ -1367,16 +1373,20 @@ function showWarnings(appendToConsole: (t: string) => void) {
  * G-Code erzeugen und per Speichern-Dialog als .gcode-Datei ablegen.
  */
 export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string) => void, fileName = "cnc-auftrag.gcode") {
-  const gcode = generateGcode(shapes);
-  if (!gcode) { appendToConsole(noGcodeMessage()); return; }
+  // Post-Prozessor (post/): nur die Datei. GRBL in mm liefert genau den Text von generateGcode()
+  const neutral = withPost(() => generateGcode(shapes));
+  if (!neutral) { appendToConsole(noGcodeMessage()); return; }
   showWarnings(appendToConsole);
+  const gcode = postedText(neutral, appendToConsole);
+  if (gcode === null) return;
+  fileName = postFileName(fileName);
 
   try {
     const filePath = await save({
       title: t("rp.saveGcode"),
       defaultPath: fileName,
       filters: [
-        { name: t("stream.dlgFilter"), extensions: ["gcode", "nc", "tap"] }
+        { name: t("stream.dlgFilter"), extensions: postExtensions() }
       ]
     });
 

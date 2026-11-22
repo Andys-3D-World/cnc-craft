@@ -2028,3 +2028,7 @@ svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
 .bed-sides .bed-side:first-child { border-radius: 6px 0 0 6px; }
 .bed-sides .bed-side:last-child { border-radius: 0 6px 6px 0; margin-left: -1px; }
 .bed-sides .bed-side.on { color: #ffb454; border-color: #ffb454; background: rgba(255, 180, 84, 0.12); position: relative; }
+/* Post-Prozessor (Datei für andere Steuerungen): Hinweise neben der Auswahl */
+#post-box { padding: 6px 8px; }
+#post-note { line-height: 1.35; display: flex; flex-direction: column; gap: 4px; }
+#post-note.warn { color: var(--lt-amber, #ffb547); }

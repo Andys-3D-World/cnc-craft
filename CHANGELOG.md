@@ -2,6 +2,15 @@
 
 ## Next version (unreleased)
 
+**New**
+- **G-code files for LinuxCNC, Mach3 and Mach4, in millimetres or inches (router):** under *Job → G-code*, below *Save G-code*, *File for controller* now chooses who the saved file is for: GRBL (as before), LinuxCNC, Mach3 or Mach4, and *Unit in the file* chooses millimetres (`G21`) or inches (`G20`, four decimals). Only the saved file changes: *To machine*, the simulation and files for GRBL in millimetres are exactly as before, character for character. Each controller gets its own program start and end (LinuxCNC: `%`, `G17 G21 G40 G49 G54 G80 G90 G94`, `G91.1`, `G64 P0.01`, `M2`; Mach3: `M30`, file ending `.tap`; Mach4: the safe start line from its guide, `M30` and `%`), a wait after every spindle start (`G4 P2`; Mach4 `G4 P2.0`, because it reads a number without a decimal point as milliseconds) and its file ending (`.ngc`, `.tap`). *Tool change* chooses between *Tool table* (every tool is loaded with its number and its length is switched on, `T1 M6` and `G43 H1`, the first tool before anything moves; the number is the tool's place in the tool library) and *Pause* (`M0`, nothing about tool lengths in the file, you set Z again yourself). Arcs are centred again after rounding, so they still close in inches. Before a file is handed to the save dialog it is read back and compared with the program (path, feeds, spindle speeds, unit); if anything differs, nothing is saved. Jobs with a rotary axis can only be saved for GRBL in millimetres for now, and re-measuring the tool during long jobs is left out of files for other controllers. **Not tested on a real machine:** the LinuxCNC, Mach3 and Mach4 files are written from the controllers' manuals and have never run on a real LinuxCNC or Mach machine, and inch files (also for GRBL) have not run on a real machine either. The app says so next to the choice, in the console and at the top of every such file. Run the first job without a workpiece, with your hand on the stop. **Testers wanted:** if you have a LinuxCNC, Mach3 or Mach4 machine, please tell us how it went. Mach3 note: the file gives waiting times in seconds, so *G04 Dwell in ms* in Mach3's General Config must be off. The controllers are described as small tables in `src/post/posts.ts`, so another controller can be added by copying one.
+
+**Improved**
+- **G-code check reads inch files:** the check behind *To machine* used to skip every move of a program in inches (`G20`). It now converts them and checks them like millimetres.
+
+**Fixed**
+- **G-code check, false alarm at a tool change in German and Dutch:** the comment of a tool change ("Z neu nullen", "Z opnieuw nullen") contains the letters "null", which the check took for a broken value and warned about on *To machine*. Words inside comments no longer count; a broken value in the command itself is still reported.
+
 ## 0.4.7 Beta
 
 **New**

@@ -1,6 +1,7 @@
 /**
  * G-CODE-PRÜFER (ohne Oberfläche): liest fertigen G-Code und meldet, was an der Maschine gefährlich oder falsch wäre.
- * Kennt nur den Text, nichts vom Programm. Maße in mm, es wird G21/G90 erwartet.
+ * Kennt nur den Text, nichts vom Programm. Es wird G90 erwartet. Zoll (G20) wird in mm umgerechnet und genauso geprüft
+ * (Dateien für LinuxCNC/Mach aus dem Post-Prozessor); die Grenzen (Bett, Oberfläche) bleiben in mm.
  *
  * Prüft: kaputte Zahlen, zu lange Zeilen, Kommentare, Vorschub, Werkzeug an/aus, Eilfahrten im Material
  * und bei eingeschaltetem Laser/Brenner, Bereich des Betts, Ende des Programms.
@@ -32,8 +33,9 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
   for (let idx = 0; idx < lines.length; idx++) {
     const raw = lines[idx], n = idx + 1;
     if (/[^\x20-\x7e\t]/.test(raw)) add("not-ascii", n, raw);
-    if (/undefined|NaN|Infinity|null|\[object/i.test(raw)) add("broken-value", n, raw);
     const paren = raw.includes("(") || raw.includes(")");
+    // kaputte Werte: im Befehl jede Schreibweise; im Kommentar nur die genaue (dort stehen Wörter wie „Z neu nullen“)
+    if (/undefined|NaN|Infinity|\[object/.test(raw) || /undefined|nan|infinity|null/i.test(raw.replace(/\([^)]*\)/g, "").replace(/;.*$/, ""))) add("broken-value", n, raw);
     if (paren) {
       const opens = (raw.match(/\(/g) || []).length, closes = (raw.match(/\)/g) || []).length;
       // verschachtelte Klammern verwirren manche Steuerungen; mehrere Kommentare nacheinander sind in Ordnung
@@ -73,6 +75,11 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
       if (hasG(91)) relative = true;
       if (hasG(90)) relative = false;
     }
+    if (inch) {
+      if (wX !== undefined) wX *= 25.4;
+      if (wY !== undefined) wY *= 25.4;
+      if (wZ !== undefined) wZ *= 25.4;
+    }
     if (wF !== undefined) { feed = wF; if (!(feed > 0)) add("bad-feed", n, raw); }
     if (wS !== undefined) { s = wS; if (s < 0 || (o.kind === "laser" && s > sMax)) add("s-out-of-range", n, raw); }
     if (M.length) {
@@ -91,7 +98,7 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
       if (hasG(3)) motion = "G3"; else if (hasG(2)) motion = "G2"; else if (hasG(1)) motion = "G1"; else if (hasG(0)) motion = "G0";
     }
     const moves = (wX !== undefined || wY !== undefined || wZ !== undefined) && !special;
-    if (!moves || !motion || relative || inch) {
+    if (!moves || !motion || relative) {
       if (moves && !motion) add("move-without-mode", n, raw);
       continue;
     }

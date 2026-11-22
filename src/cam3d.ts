@@ -12,6 +12,7 @@ import { ascii, tMm } from "./i18n/i18n";
 import { spindleCode } from "./spindleDir";
 import { DEFAULT_PLUNGE, MillingTool, toolNumber, cutDiameter } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
+import { postCtx } from "./post/postContext";
 
 const SAFE_Z = 5.0;     // wie cam.ts
 const CLEAR = 1.0;      // so weit über dem Material im Eilgang anfahren, dann eintauchen
@@ -156,7 +157,10 @@ export function gcode3d(paths: Path3D[], job: Job3D, opts: Gcode3dOpts = {}): st
     if (gi > 0) {
       g += `\nG0 Z${SAFE_Z.toFixed(2)}\n`; lz = SAFE_Z;
       g += `M5 ${c("gc.spindleOff")}\n`;
-      g += `${toolChangeGcode(toolNumber(tl), c("gc.toolChange", { i: gi + 1, name: tl.name, d: tl.diameter.toFixed(1) }))}\n`;
+      g += `${toolChangeGcode(toolNumber(tl), c(postCtx.toolTable ? "gc.toolLoad" : "gc.toolChange", { i: gi + 1, name: tl.name, d: tl.diameter.toFixed(1) }))}\n`;
+    } else if (postCtx.toolTable) {
+      // Datei für eine Steuerung mit Werkzeugtabelle (post/postContext.ts): auch das erste Werkzeug mit Nummer
+      g += `${toolChangeGcode(toolNumber(tl), c("gc.toolLoad", { i: gi + 1, name: tl.name, d: tl.diameter.toFixed(1) }))}\n`;
     }
     g += `\n${c("gc.tool", { name: tl.name, d: tl.diameter.toFixed(1) })}\n`;
     g += `${spindleCode("M3")} S${rpm} ${c("gc.spindleOn", { rpm })}\n`;

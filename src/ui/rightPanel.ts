@@ -32,6 +32,7 @@ import { MACHINE_EVENT } from "../machine";
 import { feedAdapt, loadFeedAdapt, saveFeedAdapt, clampPct } from "../feedAdapt";
 import { arcFit, loadArcFit, saveArcFit, clampArcTol } from "../arcFit";
 import { SKIN_DEFAULT, SKIN_MIN, SKIN_MAX, SKIN_FEED_MIN } from "../onionSkin";
+import { postRowsHtml, initPostPanel } from "./postPanel";
 
 const CONSOLE_KEY = "cnc_craft_console_collapsed";
 const ADV_KEY = "cnc_craft_mill_advanced";
@@ -169,6 +170,7 @@ export function renderRightPanel(container: HTMLElement) {
             <button id="btn-simulate" class="btn-secondary" ${tip("rp.simulateTip")}>🎬 ${T("rp.simulate")}</button>
             <button id="btn-cost" class="btn-secondary" ${tip("cost.tip")}>💶 ${T("cost.button")}</button>
             <button id="btn-save-gcode" class="btn-secondary" ${tip("rp.saveGcodeTip")}>💾 ${T("rp.saveGcode")}</button>
+            ${postRowsHtml()}
             <button id="btn-save-rd" class="btn-secondary only-ruida" ${tip("rd.saveTip")}>💾 ${T("rd.save")}</button>
             <div style="display: flex; gap: 5px;">
               <button id="btn-load-gcode" class="btn-secondary" style="flex: 1;" ${tip("rp.loadGcodeTip")}>📂 ${T("rp.loadGcode")}</button>
@@ -381,6 +383,9 @@ export function renderRightPanel(container: HTMLElement) {
   faShow();
   faOn.addEventListener("change", () => { feedAdapt.on = faOn.checked; saveFeedAdapt(); faShow(); });
   faMin.addEventListener("change", () => { const v = parseFloat(faMin.value); if (Number.isFinite(v)) feedAdapt.minPct = clampPct(v); saveFeedAdapt(); faShow(); });
+
+  // Post-Prozessor für die gespeicherte Datei (nur Fräse)
+  initPostPanel(container);
 
   // „Erweitert“ offen oder zu: gemerkt
   const adv = container.querySelector<HTMLDetailsElement>("#rp-adv-mill")!;

@@ -25,6 +25,7 @@ import { rotary, setRotary, applyRotary, rotaryCheck } from "../rotary";
 import { axesToMachine } from "../rotaryWrap";
 import { HeightField, detailLoss } from "../relief/heightField.ts";
 import { RField, meshForRotary, rotateX, roughRotary, finishRotary, chainRotary, fieldPreview } from "../rotary3d";
+import { withPost, postedText, postFileName, postExtensions } from "../post/postExport";
 
 const KEY = "cnc_craft_cam3d";
 
@@ -200,6 +201,8 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   const save_ = () => { try { localStorage.setItem(KEY, JSON.stringify(relief ? { ...o, ...keepSaved } : o)); } catch { /* egal */ } };
 
   let paths: Path3D[] | null = null, gcode = "", running = false, run = 0, closed = false;
+  /** dasselbe Programm noch einmal für den Post-Prozessor erzeugen (post/postExport.ts); null = mit Drehachse */
+  let regen: (() => string) | null = null;
   const job = (): Job3D => {
     const op = (on: boolean, id: string, down: number, over: number, allow: number) => {
       const tl = tool(id);
@@ -418,7 +421,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     const j = job();
     if (!tools.length) { showWarn([t("c3d.noTools")]); return; }
     if (!j.rough && !j.finish) { showWarn([t("c3d.noOp")]); return; }
-    running = true; paths = null; gcode = ""; preview = null; buttons();
+    running = true; paths = null; gcode = ""; preview = null; regen = null; buttons();
     const my = ++run;
     try {
       if (rot() !== "flat") {
@@ -440,6 +443,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
       if (closed || my !== run) return;
       paths = res;
       gcode = gcode3d(res, j);
+      regen = () => gcode3d(res, j);
       running = false; buttons();
       log(t("c3d.done", { n: res.length, l: gcode.split("\n").length }));
       await simulate(false);
@@ -506,14 +510,17 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   };
   $("c3d-save").onclick = async () => {
     if (!gcode) return;
+    // Post-Prozessor: nur die Datei. GRBL in mm speichert genau den gezeigten G-Code
+    const text = postedText(regen ? withPost(regen) : gcode, log);
+    if (text === null) return;
     try {
       const filePath = await save({
         title: t("rp.saveGcode"),
-        defaultPath: name.replace(/\.[^.]+$/, "") + "-3d.gcode",
-        filters: [{ name: t("stream.dlgFilter"), extensions: ["gcode", "nc", "tap"] }]
+        defaultPath: postFileName(name.replace(/\.[^.]+$/, "") + "-3d.gcode"),
+        filters: [{ name: t("stream.dlgFilter"), extensions: postExtensions() }]
       });
       if (filePath) {
-        await writeFile(filePath, new TextEncoder().encode(gcode));
+        await writeFile(filePath, new TextEncoder().encode(text));
         log(t("gcw.saved", { p: filePath }));
       }
     } catch (err) {

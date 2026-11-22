@@ -63,3 +63,12 @@ test("Lesen der Zeile: mehrere G-Befehle, Kommentar mit Semikolon, Kleinbuchstab
   assert.equal(rules("G21\nM3\nG0 X5 Y5\nG1 Z-2 F100\nG0 Z1\nG0 X9\nG0 X5\nG0 Z-1.5\nG0 Z5\nM5\nM30", "mill")["rapid-into-material"], undefined);
   assert.ok(rules("G21\nM3\nG0 X5 Y5\nG1 Z-2 F100\nG0 Z1\nG0 X9\nG0 Z-1.5\nM5\nM30", "mill")["rapid-into-material"]);
 });
+
+test("kaputte Werte: Wörter im Kommentar („Z neu nullen“) sind kein Fehler", () => {
+  const ok = "G21\nG90\nG0 Z5\nM3 S10000\nM0 (WERKZEUGWECHSEL 2: 6 mm einsetzen, Z neu nullen)\nG0 X10 Y10\nM5\nM30";
+  assert.deepEqual(rules(ok, "mill"), {});
+  assert.ok(rules("G21\nG90\nG0 Xnull Y5\nM30", "mill")["broken-value"]);
+  assert.ok(rules("G21\nG90\nG0 X5 YNaN\nM30", "mill")["broken-value"]);
+  assert.ok(rules("G21\nG90\n(Form undefined)\nM30", "mill")["broken-value"]);
+  assert.ok(rules("G21\nG90\n(tool [object Object])\nM30", "mill")["broken-value"]);
+});

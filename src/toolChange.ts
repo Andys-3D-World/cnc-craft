@@ -36,6 +36,7 @@ import { probeSettings as s, setProbeLog, step, settled, startGuard, stopGuard, 
   guard, sleep } from "./probe";
 import { getTools } from "./toolLibrary";
 import { fmtLenShort, unitName } from "./units";
+import { postCtx } from "./post/postContext";
 
 export enum TcState {
   Idle = "idle",
@@ -55,6 +56,8 @@ export enum TcState {
 
 /** Werkzeugwechsel im G-Code: „M6 T<n> (…)“ (Einstellung) oder wie bisher „M0 (…)“ */
 export function toolChangeGcode(num: number, comment: string): string {
+  // file for a controller with a tool table (post/postContext.ts): always with the number – a tool without one stops the export
+  if (postCtx.toolTable) return `M6 T${num} ${comment}`;
   return s.tcM6 && num > 0 ? `M6 T${num} ${comment}` : `M0 ${comment}`;
 }
 
