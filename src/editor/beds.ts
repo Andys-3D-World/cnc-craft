@@ -24,8 +24,16 @@ import { MM_TO_PIXEL, groupBounds, shapeBounds, translateShape, type Bounds } fr
 import { tracePath } from "../render";
 import { updateDimensionInputs } from "../uiInputs";
 import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
+import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
 
-interface Sheet { name: string; done: boolean; shapes: any[]; hist?: HistoryState | null }
+/**
+ * Zweiseitig fräsen (twoSided.ts): `shapes` ist immer die Seite, die gerade gezeigt wird, `other` die verdeckte.
+ * `back` = gezeigt wird die Rückseite. `two` = Einstellungen (Rohteil, Wenderichtung, Stifte) dieses Bettes.
+ */
+interface Sheet {
+  name: string; done: boolean; shapes: any[]; hist?: HistoryState | null;
+  other?: any[]; otherHist?: HistoryState | null; back?: boolean; two?: TwoSidedSetup | null;
+}
 
 let beds: Sheet[] = [{ name: "", done: false, shapes: [] }];
 let active = 0;
@@ -43,6 +51,65 @@ export function activeBed(): number { return active; }
 
 /** Formen des aktiven Bettes zurücklegen (app().shapes wird oft neu zugewiesen) */
 function stash() { beds[active].shapes = app().shapes; }
+
+// ---------------------------------------------------------------------
+// Zweiseitig fräsen: Vorder- und Rückseite des aktiven Bettes
+// ---------------------------------------------------------------------
+
+/** Einstellungen des Bettes (null = nie eingerichtet) */
+export function bedSetup(i = active): TwoSidedSetup | null { return beds[i]?.two ?? null; }
+
+/** Zweiseitig ist für das aktive Bett eingeschaltet */
+export function twoSidedOn(): boolean { return beds[active]?.two?.on === true; }
+
+/** Welche Seite die Zeichenfläche zeigt (ohne Zweiseitig immer die Vorderseite) */
+export function viewSide(): Side { return twoSidedOn() && beds[active].back ? "back" : "front"; }
+
+/** Formen der verdeckten Seite des aktiven Bettes */
+export function hiddenShapes(): any[] { return beds[active].other ?? []; }
+
+/** Formen einer Seite des aktiven Bettes */
+export function sideShapes(side: Side): any[] { return side === viewSide() ? app().shapes : hiddenShapes(); }
+
+/** Verdeckte Seite ersetzen (Kopieren/Verschieben auf die andere Seite); ihr Rückgängig-Verlauf beginnt neu */
+export function setHiddenShapes(list: any[]) {
+  beds[active].other = list;
+  beds[active].otherHist = null;
+  markDirty();
+  changed();
+}
+
+/** Einstellungen des aktiven Bettes setzen. Wird Zweiseitig ausgeschaltet, zeigt die Zeichenfläche wieder die Vorderseite */
+export function setBedSetup(two: TwoSidedSetup | null) {
+  if (beds[active].back && !(two && two.on)) showSide("front", true);
+  beds[active].two = two;
+  markDirty();
+  changed();
+}
+
+/** Zeichenfläche auf die andere Seite umschalten (wie ein Bett-Wechsel: jede Seite hat ihr eigenes Rückgängig) */
+export function showSide(side: Side, force = false) {
+  const b = beds[active];
+  if (!force && !twoSidedOn()) return;
+  if ((side === "back") === !!b.back) return;
+  const st = app();
+  const hist = takeHistory();
+  const visible = st.shapes;
+  st.shapes = b.other ?? [];
+  b.shapes = st.shapes;
+  b.other = visible;
+  putHistory(b.otherHist);
+  b.otherHist = hist;
+  b.back = side === "back";
+  st.selectedShapeIds = [];
+  changed();
+}
+
+/** Vorder- und Rückseite eines Bettes (zum Speichern und für das Einrichteblatt) */
+function frontBack(i: number): { front: any[]; back: any[] } {
+  const b = beds[i], shown = i === active ? app().shapes : b.shapes, other = b.other ?? [];
+  return b.back ? { front: other, back: shown } : { front: shown, back: other };
+}
 
 /** Teile zählen: eine Gruppe = ein Teil */
 function parts(shapes: any[]): number { return new Set(shapes.map(s => s.groupId || s.id)).size; }
@@ -116,7 +183,7 @@ export function addBed(): number {
 export function removeBed(i: number) {
   if (beds.length < 2 || i < 0 || i >= beds.length) return;
   stash();
-  const n = parts(beds[i].shapes);
+  const n = parts(beds[i].shapes) + parts(beds[i].other ?? []);
   if (n && !window.confirm(t("bed.confirmDelete", { name: bedName(i), n }))) return;
   removeStockBed(i, beds.length);
   beds.splice(i, 1);
@@ -147,7 +214,10 @@ export function moveToBed(ids: string[], target: number): number {
   const set = new Set(moving);
   st.shapes = st.shapes.filter((s: any) => !set.has(s));
   st.selectedShapeIds = st.selectedShapeIds.filter((id: string) => !moving.some((s: any) => s.id === id));
-  beds[target].shapes = [...beds[target].shapes, ...moving];
+  // Zweiseitig: die Teile bleiben auf ihrer Seite. Zeigt das Ziel-Bett die andere Seite, kommen sie in seine verdeckte Liste
+  const tb = beds[target];
+  if (tb.two?.on && !!tb.back !== (viewSide() === "back")) { tb.other = [...(tb.other ?? []), ...moving]; tb.otherHist = null; }
+  else tb.shapes = [...tb.shapes, ...moving];
   beds[target].hist = null;
   beds[target].done = false;
   putHistory(null);
@@ -160,11 +230,18 @@ export function moveToBed(ids: string[], target: number): number {
 export function bedShapes(i: number): any[] { return i === active ? app().shapes : beds[i].shapes; }
 
 /** Alle Formen aller Betten (zum Speichern, Werkzeuge/Ebenen im Projekt) */
-export function allShapes(): any[] { stash(); return beds.flatMap(b => b.shapes); }
-
-export function bedsForSave(): { name: string; done: boolean; n: number }[] {
+export function allShapes(): any[] {
   stash();
-  return beds.map(b => ({ name: b.name, done: b.done, n: b.shapes.length }));
+  // Rückseiten-Formen tragen in der Datei `side: "back"` (als Kopie – die Formen selbst bleiben unverändert)
+  return beds.flatMap((_, i) => { const fb = frontBack(i); return fb.back.length ? [...fb.front, ...fb.back.map(s => ({ ...s, side: "back" }))] : fb.front; });
+}
+
+export function bedsForSave(): { name: string; done: boolean; n: number; twoSided?: TwoSidedSetup }[] {
+  stash();
+  return beds.map((b, i) => {
+    const fb = frontBack(i);
+    return { name: b.name, done: b.done, n: fb.front.length + fb.back.length, ...(b.two ? { twoSided: b.two } : {}) };
+  });
 }
 
 /** Projekt geladen: Formen nach den Angaben in `list` auf die Betten verteilen (ohne Angaben: ein Bett) */
@@ -176,7 +253,15 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
     beds = list.map((b: any) => {
       const part = shapes.slice(k, k + b.n);
       k += b.n;
-      return { name: typeof b.name === "string" ? b.name.slice(0, 40) : "", done: b.done === true, shapes: part };
+      // Zweiseitig: Formen mit side "back" gehören zur Rückseite; geöffnet wird immer mit Blick auf die Vorderseite
+      const back = part.filter((s: any) => s?.side === "back");
+      const front = back.length ? part.filter((s: any) => s?.side !== "back") : part;
+      for (const s of back) delete s.side;
+      const sheet: Sheet = { name: typeof b.name === "string" ? b.name.slice(0, 40) : "", done: b.done === true, shapes: front };
+      const two = cleanSetup(b.twoSided);
+      if (two) sheet.two = two;
+      if (back.length) sheet.other = back;
+      return sheet;
     });
   } else beds = [{ name: "", done: false, shapes }];
   active = Number.isInteger(activeIdx) && activeIdx >= 0 && activeIdx < beds.length ? activeIdx : 0;
@@ -190,9 +275,11 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
 
 /** Dateiname für G-Code: bei mehreren Betten mit Bett-Namen */
 export function gcodeFileName(): string {
-  if (beds.length < 2) return "cnc-auftrag.gcode";
+  // Zweiseitig: zwei Dateien, eine je Seite
+  const side = twoSidedOn() ? `-${viewSide()}` : "";
+  if (beds.length < 2) return `cnc-auftrag${side}.gcode`;
   const n = bedName().normalize("NFKD").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "") || String(active + 1);
-  return `cnc-auftrag-${n}.gcode`;
+  return `cnc-auftrag-${n}${side}.gcode`;
 }
 
 // =====================================================================
@@ -218,6 +305,7 @@ export function initBeds(onRedraw: () => void, onLog: (s: string) => void, onFit
     const act = el.dataset.act;
     if (act === "add") { switchBed(addBed()); fitAll(); log(t("bed.added", { name: bedName() })); }
     if (act === "done") { beds[active].done = !beds[active].done; changed(); }
+    if (act === "front" || act === "back") { showSide(act); log(t(act === "back" ? "two.viewBack" : "two.viewFront")); }
     if (act === "del") removeBed(active);
     if (act === "plate") {
       if (!window.confirm(t("bed.plateConfirm", { name: bedName() }))) return;
@@ -273,7 +361,8 @@ export function refreshBeds() {
   if (!bar || bar.querySelector(".bed-rename")) return;
   const counts = beds.map((_, i) => parts(bedShapes(i)));
   const used = hasUsedArea();
-  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done]), used]);
+  const two = twoSidedOn(), side = viewSide();
+  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done]), used, two, side, two ? parts(hiddenShapes()) : 0]);
   if (sig === shown) return;
   shown = sig;
   const tabs = beds.map((b, i) =>
@@ -283,6 +372,9 @@ export function refreshBeds() {
     .map(i => `<option value="${i}">→ ${esc(bedName(i))}</option>`).join("");
   bar.innerHTML = `${tabs}
     <button type="button" class="bed-btn" data-act="add" title="${esc(t("bed.addTip"))}">＋</button>
+    ${two ? `<span class="bed-sides" title="${esc(t("two.sideTip"))}">`
+      + (["front", "back"] as const).map(sd => `<button type="button" class="bed-btn bed-side${sd === side ? " on" : ""}" data-act="${sd}">${esc(t(sd === "front" ? "two.front" : "two.back"))}`
+        + `<span class="bed-n">${parts(sideShapes(sd))}</span></button>`).join("") + `</span>` : ""}
     <span class="bed-space"></span>
     ${used ? `<button type="button" class="bed-btn" data-act="plate" title="${esc(t("bed.plateTip"))}">🧱 ${esc(t("bed.plate"))}</button>` : ""}
     <button type="button" class="bed-btn${beds[active].done ? " on" : ""}" data-act="done" title="${esc(t("bed.doneTip"))}">✓ ${esc(t("bed.done"))}</button>

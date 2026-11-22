@@ -33,6 +33,8 @@ import { zonesFromShapes } from "./keepOutShapes";
 import { state as appState } from "./main";
 import { optimizeCutOrder, CutItem } from "./cutOrder";
 import { applyCut, applyCutClosed, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSetting";
+import { twoSidedJob } from "./twoSidedJob";
+import type { Side } from "./twoSided";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -134,16 +136,27 @@ function withRestGroups(groups: ToolGroup[]): ToolGroup[] {
  */
 /** flat: Drehachse nicht umrechnen (Simulation zeigt die abgewickelte Fläche) */
 let flatOnly = false;
-export const generateGcode = (allShapes: any, opts: { flat?: boolean } = {}): string | null => {
+/** Zweiseitig: Sperrzonen der Seite, deren Programm gerade entsteht (null = die gezeigte Zeichnung) */
+let zoneSource: any[] | null = null;
+/**
+ * side: nur bei „Zweiseitig fräsen“ (twoSidedJob.ts) – Programm dieser Seite statt der gezeigten.
+ * Ohne Zweiseitig ändert sich nichts: derselbe G-Code wie immer.
+ */
+export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Side } = {}): string | null => {
   flatOnly = !!opts.flat;
+  const two = twoSidedJob(allShapes, opts.side);
+  if (two) allShapes = two.shapes;
+  zoneSource = two ? two.shapes : null;
   // Sperrzonen werden nie geschnitten; sie gelten auch, wenn nur ein Teil der Zeichnung erzeugt wird
   const shapes = allShapes.filter((s: any) => !isKeepOut(s));
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
-  const skipped = usedAreaShapes(shapes);
+  // Zweiseitig: die Rückseite liegt genau dort, wo die Vorderseite schon gefräst hat – „verbraucht“ gilt hier nicht
+  const skipped = two ? new Set<any>() : usedAreaShapes(shapes);
   allSkipped = skipped.size > 0 && skipped.size === shapes.length;
   const used = skipped.size ? shapes.filter((s: any) => !skipped.has(s)) : shapes;
   lastGcodeNotes = [];
-  let g = generateGcodeInner(used);
+  // Zweiseitig: das Programm der Vorderseite bohrt die Löcher für die Passstifte mit
+  let g = generateGcodeInner(two && two.pins.length ? [...used, ...two.pins] : used);
   // Arc Fitting: nach Vorschub-Anpassung und Nachmess-Punkten, nur Fräse, nicht mit Drehachse (arcFit.ts)
   if (g && arcFit.on && !isLaser() && !isPlasma() && !rotary.on) {
     const r = fitArcs(g, arcFit.tol);
@@ -153,13 +166,14 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean } = {}): st
   if (g && !isLaser() && !isPlasma()) g = applyZones(g, used);
   if (g && rotary.on && !flatOnly && !isPlasma()) g = rotaryGcode(g, used);
   if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
-  else if (g) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
+  else if (g && !two) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
+  if (g && two) { g = two.header + g; lastGcodeWarnings.push(...two.warnings); }
   return g;
 };
 
 /** Sperrzonen (keepOut.ts): Eilfahrten anheben, Schnitte hinein melden. Mit Drehachse gibt es keine feste Fläche → nur Hinweis */
 function applyZones(g: string, used: any[]): string {
-  const zones = zonesFromShapes(appState.shapes);
+  const zones = zonesFromShapes(zoneSource ?? appState.shapes);
   if (!zones.length) return g;
   if (rotary.on) { lastGcodeWarnings.push(t("ko.rotary")); return g; }
   const dia = Math.max(0, ...used.map((s: any) => { const tl = toolForShape(s); return tl ? cutDiameter(tl) : 3; }));
@@ -975,6 +989,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     formCounter++;
     computePasses(computeDepth(shape));
     const mode = shape.millingMode || "outside";
+    // Zweiseitig: Loch für einen Passstift (twoSidedJob.ts) – heißt im G-Code und im Einrichteblatt auch so
+    const pinMark = shape.pin ? `(--- ${ascii(tMm("two.gc.pin", { n: shape.pin }))} ---)` : "";
     // An-/Wegfahren nur an geschlossenen Konturen mit Seite (Kreis und geschlossener Linienzug)
     curLead = (mode === "outside" || mode === "inside") && (shape.type === "circle" || (shape.type === "polyline" && shape.closed)) ? leadOptions(shape) : null;
     if (mode === "chamfer") {
@@ -992,7 +1008,7 @@ const generateGcodeInner = (shapes: any): string | null => {
       return;
     }
     if (mode === "drill") {
-      gcode += `\n${c("gc.drill", { n: formCounter })}\n`;
+      gcode += `\n${pinMark || c("gc.drill", { n: formCounter })}\n`;
       millDrill(shape);
       return;
     }
@@ -1015,7 +1031,7 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (mode === "outside") offset = toolRadius;
     if (mode === "inside") offset = -toolRadius;
 
-    gcode += `\n${c("gc.shape", { n: formCounter, type: shape.type.toUpperCase(), mode })}\n`;
+    gcode += `\n${pinMark || c("gc.shape", { n: formCounter, type: shape.type.toUpperCase(), mode })}\n`;
 
     const pocketOuter = mode === "pocket" ? closedMm(shape) : null;
     if (pocketOuter) {

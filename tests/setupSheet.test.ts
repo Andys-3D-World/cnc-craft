@@ -50,3 +50,32 @@ test("Bild: nur Schnitte, begrenzte Größe, leer ohne Schnitte", () => {
   assert.ok((svg.match(/M/g) || []).length <= 6100);
   assert.equal(jobSvg({ n: 1, x0: [0], y0: [0], x1: [1], y1: [1], cut: () => false }), "");
 });
+
+test("Two-sided: both sides, pins and steps on the sheet; foreign names stay harmless", () => {
+  const evil = "<img src=x onerror=alert(1)>";
+  const side = (name: string) => ({ name, time: evil, partSize: evil, tools: [{ no: "T1", name: evil, dia: "3 mm", type: evil, len: "–" }],
+    ops: [{ label: evil, depth: -5, feed: 800, line: 0 }], changes: [{ line: 3, code: "M0", note: evil }], warnings: [evil], svg: "" });
+  const base = {
+    title: "t", date: "d", tools: [], toolsNote: "", stock: "160 × 110", partSize: "", time: "", timeBasis: "", zero: "", zeroZ: "", wcs: "",
+    ops: [], changes: [], warnings: ["both sides"], zones: [], svg: ""
+  };
+  const html = sheetHtml({ ...base, two: { rows: [["Turn over", evil]], pins: [{ no: "1", x: "100", y: "29" }, { no: "2", x: "100", y: evil }], steps: ["one", evil], sides: [side("FRONT-1"), side("BACK-2")] } }, k => k);
+  assert.ok(!html.includes("<img"));
+  assert.ok(html.indexOf("FRONT-1") > 0 && html.indexOf("BACK-2") > html.indexOf("FRONT-1"));
+  assert.ok(html.includes("<td>100</td><td>29</td>"));
+  assert.ok(html.includes("<ol><li>one</li>"));
+  assert.ok(html.includes("both sides"));
+  // without `two` the sheet is the single-sided one
+  assert.ok(!sheetHtml(base, k => k).includes("<ol>"));
+});
+
+test("Two-sided: the picture shows stock, turning line and pins even without cuts", () => {
+  const marks = { rect: { x: 20, y: 20, w: 160, h: 110 }, line: { along: "y" as const, at: 100 }, pins: [{ x: 100, y: 29, r: 3 }, { x: 100, y: 121, r: 3 }] };
+  const svg = jobSvg({ n: 1, x0: [50], y0: [50], x1: [90], y1: [50], cut: () => true }, [], 6000, marks);
+  assert.ok(svg.includes(`<rect x="20" y="0" width="160" height="110"`));   // y is flipped: top edge of the stock (Y130) is 0
+  assert.equal((svg.match(/<circle/g) || []).length, 2);
+  assert.ok(svg.includes(`<line x1="100"`));
+  assert.ok(jobSvg({ n: 0, x0: [], y0: [], x1: [], y1: [], cut: () => false }, [], 6000, marks).startsWith("<svg"));
+  // unchanged without marks
+  assert.ok(!jobSvg({ n: 1, x0: [50], y0: [50], x1: [90], y1: [50], cut: () => true }).includes("<rect"));
+});

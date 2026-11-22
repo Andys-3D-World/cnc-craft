@@ -17,6 +17,7 @@ import { modeSwitchHtml, laserLayersHtml, laserSettingsHtml } from "./laserPanel
 import { rotarySectionHtml } from "./rotaryPanel";
 import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
 import { stockSectionHtml } from "./stockPanel";
+import { twoSidedSectionHtml } from "./twoSidedPanel";
 import { machineLineHtml } from "./machineWizard";
 import { spindlePanelHtml } from "./spindlePanel";
 import { probePanelHtml } from "./probePanel";
@@ -168,6 +169,7 @@ export function renderRightPanel(container: HTMLElement) {
 
         ${toolSummaryHtml()}
         ${stockSectionHtml()}
+        ${twoSidedSectionHtml()}
         ${laserSettingsHtml()}
         ${rotarySectionHtml()}
         ${plasmaSettingsHtml()}

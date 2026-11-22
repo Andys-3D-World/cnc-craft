@@ -19,6 +19,9 @@ import { openSetupSheet } from "./setupSheetDialog";
 import { openToolPanel, rowCss } from "./toolPanel";
 import { esc } from "../setupSheet";
 import { JOB_ANCHORS, JobAnchor, extentFromHead, jobHereCommand } from "../jobOrigin";
+import { activeSetup } from "../twoSidedJob";
+import { loadedJobSide } from "../jobFlow";
+import { viewSide } from "../editor/beds";
 
 const JOB_ANCHOR_KEY = "cnc_craft_job_anchor";
 
@@ -109,6 +112,8 @@ export function openJobHereDialog(log: (s: string) => void, redraw: () => void) 
   if (machine.protocol !== "grbl") { log(t("jobhere.grblOnly")); return; }
   if (rotary.on) { log(t("jobhere.noRotary")); return; }
   if (!canCommand() || machine.job.active) { log(t("m.why.job running")); return; }
+  // Zweiseitig, Rückseite: X/Y-Null bleibt von der Vorderseite – ein neuer Nullpunkt würde die Seiten gegeneinander verschieben
+  if (activeSetup() && (streamState.loadedLines.length ? loadedJobSide() : viewSide()) === "back") { log(t("two.jobHereBack")); return; }
   const job = currentLines();
   if (!job) { log(noGcodeMessage()); return; }
   const laser = isLaser();

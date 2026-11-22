@@ -47,7 +47,7 @@ import { initUpdater } from "./update/updater";
 import { initProjectSafety } from "./projectSafety";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
-import { buildJob, okToStart } from "./jobFlow";
+import { buildJob, designLabel, okToBuild, okToStart } from "./jobFlow";
 import { stopPlanFor, holdSettled } from "./stopPlan";
 import { initHoldJog, holdJogStop } from "./holdJog";
 import { macroRunning, cancelMacro } from "./macroRun";
@@ -64,6 +64,7 @@ import { setEngraveLog } from "./raster/engraveDialog";
 import { initMaterialView } from "./materialView";
 import { solveConstraints } from "./editor/dims";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
+import { initTwoSidedPanel, refreshTwoSided, drawTwoSided } from "./ui/twoSidedPanel";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
 import { initImports, importBytes } from "./importers/importManager";
@@ -189,6 +190,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         solveConstraints(); // Maße: abhängige Formen folgen ihrer Bezugsform
         drawEverything(ctx, canvas, state.shapes, state.selectedShapeIds, state.offsetX, state.offsetY, state.scale);
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
+        drawTwoSided(ctx);    // Zweiseitig fräsen: Rohteil, Wendelinie, Stifte, andere Seite blass
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
         refreshMillProfilePicker();
@@ -196,6 +198,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         refreshLaserPanel(); // Laser-Ebenen ebenso
         refreshPlasmaPanel(); // und Plasma-Schnitte
         refreshBeds();        // Reiter der Betten (Anzahl Teile)
+        refreshTwoSided();    // Abschnitt „Zweiseitig fräsen“
         // Reiter „Objekt“: ohne Auswahl nur Ebenen + Hinweis
         document.getElementById("rp-object")?.classList.toggle("no-sel", !state.selectedShapeIds.length);
       }
@@ -301,7 +304,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (rotary.on && !isPlasma() && !isPrism(rotary)) document.getElementById("btn-simulate")?.click();
       else openSimTab();
     }
-    document.getElementById("btn-to-machine")?.addEventListener("click", () => {
+    document.getElementById("btn-to-machine")?.addEventListener("click", async () => {
+      // Zweiseitig, Rückseite: erst fragen, ob das Rohteil gewendet auf den Stiften liegt (jobFlow.ts)
+      if (!(await okToBuild())) return;
       if (buildJob(state.shapes, appendToConsole)) showBuiltJob();
     });
     // Job-Leiste: was als Nächstes dran ist, ist der farbige Knopf. Stopp oben, solange ein Job läuft (auch in den anderen Reitern)
@@ -323,7 +328,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
       lastGcodeNotes.forEach(n => appendToConsole(n));
       if (rotary.on && !isPlasma()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
-      setSimProgram(gcode.split("\n"), t("sim.currentDesign"), "design");
+      setSimProgram(gcode.split("\n"), designLabel(), "design");
       openSimTab();
     });
     document.getElementById("btn-cost")?.addEventListener("click", () => openCostDialog(state.shapes, appendToConsole));
@@ -348,6 +353,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initPlasmaPanel(redraw);
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
+    initTwoSidedPanel(redraw, appendToConsole);
     initMachineWizard(redraw, appendToConsole);
     initJobTools(appendToConsole);      // Rahmen abfahren, .rd speichern
 
