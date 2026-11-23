@@ -31,6 +31,7 @@ import { getCuts, cutForShape, plasmaSettings, PlasmaCut } from "./plasmaCuts";
 import { t, ascii, tMm } from "./i18n/i18n";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
+import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
 import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo } from "./cutSetting";
 
@@ -297,7 +298,8 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   if (S.useZ) g += `G0 Z${n(S.safeZ)} ${c("gc.safeZ")}\n`;
   let pierces = 0, smallHoles = 0;
   // Leerfahrten um schon ausgeschnittene Teile herum (sie können kippen)
-  const avoid = S.avoidCut ? new RapidPlanner(AVOID_MARGIN) : null;
+  // The detours stay on the bed (rapidAvoid.ts). No bed size without a page (tests) -> not limited there
+  const avoid = S.avoidCut ? new RapidPlanner(AVOID_MARGIN, typeof document !== "undefined" ? bedSizeMm() : null) : null;
   let pos: Pt | null = null;
   const rapid = (to: Pt, note = "") => {
     if (avoid && pos) for (const v of avoid.route(pos, to)) g += `G0 X${n(v.x)} Y${n(v.y)} ${c("gc.avoid")}\n`;

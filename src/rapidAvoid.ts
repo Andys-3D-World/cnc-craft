@@ -12,6 +12,24 @@
  * in einem Loch, das im 2. Durchgang noch einmal geschnitten wird), lassen sich nicht umfahren
  * und werden für diese Fahrt übergangen. Findet sich kein Weg, bleibt die Fahrt gerade.
  *
+ * WORK AREA: the frame corners know nothing about the bed, so a part closer to the bed edge than
+ * the margin used to send the head outside (`G0 … Y-1` = soft-limit alarm or a run against the end
+ * stop). With a bed size the planner keeps its own points inside 0…w / 0…h:
+ *  1. The search runs as before. A detour that stays on the bed is used unchanged, so drawings
+ *     that were fine keep exactly the same G-code.
+ *  2. Only if that detour leaves the bed, the search runs again with every corner pulled back onto
+ *     the bed edge. A pulled-back corner is closer to its part than asked for. It still counts
+ *     while at least half the margin is left to the part's frame, in X and in Y (MIN_KEEP): the
+ *     head then passes beside the cut edge, not along it. With less room the move would run on the
+ *     kerf of a part that may stand up, which is no better than crossing it, so that corner is
+ *     dropped and the way has to go round another side of the part.
+ *  3. No way left on the bed -> straight move, as when no path is found at all. Leaving the bed
+ *     is certain trouble at the machine, a part in the way only possible trouble.
+ * A bed edge that the job itself already reaches past (start or end of the move, or a part cut so
+ * far) does not limit: that job cannot run in this work area anyway, or the bed size is set too
+ * small, and pulling its detours back to the bed edge would only add long trips. The other edges
+ * still limit. Start and end of the move are never changed.
+ *
  * Bewusst ohne Laufzeit-Importe (nur Typen): so laufen die Tests direkt mit `node --test`.
  */
 import type { Pt } from "./shapeTransform";
@@ -20,6 +38,14 @@ const EPS = 1e-9;
 const INSIDE_TOL = 0.2;   // so viel mm muss eine Fahrt durch eine Kontur gehen, damit sie zählt
 const EDGE_TOL = 0.02;    // näher am Rand gilt ein Punkt als "auf der Kontur" (nicht darin)
 const MAX_NODES = 400;    // Schutz vor sehr langen Suchen bei riesigen Jobs
+const MIN_KEEP = 0.5;     // share of the margin a corner pulled back onto the bed must still keep to its part
+const BED_TOL = 1e-6;     // mm; a point this far past the bed edge still counts as on the bed
+
+/** Work area in mm, from X0 Y0 (the G-code zero of the drawing) to X w / Y h */
+export interface Bed { w: number; h: number }
+
+/** Where detour points may lie; an edge that does not limit is ±Infinity */
+interface Box { x0: number; y0: number; x1: number; y1: number }
 
 interface Obstacle {
   poly: Pt[];
@@ -29,9 +55,19 @@ interface Obstacle {
 export class RapidPlanner {
   private obs: Obstacle[] = [];
   private margin: number;
+  private bed: Bed | null;
+  // frame round all obstacles so far (to tell whether the job itself reaches past a bed edge)
+  private ext: Box = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };
 
-  /** @param margin Abstand des Umwegs zum Rahmen der Kontur in mm */
-  constructor(margin: number) { this.margin = margin; }
+  /**
+   * @param margin Abstand des Umwegs zum Rahmen der Kontur in mm
+   * @param bed    work area in mm; detours stay inside it. Without it (or with a size that is not
+   *               a positive number) nothing is limited, as before
+   */
+  constructor(margin: number, bed?: Bed | null) {
+    this.margin = margin;
+    this.bed = bed && bed.w > 0 && bed.h > 0 ? { w: bed.w, h: bed.h } : null;
+  }
 
   /** Geschlossene Kontur ist fertig geschnitten -> ab jetzt Hindernis */
   addCut(loop: Pt[]) {
@@ -41,6 +77,8 @@ export class RapidPlanner {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const p of poly) { x0 = Math.min(x0, p.x); y0 = Math.min(y0, p.y); x1 = Math.max(x1, p.x); y1 = Math.max(y1, p.y); }
     this.obs.push({ poly, x0, y0, x1, y1 });
+    const e = this.ext;
+    e.x0 = Math.min(e.x0, x0); e.y0 = Math.min(e.y0, y0); e.x1 = Math.max(e.x1, x1); e.y1 = Math.max(e.y1, y1);
   }
 
   /**
@@ -53,18 +91,46 @@ export class RapidPlanner {
     const active = this.obs.filter(o => !strictlyInside(a, o) && !strictlyInside(b, o));
     if (!active.some(o => crosses(a, b, o))) return [];
 
+    const free = (p: Pt, q: Pt) => !active.some(o => crosses(p, q, o));
+    let path = aStar(this.nodes(a, b, active, null), free);
+    const lim = this.limits(a, b);
+    if (path && lim && path.slice(1, -1).some(p => outside(p, lim))) path = aStar(this.nodes(a, b, active, lim), free);
+    return path ? path.slice(1, -1) : [];
+  }
+
+  /** The bed, without the edges this job already reaches past (see the header); null = nothing limits */
+  private limits(a: Pt, b: Pt): Box | null {
+    const bed = this.bed;
+    if (!bed) return null;
+    const e = this.ext;
+    return {
+      x0: Math.min(a.x, b.x, e.x0) < -BED_TOL ? -Infinity : 0,
+      y0: Math.min(a.y, b.y, e.y0) < -BED_TOL ? -Infinity : 0,
+      x1: Math.max(a.x, b.x, e.x1) > bed.w + BED_TOL ? Infinity : bed.w,
+      y1: Math.max(a.y, b.y, e.y1) > bed.h + BED_TOL ? Infinity : bed.h
+    };
+  }
+
+  /**
+   * Start, Ziel und die Rahmen-Ecken aller Hindernisse. With `bed` every corner is pulled back into
+   * it, and left out if less than MIN_KEEP of the margin is then left to its own frame.
+   */
+  private nodes(a: Pt, b: Pt, active: Obstacle[], bed: Box | null): Pt[] {
     const m = this.margin;
     const nodes: Pt[] = [a, b];
     for (const o of active) {
-      for (const c of [{ x: o.x0 - m, y: o.y0 - m }, { x: o.x1 + m, y: o.y0 - m }, { x: o.x1 + m, y: o.y1 + m }, { x: o.x0 - m, y: o.y1 + m }]) {
+      for (let c of [{ x: o.x0 - m, y: o.y0 - m }, { x: o.x1 + m, y: o.y0 - m }, { x: o.x1 + m, y: o.y1 + m }, { x: o.x0 - m, y: o.y1 + m }]) {
+        if (bed) {
+          c = { x: Math.min(Math.max(c.x, bed.x0), bed.x1), y: Math.min(Math.max(c.y, bed.y0), bed.y1) };
+          const keep = m * MIN_KEEP - EPS;
+          if (Math.max(o.x0 - c.x, c.x - o.x1) < keep || Math.max(o.y0 - c.y, c.y - o.y1) < keep) continue;
+        }
         // Ecken, die selbst in einem Teil liegen, taugen nicht als Umweg
         if (!active.some(q => inBox(c, q) && pointInPoly(c.x, c.y, q.poly))) nodes.push(c);
       }
       if (nodes.length > MAX_NODES) break;
     }
-    const free = (p: Pt, q: Pt) => !active.some(o => crosses(p, q, o));
-    const path = aStar(nodes, free);
-    return path ? path.slice(1, -1) : [];
+    return nodes;
   }
 }
 
@@ -139,6 +205,10 @@ function strictlyInside(p: Pt, o: Obstacle): boolean {
     if (segDist(p, poly[j], poly[i]) < EDGE_TOL) return false;
   }
   return true;
+}
+
+function outside(p: Pt, b: Box): boolean {
+  return p.x < b.x0 - BED_TOL || p.x > b.x1 + BED_TOL || p.y < b.y0 - BED_TOL || p.y > b.y1 + BED_TOL;
 }
 
 function inBox(p: Pt, o: Obstacle): boolean {

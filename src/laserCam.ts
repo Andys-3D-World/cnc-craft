@@ -19,6 +19,7 @@ import { cornerIndex, leadPoint } from "./plasmaCam";
 import { cornerPowerPath } from "./cornerPower";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
+import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
 import { applyCutClosed, applyCutOpen, cutDirOf, cutStartOf } from "./cutSetting";
 import {
@@ -70,7 +71,8 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
   g += `${laserSettings.dynamic ? "M4" : "M3"} S0 ${c(laserSettings.dynamic ? "lgc.m4" : "lgc.m3")}\n`;
 
   // Leerfahrten (Linien-Modus) um schon ausgeschnittene Teile herum (sie können kippen)
-  const avoid = laserSettings.avoidCut ? new RapidPlanner(AVOID_MARGIN) : null;
+  // The detours stay on the bed (rapidAvoid.ts). No bed size without a page (tests) -> not limited there
+  const avoid = laserSettings.avoidCut ? new RapidPlanner(AVOID_MARGIN, typeof document !== "undefined" ? bedSizeMm() : null) : null;
   let pos: Pt | null = null;
   const rapid = (to: Pt, note = "") => {
     if (avoid && pos) for (const v of avoid.route(pos, to)) g += `G0 X${n(v.x)} Y${n(v.y)} S0 ${c("gc.avoid")}\n`;
