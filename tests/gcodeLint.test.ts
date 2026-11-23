@@ -72,3 +72,71 @@ test("kaputte Werte: Wörter im Kommentar („Z neu nullen“) sind kein Fehler"
   assert.ok(rules("G21\nG90\n(Form undefined)\nM30", "mill")["broken-value"]);
   assert.ok(rules("G21\nG90\n(tool [object Object])\nM30", "mill")["broken-value"]);
 });
+
+// ---- Laser: Bildgravur fährt mit Absicht mit S0, eine Kontur mit Leistung 0 ist ein Fehler ----
+const laserJob = (body: string) => `G21\nG90\nM4 S0\nF3000\n${body}\nS0\nM5\nG0 X0 Y0 S0\nM30`;
+const zeroLines = (c: string, extra = {}) => lintGcode(c, { kind: "laser", ...extra }).filter(i => i.rule === "cut-power-zero").map(i => i.line);
+
+test("Laser: Bildzeile mit Überfahren und weißer Stelle ergibt keine Meldung (hin und zurück)", () => {
+  // Bild von X10 bis X30, 2 mm Überfahren, weiß von X18 bis X22; zweite Zeile von rechts nach links
+  const rows = [
+    "G0 X8 Y10 S0", "G1 X10 S0", "G1 X18 S800", "G1 X22 S0", "G1 X30 S800", "G1 X32 S0",
+    "G0 Y10.1 S0", "G1 X30 S0", "G1 X22 S800", "G1 X18 S0", "G1 X10 S800", "G1 X8 S0",
+  ].join("\n");
+  assert.deepEqual(rules(laserJob(rows), "laser"), {});
+  // Graustufen: Leistung wechselt in der Zeile, dazwischen weiß
+  const gray = ["G0 X8 Y10 S0", "G1 X10 S0", "G1 X10.1 S120", "G1 X10.2 S640", "G1 X14 S0", "G1 X14.1 S15", "G1 X30 S1000", "G1 X32 S0"].join("\n");
+  assert.deepEqual(rules(laserJob(gray), "laser"), {});
+  // ohne Überfahren (0 mm): „G1 S0“ ohne Weg, die Zeile beginnt mit einem Bildpunkt von 0,1 mm
+  assert.deepEqual(rules(laserJob("G0 X10 Y10 S0\nG1 S0\nG1 X10.1 S800\nG1 X25 S0\nG1 X30 S800\nG1 S0"), "laser"), {});
+  // mit M3 (feste Leistung) genauso
+  assert.deepEqual(rules(laserJob(rows).replace("M4 S0", "M3 S0"), "laser"), {});
+});
+
+test("Laser: Bildzeile eines gedrehten Bildes (schräg, auf 0,001 mm gerundet) ergibt keine Meldung", () => {
+  // Richtung 30°: (0,866025 | 0,5). Start (10 | 10), erster Bildpunkt nur 0,1 mm lang, weiß bis 100 mm, dann wieder ein Punkt
+  const up = "G0 X10 Y10 S0\nG1 S0\nG1 X10.087 Y10.05 S500\nG1 X96.603 Y60 S0\nG1 X96.689 Y60.05 S500\nG1 X98.421 Y61.05 S0";
+  // Rückweg, eine Zeile weiter (0,1 mm quer zur Zeile: −0,05 | +0,087)
+  const back = "G0 X98.371 Y61.137 S0\nG1 X96.639 Y60.137 S0\nG1 X96.553 Y60.087 S500\nG1 X10.037 Y10.137 S0\nG1 X9.95 Y10.087 S500\nG1 X8.218 Y9.087 S0";
+  assert.deepEqual(rules(laserJob(up + "\n" + back), "laser"), {});
+});
+
+test("Laser: Bildzeile in Zoll (G20) ergibt keine Meldung", () => {
+  const c = "G20\nG90\nM4 S0\nF100\nG0 X0.3 Y0.4 S0\nG1 X0.4 S0\nG1 X0.7 S800\nG1 X0.9 S0\nG1 X1.2 S800\nG1 X1.3 S0\nS0\nM5\nM30";
+  assert.deepEqual(rules(c, "laser"), {});
+});
+
+test("Laser: Kontur mit Leistung 0 wird weiter gemeldet", () => {
+  // Ebene auf 0 %: Quadrat, S0 steht nur an der ersten Fahrt und gilt für alle vier (Zeilen 6 bis 9)
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG1 X30 Y10 S0\nG1 X30 Y30\nG1 X10 Y30\nG1 X10 Y10")), [6, 7, 8, 9]);
+  // offene gerade Linie mit 0 %: gerade, aber nirgends Leistung
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG1 X30 Y10 S0\nG1 X50 Y10")), [6, 7]);
+  // Füllen mit 0 %: jede Linie ist gerade, aber ohne Leistung
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG1 X30 Y10 S0\nG0 X30 Y10.1 S0\nG1 X10 Y10.1 S0")), [6, 8]);
+  // Kontur mit Haltesteg bei 0 %: beide Stücke
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG1 X20 Y10 S0\nG1 X20 Y20\nG0 X20 Y22 S0\nG1 X20 Y30 S0\nG1 X10 Y30")), [6, 7, 9, 10]);
+  // Bogen mit Leistung 0
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG2 X20 Y10 I5 J0 S0")), [6]);
+});
+
+test("Laser: S0 zählt nur in einer geraden Zeile mit Leistung als gewollt", () => {
+  // Kontur mit Leistung, eine Seite mit S0: keine Gerade -> diese Seite wird gemeldet
+  assert.deepEqual(zeroLines(laserJob("G0 X10 Y10 S0\nG1 X30 Y10 S800\nG1 X30 Y30 S0\nG1 X10 Y30 S800\nG1 X10 Y10")), [7]);
+  // Überfahren, dann knickt die Bahn ab (kein Bildzeilen-Muster)
+  assert.deepEqual(zeroLines(laserJob("G0 X8 Y10 S0\nG1 X10 S0\nG1 X30 Y30 S800")), [6]);
+  // S0 hin, mit Leistung auf derselben Linie zurück: keine Zeile in einer Richtung
+  assert.deepEqual(zeroLines(laserJob("G0 X0 Y10 S0\nG1 X20 S0\nG1 X10 S800")), [6]);
+  // Leistung erst nach einer Eilfahrt, einem M-Befehl oder einer Z-Fahrt: gehört nicht mehr zur selben Zeile
+  assert.deepEqual(zeroLines(laserJob("G0 X8 Y10 S0\nG1 X10 S0\nG0 X10 Y10\nG1 X30 S800")), [6]);
+  assert.deepEqual(zeroLines(laserJob("G0 X8 Y10 S0\nG1 X10 S0\nM8\nG1 X30 S800")), [6]);
+  assert.deepEqual(zeroLines(laserJob("G0 X8 Y10 Z0 S0\nG1 X10 S0\nG1 Z-1\nG1 X30 S800")), [6]);
+  // Bild richtig, die Kontur danach mit 0 %: nur die Kontur
+  const img = "G0 X8 Y10 S0\nG1 X10 S0\nG1 X30 S800\nG1 X32 S0";
+  assert.deepEqual(zeroLines(laserJob(img + "\nG0 X10 Y40 S0\nG1 X30 Y40 S0\nG1 X30 Y60\nG1 X10 Y40")), [10, 11, 12]);
+});
+
+test("Laser: Meldungen bleiben nach Zeilen geordnet (die erste nennt „Zur Maschine“)", () => {
+  // Zeile 6 (S0) wird erst am Ende des Zugs gemeldet, Zeile 7 (außerhalb des Betts) sofort
+  const list = lintGcode(laserJob("G0 X8 Y10 S0\nG1 X10 S0\nG1 X30 Y30 S800"), { kind: "laser", bedW: 20, bedH: 100 });
+  assert.deepEqual(list.map(i => [i.rule, i.line]), [["cut-power-zero", 6], ["off-bed", 7]]);
+});

@@ -5,10 +5,21 @@
  *
  * Prüft: kaputte Zahlen, zu lange Zeilen, Kommentare, Vorschub, Werkzeug an/aus, Eilfahrten im Material
  * und bei eingeschaltetem Laser/Brenner, Bereich des Betts, Ende des Programms.
+ *
+ * LASER, „cut-power-zero“ (Schneiden mit Leistung 0, z. B. Ebene auf 0 %): Bildgravur fährt mit Absicht mit S0 –
+ * vor und nach jeder Zeile über den Rand hinaus und über weiße Stellen in der Zeile. Unterschieden wird am Zug:
+ * alle G1-Fahrten in X/Y zwischen zwei Unterbrechungen (Eilfahrt, M-Befehl, Bogen, Z, G91 …). Ein Zug ist eine
+ * Gravurzeile, wenn er EINE gerade Strecke in EINER Richtung ist und darin auch mit Leistung gefahren wird; dann
+ * sind seine S0-Stücke gewollt. In jedem anderen Zug wird jede S0-Fahrt gemeldet: eine Kontur mit 0 % hat nirgends
+ * Leistung, und eine Kontur mit einem S0-Stück ist keine Gerade. Es gibt keine Markierung im G-Code, die die Regel
+ * abschaltet – nur die Form zählt, also auch bei G-Code aus anderen Programmen.
  */
 export type LintKind = "mill" | "laser" | "plasma";
 export interface LintOptions { kind: LintKind; bedW?: number; bedH?: number; sMax?: number; maxLine?: number }
 export interface LintIssue { rule: string; line: number; text: string }
+
+/** mm – so weit darf ein Punkt einer Gravurzeile neben ihrer Geraden liegen (Rundung im G-Code: unter 0,002 mm) */
+const STRAIGHT_TOL = 0.01;
 
 const WORD = /([A-Z])\s*([-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?)/g;
 
@@ -29,6 +40,33 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
   // Wörter der aktuellen Zeile – je Zeile neu gefüllt statt neu angelegt (schneller bei Millionen Zeilen)
   const G: number[] = [], M: number[] = [];
   const hasG = (v: number) => G.includes(v), hasM = (v: number) => M.includes(v);
+
+  // Laser: der laufende Zug (siehe oben). Start, Endpunkte der Fahrten, Zeilen mit S0, ob mit Leistung gefahren wurde
+  let sx: number | null = null, sy: number | null = null, powered = false, late = false;
+  const px: number[] = [], py: number[] = [], zero: number[] = [];
+  /** gerade Strecke in einer Richtung? Gemessen an der Linie Start → Ende (lang, also sicher gegen Rundung) */
+  const straight = () => {
+    if (sx === null || sy === null) return false;
+    const k = px.length - 1, dx = px[k] - sx, dy = py[k] - sy, len = Math.hypot(dx, dy);
+    if (!(len > STRAIGHT_TOL)) return false;
+    let before = 0;
+    for (let i = 0; i <= k; i++) {
+      const ax = px[i] - sx, ay = py[i] - sy;
+      if (Math.abs(ax * dy - ay * dx) / len > STRAIGHT_TOL) return false; // neben der Linie
+      const along = (ax * dx + ay * dy) / len;
+      if (along < before - STRAIGHT_TOL) return false;                    // fährt zurück
+      before = along;
+    }
+    return true;
+  };
+  const endStroke = () => {
+    if (!px.length) return;
+    if (zero.length && !(powered && straight())) {
+      for (const ln of zero) add("cut-power-zero", ln, lines[ln - 1]);
+      late = true; // diese Meldungen kommen erst am Ende des Zugs: später nach Zeile ordnen
+    }
+    px.length = 0; py.length = 0; zero.length = 0; powered = false;
+  };
 
   for (let idx = 0; idx < lines.length; idx++) {
     const raw = lines[idx], n = idx + 1;
@@ -83,6 +121,7 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
     if (wF !== undefined) { feed = wF; if (!(feed > 0)) add("bad-feed", n, raw); }
     if (wS !== undefined) { s = wS; if (s < 0 || (o.kind === "laser" && s > sMax)) add("s-out-of-range", n, raw); }
     if (M.length) {
+      endStroke();
       if (hasM(3) || hasM(4)) { on = true; everOn = true; }
       if (hasM(5)) on = false;
       if (hasM(2) || hasM(30)) {
@@ -99,6 +138,7 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
     }
     const moves = (wX !== undefined || wY !== undefined || wZ !== undefined) && !special;
     if (!moves || !motion || relative) {
+      if (moves) endStroke();
       if (moves && !motion) add("move-without-mode", n, raw);
       continue;
     }
@@ -111,9 +151,20 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
         if (nz !== null && nz < 0 && !on) add("cut-spindle-off", n, raw);
       } else if (xyMoves) {
         if (!on) add("cut-tool-off", n, raw);
-        else if (o.kind === "laser" && s <= 0) add("cut-power-zero", n, raw);
+        else if (o.kind === "laser") {
+          // nur eine gerade G1-Fahrt in X/Y gehört zum Zug; S0 wird erst am Ende des Zugs beurteilt
+          if (motion !== "G1" || nz !== z || nx === null || ny === null) {
+            endStroke(); // Bogen oder Fahrt mit Z: keine Gravurzeile
+            if (s <= 0) add("cut-power-zero", n, raw);
+          } else {
+            if (!px.length) { sx = x; sy = y; }
+            px.push(nx); py.push(ny);
+            if (s > 0) powered = true; else zero.push(n);
+          }
+        }
         cut = true;
       }
+      if (o.kind === "laser" && (!xyMoves || !on)) endStroke(); // nur Z, oder Laser aus: der Zug ist zu Ende
     } else if (o.kind === "mill") {
       // Eilfahrt seitwärts unter der Oberfläche: Werkzeug fährt durchs Material
       if (xyMoves && z !== null && z < -1e-6) add("rapid-in-material", n, raw);
@@ -121,6 +172,8 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
       if (nz !== null && nz < -1e-6 && !(nz >= (cutAt.get(here(nx, ny)) ?? Infinity) - 1e-6)) add("rapid-into-material", n, raw);
     } else if (o.kind === "plasma" && on && xyMoves) {
       add("rapid-torch-on", n, raw);
+    } else if (o.kind === "laser") {
+      endStroke(); // Eilfahrt: der Zug ist zu Ende
     }
     if (o.bedW && nx !== null && (nx < -0.01 || nx > o.bedW + 0.01)) add("off-bed", n, raw);
     if (o.bedH && ny !== null && (ny < -0.01 || ny > o.bedH + 0.01)) add("off-bed", n, raw);
@@ -128,6 +181,8 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
     x = nx; y = ny; z = nz;
   }
 
+  endStroke();
+  if (late) out.sort((p, q) => p.line - q.line); // stabil: Meldungen einer Zeile bleiben in ihrer Reihenfolge
   if (!ended) add("no-end", lines.length, "(no M2/M30)");
   if (on && !ended) add("end-tool-on", lines.length, "(tool still on)");
   if (!everOn && (o.kind !== "mill" || cut)) add("tool-never-on", 1, "(no M3/M4)");
