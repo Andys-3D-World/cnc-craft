@@ -76,6 +76,8 @@ export const machine = {
 
 let infoRequested = false;
 let espInfoRequested = false;
+/** Start message of the board as it arrived ("Grbl 4.1 [FluidNC v4.1.1 (esp32-wifi) '$' for help]") */
+let welcomeRaw = "";
 
 function resetInfo() {
   machine.info = { name: "", version: "", date: "", options: "", rx: 0, fw: "", host: "", raw: [] };
@@ -145,7 +147,10 @@ function parseInfoLine(text: string): boolean {
     } catch { /* egal */ }
     // ESP32-Boards (MKS, Grbl_ESP32, FluidNC) kennen zusätzlich [ESP800] mit Firmware-Details
     // (nicht grblHAL: auch mit grblHAL heißt eine MKS-Platine noch „MKS DLC32 …“ – [ESP800] gäbe dort Fehler 1)
-    const esp = machine.firmware !== "grblHAL" && (/MKS/i.test(info.name) || machine.firmware === "Grbl_ESP32" || machine.firmware === "FluidNC");
+    // FluidNC knows [ESP800] only in its Wi-Fi build ("esp32-wifi", in 3.x "(wifi)", in the start message and in $I).
+    // The Bluetooth and no-radio builds answer error 3, which looked like a fault on every connect (issue #12).
+    const fluidWifi = machine.firmware === "FluidNC" && /wifi/i.test(`${welcomeRaw} ${info.version} ${info.name}`);
+    const esp = machine.firmware !== "grblHAL" && (/MKS/i.test(info.name) || machine.firmware === "Grbl_ESP32" || fluidWifi);
     if (esp && !espInfoRequested && machine.connected) {
       espInfoRequested = true;
       setTimeout(() => send("[ESP800]", true).catch(() => {}), 100);
@@ -449,6 +454,7 @@ export async function initMachine(logFn: (s: string) => void) {
     if (!own) { log(tag + t("m.welcome", { fw: m.firmware, v: m.version })); return; }
     flushAcks(false);
     resetInfo();
+    welcomeRaw = String(p.raw || "");
     if (machine.firmware === "Marlin" && machine.protocol === "marlin") {
       log(t("m.marlinWelcome", { v: p.version || "?" }));
       fire("welcome", p);

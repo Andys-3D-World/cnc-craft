@@ -89,7 +89,21 @@ pub struct Welcome {
     pub raw: String,
 }
 
+/// Start message of the board after a (re)start. Only such a line resets the line counter and ends a job.
 pub fn parse_welcome(line: &str) -> Option<Welcome> {
+    let l = line.trim();
+    // Reports in brackets ([VER:…], [MSG:…], [OPT:…]) and "FW version: …" (answer to [ESP800]/[ESP420]) are
+    // never a start message. FluidNC names itself in all of them: the answer to $I, "[VER:4.1 FluidNC v4.1.1 …]",
+    // used to count as a restart, so CNC Craft cleared the line counter, dropped a running job and asked $I
+    // again, forever (issue #12). A start message ("Grbl 4.1 [FluidNC v4.1.1 (esp32-wifi) '$' for help]")
+    // starts with the firmware name.
+    if l.starts_with('[') || l.to_lowercase().starts_with("fw version") { return None; }
+    firmware_named(l)
+}
+
+/// Which firmware a line names, also in reports and log lines ("[MSG:INFO: FluidNC v3.7.8]"). Used by the
+/// port search to tell what is listening; whether a line means a restart decides `parse_welcome`.
+pub fn firmware_named(line: &str) -> Option<Welcome> {
     let l = line.trim();
     let lower = l.to_lowercase();
     let raw = l.to_string();
@@ -351,6 +365,27 @@ mod tests {
         assert_eq!(parse_welcome("echo:Marlin 2.1.2").unwrap().firmware, "Marlin");
         assert!(parse_welcome("ok").is_none());
         assert!(parse_welcome("[MSG:Grbl is great]").is_none());
+    }
+
+    /// Lines FluidNC 4.1 really prints (FluidNC sources: Report.cpp, Main.cpp, WebCommands.cpp): only the start
+    /// message is one. The others answer $I and [ESP800] or are log lines, and must not look like a restart (issue #12).
+    #[test]
+    fn fluidnc_reports_are_not_restarts() {
+        let w = parse_welcome("Grbl 4.1 [FluidNC v4.1.1 (esp32-wifi) '$' for help]").unwrap();
+        assert_eq!((w.firmware.as_str(), w.version.as_str()), ("FluidNC", "v4.1.1"));
+        for l in [
+            "[VER:4.1 FluidNC v4.1.1 (esp32-wifi) :]",
+            "[VER:3.7 FluidNC v3.7.17:]",
+            "[MSG:INFO: FluidNC v4.1.1 https://github.com/bdring/FluidNC]",
+            "[MSG:ERR: Reboot FluidNC]",
+            "FW version: FluidNC v4.1.1 # FW target:fluidnc-embedded  # FW HW:Direct SD  # primary sd:/sd # secondary sd:none  # authentication:no # webcommunication: Sync: 81 # hostname:fluidnc # axis:3",
+            "[OPT:PHSEW]",
+        ] {
+            assert!(parse_welcome(l).is_none(), "taken for a start message: {l}");
+            assert!(!matches!(classify(l), Incoming::Welcome(_)), "classified as welcome: {l}");
+        }
+        assert!(matches!(classify("[VER:4.1 FluidNC v4.1.1 (esp32-wifi) :]"), Incoming::Msg(_)));
+        assert!(matches!(classify("FW version: FluidNC v4.1.1 # hostname:fluidnc"), Incoming::Text(_)));
     }
 
     #[test]

@@ -716,6 +716,60 @@ mod tests {
         m.shutdown();
     }
 
+    /// FluidNC names itself in its answers to $I and [ESP800] and in log lines. Before the fix for issue #12 each
+    /// of them counted as a restart: the line counter was cleared, a running job was dropped as "reboot" and the
+    /// app asked $I again, forever. Now only the real start message is one, even when a log line comes mid-job.
+    #[test]
+    fn fluidnc_answers_are_not_restarts() {
+        let (to_board_tx, to_board_rx) = channel::<u8>();
+        let (from_board_tx, from_board_rx) = channel::<u8>();
+        thread::spawn(move || {
+            let send = |s: &str| for b in s.bytes() { let _ = from_board_tx.send(b); };
+            // as FluidNC 4.1 starts: a log line naming the firmware, then the start message
+            send("[MSG:INFO: FluidNC v4.1.1 https://github.com/bdring/FluidNC]\r\n");
+            send("\r\nGrbl 4.1 [FluidNC v4.1.1 (esp32-wifi) '$' for help]\r\n");
+            let mut line = Vec::new();
+            let mut moves = 0;
+            loop {
+                match to_board_rx.recv_timeout(Duration::from_millis(2)) {
+                    Ok(b'?') => send("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\r\n"),
+                    Ok(b'\n') => {
+                        let l = String::from_utf8_lossy(&line).trim().to_string();
+                        line.clear();
+                        match l.as_str() {
+                            "$I" => send("[VER:4.1 FluidNC v4.1.1 (esp32-wifi) :]\r\n[OPT:PHSEW]\r\n[CLUSTER:16]\r\n[MSG:INFO: Machine: Laser]\r\nok\r\n"),
+                            "[ESP800]" => send("FW version: FluidNC v4.1.1 # FW target:fluidnc-embedded # hostname:fluidnc # axis:3\r\nok\r\n"),
+                            _ => {
+                                if l.starts_with("G1") {
+                                    moves += 1;
+                                    if moves == 5 { send("[MSG:INFO: FluidNC v4.1.1 https://github.com/bdring/FluidNC]\r\n"); }
+                                }
+                                send("ok\r\n");
+                            }
+                        }
+                    }
+                    Ok(b) if b >= 0x80 || b == b'!' || b == b'~' || b == 0x18 => {}
+                    Ok(b) => line.push(b),
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                    Err(_) => {}
+                }
+            }
+        });
+        let (emit, ev) = collect();
+        let m = Machine::start(Box::new(FakeReader { rx: from_board_rx }), Box::new(FakeWriter { tx: to_board_tx }), emit);
+        let wel = wait_for(&ev, "machine-welcome", 2).expect("welcome");
+        assert!(wel.contains("\"FluidNC\"") && wel.contains("v4.1.1"), "{}", wel);
+        for _ in 0..3 { m.send_line("$I").unwrap(); }
+        m.send_line("[ESP800]").unwrap();
+        thread::sleep(Duration::from_millis(300));
+        assert_eq!(m.start_job(job(20)).unwrap(), 22);
+        let done = wait_for(&ev, "machine-job-done", 10).expect("job done");
+        assert!(done.contains("\"aborted\":false"), "{}", done);
+        let welcomes = ev.lock().unwrap().iter().filter(|(n, _)| n == "machine-welcome").count();
+        assert_eq!(welcomes, 1, "only the start message is a restart");
+        m.shutdown();
+    }
+
     #[test]
     fn tool_change_pauses_and_resumes() {
         let received = Arc::new(Mutex::new(Vec::new()));

@@ -30,7 +30,7 @@ pub fn grbl_reply(line: &str) -> Option<String> {
         }
         return None;
     }
-    let w = grbl::parse_welcome(line)?;
+    let w = grbl::firmware_named(line)?;
     matches!(w.firmware.as_str(), "GRBL" | "grblHAL" | "FluidNC" | "Grbl_ESP32").then_some(w.firmware)
 }
 
