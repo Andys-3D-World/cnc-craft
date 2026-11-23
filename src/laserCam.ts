@@ -31,7 +31,7 @@ import { scanOffsetAt, shiftSeg } from "./scanOffset";
 import { orderByStage } from "./testCard";
 
 const MAX_SCANLINES = 40000; // Schutz vor riesigen Dateien
-const AVOID_MARGIN = 3;      // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
+export const AVOID_MARGIN = 3; // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
 
 export function generateLaserGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
   const warnings: string[] = [];

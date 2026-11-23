@@ -36,7 +36,7 @@ import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo 
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
-const AVOID_MARGIN = 5; // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
+export const AVOID_MARGIN = 5; // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
 
 export interface PlasmaPlan {
   pts: Pt[];          // Kontur in Schneid-Richtung, beginnt am Startpunkt (mm)

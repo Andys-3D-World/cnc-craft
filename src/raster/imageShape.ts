@@ -413,28 +413,43 @@ export async function splitImage(s: any, cutsU: number[], cutsV: number[]): Prom
   const im = await loadImg(img.src);
   const us = [0, ...cutsU.filter(u => u > 0.01 && u < 0.99).sort((a, b) => a - b), 1];
   const vs = [0, ...cutsV.filter(v => v > 0.01 && v < 0.99).sort((a, b) => a - b), 1];
+  const out: any[] = [];
+  for (let i = 0; i < us.length - 1; i++) for (let j = 0; j < vs.length - 1; j++) out.push(cutOut(s, im, us[i], us[i + 1], vs[j], vs[j + 1]));
+  return out;
+}
+
+/** Ausschnitt u0…u1 × v0…v1 (Anteile 0…1) eines Bildes als eigenes Bild mit denselben Gravur-Einstellungen */
+function cutOut(s: any, im: HTMLImageElement, u0: number, u1: number, v0: number, v1: number): any {
+  const img: ImageSettings = s.img;
   const [p0, p1, , p3] = s.points as Pt[];
   const P = (u: number, v: number) => ({ x: p0.x + u * (p1.x - p0.x) + v * (p3.x - p0.x), y: p0.y + u * (p1.y - p0.y) + v * (p3.y - p0.y) });
   const W = im.naturalWidth, H = im.naturalHeight;
-  const out: any[] = [];
-  for (let i = 0; i < us.length - 1; i++) for (let j = 0; j < vs.length - 1; j++) {
-    const u0 = us[i], u1 = us[i + 1], v0 = vs[j], v1 = vs[j + 1];
-    const sx = Math.round(u0 * W), ex = Math.round(u1 * W), sy = Math.round((1 - v1) * H), ey = Math.round((1 - v0) * H);
-    const pw = Math.max(1, ex - sx), ph = Math.max(1, ey - sy);
-    const c = document.createElement("canvas");
-    c.width = pw; c.height = ph;
-    const ctx = c.getContext("2d")!;
-    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, pw, ph);
-    ctx.drawImage(im, sx, sy, pw, ph, 0, 0, pw, ph);
-    const src = pw * ph <= 1_000_000 ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.92);
-    // Maske in die Anteile des Stücks umrechnen
-    const mask = img.mask?.map(r => r.map(q => ({ u: (q.u - u0) / (u1 - u0), v: (q.v - v0) / (v1 - v0) })));
-    const piece = { ...JSON.parse(JSON.stringify(s)), id: newId(), points: [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)],
-      img: { ...JSON.parse(JSON.stringify({ ...img, src: "" })), src, pw, ph, ...(mask ? { mask } : {}) } };
-    delete piece.groupId;
-    delete piece.gen;
-    updatePolylineBounds(piece);
-    out.push(piece);
-  }
-  return out;
+  const sx = Math.round(u0 * W), ex = Math.round(u1 * W), sy = Math.round((1 - v1) * H), ey = Math.round((1 - v0) * H);
+  const pw = Math.max(1, ex - sx), ph = Math.max(1, ey - sy);
+  const c = document.createElement("canvas");
+  c.width = pw; c.height = ph;
+  const ctx = c.getContext("2d")!;
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, pw, ph);
+  ctx.drawImage(im, sx, sy, pw, ph, 0, 0, pw, ph);
+  const src = pw * ph <= 1_000_000 ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.92);
+  // Maske in die Anteile des Stücks umrechnen
+  const mask = img.mask?.map(r => r.map(q => ({ u: (q.u - u0) / (u1 - u0), v: (q.v - v0) / (v1 - v0) })));
+  const piece = { ...JSON.parse(JSON.stringify(s)), id: newId(), points: [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)],
+    img: { ...JSON.parse(JSON.stringify({ ...img, src: "" })), src, pw, ph, ...(mask ? { mask } : {}) } };
+  delete piece.groupId;
+  delete piece.gen;
+  updatePolylineBounds(piece);
+  return piece;
+}
+
+/**
+ * Bild auf ein Rechteck zuschneiden (Welt-Pixel, für gerade liegende Bilder) – für „Großes Teil teilen“: jedes Stück
+ * bekommt den Teil des Bildes, der in seinem Rahmen liegt. null = vom Bild liegt dort nichts.
+ */
+export async function cropImage(s: any, box: { minX: number; minY: number; maxX: number; maxY: number }): Promise<any | null> {
+  const a = toImageUV(s, { x: box.minX, y: box.minY }), b = toImageUV(s, { x: box.maxX, y: box.maxY });
+  const cl = (v: number) => Math.max(0, Math.min(1, v));
+  const u0 = cl(Math.min(a.u, b.u)), u1 = cl(Math.max(a.u, b.u)), v0 = cl(Math.min(a.v, b.v)), v1 = cl(Math.max(a.v, b.v));
+  if (u1 - u0 < 1e-4 || v1 - v0 < 1e-4) return null;
+  return cutOut(s, await loadImg(s.img.src), u0, u1, v0, v1);
 }

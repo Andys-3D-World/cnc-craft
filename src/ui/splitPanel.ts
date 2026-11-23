@@ -5,6 +5,8 @@
  *    Stücke mit Größe (rot = passt nicht aufs Bett), Hinweise
  *  - Zeichenfläche: Fugen mit ihrer Verbindung, Stücke eingefärbt und beschriftet; Fugen lassen sich ziehen
  *  - ohne offenes Fenster zeigt das Original-Bett seine Fugen als gestrichelte Linien mit den Stück-Namen
+ *  - Laser: welche Ebenen durchschneiden (ihre geschlossenen Formen sind der Umriss), wird hier angehakt;
+ *    Plasma: die Regel steht als Text da (alle geschlossenen Formen „Außen“/„Innen“)
  *
  * Hier wird nichts an die Maschine geschickt. Es stehen nur eigene Texte und Zahlen im HTML.
  */
@@ -16,9 +18,13 @@ import { fmtLenShort, fmtLenU, unitName } from "../units";
 import { openToolPanel, rowCss, checkCss, type ToolPanel } from "./toolPanel";
 import {
   cloneSplit, defaultSeam, fitGrid, gridSeams, pieceName, cleanSeam, MAX_SEAMS, SEAM_JOINTS,
-  type Issue, type Seam, type SeamAxis, type SplitResult, type SplitSetup,
+  type Issue, type Seam, type SeamAxis, type SplitKind, type SplitResult, type SplitSetup,
 } from "../seamSplit";
-import { computeSplit, makePieces, splitBlocked, splitOptions } from "../splitJob";
+import { computeSplit, makePieces, splitBlocked, splitKind, splitOptions } from "../splitJob";
+import { laserCutLayers } from "../splitBeam";
+import { MODE_CHANGED } from "../machineMode";
+import { LAYERS_CHANGED } from "../laserLayers";
+import { PLASMA_CHANGED } from "../plasmaCuts";
 
 let redraw = () => {};
 let log: (s: string) => void = () => {};
@@ -32,29 +38,34 @@ let drag = -1;
 /** erst wenn die Felder gefüllt sind, darf aus ihnen gelesen werden (das Fenster meldet schon beim Öffnen eine Änderung) */
 let ready = false;
 
-const KEY = "cnc_craft_seam";
+/** zuletzt benutzte Einstellungen – je Maschinen-Art, denn Spiel und Größen passen nicht von der Fräse zum Plasma */
+const KEY: Record<SplitKind, string> = { mill: "cnc_craft_seam", laser: "cnc_craft_seam_laser", plasma: "cnc_craft_seam_plasma" };
 const K = MM_TO_PIXEL;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
 /** Vorlage für neue Fugen: die zuletzt benutzten Einstellungen */
 function template(): Seam {
+  const kind = splitKind(), d = defaultSeam("x", 0, kind);
   let raw: any = null;
-  try { raw = JSON.parse(localStorage.getItem(KEY) || "null"); } catch { /* Standard */ }
-  return cleanSeam({ ...defaultSeam(), ...(raw && typeof raw === "object" ? raw : {}), axis: "x", pos: 0 }) ?? defaultSeam();
+  try { raw = JSON.parse(localStorage.getItem(KEY[kind]) || "null"); } catch { /* Standard */ }
+  return cleanSeam({ ...d, ...(raw && typeof raw === "object" ? raw : {}), axis: "x", pos: 0 }) ?? d;
 }
 function remember(s: Seam) {
   const { joint, size, depth, count, spacing, clearance, alternate } = s;
-  try { localStorage.setItem(KEY, JSON.stringify({ joint, size, depth, count, spacing, clearance, alternate })); } catch { /* egal */ }
+  try { localStorage.setItem(KEY[splitKind()], JSON.stringify({ joint, size, depth, count, spacing, clearance, alternate })); } catch { /* egal */ }
 }
 
+/** Texte, die bei Laser/Plasma anders lauten (dort gibt es keinen Fräser, sondern einen Schnittspalt) */
+const BEAM_ISSUE: Partial<Record<Issue["code"], string>> = { knobSmall: "knobSmallBeam", fingerSmall: "fingerSmallBeam" };
+
 /** Hinweis als Text */
-export function issueText(i: Issue): string {
+export function issueText(i: Issue, kind: SplitKind = splitKind()): string {
   const p: Record<string, string | number> = {
     seam: (i.seam ?? 0) + 1, piece: i.piece ?? "", n: i.n ?? 0,
     v: i.v !== undefined ? fmtLenU(i.v, 2) : "", w: i.w !== undefined ? fmtLenShort(i.w, 1) : "", h: i.h !== undefined ? fmtLenShort(i.h, 1) : "",
     x: i.x !== undefined ? fmtLenShort(i.x, 1) : "", y: i.y !== undefined ? fmtLenShort(i.y, 1) : "", u: unitName(),
   };
-  return t("seam.i." + i.code, p);
+  return t("seam.i." + ((kind !== "mill" && BEAM_ISSUE[i.code]) || i.code), p);
 }
 
 function recompute() {
@@ -92,22 +103,28 @@ export function openSplitPanel() {
   sel = 0;
   ready = false;
   recompute();
-  if (res && !res.bounds) { log(t("seam.i.noOutline")); draft = null; res = null; return; }
+  if (res && !res.bounds) { log(issueText(res.issues.find(i => i.level === "error") ?? { code: "noOutline", level: "error" })); draft = null; res = null; return; }
   // erstes Öffnen: gleich so teilen, dass jedes Stück passt
   if (!stored) {
-    const g = fitGrid(app().shapes, template(), splitOptions());
+    const g = fitGrid(app().shapes, template(), splitOptions(app().shapes, draft));
     if (g) draft.seams = g.seams;
     recompute();
   }
   const bed = bedSizeMm();
   const b = drawingBox()!;
+  const kind = splitKind();
   const numRow = (label: string, id: string, attrs: string) => `<label style="${rowCss}">${label}<input type="number" id="${id}" class="prop-input" style="width:84px;" ${attrs}></label>`;
   panel = openToolPanel({
     id: "seam-split-panel", ico: "seamSplit", title: t("seam.title"), ok: "✔ " + t(stored && pieceBeds(stored.id).length ? "seam.remake" : "seam.make"), redraw: () => redraw(),
     body: `
       <div style="font-size:0.78rem;color:var(--text-muted);">${esc(t("seam.hint", { w: fmtLenShort(b.maxX - b.minX, 1), h: fmtLenShort(b.maxY - b.minY, 1), bw: fmtLenShort(bed.w, 1), bh: fmtLenShort(bed.h, 1), u: unitName() }))}</div>
+      ${kind === "laser" ? `<div style="font-size:0.78rem;display:flex;flex-direction:column;gap:4px;border:1px solid var(--border-color);border-radius:8px;padding:6px 8px;">
+        <b style="font-size:0.82rem;">${esc(t("seam.cutLayers"))}</b>
+        <div id="ss-cut" style="display:flex;flex-wrap:wrap;gap:4px 12px;"></div>
+        <span style="color:var(--text-muted);">${esc(t("seam.ruleLaser"))} <span id="ss-cut-auto"></span></span>
+      </div>` : kind === "plasma" ? `<div style="font-size:0.78rem;color:var(--text-muted);border:1px solid var(--border-color);border-radius:8px;padding:6px 8px;">${esc(t("seam.rulePlasma"))}</div>` : ""}
       <div style="display:flex;gap:6px;align-items:center;font-size:0.85rem;flex-wrap:wrap;">
-        <button type="button" class="btn-secondary btn-compact" data-act="fit" title="${esc(t("seam.fitTip"))}">⤢ ${esc(t("seam.fit"))}</button>
+        <button type="button" class="btn-secondary btn-compact" data-act="fit" title="${esc(t(kind === "mill" ? "seam.fitTip" : "seam.fitTipBeam"))}">⤢ ${esc(t("seam.fit"))}</button>
         <input type="number" id="ss-cols" data-unit="none" class="prop-input" min="1" max="${MAX_SEAMS + 1}" step="1" style="width:46px;" title="${esc(t("seam.cols"))}">
         ×
         <input type="number" id="ss-rows" data-unit="none" class="prop-input" min="1" max="${MAX_SEAMS + 1}" step="1" style="width:46px;" title="${esc(t("seam.rows"))}">
@@ -134,10 +151,10 @@ export function openSplitPanel() {
         <button type="button" class="btn-secondary btn-compact" data-act="all">${esc(t("seam.toAll"))}</button>
       </div>
       <div id="ss-gap" style="font-size:0.78rem;color:var(--text-muted);"></div>
-      <b style="font-size:0.85rem;">${esc(t("seam.pieces"))}</b>
+      <b style="font-size:0.85rem;">${esc(t(kind === "mill" ? "seam.pieces" : "seam.piecesBeam"))}</b>
       <div id="ss-pieces" style="display:flex;flex-wrap:wrap;gap:4px;font-size:0.8rem;"></div>
       <div id="ss-issues" style="font-size:0.78rem;display:flex;flex-direction:column;gap:3px;"></div>
-      <div style="font-size:0.75rem;color:var(--text-muted);">${esc(t("seam.testNote"))}</div>
+      <div style="font-size:0.75rem;color:var(--text-muted);">${esc(t(kind === "laser" ? "seam.testNoteLaser" : kind === "plasma" ? "seam.testNotePlasma" : "seam.testNote"))}</div>
       ${stored ? `<button type="button" class="btn-secondary btn-compact" data-act="remove">${esc(t("seam.remove"))}</button>` : ""}`,
     onChange: p => { if (!ready) return; readFields(p); recompute(); show(p, false); },
     onOk: () => create(),
@@ -164,7 +181,7 @@ function act(p: ToolPanel, a: string) {
   const cur = draft.seams[sel];
   const like = cur ? { ...cur } : template();
   if (a === "fit") {
-    const g = fitGrid(app().shapes, like, splitOptions());
+    const g = fitGrid(app().shapes, like, splitOptions(app().shapes, draft));
     if (!g) { p.info(t("seam.fitNone"), true); return; }
     draft.seams = g.seams; sel = 0;
     p.$<HTMLInputElement>("#ss-cols").value = String(g.cols);
@@ -204,8 +221,20 @@ function act(p: ToolPanel, a: string) {
   redraw();
 }
 
+/** Laser: angehakte Schneid-Ebenen übernehmen – nur, wenn wirklich umgehakt wurde (sonst bleibt „automatisch“) */
+function readCutLayers(p: ToolPanel) {
+  if (!draft || splitKind() !== "laser") return;
+  const boxes = [...p.el.querySelectorAll<HTMLInputElement>("#ss-cut input[data-cut]")];
+  if (!boxes.length) return;
+  const now = laserCutLayers(app().shapes, draft).list;
+  if (boxes.every(b => (now.find(c => c.id === b.dataset.cut)?.on ?? false) === b.checked)) return;
+  const ids = boxes.filter(b => b.checked).map(b => b.dataset.cut!);
+  if (ids.length) draft.cutLayers = ids; else delete draft.cutLayers;
+}
+
 /** Felder der gewählten Fuge lesen */
 function readFields(p: ToolPanel) {
+  readCutLayers(p);
   const s = draft?.seams[sel];
   if (!s) return;
   const joint = p.$<HTMLSelectElement>("#ss-joint").value as Seam["joint"];
@@ -246,8 +275,20 @@ function show(p: ToolPanel, fields: boolean) {
     }
   }
   const r = res;
-  p.$<HTMLElement>("#ss-gap").textContent = r && s && s.joint !== "butt"
-    ? t("seam.gap", { g: fmtLenU(2 * s.clearance, 2), d: fmtLenU(r.toolDia, 2) }) : r ? t("seam.tool", { d: fmtLenU(r.toolDia, 2) }) : "";
+  const kind = splitKind();
+  if (kind === "laser") {
+    // Schneid-Ebenen: Farbe + Name zum Anhaken (Namen sind fremder Text → esc)
+    const cut = laserCutLayers(app().shapes, draft);
+    p.$<HTMLElement>("#ss-cut").innerHTML = cut.list.map(c => `<label style="display:flex;gap:5px;align-items:center;"><input type="checkbox" data-cut="${esc(c.id)}"${c.on ? " checked" : ""}>`
+      + `<span style="width:10px;height:10px;border-radius:2px;background:${esc(c.color)};display:inline-block;"></span>${esc(c.name)}</label>`).join("");
+    p.$<HTMLElement>("#ss-cut-auto").textContent = cut.auto && cut.list.length ? t("seam.cutAuto") : "";
+  }
+  const joined = !!s && s.joint !== "butt";
+  const lay = r?.seams.find(l => l.index === sel);
+  p.$<HTMLElement>("#ss-gap").textContent = !r ? ""
+    : kind === "laser" ? (r.toolDia > 0 ? t(joined ? "seam.gapLaser" : "seam.toolLaser", { g: fmtLenU(2 * (s?.clearance ?? 0), 2), k: fmtLenU(r.toolDia, 2), h: fmtLenU(r.kerfShift, 3) }) : "")
+    : kind === "plasma" ? t(joined ? "seam.gapPlasma" : "seam.toolPlasma", { g: fmtLenU(2 * (s?.clearance ?? 0), 2), k: fmtLenU(r.toolDia, 2), r: fmtLenU(lay?.profile.rho ?? 0, 1) })
+    : joined ? t("seam.gap", { g: fmtLenU(2 * s!.clearance, 2), d: fmtLenU(r.toolDia, 2) }) : t("seam.tool", { d: fmtLenU(r.toolDia, 2) });
   p.$<HTMLElement>("#ss-pieces").innerHTML = r ? r.pieces.map(pc => {
     const w = pc.extent ? pc.extent.maxX - pc.extent.minX : 0, h = pc.extent ? pc.extent.maxY - pc.extent.minY : 0;
     return `<span style="padding:1px 6px;border-radius:6px;border:1px solid ${pc.fits ? "var(--border-color)" : "#ff5a5a"};color:${pc.fits ? "inherit" : "#ff7a7a"};" title="${esc(t(pc.fits ? "seam.fits" : "seam.noFits"))}">`
@@ -260,7 +301,7 @@ function show(p: ToolPanel, fields: boolean) {
 }
 
 /** OK: Stücke erzeugen (false = Fenster bleibt offen) */
-function create(): boolean {
+async function create(): Promise<boolean> {
   if (!draft || !res) return false;
   recompute();
   const r = res as SplitResult | null;
@@ -270,7 +311,7 @@ function create(): boolean {
   if (bad.length && !window.confirm(t("seam.confirmNoFit", { names: bad.map(pc => pc.name).join(", ") }))) return false;
   const stored = bedSplit(), old = stored ? pieceBeds(stored.id).length : 0;
   if (old && !window.confirm(t("seam.confirmRemake", { n: old }))) return false;
-  const n = makePieces(draft, app().shapes, r);
+  const n = await makePieces(draft, app().shapes, r);
   log(t("seam.made", { n, names: r.pieces.map(pc => pc.name).join(", ") }));
   for (const i of r.issues) if (i.code !== "noFit") log(`${t("log.warning")} ${issueText(i)}`);
   return true;
@@ -419,4 +460,8 @@ export function initSplitPanel(onRedraw: () => void, onLog: (s: string) => void)
     if (panel && draft) { recompute(); show(panel, true); redraw(); }
   });
   window.addEventListener("cnc-unit-changed", () => { if (panel) show(panel, true); });
+  // andere Maschinen-Art = andere Regeln und Texte: Fenster zu (die Fugen des Bettes bleiben, nichts geht verloren außer dem Entwurf)
+  window.addEventListener(MODE_CHANGED, () => panel?.close());
+  // Ebene, Schnitt oder Schnittspalt geändert, während das Fenster offen ist: neu rechnen
+  for (const ev of [LAYERS_CHANGED, PLASMA_CHANGED]) window.addEventListener(ev, () => { if (panel && draft) { recompute(); show(panel, false); redraw(); } });
 }

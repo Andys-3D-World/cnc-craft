@@ -155,7 +155,7 @@ function assemblySheet(): SheetAssembly | null {
     const near = [xs[pc.col - 1], xs[pc.col], ys[ys.length - pc.row - 1], ys[ys.length - pc.row]].filter(Boolean);
     return [...new Set(near.map(l => t(l.feats.length ? "seam.joint." + l.seam.joint : "seam.joint.butt")))].join(", ") || "–";
   };
-  const notes = r.issues.filter(i => i.code !== "noFit").map(issueText);
+  const notes = r.issues.filter(i => i.code !== "noFit").map(i => issueText(i, r.kind));
   if (sp.stale) notes.unshift(t("sheet.asm.stale"));
   const clear = Math.max(0, ...r.seams.map(l => l.profile.c));
   return {
@@ -164,7 +164,8 @@ function assemblySheet(): SheetAssembly | null {
     svg: assemblySvg(r.pieces, sp.piece),
     head: [t("sheet.asm.piece"), t("sheet.asm.size"), t("sheet.asm.joints")],
     rows: r.pieces.map(p => [p.name, p.extent ? `${fmtLenU(p.extent.maxX - p.extent.minX, 1)} × ${fmtLenU(p.extent.maxY - p.extent.minY, 1)}` : "–", jointsOf(p.name)]),
-    steps: [t("sheet.asm.s1"), t("sheet.asm.s2", { g: fmtLenU(2 * clear, 2) }), t("sheet.asm.s3")],
+    // Blech wird nicht geleimt: beim Plasma eigene Sätze zum Fügen
+    steps: [t("sheet.asm.s1"), t(r.kind === "plasma" ? "sheet.asm.s2Plasma" : "sheet.asm.s2", { g: fmtLenU(2 * clear, 2) }), t(r.kind === "plasma" ? "sheet.asm.s3Plasma" : "sheet.asm.s3")],
     notes,
   };
 }

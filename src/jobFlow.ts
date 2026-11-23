@@ -107,7 +107,8 @@ export async function splitOk(): Promise<boolean> {
   }
   const pc = pieceState();
   if (pc && pc.stale) {
-    const r = await askChoice(t("seam.ask.staleTitle"), t("seam.ask.staleText", { name: pc.name, src: pc.source >= 0 ? bedName(pc.source) : "" }), [
+    // Laser/Plasma: statt eines Fräsers können sich Ebenen, Schnitte oder der Schnittspalt geändert haben
+    const r = await askChoice(t("seam.ask.staleTitle"), t(getMachineMode() === "mill" ? "seam.ask.staleText" : "seam.ask.staleTextBeam", { name: pc.name, src: pc.source >= 0 ? bedName(pc.source) : "" }), [
       { key: "cancel", label: t("dlg.cancel"), cancel: true, primary: true },
       { key: "old", label: t("seam.ask.staleOld") }
     ]);

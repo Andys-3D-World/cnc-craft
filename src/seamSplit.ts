@@ -26,15 +26,29 @@
  *   - Bohrungen und Gewinde, die eine Fuge trifft, gibt es in keinem Stück (halbe Löcher am Rand verlaufen) → Meldung;
  *     Fasen an geteilten Konturen ebenso (sie würden auch die Fuge anfasen).
  *
+ * LASER UND PLASMA (kind "laser" / "plasma") schneiden mit einem Schnittspalt statt mit einem Fräser:
+ *   - Umriss des Teils sind die geschlossenen Formen, die durchschneiden (`beam(s).cut`): beim Laser die Formen der
+ *     gewählten Schneid-Ebenen, beim Plasma alle geschlossenen Formen außer „auf Linie“. Tiefen gibt es dort nicht.
+ *   - Der Spalt nimmt an beiden Stücken Material weg. Plasma gleicht ihn im G-Code selbst aus (plasmaCam.ts versetzt
+ *     um den halben Spalt) – das Stück wird gezeichnet, wie es fertig sein soll. Der Laser fährt genau auf der Linie:
+ *     dort wird die Fugenkante jedes Stücks um den halben Spalt weiter gezeichnet (Spiel − Spalt/2 von der Trennlinie,
+ *     die gezeichneten Stücke überlappen also, wenn das Spiel kleiner ist als der halbe Spalt). Nach dem Schneiden
+ *     liegt die Kante in beiden Fällen um das Spiel vor der Trennlinie, der Spalt zwischen den Stücken ist 2 × Spiel.
+ *   - Rundungen: der Spalt-Ø gilt wie ein Fräser-Ø (der Brenner muss in jede Mulde kommen), Plasma bekommt größere.
+ *   - Gefüllte Gravur-Flächen werden an der Stück-Kante abgeschnitten, Linien ebenso; gerade liegende Bilder werden
+ *     auf den Rahmen des Stücks zugeschnitten (`cropMm`, das Zuschneiden selbst macht splitJob.ts).
+ *
  * Einheiten: Formen kommen in Welt-Pixeln (shapeTransform.ts), gerechnet wird in mm, Y nach oben.
  */
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon, Polygon, Ring } from "polygon-clipping";
 import { offsetArea, type XY } from "./joints.ts";
-import { shapeToPaths, shapeBounds, createPolyline, cloneShape, newId, MM_TO_PIXEL } from "./shapeTransform.ts";
+import { shapeToPaths, shapeBounds, createPolyline, cloneShape, newId, translateShape, MM_TO_PIXEL } from "./shapeTransform.ts";
 import { extraOps, chamferSide } from "./ops.ts";
 
 export type SeamAxis = "x" | "y";
+/** Womit geschnitten wird: Fräser (Radius), Laser (Spalt, fährt auf der Linie) oder Plasma (Spalt, G-Code gleicht aus) */
+export type SplitKind = "mill" | "laser" | "plasma";
 export type SeamJoint = "puzzle" | "finger" | "butt";
 export const SEAM_JOINTS: SeamJoint[] = ["puzzle", "finger", "butt"];
 
@@ -54,6 +68,8 @@ export interface SplitSetup {
   id: string;          // Kennung: die Stück-Betten gehören zu dieser Aufteilung
   seams: Seam[];
   made?: string;       // Fingerabdruck von Zeichnung + Fugen, als die Stücke zuletzt erzeugt wurden
+  /** nur Laser: Ebenen, deren geschlossene Formen der Umriss des Teils sind (fehlt = automatisch die kräftigste) */
+  cutLayers?: string[];
 }
 
 export const MAX_SEAMS = 12; // je Richtung
@@ -61,8 +77,11 @@ const PX = MM_TO_PIXEL;
 const TOL = 0.004;           // Bögen der Trennlinie: größte Abweichung der Sehnen (mm)
 const NECK = 0.56;           // Noppe: Halsbreite / Kopf-Ø
 
-export function defaultSeam(axis: SeamAxis = "x", pos = 0): Seam {
-  return { axis, pos, joint: "puzzle", size: 24, depth: 12, count: 0, spacing: 120, clearance: 0.1, alternate: true };
+/** Spiel je Seite, mit dem eine neue Fuge beginnt: Plasma-Kanten sind rauer und schräg, Laser-Kanten fast glatt */
+export const DEFAULT_CLEARANCE: Record<SplitKind, number> = { mill: 0.1, laser: 0.05, plasma: 0.3 };
+
+export function defaultSeam(axis: SeamAxis = "x", pos = 0, kind: SplitKind = "mill"): Seam {
+  return { axis, pos, joint: "puzzle", size: 24, depth: 12, count: 0, spacing: 120, clearance: DEFAULT_CLEARANCE[kind], alternate: true };
 }
 
 const num = (v: any, d: number, lo: number, hi: number) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, n)) : d; };
@@ -87,10 +106,12 @@ export function cleanSplit(raw: any): SplitSetup | null {
   const keep: Seam[] = [];
   for (const ax of ["x", "y"] as SeamAxis[]) keep.push(...seams.filter((s: Seam) => s.axis === ax).slice(0, MAX_SEAMS));
   const id = typeof raw.id === "string" && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : newId();
-  return { id, seams: keep, ...(typeof raw.made === "string" ? { made: raw.made.slice(0, 40) } : {}) };
+  // Ebenen-Kennungen landen in HTML-Attributen: nur harmlose Zeichen (wie laserLayers.ts sie vergibt)
+  const cut = Array.isArray(raw.cutLayers) ? [...new Set<string>(raw.cutLayers.filter((x: any) => typeof x === "string" && /^[A-Za-z0-9_.-]{1,64}$/.test(x)))].slice(0, 40) : [];
+  return { id, seams: keep, ...(typeof raw.made === "string" ? { made: raw.made.slice(0, 40) } : {}), ...(cut.length ? { cutLayers: cut } : {}) };
 }
 
-export const cloneSplit = (s: SplitSetup): SplitSetup => ({ ...s, seams: s.seams.map(m => ({ ...m })) });
+export const cloneSplit = (s: SplitSetup): SplitSetup => ({ ...s, seams: s.seams.map(m => ({ ...m })), ...(s.cutLayers ? { cutLayers: [...s.cutLayers] } : {}) });
 
 /** Name eines Stücks: Spalte als Buchstabe (links A), Reihe als Zahl (oben 1) */
 export function pieceName(col: number, row: number): string {
@@ -103,11 +124,23 @@ export function pieceName(col: number, row: number): string {
 // FORM DER VERBINDUNG
 // =====================================================================
 
-/** Kleinster Bogen-Radius der Trennlinie für diesen Fräser-Ø (etwas größer als der Fräser-Radius; 0 = Laser) */
-export function minCurveRadius(toolDia: number): number { return toolDia > 0 ? toolDia * 0.55 + 0.2 : 0.2; }
+/**
+ * Kleinster Bogen-Radius der Trennlinie für diesen Fräser-Ø bzw. Schnittspalt (etwas größer als der halbe Ø).
+ * Plasma: mindestens 2 mm und 1,5 × Spalt – der Brenner fährt dann nie enger als einen Spalt-Radius um eine Ecke
+ * (in engen Ecken bleibt er fast stehen und brennt sie aus).
+ */
+export function minCurveRadius(toolDia: number, kind: SplitKind = "mill"): number {
+  if (kind === "plasma") return Math.max(2, 1.5 * Math.max(0, toolDia));
+  return toolDia > 0 ? toolDia * 0.55 + 0.2 : 0.2;
+}
 
 export type IssueCode =
   | "noOutline"     // keine ausgeschnittene Außenkontur gefunden
+  | "noOutlineLaser"  // Laser: keine geschlossene Form auf einer Ebene, die eine Linie schneidet
+  | "noOutlinePlasma" // Plasma: keine geschlossene Form mit „Außen“ oder „Innen“
+  | "kerf0"         // Laser: Schnittspalt nicht gemessen → die Fuge wird um einen Spalt weiter
+  | "fillLine"      // Laser: n Flächen „Füllen + Linie“ über einer Fuge – ihre Linie läuft auch an der Fuge entlang
+  | "imageCut"      // Laser: n Bilder am Rahmen der Stücke zugeschnitten
   | "knobSmall"     // Noppe zu klein für den Fräser (v = kleinster Kopf-Ø)
   | "fingerSmall"   // Finger zu schmal für den Fräser (v = kleinste Breite)
   | "fingerShallow" // Finger zu flach (v = kleinste Tiefe)
@@ -147,8 +180,8 @@ export interface Profile {
   errors: Issue[];
 }
 
-export function seamProfile(seam: Seam, toolDia: number, index = 0): Profile {
-  const rhoMin = minCurveRadius(toolDia);
+export function seamProfile(seam: Seam, toolDia: number, index = 0, kind: SplitKind = "mill"): Profile {
+  const rhoMin = minCurveRadius(toolDia, kind);
   const p: Profile = { joint: seam.joint, c: seam.joint === "butt" ? 0 : Math.max(0, seam.clearance), rho: rhoMin, R: 0, w: 0, h: 0, halfW: 0, F: 0, D: 0, reach: 0, minPitch: 0, errors: [] };
   const err = (code: IssueCode, v: number) => p.errors.push({ code, level: "error", seam: index, v: Math.ceil(v * 10 - 1e-9) / 10 });
   if (seam.joint === "puzzle") {
@@ -405,19 +438,32 @@ function layoutSeam(seam: Seam, index: number, prof: Profile, M: MultiPolygon, c
 // ZEICHNUNG TEILEN
 // =====================================================================
 
+/** Wie Laser oder Plasma eine Form bearbeiten */
+export interface BeamInfo {
+  cut: boolean;     // schneidet durch → geschlossene Formen damit sind der Umriss des Teils
+  fill: boolean;    // gefüllte Gravur (Laser): geschlossene Formen werden als Fläche geteilt
+  line: boolean;    // die Linie wird abgefahren
+  kerf: number;     // Schnittspalt in mm (0 = nicht bekannt)
+  margin: number;   // Platz, den die Bahn außerhalb der Kontur braucht (Anfahrbahn, halber Spalt) in mm
+}
+
 export interface SplitOptions {
   bed: { w: number; h: number };  // Arbeitsbereich in mm
   /** wirksamer Schneid-Radius (mm) für eine Bearbeitung – 0 = Laser/Plasma */
   radiusOf: (v: { mode: string; toolId?: string; depth: number }) => number;
   /** Tiefe für Formen ohne eigene Tiefe (wie das Eingabefeld der Fräse) */
   fallbackDepth?: number;
+  /** womit geschnitten wird (fehlt = Fräse) */
+  kind?: SplitKind;
+  /** Laser/Plasma: wie eine Form bearbeitet wird (null = gar nicht) – nötig, wenn kind nicht "mill" ist */
+  beam?: (s: any) => BeamInfo | null;
 }
 
 export interface Piece {
   name: string; col: number; row: number;
   region: MultiPolygon;   // Fläche des Stücks in mm (Zeichnung)
-  shapes: any[];          // Formen des Stücks in Welt-Pixeln, an ihrem Platz in der Zeichnung
-  extent: Box | null;     // Platz, den das Stück beim Fräsen braucht (mit Fräserbahn), mm
+  shapes: any[];          // Formen des Stücks in Welt-Pixeln, an ihrem Platz in der Zeichnung (Bilder mit `cropMm` sind noch nicht zugeschnitten)
+  extent: Box | null;     // Platz, den das Stück beim Schneiden braucht (mit Fräserbahn bzw. Anfahrbahn), mm
   fits: boolean;
 }
 
@@ -428,12 +474,15 @@ export interface SplitResult {
   issues: Issue[];
   part: MultiPolygon;     // das ganze Teil (mm)
   bounds: Box | null;     // Rahmen des Teils (mm)
-  toolDia: number;        // Fräser-Ø, mit dem die Stücke ausgeschnitten werden
+  toolDia: number;        // Fräser-Ø, mit dem die Stücke ausgeschnitten werden – Laser/Plasma: der Schnittspalt
+  kind: SplitKind;
+  /** Laser: so weit ist jede Fugenkante weiter gezeichnet, damit der Schnittspalt ausgeglichen ist (sonst 0) */
+  kerfShift: number;
   ok: boolean;            // keine Fehler → Stücke dürfen erzeugt werden
 }
 
 /** eine Bearbeitung einer Form (die Form selbst oder eine weitere aus shape.ops) */
-interface Virt { src: any; op: number; mode: string; toolId?: string; depth: number; finishAllow?: number; millDir?: any; extra?: Record<string, any> }
+interface Virt { src: any; op: number; mode: string; out?: string; toolId?: string; depth: number; finishAllow?: number; millDir?: any; extra?: Record<string, any> }
 
 function virtuals(s: any, fallback: number): Virt[] {
   const out: Virt[] = [{ src: s, op: -1, mode: s.millingMode || "outside", toolId: s.toolId, depth: typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallback, finishAllow: s.finishAllow, millDir: s.millDir }];
@@ -452,7 +501,7 @@ function carry(v: Virt, contour: boolean): Record<string, any> {
   if (typeof v.toolId === "string") out.toolId = v.toolId;
   if (v.finishAllow) out.finishAllow = v.finishAllow;
   if (v.millDir) out.millDir = v.millDir;
-  for (const k of ["laserLayerId", "plasmaCutId", "source"]) if (s[k] !== undefined) out[k] = s[k];
+  for (const k of ["laserLayerId", "plasmaCutId", "source", "laserOverride", "foldLine"]) if (s[k] !== undefined) out[k] = s[k];
   if (v.op < 0) for (const k of ["cutData", "restToolId", "vStart"]) if (s[k] !== undefined) out[k] = s[k];
   if (contour) for (const k of CONTOUR_KEYS) if (s[k] !== undefined) out[k] = s[k];
   return out;
@@ -479,34 +528,51 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   const issues: Issue[] = [];
   clipErrors = 0;
   const fallback = o.fallbackDepth ?? -2;
+  const kind: SplitKind = o.kind ?? "mill", beam = kind !== "mill";
+  const beamOf = (s: any): BeamInfo | null => (beam && o.beam ? o.beam(s) : null);
   const list = shapes.filter(s => s && !s.keepOut);
   const info = list.map(s => {
     let path: { pts: { x: number; y: number }[]; closed: boolean } | undefined;
     try { path = shapeToPaths(s)[0]; } catch { /* ohne Bahn */ }
     const ring = path && path.pts.length >= 2 ? mmRing(path.pts) : null;
-    return { s, ring, closed: !!path?.closed && !!ring && ring.length >= 3, virts: virtuals(s, fallback), box: ring ? boxOfRing(ring) : null };
+    const closed = !!path?.closed && !!ring && ring.length >= 3;
+    const bi = beamOf(s);
+    // Laser/Plasma: genau eine Bearbeitung je Form – ausschneiden, Fläche füllen oder Linie abfahren
+    const virts: Virt[] = beam
+      ? [{ src: s, op: -1, mode: closed && bi?.cut ? "outside" : closed && bi?.fill ? "fill" : "on-line", out: s.millingMode || "outside", toolId: s.toolId, depth: typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallback }]
+      : virtuals(s, fallback);
+    return { s, ring, closed, virts, box: ring ? boxOfRing(ring) : null, beam: bi };
   });
   type Info = (typeof info)[number];
 
-  // ---- das Teil: geschlossene Konturen außen/innen, so tief wie die tiefste Außenkontur ----
+  // ---- das Teil: geschlossene Konturen außen/innen, so tief wie die tiefste Außenkontur (Laser/Plasma: was durchschneidet) ----
   let T = 0;
   for (const i of info) if (i.closed) for (const v of i.virts) if (v.mode === "outside") T = Math.max(T, Math.abs(v.depth));
-  const isThrough = (i: Info, v: Virt) => i.closed && (v.mode === "outside" || v.mode === "inside") && T > 0 && Math.abs(v.depth) >= T - 0.011;
+  const isThrough = (i: Info, v: Virt) => beam
+    ? i.closed && !!i.beam?.cut
+    : i.closed && (v.mode === "outside" || v.mode === "inside") && T > 0 && Math.abs(v.depth) >= T - 0.011;
   const through = info.filter(i => i.virts.some(v => isThrough(i, v)));
-  const empty: SplitResult = { pieces: [], cols: 1, rows: 1, seams: [], issues, part: [], bounds: null, toolDia: 0, ok: false };
-  if (!through.length) { issues.push({ code: "noOutline", level: "error" }); return empty; }
+  const empty: SplitResult = { pieces: [], cols: 1, rows: 1, seams: [], issues, part: [], bounds: null, toolDia: 0, kind, kerfShift: 0, ok: false };
+  const noOutline: IssueCode = kind === "laser" ? "noOutlineLaser" : kind === "plasma" ? "noOutlinePlasma" : "noOutline";
+  if (!through.length) { issues.push({ code: noOutline, level: "error" }); return empty; }
   const rings = through.map(i => [i.ring!] as Polygon);
   const M: MultiPolygon = rings.length === 1 ? safe(() => polygonClipping.union(rings[0]), [rings[0]]) : safe(() => polygonClipping.xor(rings[0], ...rings.slice(1)), []);
   const bounds = boxOf(M);
-  if (!bounds) { issues.push({ code: "noOutline", level: "error" }); return empty; }
-  const toolDia = 2 * Math.max(0, ...through.flatMap(i => i.virts.filter(v => isThrough(i, v)).map(v => o.radiusOf(v))));
+  if (!bounds) { issues.push({ code: noOutline, level: "error" }); return empty; }
+  // Fräser-Ø – bei Laser/Plasma der (größte) Schnittspalt der Umriss-Formen: er muss in jede Mulde passen
+  const toolDia = beam
+    ? Math.max(0, ...through.map(i => i.beam?.kerf || 0))
+    : 2 * Math.max(0, ...through.flatMap(i => i.virts.filter(v => isThrough(i, v)).map(v => o.radiusOf(v))));
+  // Laser fährt auf der Linie: jede Fugenkante um den halben Spalt weiter zeichnen. Plasma versetzt im G-Code selbst
+  const shift = kind === "laser" ? toolDia / 2 : 0;
+  if (kind === "laser" && !(toolDia > 0)) issues.push({ code: "kerf0", level: "warn" });
   // welcher Punkt gehört zu welcher Außen-/Innenkontur (für die Einstellungen der neuen Stück-Umrisse)
   const owner = new Map<string, Info>();
   for (const i of through) for (const q of i.ring!) owner.set(key(q[0], q[1]), i);
   const biggest = through.reduce((a, b) => (Math.abs(ringArea(b.ring!)) > Math.abs(ringArea(a.ring!)) ? b : a));
 
   // ---- Fugen: sortieren, prüfen, auslegen ----
-  const all = setup.seams.map((seam, index) => ({ seam, index, profile: seamProfile(seam, toolDia, index) }));
+  const all = setup.seams.map((seam, index) => ({ seam, index, profile: seamProfile(seam, toolDia, index, kind) }));
   const inside = all.filter(a => {
     const lo = a.seam.axis === "x" ? bounds.minX : bounds.minY, hi = a.seam.axis === "x" ? bounds.maxX : bounds.maxY;
     if (a.seam.pos > lo + 0.5 && a.seam.pos < hi - 0.5) return true;
@@ -517,7 +583,8 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   const edge = Math.max(3, toolDia);
   const along = (ax: SeamAxis) => inside.filter(a => a.seam.axis === ax).sort((p, q) => p.seam.pos - q.seam.pos);
   const xs = along("x"), ys = along("y");
-  const band = (a: (typeof all)[number]) => (a.profile.errors.length ? 0 : a.profile.reach) + a.profile.c;
+  // so weit reicht eine Fuge höchstens zur Seite: Verbindung plus Spiel (Laser: plus die weiter gezeichnete Kante)
+  const band = (a: (typeof all)[number]) => (a.profile.errors.length ? 0 : a.profile.reach) + Math.max(a.profile.c, shift);
   for (const set of [xs, ys]) for (let k = 1; k < set.length; k++) {
     const need = band(set[k - 1]) + band(set[k]) + edge;
     if (set[k].seam.pos - set[k - 1].seam.pos < need) issues.push({ code: "close", level: "error", seam: set[k].index, v: Math.ceil(need) });
@@ -543,8 +610,9 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   }
 
   // ---- Seiten einer Fuge als Flächen: A = links/unten bis zur Linie − Spiel, B = rechts/oben ab Linie + Spiel ----
+  // (Laser: Spiel − halber Spalt – ist das negativ, reicht jede Seite über die Linie und die Zeichnungen überlappen)
   const side = (l: SeamLayout, b: boolean): Polygon => {
-    const d = b ? l.profile.c : -l.profile.c, far = b ? BIG : -BIG;
+    const dd = l.profile.c - shift, d = b ? dd : -dd, far = b ? BIG : -BIG;
     const u0 = (l.seam.axis === "x" ? bounds.minY : bounds.minX) - BIG, u1 = (l.seam.axis === "x" ? bounds.maxY : bounds.maxX) + BIG;
     const path = seamPath(l.profile, l.feats, d, u0, u1);
     const loop = [...path, [u1, far] as XY, [u0, far] as XY].map(([u, v]) => toWorld(l.seam, u, v));
@@ -605,7 +673,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
     // offene Linie: alle Punkte in der Zelle und kein Abschnitt verlässt sie
     return ring.every(q => inArea(c.terr, q[0], q[1])) && clipLine(ring as XY[], c.terr).length === 1;
   };
-  let lostDrill = 0, lostChamfer = 0, images = 0, firstDrill: XY | null = null;
+  let lostDrill = 0, lostChamfer = 0, images = 0, imagesCut = 0, fillLines = 0, firstDrill: XY | null = null;
   const wholeRings: { box: Box; area: number }[][] = cells.map(() => []);
   const crossing: Info[] = [];
   const idMap = cells.map(() => new Map<string, string>());
@@ -625,7 +693,25 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
       const cx = (b.minX + b.maxX) / 2 / PX, cy = (b.minY + b.maxY) / 2 / PX;
       const ci = Math.max(0, cells.findIndex(c => inArea(c.terr, cx, cy)));
       const mb: Box = { minX: b.minX / PX, minY: b.minY / PX, maxX: b.maxX / PX, maxY: b.maxY / PX };
-      if (i.s.type === "image" && !inBox(mb, cells[ci].core)) images++;
+      if (i.s.type === "image" && !inBox(mb, cells[ci].core)) {
+        // Laser: ein gerade liegendes Bild bekommt jedes Stück als Ausschnitt in seinem Rahmen (um Noppen herum wird
+        // dabei auch etwas Abfall graviert). Gedrehte Bilder lassen sich so nicht schneiden und bleiben ganz
+        const q = i.s.points;
+        const straight = kind === "laser" && Array.isArray(q) && q.length === 4 && Math.abs(q[1].y - q[0].y) < 1e-6 && Math.abs(q[3].x - q[0].x) < 1e-6;
+        if (straight) {
+          let n = 0;
+          cells.forEach((c, k) => {
+            const cb = boxOf(c.outer);
+            if (!cb) return;
+            const crop: Box = { minX: Math.max(mb.minX, cb.minX), minY: Math.max(mb.minY, cb.minY), maxX: Math.min(mb.maxX, cb.maxX), maxY: Math.min(mb.maxY, cb.maxY) };
+            if (crop.maxX - crop.minX < 0.2 || crop.maxY - crop.minY < 0.2) return;
+            c.shapes.push(Object.assign(copy(i.s, k), { cropMm: crop }));
+            n++;
+          });
+          if (n) { imagesCut++; continue; }
+        }
+        images++;
+      }
       cells[ci].shapes.push(copy(i.s, ci));
       continue;
     }
@@ -653,6 +739,8 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
         for (const [w, n] of votes) if (n > best) { best = n; like = w; }
         const v = like.virts.find(x => isThrough(like, x))!;
         const shape = createPolyline(ringPoints(r, Math.max(0, start)), true, ri === 0 ? "outside" : "inside", { ...carry(v, true), ...(gid ? { groupId: gid } : {}) });
+        // Schneid-Richtung von Hand (im/gegen den Uhrzeigersinn) gilt weiter; ein Startpunkt von Hand passt nicht mehr
+        if (beam && (like.s.cutDir === "cw" || like.s.cutDir === "ccw")) shape.cutDir = like.s.cutDir;
         // der Umriss eines Stücks ist nie die „Insel“ einer Tasche, die über das Stück hinausreicht (cam.ts)
         if (ri === 0) shape.noIsland = true;
         c.shapes.push(shape);
@@ -671,9 +759,10 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
         continue;
       }
       if (v.mode === "chamfer") { lostChamfer++; continue; }
-      const r = Math.max(0, o.radiusOf(v));
+      const r = beam ? 0 : Math.max(0, o.radiusOf(v));
       // Fläche (Tasche, V-Carve, flache Kontur) oder Linie (Gravur, offene Bahn)?
       const asArea = i.closed && v.mode !== "on-line";
+      if (asArea && beam && i.beam?.line) fillLines++;
       // so weit reicht die Bearbeitung über das Stück hinaus: die Fräser-Mitte kommt einen Radius hinter die Fuge,
       // und keine Bahn läuft bündig an der Fugenkante entlang (flache Innen-Kontur deshalb 3 Radien, außen einer).
       // Die krummen Zugaben verhindern, dass die Hilfskante einer Insel genau auf der Fräserbahn-Grenze einer Tasche
@@ -705,7 +794,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
           for (const poly of inter([[i.ring!]], grown)) {
             const ring = poly[0];
             if (ring.length < 4 || Math.abs(ringArea(ring)) < 1e-4) continue;
-            c.shapes.push(Object.assign(createPolyline(ringPoints(ring, startIndex(ring, i.ring!, c.outer)), true, v.mode, { ...carry(v, false), ...(v.extra ?? {}) }), { splitOf: i.s.id }));
+            c.shapes.push(Object.assign(createPolyline(ringPoints(ring, startIndex(ring, i.ring!, c.outer)), true, v.out ?? v.mode, { ...carry(v, false), ...(v.extra ?? {}) }), { splitOf: i.s.id }));
           }
           if (lineIslands.some(q => areaOf(inter([[q]], c.outer)) > 1e-4) && !lostIslands.includes(c.name)) lostIslands.push(c.name);
         } else {
@@ -721,7 +810,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
           for (const run of runs) {
             if (!run.some(q => inArea(c.outer, q[0], q[1])) && !clipLine(run, c.outer).length) continue;
             const pts = (loop ? run.slice(0, -1) : run).map(q => ({ x: q[0] * PX, y: q[1] * PX }));
-            c.shapes.push(createPolyline(pts, loop, v.mode, carry(v, false)));
+            c.shapes.push(createPolyline(pts, loop, v.out ?? v.mode, carry(v, false)));
           }
         }
       }
@@ -730,12 +819,15 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   if (lostDrill) issues.push({ code: "drill", level: "warn", n: lostDrill, x: Math.round(firstDrill![0] * 10) / 10, y: Math.round(firstDrill![1] * 10) / 10 });
   if (lostChamfer) issues.push({ code: "chamfer", level: "warn", n: lostChamfer });
   if (images) issues.push({ code: "image", level: "warn", n: images });
+  if (imagesCut) issues.push({ code: "imageCut", level: "warn", n: imagesCut });
+  if (fillLines) issues.push({ code: "fillLine", level: "warn", n: fillLines });
 
   // ---- Inseln der Taschen: im Stück muss dieselbe Form Insel sein wie im Original ----
   const srcRing = new Map<string, Ring>();
   for (const i of info) if (i.closed) srcRing.set(i.s.id, i.ring!);
   for (const c of cells) {
-    const closed = c.shapes.filter(s => s.type === "polyline" && s.closed && s.splitOf && srcRing.has(s.splitOf));
+    // (nur Fräse: Laser und Plasma kennen keine Taschen mit Inseln)
+    const closed = beam ? [] : c.shapes.filter(s => s.type === "polyline" && s.closed && s.splitOf && srcRing.has(s.splitOf));
     let bad = false;
     for (const p of closed) {
       if (p.millingMode !== "pocket") continue;
@@ -766,8 +858,11 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
       let b: Box | null = null;
       try { b = shapeBounds(s); } catch { /* ohne Maße */ }
       if (!b) continue;
+      // ein Bild, das noch zugeschnitten wird, braucht nur seinen Ausschnitt
+      if (s.cropMm) b = { minX: s.cropMm.minX * PX, minY: s.cropMm.minY * PX, maxX: s.cropMm.maxX * PX, maxY: s.cropMm.maxY * PX };
       const mode = s.millingMode || "outside", rr = s.type === "image" ? 0 : Math.max(0, o.radiusOf({ mode, toolId: s.toolId, depth: Number(s.millingDepth) || 0 }));
-      const grow = mode === "outside" ? 2 * rr : mode === "on-line" ? rr : 0;
+      // Laser/Plasma: Platz für Anfahrbahn und halben Spalt statt für den Fräser, bei Bildern für den Überlauf der Zeilen
+      const grow = beam ? Math.max(0, beamOf(s)?.margin || 0) : mode === "outside" ? 2 * rr : mode === "on-line" ? rr : 0;
       const e: Box = { minX: b.minX / PX - grow, minY: b.minY / PX - grow, maxX: b.maxX / PX + grow, maxY: b.maxY / PX + grow };
       ext = ext ? { minX: Math.min(ext.minX, e.minX), minY: Math.min(ext.minY, e.minY), maxX: Math.max(ext.maxX, e.maxX), maxY: Math.max(ext.maxY, e.maxY) } : e;
     }
@@ -782,7 +877,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
     pieces.push({ name: c.name, col: c.col, row: c.row, region: c.reg, shapes: c.shapes, extent: ext, fits });
   }
   if (clipErrors) issues.push({ code: "geometry", level: "error" });
-  return { pieces, cols, rows, seams: layouts, issues, part: M, bounds, toolDia, ok: !issues.some(x => x.level === "error") };
+  return { pieces, cols, rows, seams: layouts, issues, part: M, bounds, toolDia, kind, kerfShift: shift, ok: !issues.some(x => x.level === "error") };
 }
 
 /**
@@ -804,6 +899,20 @@ function startIndex(ring: Ring, src: Ring, piece: MultiPolygon): number {
 // =====================================================================
 // HELFER FÜR DAS FENSTER
 // =====================================================================
+
+/**
+ * Stück an die Bett-Ecke legen: sein Platzbedarf (mit Fräserbahn bzw. Anfahrbahn) beginnt bei 0 – ist noch Luft,
+ * mit 1 mm Abstand. Verschiebt die Formen des Stücks (und den Ausschnitt eines noch nicht zugeschnittenen Bildes).
+ */
+export function placeAtCorner(p: Piece, bed: { w: number; h: number }): void {
+  if (!p.extent) return;
+  const w = p.extent.maxX - p.extent.minX, h = p.extent.maxY - p.extent.minY;
+  const dx = -p.extent.minX + (w + 2 <= bed.w ? 1 : 0), dy = -p.extent.minY + (h + 2 <= bed.h ? 1 : 0);
+  for (const s of p.shapes) {
+    translateShape(s, dx * PX, dy * PX);
+    if (s.cropMm) s.cropMm = { minX: s.cropMm.minX + dx, minY: s.cropMm.minY + dy, maxX: s.cropMm.maxX + dx, maxY: s.cropMm.maxY + dy };
+  }
+}
 
 /** Fugen gleichmäßig: cols Spalten und rows Reihen über den Rahmen, Einstellungen wie `like` */
 export function gridSeams(b: Box, cols: number, rows: number, like: Seam): Seam[] {
@@ -840,7 +949,10 @@ export function fitGrid(shapes: any[], like: Seam, o: SplitOptions): { cols: num
 
 /** Fingerabdruck von Zeichnung und Fugen – ändert er sich, sind die erzeugten Stücke veraltet (Bilddaten zählen nicht) */
 export function splitFingerprint(shapes: any[], setup: SplitSetup, toolInfo = ""): string {
-  const text = JSON.stringify([shapes, setup.seams, toolInfo], (k, v) => (k === "img" || k === "id" || k === "made" ? undefined : typeof v === "number" ? Math.round(v * 1000) / 1000 : v));
+  // die gewählten Schneid-Ebenen (Laser) zählen nur, wenn es welche gibt – ältere Fingerabdrücke bleiben gültig
+  const what: any[] = [shapes, setup.seams, toolInfo];
+  if (setup.cutLayers?.length) what.push(setup.cutLayers);
+  const text = JSON.stringify(what, (k, v) => (k === "img" || k === "id" || k === "made" ? undefined : typeof v === "number" ? Math.round(v * 1000) / 1000 : v));
   let h1 = 0x811c9dc5, h2 = 0x1b873593;
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
