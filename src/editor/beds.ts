@@ -25,6 +25,7 @@ import { tracePath } from "../render";
 import { updateDimensionInputs } from "../uiInputs";
 import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
 import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
+import { cleanSplit, type SplitSetup } from "../seamSplit";
 
 /**
  * Zweiseitig fräsen (twoSided.ts): `shapes` ist immer die Seite, die gerade gezeigt wird, `other` die verdeckte.
@@ -33,7 +34,12 @@ import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
 interface Sheet {
   name: string; done: boolean; shapes: any[]; hist?: HistoryState | null;
   other?: any[]; otherHist?: HistoryState | null; back?: boolean; two?: TwoSidedSetup | null;
+  /** Großes Teil teilen (seamSplit.ts): dieses Bett trägt das Original und seine Fugen */
+  split?: SplitSetup | null;
+  /** … oder es ist ein Stück daraus: `of` = Kennung der Aufteilung, `name` = A1, B1 … */
+  piece?: BedPiece | null;
 }
+export interface BedPiece { of: string; name: string }
 
 let beds: Sheet[] = [{ name: "", done: false, shapes: [] }];
 let active = 0;
@@ -105,6 +111,63 @@ export function showSide(side: Side, force = false) {
   changed();
 }
 
+// ---------------------------------------------------------------------
+// Großes Teil teilen: Original-Bett mit Fugen, je Stück ein eigenes Bett
+// ---------------------------------------------------------------------
+
+/** Fugen des Bettes (null = dieses Bett ist kein geteiltes Original) */
+export function bedSplit(i = active): SplitSetup | null { return beds[i]?.split ?? null; }
+
+/** Stück-Angabe des Bettes (null = kein Stück) */
+export function bedPiece(i = active): BedPiece | null { return beds[i]?.piece ?? null; }
+
+/** Bett, das das Original zu dieser Aufteilung trägt (−1 = gibt es nicht mehr) */
+export function splitSource(id: string): number { return beds.findIndex(b => b.split?.id === id); }
+
+/** Betten der Stücke einer Aufteilung */
+export function pieceBeds(id: string): number[] { return beds.map((b, i) => (b.piece?.of === id ? i : -1)).filter(i => i >= 0); }
+
+/** Fugen des aktiven Bettes setzen (null = Aufteilung entfernen; die Stück-Betten bleiben als normale Betten) */
+export function setBedSplit(split: SplitSetup | null) {
+  const old = beds[active].split;
+  beds[active].split = split;
+  if (!split && old) for (const b of beds) if (b.piece?.of === old.id) b.piece = null;
+  markDirty();
+  changed();
+}
+
+/**
+ * Stücke des aktiven Bettes (Original) auf ihre Betten legen: vorhandene Stück-Betten bekommen die neuen Formen,
+ * fehlende kommen dazu, überzählige (Stück gibt es nicht mehr) werden entfernt. Gibt die Anzahl der Betten zurück.
+ */
+export function applyPieces(id: string, list: { name: string; shapes: any[] }[]): number {
+  stash();
+  const prefix = beds[active].name ? beds[active].name.slice(0, 30) + " " : "";
+  for (const p of list) {
+    let b = beds.find(x => x.piece?.of === id && x.piece.name === p.name);
+    if (!b) { b = { name: "", done: false, shapes: [] }; beds.push(b); }
+    b.name = prefix + p.name;
+    b.piece = { of: id, name: p.name };
+    b.shapes = p.shapes;
+    b.done = false;
+    b.hist = null;
+    b.other = undefined; b.otherHist = null; b.back = false; b.two = null;
+  }
+  const keep = new Set(list.map(p => p.name));
+  for (let i = beds.length - 1; i >= 0; i--) {
+    const b = beds[i];
+    if (b.piece?.of !== id || keep.has(b.piece.name) || i === active) continue;
+    removeStockBed(i, beds.length);
+    beds.splice(i, 1);
+    if (i < active) active--;
+  }
+  setStockBed(active);
+  markDirty();
+  changed();
+  fitAll();
+  return list.length;
+}
+
 /** Vorder- und Rückseite eines Bettes (zum Speichern und für das Einrichteblatt) */
 function frontBack(i: number): { front: any[]; back: any[] } {
   const b = beds[i], shown = i === active ? app().shapes : b.shapes, other = b.other ?? [];
@@ -148,6 +211,8 @@ export function allBedsBounds(): Bounds {
   const b = bedSizeMm(), w = b.w * MM_TO_PIXEL, h = b.h * MM_TO_PIXEL;
   const r: Bounds = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
   for (let i = 0; i < beds.length; i++) {
+    // Original eines geteilten Teils: die anderen Betten sind dort nicht zu sehen (drawOtherBeds)
+    if (beds[active].split && i !== active) continue;
     const o = shiftOf(i);
     r.minX = Math.min(r.minX, o.x); r.maxX = Math.max(r.maxX, o.x + w);
     r.minY = Math.min(r.minY, o.y); r.maxY = Math.max(r.maxY, o.y + h);
@@ -236,11 +301,14 @@ export function allShapes(): any[] {
   return beds.flatMap((_, i) => { const fb = frontBack(i); return fb.back.length ? [...fb.front, ...fb.back.map(s => ({ ...s, side: "back" }))] : fb.front; });
 }
 
-export function bedsForSave(): { name: string; done: boolean; n: number; twoSided?: TwoSidedSetup }[] {
+export function bedsForSave(): { name: string; done: boolean; n: number; twoSided?: TwoSidedSetup; split?: SplitSetup; piece?: BedPiece }[] {
   stash();
   return beds.map((b, i) => {
     const fb = frontBack(i);
-    return { name: b.name, done: b.done, n: fb.front.length + fb.back.length, ...(b.two ? { twoSided: b.two } : {}) };
+    return {
+      name: b.name, done: b.done, n: fb.front.length + fb.back.length, ...(b.two ? { twoSided: b.two } : {}),
+      ...(b.split ? { split: b.split } : {}), ...(b.piece ? { piece: b.piece } : {}),
+    };
   });
 }
 
@@ -261,6 +329,10 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
       const two = cleanSetup(b.twoSided);
       if (two) sheet.two = two;
       if (back.length) sheet.other = back;
+      // Großes Teil teilen: Fugen des Originals bzw. zu welcher Aufteilung ein Stück gehört
+      const split = cleanSplit(b.split);
+      if (split) sheet.split = split;
+      if (b.piece && typeof b.piece.of === "string" && typeof b.piece.name === "string" && /^[A-Z]{1,3}\d{1,3}$/.test(b.piece.name)) sheet.piece = { of: b.piece.of.slice(0, 40), name: b.piece.name };
       return sheet;
     });
   } else beds = [{ name: "", done: false, shapes }];
@@ -362,12 +434,12 @@ export function refreshBeds() {
   const counts = beds.map((_, i) => parts(bedShapes(i)));
   const used = hasUsedArea();
   const two = twoSidedOn(), side = viewSide();
-  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done]), used, two, side, two ? parts(hiddenShapes()) : 0]);
+  const sig = JSON.stringify([active, counts, beds.map(b => [b.name, b.done, !!b.split, b.piece?.name]), used, two, side, two ? parts(hiddenShapes()) : 0]);
   if (sig === shown) return;
   shown = sig;
   const tabs = beds.map((b, i) =>
     `<button type="button" class="bed-tab${i === active ? " active" : ""}${b.done ? " done" : ""}" data-bed="${i}" title="${esc(t(i === active ? "bed.tabTipActive" : "bed.tabTip"))}">`
-    + `${b.done ? "✓ " : ""}${esc(bedName(i))}<span class="bed-n">${counts[i]}</span></button>`).join("");
+    + `${b.done ? "✓ " : ""}${b.split ? "✂ " : ""}${esc(bedName(i))}<span class="bed-n">${counts[i]}</span></button>`).join("");
   const others = beds.map((_, i) => i).filter(i => i !== active)
     .map(i => `<option value="${i}">→ ${esc(bedName(i))}</option>`).join("");
   bar.innerHTML = `${tabs}
@@ -409,6 +481,9 @@ export function drawOtherBeds(ctx: CanvasRenderingContext2D) {
     const shapes = bedShapes(i);
     const label = `${beds[i].done ? "✓ " : ""}${bedName(i)} · ${t("bed.parts", { n: parts(shapes) })}`;
     if (i !== active) {
+      // Original eines geteilten Teils: größer als das Bett – es würde die Nachbarn überdecken. Ist es selbst aktiv,
+      // bleiben die anderen Betten weg; ist ein anderes aktiv, wird von ihm nur der Rahmen gezeigt
+      if (beds[active].split) continue;
       if (x1 < 0 || x0 > ctx.canvas.width || y1 < 0 || y0 > ctx.canvas.height) continue;
       const light = isLight();
       ctx.fillStyle = light ? "#f2f2f6" : "#121217";
@@ -419,7 +494,7 @@ export function drawOtherBeds(ctx: CanvasRenderingContext2D) {
       ctx.strokeStyle = beds[i].done ? "rgba(52,209,123,0.45)" : light ? "rgba(90,96,110,0.55)" : "rgba(160,170,190,0.55)";
       ctx.lineWidth = 1;
       ctx.beginPath();
-      for (const s of shapes) tracePath(ctx, s, sx, sy, scale);
+      if (!beds[i].split) for (const s of shapes) tracePath(ctx, s, sx, sy, scale);
       ctx.stroke();
     }
     ctx.fillStyle = i === active ? "#e6e6f0" : beds[i].done ? "#34d17b" : "#8a8a99";
@@ -437,6 +512,7 @@ function initCanvasMouse(canvas: HTMLCanvasElement) {
   // Läuft vor dem normalen Klick (capture), damit dort keine Auswahl-Box startet.
   canvas.addEventListener("mousedown", e => {
     if (e.button !== 0 || beds.length < 2 || app().currentTool !== "select") return;
+    if (beds[active].split) return; // die anderen Betten sind hier nicht zu sehen (drawOtherBeds)
     const p = world(e);
     const i = bedAt(p.x, p.y);
     if (i < 0 || i === active) return;
@@ -454,6 +530,7 @@ function initCanvasMouse(canvas: HTMLCanvasElement) {
   window.addEventListener("mouseup", () => setTimeout(() => {
     const st = app();
     if (beds.length < 2 || !st.selectedShapeIds.length) return;
+    if (beds[active].split) return; // ein Teil, das größer als das Bett ist, liegt mit seiner Mitte leicht über einem Nachbarn
     const ids = new Set<string>(st.selectedShapeIds);
     const sel = st.shapes.filter((s: any) => ids.has(s.id));
     const b = groupBounds(sel);

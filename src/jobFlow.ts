@@ -13,7 +13,8 @@ import { getMachineMode } from "./machineMode";
 import { laserSettings } from "./laserLayers";
 import { rotary } from "./rotary";
 import { activeSetup, twoSidedFingerprint } from "./twoSidedJob";
-import { viewSide } from "./editor/beds";
+import { viewSide, bedName, bedPiece } from "./editor/beds";
+import { isSplitSource, pieceState } from "./splitJob";
 import type { Side } from "./twoSided";
 
 type Log = (s: string) => void;
@@ -66,6 +67,9 @@ function warnIfSuspicious(gcode: string, log: Log) {
 
 /** Name des Programms aus der Zeichnung – bei „Zweiseitig fräsen“ mit der gezeigten Seite */
 export function designLabel(): string {
+  // Stück eines geteilten Teils: mit seinem Namen (A1, B1 …), damit man die Programme nicht verwechselt
+  const pc = bedPiece();
+  if (pc) return `${t("sim.currentDesign")} – ${pc.name}`;
   return activeSetup() ? `${t("sim.currentDesign")} – ${t(viewSide() === "front" ? "two.front" : "two.back")}` : t("sim.currentDesign");
 }
 
@@ -88,10 +92,36 @@ export function buildJob(shapes: any, log: Log): boolean {
 }
 
 /**
+ * Großes Teil teilen (splitJob.ts): fragen, bevor aus dem falschen Bett ein Programm wird.
+ *  - Original-Bett: das ganze Teil passt nicht auf die Maschine, gefräst werden die Stücke
+ *  - Stück-Bett, dessen Original (oder ein Fräser) sich seit dem Erzeugen geändert hat: die Stücke passen nicht mehr dazu
+ * Gilt für „Zur Maschine“ und für „G-Code speichern“. Ohne Fugen kommt keine Frage.
+ */
+export async function splitOk(): Promise<boolean> {
+  if (isSplitSource()) {
+    const r = await askChoice(t("seam.ask.srcTitle"), t("seam.ask.srcText", { name: bedName() }), [
+      { key: "cancel", label: t("dlg.cancel"), cancel: true, primary: true },
+      { key: "ok", label: t("seam.ask.srcOk") }
+    ]);
+    return r === "ok";
+  }
+  const pc = pieceState();
+  if (pc && pc.stale) {
+    const r = await askChoice(t("seam.ask.staleTitle"), t("seam.ask.staleText", { name: pc.name, src: pc.source >= 0 ? bedName(pc.source) : "" }), [
+      { key: "cancel", label: t("dlg.cancel"), cancel: true, primary: true },
+      { key: "old", label: t("seam.ask.staleOld") }
+    ]);
+    return r === "old";
+  }
+  return true;
+}
+
+/**
  * Zweiseitig, Rückseite: vor dem Bauen fragen, ob das Rohteil gewendet auf den Stiften liegt. Ohne Ja kein Job.
  * Auch danach startet nichts von selbst – Start bleibt ein eigener Klick.
  */
 export async function okToBuild(): Promise<boolean> {
+  if (!(await splitOk())) return false;
   const two = activeSetup();
   if (!two || viewSide() !== "back") return true;
   const text = [

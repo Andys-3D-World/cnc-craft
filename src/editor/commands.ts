@@ -47,6 +47,7 @@ import { openQrDialog } from "./qrTool";
 import { openSerialDialog } from "./serial";
 import { openThicknessDialog } from "./thickness";
 import { openDogboneDialog } from "./dogbone";
+import { openSplitPanel } from "../ui/splitPanel";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
@@ -265,6 +266,7 @@ export const commands: Record<string, () => void> = {
   stlExport: () => openStlExport(log),
   nodeGraph: () => openNodeEditor(log),
   tiles: () => openTileDialog(),
+  seamSplit: () => openSplitPanel(),
   duplicateDialog: () => openDuplicateDialog(),
   array: () => openArrayDialog(),
   copiesOnPath: () => openCopiesOnPathDialog(),

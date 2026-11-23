@@ -601,7 +601,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     const me = closedInfo(shape);
     const cand: { pts: P[]; area: number }[] = [];
     for (const s of shapes) {
-      if (s === shape) continue;
+      // noIsland: Umriss eines Stücks aus „Großes Teil teilen“ (seamSplit.ts) – die Tasche reicht dort über das Stück hinaus
+      if (s === shape || s.noIsland) continue;
       const o = closedInfo(s);
       if (!o.pts) continue;
       // Punkt außerhalb des umgebenden Rechtecks -> kann nicht drin liegen

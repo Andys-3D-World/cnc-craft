@@ -24,8 +24,13 @@ import { limitReport } from "./limitGuard";
 import { jobSvg, sheetDocument, sheetHtml, summarizeJob, zeroPosition, SheetData, SheetMarks, SheetSide, SheetTool, SheetTwo, SHEET_CSS } from "../setupSheet";
 import { activeSetup, depthWarnings, pinTool, pinWarnings } from "../twoSidedJob";
 import { skinInfo } from "../skinNotes";
-import { sideShapes } from "../editor/beds";
+import { sideShapes, bedPiece } from "../editor/beds";
 import { flipLine, mirrorPoint, type Side, type TwoSidedSetup } from "../twoSided";
+import { computeSplit, splitOfBed } from "../splitJob";
+import { assemblySvg } from "../splitSheet";
+import { issueText } from "./splitPanel";
+import { fmtLenU } from "../units";
+import type { SheetAssembly } from "../setupSheet";
 
 
 function fmtTime(s: number): string {
@@ -137,6 +142,33 @@ function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): { part: Sh
   };
 }
 
+/** Großes Teil teilen: Seite „Zusammenbau“ für das Original-Bett und für jedes Stück-Bett (null = keine Fugen) */
+function assemblySheet(): SheetAssembly | null {
+  const sp = splitOfBed();
+  if (!sp) return null;
+  const r = computeSplit(sp.shapes, sp.setup);
+  if (!r.pieces.length) return null;
+  const jointsOf = (name: string) => {
+    // welche Fugen an diesem Stück liegen und wie sie verbunden sind
+    const pc = r.pieces.find(p => p.name === name)!;
+    const xs = r.seams.filter(l => l.seam.axis === "x").sort((a, b) => a.seam.pos - b.seam.pos), ys = r.seams.filter(l => l.seam.axis === "y").sort((a, b) => a.seam.pos - b.seam.pos);
+    const near = [xs[pc.col - 1], xs[pc.col], ys[ys.length - pc.row - 1], ys[ys.length - pc.row]].filter(Boolean);
+    return [...new Set(near.map(l => t(l.feats.length ? "seam.joint." + l.seam.joint : "seam.joint.butt")))].join(", ") || "–";
+  };
+  const notes = r.issues.filter(i => i.code !== "noFit").map(issueText);
+  if (sp.stale) notes.unshift(t("sheet.asm.stale"));
+  const clear = Math.max(0, ...r.seams.map(l => l.profile.c));
+  return {
+    title: t("sheet.asm.title"),
+    intro: t(sp.piece ? "sheet.asm.introPiece" : "sheet.asm.intro", { name: sp.piece ?? "", n: r.pieces.length }),
+    svg: assemblySvg(r.pieces, sp.piece),
+    head: [t("sheet.asm.piece"), t("sheet.asm.size"), t("sheet.asm.joints")],
+    rows: r.pieces.map(p => [p.name, p.extent ? `${fmtLenU(p.extent.maxX - p.extent.minX, 1)} × ${fmtLenU(p.extent.maxY - p.extent.minY, 1)}` : "–", jointsOf(p.name)]),
+    steps: [t("sheet.asm.s1"), t("sheet.asm.s2", { g: fmtLenU(2 * clear, 2) }), t("sheet.asm.s3")],
+    notes,
+  };
+}
+
 export function openSetupSheet(log: (s: string) => void) {
   const fromFile = streamState.loadedLines.length > 0;
   let lines: string[];
@@ -166,7 +198,7 @@ export function openSetupSheet(log: (s: string) => void) {
     ? t("sheet.zero.other", { x: minX.toFixed(1), y: minY.toFixed(1) })
     : t("sheet.zero." + zero);
   const data: SheetData = {
-    title: t("sheet.title", { name: drawing ? t("sim.currentDesign") : streamState.label }),
+    title: t("sheet.title", { name: drawing ? (bedPiece() ? `${t("sim.currentDesign")} – ${bedPiece()!.name}` : t("sim.currentDesign")) : streamState.label }),
     date: new Date().toLocaleString(currentLanguage()),
     tools: toolRows(drawing),
     toolsNote: t("sheet.toolsFromFile"),
@@ -185,6 +217,7 @@ export function openSetupSheet(log: (s: string) => void) {
     svg: info.svg,
     ...(info.skin ? { skin: info.skin } : {}),
     ...(two ? { two: two.part } : {}),
+    ...(drawing ? (() => { const a = assemblySheet(); return a ? { assembly: a } : {}; })() : {}),
   };
   const body = sheetHtml(data, t);
 

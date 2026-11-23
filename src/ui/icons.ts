@@ -118,6 +118,7 @@ const P: Record<string, string> = {
   patternFill: `<circle cx="12" cy="12" r="9"/><path d="M8 7.5l1 1.8 2-.1-1.2 1.6.8 1.9-2-.6-1.5 1.3.1-2L5.5 10.3l2-.6zM15.5 12l.8 1.4 1.6-.1-1 1.3.6 1.5-1.6-.5-1.2 1 .1-1.6-1.3-.9 1.6-.5z"/>`,
   weldScore: `<path d="M4 17c1.5-5 3-9 5.5-9S12 12 14 12s3-4 6-4"/><path d="M9.5 8c-1 3-1.5 6-1 9" stroke-dasharray="1.6 1.6" opacity=".7"/><path d="M14 12c1 2 2.5 4 4.5 4"/>`,
   imageSplit: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5"/><path d="M12 3v18M2 12h20" stroke-dasharray="2.5 2"/><circle cx="8" cy="8.5" r="1.4"/><path d="M14 18l2.5-3 2 2.5"/>`,
+  seamSplit: `<path d="M3 5h8v5a2 2 0 100 4v5H3z"/><path d="M13 5h8v14h-8v-5a2 2 0 110-4z"/>`,
   tiles: `<rect x="3" y="4" width="8" height="7" rx="1"/><rect x="13" y="4" width="8" height="7" rx="1"/><rect x="3" y="13" width="8" height="7" rx="1"/><rect x="13" y="13" width="8" height="7" rx="1" stroke-dasharray="2 1.6"/>`,
   imageMask: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="2.5 2" opacity=".55"/><path d="M12 7.5l1.6 3.2 3.5.5-2.5 2.5.6 3.5L12 15.6l-3.2 1.6.6-3.5-2.5-2.5 3.5-.5z"/>`,
   fillet: `<path d="M5 20V12a7 7 0 017-7h8"/><path d="M5 9V5h4" stroke-dasharray="2 2" opacity=".6"/>`,

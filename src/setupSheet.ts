@@ -125,6 +125,17 @@ export interface SheetData {
   svg: string;
   skin?: string;                      // Zwiebelhaut: bleibt stehen / wird am Ende durchgefräst (leer = keine)
   two?: SheetTwo;
+  assembly?: SheetAssembly;
+}
+
+/** Großes Teil teilen: eigene Seite mit dem ganzen Teil, den Fugen und den Namen der Stücke */
+export interface SheetAssembly {
+  title: string; intro: string;
+  svg: string;                        // fertiges SVG (assemblySvg), wird nicht maskiert
+  head: [string, string, string];     // Spalten: Stück, Größe, Verbindungen
+  rows: [string, string, string][];
+  steps: string[];
+  notes: string[];
 }
 
 /** Zweiseitig fräsen: ein Programm je Seite */
@@ -163,6 +174,14 @@ export function sheetHtml(d: SheetData, t: Tr): string {
     ? `<table><thead><tr><th>${esc(t("sheet.toolNo"))}</th><th>${esc(t("sheet.toolName"))}</th><th>Ø</th><th>${esc(t("sheet.toolType"))}</th><th>${esc(t("sheet.toolLen"))}</th></tr></thead><tbody>`
       + a.map(x => `<tr><td>${esc(x.no)}</td><td>${esc(x.name)}</td><td>${esc(x.dia)}</td><td>${esc(x.type)}</td><td>${esc(x.len)}</td></tr>`).join("") + `</tbody></table>`
     : `<p>–</p>`;
+  // Großes Teil teilen: letzte Seite mit dem ganzen Teil, den Fugen und den Stück-Namen
+  const a = d.assembly;
+  const asm = a ? `
+<div class="asm"><h2 class="side">${esc(a.title)}</h2><p>${esc(a.intro)}</p>
+${a.svg ? `<div class="asm-pic">${a.svg}</div>` : ""}
+<table><thead><tr>${a.head.map(x => `<th>${esc(x)}</th>`).join("")}</tr></thead><tbody>${a.rows.map(r => `<tr>${r.map(x => `<td>${esc(x)}</td>`).join("")}</tr>`).join("")}</tbody></table>
+${a.steps.length ? `<ol>${a.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>` : ""}
+${a.notes.length ? `<h3 class="warn">${esc(t("sheet.warnings"))}</h3>${list(a.notes)}` : ""}</div>` : "";
   if (d.two) {
     // Zweiseitig: gemeinsame Einrichtung, Schritte am Tisch, dann jede Seite mit Bild, Werkzeugen und Bearbeitungen
     const w = d.two;
@@ -180,7 +199,7 @@ ${w.sides.map(sd => `<h2 class="side">${esc(sd.name)}</h2>
 ${sd.changes.length ? `<h3>${esc(t("sheet.changes"))}</h3>${list(sd.changes.map(c => `${c.code}${c.note ? " – " + c.note : ""}`))}` : ""}
 ${sd.warnings.length ? `<h3 class="warn">${esc(t("sheet.warnings"))}</h3>${list(sd.warnings)}` : ""}`).join("\n")}
 ${d.zones.length ? `<h2>${esc(t("sheet.zones"))}</h2>${list(d.zones)}` : ""}
-${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d.warnings)}` : ""}`;
+${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d.warnings)}` : ""}${asm}`;
   }
   return `<h1>${esc(d.title)}</h1><p class="sub">${esc(d.date)}</p>
 <div class="two"><div><h2>${esc(t("sheet.setup"))}</h2><table>${
@@ -191,7 +210,7 @@ ${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d
 <h2>${esc(t("sheet.ops"))}</h2>${ops}
 ${d.changes.length ? `<h2>${esc(t("sheet.changes"))}</h2>${list(d.changes.map(c => `${c.code}${c.note ? " – " + c.note : ""}`))}` : ""}
 ${d.zones.length ? `<h2>${esc(t("sheet.zones"))}</h2>${list(d.zones)}` : ""}
-${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d.warnings)}` : ""}`;
+${d.warnings.length ? `<h2 class="warn">${esc(t("sheet.warnings"))}</h2>${list(d.warnings)}` : ""}${asm}`;
 }
 
 /** Aussehen der Seite – dieselben Regeln im Fenster und in der gespeicherten Datei */
@@ -212,6 +231,9 @@ export const SHEET_CSS = `
 .setup-sheet .two>div:first-child{flex:1;}
 .setup-sheet .pic{width:45%;border:1px solid #bbb;padding:4px;}
 .setup-sheet .pic svg{display:block;width:100%;height:auto;max-height:70mm;}
+.setup-sheet .asm{break-before:page;page-break-before:always;}
+.setup-sheet .asm-pic{border:1px solid #bbb;padding:6px;margin:6px 0;}
+.setup-sheet .asm-pic svg{display:block;width:100%;height:auto;max-height:150mm;}
 `;
 
 export function sheetDocument(body: string, title: string): string {

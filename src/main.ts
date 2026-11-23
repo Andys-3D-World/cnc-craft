@@ -47,7 +47,7 @@ import { initUpdater } from "./update/updater";
 import { initProjectSafety } from "./projectSafety";
 import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
-import { buildJob, designLabel, okToBuild, okToStart } from "./jobFlow";
+import { buildJob, designLabel, okToBuild, okToStart, splitOk } from "./jobFlow";
 import { stopPlanFor, holdSettled } from "./stopPlan";
 import { initHoldJog, holdJogStop } from "./holdJog";
 import { macroRunning, cancelMacro } from "./macroRun";
@@ -65,6 +65,7 @@ import { initMaterialView } from "./materialView";
 import { solveConstraints } from "./editor/dims";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initTwoSidedPanel, refreshTwoSided, drawTwoSided } from "./ui/twoSidedPanel";
+import { initSplitPanel, drawSplit } from "./ui/splitPanel";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
 import { initImports, importBytes } from "./importers/importManager";
@@ -191,6 +192,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         drawEverything(ctx, canvas, state.shapes, state.selectedShapeIds, state.offsetX, state.offsetY, state.scale);
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawTwoSided(ctx);    // Zweiseitig fräsen: Rohteil, Wendelinie, Stifte, andere Seite blass
+        drawSplit(ctx);       // Großes Teil teilen: Fugen und Stück-Namen
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
         refreshMillProfilePicker();
@@ -227,7 +229,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (!window.confirm(t("main.confirmClear"))) return;
       state.shapes = []; state.selectedShapeIds = []; redraw();
     });
-    if (saveGcodeBtn) saveGcodeBtn.addEventListener("click", () => exportGcodeToFile(state.shapes, appendToConsole, gcodeFileName()));
+    // Großes Teil teilen: erst fragen, wenn hier das Original liegt oder das Stück veraltet ist (ohne Fugen keine Frage)
+    if (saveGcodeBtn) saveGcodeBtn.addEventListener("click", async () => { if (await splitOk()) exportGcodeToFile(state.shapes, appendToConsole, gcodeFileName()); });
 
     if (loadGcodeBtn) loadGcodeBtn.addEventListener("click", () => loadGcodeFromFile(appendToConsole));
     if (jobStartBtn) jobStartBtn.addEventListener("click", async () => {
@@ -354,6 +357,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
     initTwoSidedPanel(redraw, appendToConsole);
+    initSplitPanel(redraw, appendToConsole); // Großes Teil teilen: Fugen auf der Zeichenfläche ziehen
     initMachineWizard(redraw, appendToConsole);
     initJobTools(appendToConsole);      // Rahmen abfahren, .rd speichern
 

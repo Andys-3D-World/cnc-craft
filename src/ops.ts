@@ -13,7 +13,7 @@
  * Art „face“ (Planfräsen): das umgebende Rechteck der Form auf Tiefe planen (siehe facing.ts).
  */
 
-import { cleanMillDir, type MillDir } from "./millDir";
+import { cleanMillDir, type MillDir } from "./millDir.ts";
 
 export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread" | "face";
 export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread", "face"];
