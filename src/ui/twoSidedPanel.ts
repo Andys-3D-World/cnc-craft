@@ -8,6 +8,8 @@
  *
  * Hier wird nichts an die Maschine geschickt. Texte aus Werkzeug-Namen gehen durch esc().
  */
+import { dropLinks } from "../editor/linked";
+import { isLinked, unlinkShapes } from "../linkedCopies";
 import { t, T, tip } from "../i18n/i18n";
 import { app, bedSizeMm } from "../editor/editorState";
 import { bedSetup, hiddenShapes, setBedSetup, setHiddenShapes, showSide, sideShapes, twoSidedOn, viewSide } from "../editor/beds";
@@ -259,7 +261,11 @@ function toOtherSide(move: boolean) {
   const groups = new Set(sel.filter((x: any) => x.groupId).map((x: any) => x.groupId));
   const all = st.shapes.filter((x: any) => sel.includes(x) || (x.groupId && groups.has(x.groupId)));
   const copies = (move ? all.map(cloneShape) : makeCopies(all, 0)).map((c: any) => mirrorShape(c, s));
+  // mirrored onto the other side: no linked copies there, and copies of a moved original become normal shapes
+  dropLinks(copies);
   if (move) {
+    const ids = new Set(all.map((x: any) => x.id));
+    unlinkShapes(st.shapes.filter((x: any) => isLinked(x) && ids.has(x.link.of)));
     const gone = new Set(all);
     st.shapes = st.shapes.filter((x: any) => !gone.has(x));
     st.selectedShapeIds = [];

@@ -17,6 +17,7 @@
  *                          Knoten = schließen, Doppelklick/Enter = offen fertig, Esc = abbrechen
  */
 import { app, toScreen, screenDist } from "./editorState";
+import { guardLinked } from "./linked";
 import { Pt, MM_TO_PIXEL, createPolyline, convertToPolyline, updatePolylineBounds } from "../shapeTransform";
 
 export interface BezNode { x: number; y: number; hi?: Pt; ho?: Pt; smooth?: boolean }
@@ -157,7 +158,7 @@ export function nodeDown(world: Pt, sx: number, sy: number, hit: any | null): bo
     }
   }
   // andere Form anklicken → wird bearbeitet
-  if (hit && ensureBez(hit)) {
+  if (hit && !guardLinked(hit) && ensureBez(hit)) {
     nodeEdit.targetId = hit.id;
     nodeEdit.sel = -1;
     app().selectedShapeIds = [hit.id];

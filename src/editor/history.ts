@@ -16,6 +16,14 @@ let committed: string | null = null;
 const undoStack: string[] = [];
 const redoStack: string[] = [];
 
+/** Linked copies (editor/linked.ts): sync after a user action (true = shapes changed), refresh after undo/redo */
+let linkSync: ((before: string) => boolean) | null = null;
+let linkRefresh: (() => boolean) | null = null;
+export function setLinkHooks(sync: (before: string) => boolean, refresh: () => boolean) {
+  linkSync = sync;
+  linkRefresh = refresh;
+}
+
 export function initHistory() {
   committed = JSON.stringify(app().shapes);
   const later = () => setTimeout(checkpoint, 0);
@@ -26,8 +34,9 @@ export function initHistory() {
 export function checkpoint() {
   const st = app();
   if (!st) return;
-  const now = JSON.stringify(st.shapes);
+  let now = JSON.stringify(st.shapes);
   if (now === committed) return;
+  if (committed !== null && linkSync && linkSync(committed)) now = JSON.stringify(st.shapes);
   if (committed !== null) {
     undoStack.push(committed);
     trim();
@@ -48,6 +57,8 @@ function restore(snapshot: string) {
   st.shapes = JSON.parse(snapshot);
   const ids = new Set(st.shapes.map((s: any) => s.id));
   st.selectedShapeIds = st.selectedShapeIds.filter((id: string) => ids.has(id));
+  // copies whose original lies on another bed may have to follow it
+  if (linkRefresh && linkRefresh()) committed = JSON.stringify(st.shapes);
 }
 
 export function undo(): boolean {

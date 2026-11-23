@@ -18,6 +18,7 @@ import { trimHover } from "./trimTool";
 import { cutMark, hasCutSetting, MachineKind } from "../cutSetting";
 import { isLaser } from "../machineMode";
 import { unitName } from "../units";
+import { drawLinkMarks } from "./linked";
 
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
@@ -32,6 +33,9 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
   if (tool === "select" && live.mode === "idle" && live.hover && !app().selectedShapeIds.includes(live.hover.id)) {
     strokeShape(ctx, live.hover, "rgba(255,255,255,0.55)", 3);
   }
+
+  // ---- Linked copies: chain badge, dashed outline of the selection's original and copies ----
+  drawLinkMarks(ctx, app().selectedShapeIds);
 
   // ---- Auswahlrahmen mit Griffen ----
   const sel = selectedShapes();

@@ -15,6 +15,7 @@ import { t } from "../i18n/i18n";
 import { polishGenDialog } from "../ui/genDialog";
 import { carrySettings, checkRun, imageOfShape, readGen, replaceRun, roleOf, tagRun, takeSettings, withSettings, type EditImage, type GenInfo, type RunCheck } from "./genRun";
 import { openBoxDialog } from "./boxGen";
+import { relinkGenerated } from "./linked";
 import { openMandalaDialog } from "./mandalaGen";
 import { openBirdhouseDialog } from "./birdhouseGen";
 import { openOrnamentDialog } from "./ornamentGen";
@@ -134,6 +135,7 @@ export function editRun(gen: GenInfo, log: Log, finish: () => void) {
       carrySettings(old, made);
       st.shapes = replaceRun(st.shapes, idsOf(old), made, check.angle);
       if (settings) tagRun(made, gen.type, settings, roles);
+      relinkGenerated(old, made); // linked copies of the old parts show the new ones
       st.selectedShapeIds = made.map((s: any) => s.id);
       log(t("gen.replaced", { old: old.length, n: made.length }));
     }

@@ -26,6 +26,7 @@ import { updateDimensionInputs } from "../uiInputs";
 import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
 import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
 import { cleanSplit, type SplitSetup } from "../seamSplit";
+import { cleanLinks, refreshLinks, shapeIndex, stripLinks } from "../linkedCopies";
 
 /**
  * Zweiseitig fräsen (twoSided.ts): `shapes` ist immer die Seite, die gerade gezeigt wird, `other` die verdeckte.
@@ -57,6 +58,30 @@ export function activeBed(): number { return active; }
 
 /** Formen des aktiven Bettes zurücklegen (app().shapes wird oft neu zugewiesen) */
 function stash() { beds[active].shapes = app().shapes; }
+
+// ---------------------------------------------------------------------
+// Linked copies (linkedCopies.ts): the original may lie on another bed or on the other side
+// ---------------------------------------------------------------------
+
+/** All shape lists of all beds and sides (the active bed live) */
+export function linkLists(): any[][] {
+  return beds.flatMap((b, i) => [i === active ? app().shapes : b.shapes, b.other ?? []]);
+}
+
+/** All lists except the drawing on screen (originals may lie there) */
+export function otherLists(): any[][] {
+  return beds.flatMap((b, i) => (i === active ? [b.other ?? []] : [b.shapes, b.other ?? []]));
+}
+
+/**
+ * A list comes on screen (bed or side switch): rebuild copies whose original changed meanwhile.
+ * If the undo history matched the state before, it is carried along (otherwise it would start anew).
+ */
+function freshLinks(list: any[], hist?: HistoryState | null) {
+  if (!list.some((s: any) => s?.link)) return;
+  const was = hist ? JSON.stringify(list) : "";
+  if (refreshLinks(list, shapeIndex(linkLists())) && hist && hist.committed === was) hist.committed = JSON.stringify(list);
+}
 
 // ---------------------------------------------------------------------
 // Zweiseitig fräsen: Vorder- und Rückseite des aktiven Bettes
@@ -104,6 +129,7 @@ export function showSide(side: Side, force = false) {
   st.shapes = b.other ?? [];
   b.shapes = st.shapes;
   b.other = visible;
+  freshLinks(st.shapes, b.otherHist);
   putHistory(b.otherHist);
   b.otherHist = hist;
   b.back = side === "back";
@@ -148,6 +174,7 @@ export function applyPieces(id: string, list: { name: string; shapes: any[] }[])
     if (!b) { b = { name: "", done: false, shapes: [] }; beds.push(b); }
     b.name = prefix + p.name;
     b.piece = { of: id, name: p.name };
+    stripLinks(p.shapes); // pieces are shapes of their own, not linked copies
     b.shapes = p.shapes;
     b.done = false;
     b.hist = null;
@@ -232,6 +259,7 @@ export function switchBed(i: number) {
   setStockBed(i);
   st.shapes = beds[i].shapes;
   st.selectedShapeIds = [];
+  freshLinks(st.shapes, beds[i].hist);
   putHistory(beds[i].hist);
   beds[i].hist = null;
   changed();
@@ -258,6 +286,7 @@ export function removeBed(i: number) {
     const st = app();
     st.shapes = beds[active].shapes;
     st.selectedShapeIds = [];
+    freshLinks(st.shapes, beds[active].hist);
     putHistory(beds[active].hist);
   } else if (i < active) active--;
   setStockBed(active);
@@ -314,6 +343,7 @@ export function bedsForSave(): { name: string; done: boolean; n: number; twoSide
 
 /** Projekt geladen: Formen nach den Angaben in `list` auf die Betten verteilen (ohne Angaben: ein Bett) */
 export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
+  cleanLinks(shapes);
   const ok = Array.isArray(list) && list.length > 0 && list.every((b: any) => Number.isInteger(b?.n) && b.n >= 0)
     && list.reduce((n: number, b: any) => n + b.n, 0) === shapes.length;
   if (ok) {
@@ -341,6 +371,9 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
   const st = app();
   st.shapes = beds[active].shapes;
   st.selectedShapeIds = [];
+  // Linked copies: original changed in an older version → rebuild the copies
+  const lists = linkLists(), index = shapeIndex(lists);
+  for (const l of lists) refreshLinks(l, index);
   putHistory(null);
   changed();
 }

@@ -9,6 +9,7 @@ import { checkpoint } from "./history";
 import { selectedShapes } from "./selection";
 import { snapPoint } from "./snap";
 import { makeCopies } from "./commands";
+import { prepareLinkSources } from "./linked";
 import { livePreview } from "./livePreview";
 import { gridOffsets, gridStep, polarPlacements } from "./arrayGeom";
 import { simplifyPath } from "./simplify";
@@ -85,11 +86,11 @@ const MAX_PREVIEW_POINTS = 300_000;
 interface ArrayOptions {
   kind: "grid" | "polar";
   cols: number; rows: number; spacing: "gap" | "pitch"; gapX: number; gapY: number;
-  count: number; total: number; rotate: boolean;
+  count: number; total: number; rotate: boolean; linked: boolean;
 }
 
 function loadArrayOptions(): ArrayOptions {
-  const def: ArrayOptions = { kind: "grid", cols: 3, rows: 2, spacing: "gap", gapX: 5, gapY: 5, count: 6, total: 360, rotate: true };
+  const def: ArrayOptions = { kind: "grid", cols: 3, rows: 2, spacing: "gap", gapX: 5, gapY: 5, count: 6, total: 360, rotate: true, linked: false };
   try { return { ...def, ...JSON.parse(localStorage.getItem(ARRAY_KEY) || "{}") }; } catch { return def; }
 }
 
@@ -106,7 +107,7 @@ function arrayPlacements(p: ToolPanel, sel: any[]): { list: Placement[]; opts: A
     const gapX = p.num("#arr-gapx"), gapY = p.num("#arr-gapy");
     const stepX = gridStep(spacing, b.maxX - b.minX, gapX * MM_TO_PIXEL), stepY = gridStep(spacing, b.maxY - b.minY, gapY * MM_TO_PIXEL);
     const list = gridOffsets(cols, rows, stepX, stepY).map(o => (s: any) => translateShape(s, o.dx, o.dy));
-    return { list, center: null, opts: { ...old, kind, cols, rows, spacing, gapX, gapY } };
+    return { list, center: null, opts: { ...old, kind, cols, rows, spacing, gapX, gapY, linked: p.check("#arr-linked") } };
   }
   const count = Math.max(1, Math.round(p.num("#arr-count", 1)));
   const total = p.num("#arr-total", 360), rotate = p.check("#arr-rotate");
@@ -114,7 +115,7 @@ function arrayPlacements(p: ToolPanel, sel: any[]): { list: Placement[]; opts: A
   const from = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
   const list = polarPlacements(count, center.x, center.y, from, (total * Math.PI) / 180)
     .map(q => (s: any) => { if (rotate) rotateShape(s, center.x, center.y, q.angle); else translateShape(s, q.dx, q.dy); });
-  return { list, center, opts: { ...old, kind, count, total, rotate } };
+  return { list, center, opts: { ...old, kind, count, total, rotate, linked: p.check("#arr-linked") } };
 }
 
 export function openArrayDialog() {
@@ -153,7 +154,8 @@ export function openArrayDialog() {
       <label style="${rowCss}">${t("array.centerY")}${input("arr-cy", Number(fmt(cyMm)), "1")}</label>
       <button id="arr-pick" type="button" class="btn-secondary" style="display:flex;gap:6px;align-items:center;justify-content:center;">${icon("measure", 14)}${t("array.pick")}</button>
       <label style="${checkCss}"><input id="arr-rotate" type="checkbox" ${o.rotate ? "checked" : ""}> ${t("array.rotate")}</label>
-    </div>`;
+    </div>
+    <label style="${checkCss}" title="${esc(t("dup.linkedHint"))}"><input id="arr-linked" type="checkbox" ${o.linked ? "checked" : ""}> ${t("dup.linked")}</label>`;
   openToolPanel({
     id: "array-panel", ico: "array", title: t("array.title"), body, ok: "✔ " + t("array.run"), redraw: redrawFn,
     onChange: p => {
@@ -190,14 +192,16 @@ export function openArrayDialog() {
       try { localStorage.setItem(ARRAY_KEY, JSON.stringify(opts)); } catch { /* egal */ }
       const st = app();
       const copies: any[] = [];
+      const from = opts.linked ? prepareLinkSources(sel) : sel;
       for (const place of list) {
-        const set = makeCopies(sel, 0);
+        const set = makeCopies(from, 0, opts.linked);
         set.forEach(place);
         copies.push(...set);
       }
       st.shapes = [...st.shapes, ...copies];
       st.selectedShapeIds = [...sel.map((s: any) => s.id), ...copies.map(c => c.id)];
       log(t("array.done", { n: list.length }));
+      if (opts.linked) log(t("link.made", { n: list.length }));
       commit();
     }
   });

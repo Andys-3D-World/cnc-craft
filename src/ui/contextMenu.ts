@@ -20,6 +20,7 @@ import { getLayers } from "../laserLayers";
 import { isLaser, isPlasma } from "../machineMode";
 import { refreshLaserPanel } from "./laserPanel";
 import { EXPORT_FORMATS, exportDrawing, formatLabel } from "./exportMenu";
+import { linkState } from "../editor/linked";
 
 export interface MenuItem {
   label: string;
@@ -195,6 +196,7 @@ function shapeMenu(): MenuEntry[] {
   const grouped = sel.some(s => s.groupId);
   const convertible = sel.some(s => s.type !== "polyline" && s.type !== "image");
   const run = runInSelection(sel);
+  const links = linkState(sel);
   const genEdit: MenuEntry[] = run || sel.some(s => s.qrData)
     ? [{ label: t("gen.edit"), ico: "node", run: cmd("editGenerator") },
        ...(run?.type === "testCard" ? [{ label: t("tcard.readTitle"), ico: "materialTest", run: cmd("testCardRead") } as MenuEntry] : []), "sep"] : [];
@@ -205,6 +207,14 @@ function shapeMenu(): MenuEntry[] {
     { label: t("cm.paste"), ico: "paste", key: ctrl("V"), run: cmd("paste"), disabled: !hasClipboard() },
     { label: t("cm.duplicate"), ico: "duplicate", key: ctrl("D"), run: cmd("duplicate") },
     { label: t("cm.array"), ico: "array", run: cmd("array") },
+    {
+      label: t("cm.linked"), ico: "duplicate", sub: [
+        { label: t("cm.dupLinked"), ico: "duplicate", key: (MAC ? "⌥" : "Alt+") + ctrl("D"), run: cmd("duplicateLinked") },
+        { label: t("cm.selectOriginal"), ico: "selectSim", run: cmd("selectOriginal"), disabled: !links.copies },
+        { label: t("cm.selectLinked"), ico: "selectSim", run: cmd("selectLinked"), disabled: !links.copies && !links.originals },
+        { label: t("cm.unlink"), ico: "ungroup", run: cmd("unlink"), disabled: !links.copies }
+      ]
+    },
     { label: t("cm.delete"), ico: "delete", key: t("cm.keyDel"), run: cmd("delete") },
     {
       label: t("cm.selectSim"), ico: "selectSim", sub: [

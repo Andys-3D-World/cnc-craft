@@ -60,6 +60,8 @@ import { isOpenShape, shapesWithSameKey, SIZE_TOL_MM, unitsOfSameSize } from "./
 import { openTextOnPathDialog, initTextOnPath } from "./textOnPathTool";
 import { setTrimLog } from "./trimTool";
 import { distributeDeltas } from "./distribute";
+import { esc } from "../setupSheet";
+import { initLinks, markLinked, prepareLinkSources, selectFamily, selectOriginal, unlinkSelection } from "./linked";
 
 let redrawFn: () => void = () => {};
 let log: (t: string) => void = () => {};
@@ -103,6 +105,15 @@ export const commands: Record<string, () => void> = {
     if (!sel.length) return;
     insertCopies(sel, 5 * MM_TO_PIXEL);
   },
+  // Linked copies (linkedCopies.ts): copy follows its original, keeps its own place
+  duplicateLinked: () => {
+    const sel = selectedShapes();
+    if (!sel.length) { log(t("dup.selectFirst")); return; }
+    insertCopies(prepareLinkSources(sel), 5 * MM_TO_PIXEL, true);
+  },
+  unlink: () => { unlinkSelection(selectedShapes()); done(); },
+  selectOriginal: () => { selectOriginal(selectedShapes()); done(); },
+  selectLinked: () => { selectFamily(selectedShapes()); done(); },
   delete: () => {
     const st = app();
     const n = st.selectedShapeIds.length;
@@ -298,10 +309,10 @@ export const commands: Record<string, () => void> = {
   toolMeasure: () => setTool("measure")
 };
 
-/** Kopien mit neuen IDs und eigenen Gruppen, um offsetPx nach rechts unten versetzt */
-export function makeCopies(source: any[], offsetPx: number): any[] {
+/** Kopien mit neuen IDs und eigenen Gruppen, um offsetPx nach rechts unten versetzt. linked = verknüpfte Kopien */
+export function makeCopies(source: any[], offsetPx: number, linked = false): any[] {
   const groupMap = new Map<string, string>(), genMap = new Map<string, string>();
-  return source.map(s => {
+  const out = source.map(s => {
     const c = cloneShape(s);
     c.id = newId();
     delete c.ngOut; // Kopie gehört nicht mehr zum Ergebnis des Knotengraphen
@@ -316,14 +327,17 @@ export function makeCopies(source: any[], offsetPx: number): any[] {
     translateShape(c, offsetPx, -offsetPx);
     return c;
   });
+  if (linked) markLinked(source, out);
+  else for (const c of out) delete c.linkFrame; // a plain copy of an original is no original itself
+  return out;
 }
 
-function insertCopies(source: any[], offsetPx: number) {
+function insertCopies(source: any[], offsetPx: number, linked = false) {
   const st = app();
-  const copies = makeCopies(source, offsetPx);
+  const copies = makeCopies(source, offsetPx, linked);
   st.shapes = [...st.shapes, ...copies];
   st.selectedShapeIds = copies.map(c => c.id);
-  log(t("edit.pasted", { n: copies.length }));
+  log(linked ? t("link.made", { n: new Set(copies.map(c => c.groupId || c.id)).size }) : t("edit.pasted", { n: copies.length }));
   done();
 }
 
@@ -1016,6 +1030,7 @@ function openDuplicateDialog() {
       <label style="${row}"><span><input type="radio" name="dup-mode" value="count" checked> ${t("dup.count")}</span>
         <input id="dup-count" type="number" value="1" min="1" max="999" step="1" style="width:90px;"></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input type="radio" name="dup-mode" value="fill"> ${t("dup.fill")}</label>
+      <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;" title="${esc(t("dup.linkedHint"))}"><input id="dup-linked" type="checkbox"${dupLinked() ? " checked" : ""}> ${t("dup.linked")}</label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="dup-nest" type="checkbox" checked> ${t("dup.nest")}</label>
       <div id="dup-nest-opts" style="display:flex;flex-direction:column;gap:8px;padding-left:22px;">
         <label style="${row}">${t("nest.gap")}
@@ -1051,15 +1066,20 @@ function openDuplicateDialog() {
     const num = (id: string) => Math.max(0, parseFloat($<HTMLInputElement>(id).value) || 0);
     const fill = mode() === "fill";
     const nest = $<HTMLInputElement>("#dup-nest").checked;
+    const linked = $<HTMLInputElement>("#dup-linked").checked;
+    try { localStorage.setItem(DUP_LINKED_KEY, linked ? "1" : "0"); } catch { /* egal */ }
     const opts: NestOptions = { ...loadNestOptions(), gapMm: num("#dup-gap"), marginMm: num("#dup-margin") };
     close();
     if (nest) { try { localStorage.setItem(NEST_KEY, JSON.stringify(opts)); } catch { /* egal */ } }
-    duplicateMany(sel, fill, Math.min(999, Math.max(1, Math.round(num("#dup-count")))), nest, opts);
+    duplicateMany(linked ? prepareLinkSources(sel) : sel, fill, Math.min(999, Math.max(1, Math.round(num("#dup-count")))), nest, opts, linked);
   };
   setTimeout(() => $<HTMLInputElement>("#dup-count").select(), 0);
 }
 
-function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, opts: NestOptions) {
+const DUP_LINKED_KEY = "cnc_craft_dup_linked";
+function dupLinked(): boolean { try { return localStorage.getItem(DUP_LINKED_KEY) === "1"; } catch { return false; } }
+
+function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, opts: NestOptions, linked = false) {
   const st = app();
   let want = count;
   if (fill) {
@@ -1071,7 +1091,7 @@ function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, 
     want = Math.min(999, one > 0 ? Math.floor(free / one) : 999);
   }
   const sets: any[][] = [sel];
-  for (let i = 1; i <= want; i++) sets.push(makeCopies(sel, nest ? 0 : 5 * MM_TO_PIXEL * i));
+  for (let i = 1; i <= want; i++) sets.push(makeCopies(sel, nest ? 0 : 5 * MM_TO_PIXEL * i, linked));
   const copies = sets.slice(1).flat();
   st.shapes = [...st.shapes, ...copies];
 
@@ -1093,6 +1113,7 @@ function duplicateMany(sel: any[], fill: boolean, count: number, nest: boolean, 
   else if (fill) log(t("dup.full", { n: made }));
   else if (made < count) log(t("dup.partial", { n: made, want: count }));
   else log(t("dup.done", { n: made }));
+  if (made && linked) log(t("link.made", { n: made }));
   done();
   checkpoint();
 }
@@ -1121,6 +1142,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
   redrawFn = redraw;
   log = appendToConsole;
   initCanvasMenu(redraw, appendToConsole);
+  initLinks(appendToConsole);
   initEditTools(canvas, redraw, appendToConsole);
   initTextOnPath(redraw, appendToConsole);
   setTrimLog(appendToConsole);
@@ -1167,6 +1189,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     else if (ctrl && key === "c") commands.copy();
     else if (ctrl && key === "x") commands.cut();
     else if (ctrl && key === "v") commands.paste();
+    else if (ctrl && e.altKey && e.code === "KeyD") commands.duplicateLinked();
     else if (ctrl && key === "d") commands.duplicate();
     else if (ctrl && key === "a") commands.selectAll();
     else if (ctrl && key === "g") commands.group();

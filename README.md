@@ -13,7 +13,8 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 
 **Design & import**
 - Drawing tools with Bézier curves and node editing, text with 26+ fonts, single-line fonts and all system fonts,
-  dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, nesting (also into offcuts)
+  dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, linked copies
+  that follow their original, nesting (also into offcuts)
 - Shape library, QR codes, serial numbers and variable text, several beds per project (like build plates in a slicer)
 - **Generators:** boxes with finger joints (20 types, with 3D view), jigsaw puzzles, decoration ornaments for every
   season (Christmas, Easter, Halloween, spring, summer, autumn, love – also with two layers and a landscape), 3D slot

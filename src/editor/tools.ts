@@ -18,6 +18,7 @@
  *  Punkte (N)    Knoten und Tangenten bearbeiten, Kurve zeichnen (B) – siehe bezier.ts
  *  Bemaßung (D)  Abstands- und Größenmaße, die beim Verschieben mitgehen – siehe dims.ts
  */
+import { isLinked } from "../linkedCopies";
 import { app, options, ToolName, toWorld, screenDist, fmtMm } from "./editorState";
 import { snapPoint, snapAngle, SnapResult } from "./snap";
 import {
@@ -102,7 +103,7 @@ export function setTool(name: ToolName) {
   // Punkte bearbeiten: eine einzeln ausgewählte Form gleich übernehmen
   if (name === "node") {
     const sel = selectedShapes();
-    nodeEdit.targetId = sel.length === 1 && ensureBez(sel[0]) ? sel[0].id : null;
+    nodeEdit.targetId = sel.length === 1 && !isLinked(sel[0]) && ensureBez(sel[0]) ? sel[0].id : null;
     nodeEdit.sel = -1;
   }
   document.querySelectorAll(".btn-tool-icon[data-tool]").forEach(b =>
