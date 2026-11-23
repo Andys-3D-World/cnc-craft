@@ -5,7 +5,7 @@
 Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und Maschinensteuerung in einem
 (kein Wechseln mehr zwischen drei Programmen). Läuft auf macOS, Windows und Linux.
 
-**Status: 0.4.7 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
+**Status: 0.4.8 Beta** – bitte testen, Fehler melden, und Maschinen zuerst ohne Werkstück / mit wenig Leistung ausprobieren.
 
 ![CNC Craft – Zeichnen und Fräsbahnen](docs/screenshots/01-design-fraese.png)
 
@@ -34,6 +34,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Planfräsen und Opferplatte planen, V-Carve & Inlay, Restmaterial, Gewindefräsen (innen/außen), mehrere
   Bearbeitungen pro Form
 - Zweiseitig fräsen: Vorderseite, Werkstück auf Passstiften wenden, Rückseite (2,5D)
+- G-Code-Dateien für GRBL, LinuxCNC, Mach3 und Mach4, in Millimeter oder Zoll
 - 3D-Fräsen aus 3D-Modellen und Reliefs aus Bildern oder Text (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
   Rohteil beidseitig planen
 - **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;
@@ -91,7 +92,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Werkstatt-Sync zwischen zwei Computern
 - Alle Einstellungen werden zusätzlich als Datei gesichert und überstehen Updates; Update direkt aus der App (signiert)
 - 7 Sprachen: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
-- Millimeter oder Zoll für alles, was du siehst und eintippst (Projektdateien und G-Code bleiben in Millimetern)
+- Millimeter oder Zoll für alles, was du siehst und eintippst (Projektdateien bleiben in Millimetern; gespeicherte G-Code-Dateien gehen auch in Zoll)
 - Dunkler und heller Modus (☀️ / 🌙 oben rechts)
 
 ## Installieren

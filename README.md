@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app, so you no longer switch between three programs. Runs on macOS, Windows and Linux.
 
-**Status: 0.4.7 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.4.8 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -33,6 +33,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   drilling, chamfers, facing and spoilboard surfacing, V-carve & inlay, rest machining, thread milling
   (internal/external), several operations per shape
 - Two-sided milling: front, turn the workpiece over on dowel pins, back (2.5D)
+- G-code files for GRBL, LinuxCNC, Mach3 and Mach4, in millimetres or inches
 - 3D milling from 3D models and reliefs from images or text (roughing and finishing), automatic split into cut-outs, holes and pockets,
   face stock on both sides
 - **Rotary axis for milling** (along X or Y): engrave, contours, pockets, V-carve and drilling on round parts;
@@ -84,7 +85,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - Libraries for tools, laser layers and plasma cuts with export/import, full backup and workshop sync between two computers
 - All settings are also saved to a file and survive updates; update right from the app (signed)
 - 7 languages: Deutsch, English, Français, Español, Italiano, Nederlands, Polski
-- Millimetres or inches for everything you see and type (project files and G-code stay in millimetres)
+- Millimetres or inches for everything you see and type (project files stay in millimetres; saved G-code files can also be in inches)
 - Dark and light mode (☀️ / 🌙 at the top right)
 
 ## Installation
