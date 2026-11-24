@@ -7,9 +7,11 @@
  */
 
 export interface Pt { x: number; y: number; }
-export interface ImpPath { pts: Pt[]; closed: boolean; }
-export interface ImpCircle { cx: number; cy: number; r: number; }
-export interface ImpText { text: string; x: number; y: number; height: number; rotation: number; font?: string; }
+/** Herkunft in der Datei (DXF-Handle bzw. SVG-id, Ebene) – nur für „Zeichnung neu einlesen“ (reimportMatch.ts), fremder Text */
+export interface ImpOrigin { keys?: string[]; layer?: string; }
+export interface ImpPath extends ImpOrigin { pts: Pt[]; closed: boolean; }
+export interface ImpCircle extends ImpOrigin { cx: number; cy: number; r: number; }
+export interface ImpText extends ImpOrigin { text: string; x: number; y: number; height: number; rotation: number; font?: string; }
 
 export interface ImportResult {
   paths: ImpPath[];
@@ -166,18 +168,20 @@ export function bulgePoints(p0: Pt, p1: Pt, bulge: number, tol: number): Pt[] {
 export function joinPaths(paths: ImpPath[], tol: number): ImpPath[] {
   const done: ImpPath[] = [];
   let open: Pt[][] = [];
+  const from: ImpOrigin[] = []; // Herkunft zu open[i]
 
   for (const p of paths) {
     const pts = dedupe(p.pts, tol * 0.01);
     if (pts.length < 2) continue;
-    if (p.closed) { done.push({ pts, closed: true }); continue; }
+    if (p.closed) { done.push({ pts, closed: true, ...originOf([p]) }); continue; }
     // Offene Linie, deren Enden sich treffen -> geschlossen
     if (pts.length > 2 && dist(pts[0], pts[pts.length - 1]) <= tol) {
       pts.pop();
-      done.push({ pts, closed: true });
+      done.push({ pts, closed: true, ...originOf([p]) });
       continue;
     }
     open.push(pts);
+    from.push(p);
   }
 
   // Raster über die Endpunkte, damit es auch bei tausenden Linien schnell bleibt
@@ -218,6 +222,7 @@ export function joinPaths(paths: ImpPath[], tol: number): ImpPath[] {
   for (let i = 0; i < open.length; i++) {
     if (!alive[i]) continue;
     let chain = open[i];
+    const parts = [from[i]];
     delIdx(i);
     alive[i] = false;
     let grew = true;
@@ -228,6 +233,7 @@ export function joinPaths(paths: ImpPath[], tol: number): ImpPath[] {
       if (e) {
         let seg = open[e.j];
         delIdx(e.j); alive[e.j] = false;
+        parts.push(from[e.j]);
         if (!e.atStart) seg = seg.slice().reverse();
         chain = chain.concat(seg.slice(1));
         grew = true;
@@ -238,6 +244,7 @@ export function joinPaths(paths: ImpPath[], tol: number): ImpPath[] {
       if (s) {
         let seg = open[s.j];
         delIdx(s.j); alive[s.j] = false;
+        parts.push(from[s.j]);
         if (s.atStart) seg = seg.slice().reverse();
         chain = seg.slice(0, -1).concat(chain);
         grew = true;
@@ -245,12 +252,19 @@ export function joinPaths(paths: ImpPath[], tol: number): ImpPath[] {
     }
     if (chain.length > 2 && dist(chain[0], chain[chain.length - 1]) <= tol) {
       chain.pop();
-      done.push({ pts: chain, closed: true });
+      done.push({ pts: chain, closed: true, ...originOf(parts) });
     } else {
-      done.push({ pts: chain, closed: false });
+      done.push({ pts: chain, closed: false, ...originOf(parts) });
     }
   }
   return done;
+}
+
+/** Herkunft einer verbundenen Kontur: alle Kennungen; Ebene nur, wenn alle Stücke auf derselben liegen */
+function originOf(parts: ImpOrigin[]): ImpOrigin {
+  const keys = [...new Set(parts.flatMap(p => p.keys ?? []))].sort();
+  const layer = parts[0]?.layer;
+  return { ...(keys.length ? { keys } : {}), ...(layer && parts.every(p => p.layer === layer) ? { layer } : {}) };
 }
 
 function dist(a: Pt, b: Pt) { return Math.hypot(a.x - b.x, a.y - b.y); }

@@ -10,7 +10,9 @@ import {
   StlView, WeldedMesh, ViewCoords, SliceResult
 } from "./stlLoader";
 import { Mesh3DPreview, render2D } from "./stlPreview";
-import { createPolyline, MM_TO_PIXEL } from "./shapeTransform";
+import { createPolyline, MM_TO_PIXEL, newId } from "./shapeTransform";
+import { applyPt, type Mat } from "./linkedCopies";
+import { stampImport, type MeshCut } from "./reimportMatch";
 import { updateDimensionInputs } from "./uiInputs";
 import { assignPartGroups } from "./editor/parts";
 import { parse3mf, parseObj, parseStep, MODEL_EXTENSIONS } from "./importers/meshImport";
@@ -50,13 +52,17 @@ export function setupStlLoader(
   });
 }
 
+/** „Zeichnung neu einlesen“: Konturen nicht einfügen, sondern (in Modell-Koordinaten) übergeben; start = Einstellungen vom letzten Mal */
+export interface ReimportTarget { start: MeshCut | null; take: (shapes: any[]) => void }
+
 /** 3D-Modell (STL, 3MF, OBJ, STEP) aus bereits gelesenen Bytes öffnen (wird auch vom allgemeinen Import benutzt) */
 export async function openStlFromBytes(
   fileName: string,
   binary: Uint8Array,
   state: any,
   redraw: () => void,
-  appendToConsole: (t: string) => void
+  appendToConsole: (t: string) => void,
+  re?: ReimportTarget
 ) {
   appendToConsole(t("stl.reading", { name: fileName }));
   const ext = (fileName.split(".").pop() || "").toLowerCase();
@@ -77,7 +83,7 @@ export async function openStlFromBytes(
   appendToConsole(
     t("stl.loaded", { n: mesh.triangleCount, fmt: mesh.format === "ascii" ? t("stl.ascii") : mesh.format === "binary" ? t("stl.binary") : mesh.format.toUpperCase(), x: size[0], y: size[1], z: size[2] })
   );
-  showStlDialog(fileName, welded, size, state, redraw, appendToConsole);
+  showStlDialog(fileName, welded, size, state, redraw, appendToConsole, re);
 }
 
 const VIEW_LABELS = (v: StlView) => t(`stl.view.${v}`);
@@ -89,7 +95,8 @@ function showStlDialog(
   size: string[],
   state: any,
   redraw: () => void,
-  appendToConsole: (t: string) => void
+  appendToConsole: (t: string) => void,
+  re?: ReimportTarget
 ) {
   document.getElementById("stl-dialog-overlay")?.remove();
 
@@ -140,8 +147,8 @@ function showStlDialog(
 
       <div class="stl-dlg-row" style="margin-top:14px;">
         <button id="stl-cancel" class="stl-btn-cancel">${t("dlg.cancel")}</button>
-        ${isLaser() || isPlasma() ? "" : `<button id="stl-cam3d" class="stl-btn-cancel" data-tip="${escapeHtml(t("c3d.openTip"))}">🏔 ${t("c3d.open")}</button>`}
-        <button id="stl-insert" class="stl-btn-ok">✔ ${t("stl.insert")}</button>
+        ${re || isLaser() || isPlasma() ? "" : `<button id="stl-cam3d" class="stl-btn-cancel" data-tip="${escapeHtml(t("c3d.openTip"))}">🏔 ${t("c3d.open")}</button>`}
+        <button id="stl-insert" class="stl-btn-ok">✔ ${t(re ? "reimp.compare" : "stl.insert")}</button>
       </div>
     </div>
 
@@ -318,7 +325,9 @@ function showStlDialog(
       const f = features();
       if (!f.features.length) return;
       const pct = parseFloat(scaleInput.value) || 100;
-      const shapes = featuresToShapes(f, pct / 100, fileName);
+      const cut: MeshCut = { v: view, h: 0, p: pct, holes: true, feat: true };
+      if (re) { close(); re.take(featuresToShapes(f, pct / 100, fileName, "file", cut, true)); return; }
+      const shapes = featuresToShapes(f, pct / 100, fileName, newId(), cut);
       state.shapes = [...state.shapes, ...shapes];
       state.selectedShapeIds = shapes.map((s: any) => s.id);
       const n = (k: string) => shapes.filter((s: any) => s.millingMode === k).length;
@@ -330,7 +339,9 @@ function showStlDialog(
     }
     if (!slice || slice.loops.length === 0) return;
     const pct = parseFloat(scaleInput.value) || 100;
-    const shapes = sliceToShapes(slice, pct / 100, holesCheck.checked, fileName);
+    const cut: MeshCut = { v: view, h: slice.height - vc.minW, p: pct, holes: holesCheck.checked, feat: false };
+    if (re) { close(); re.take(sliceToShapes(slice, pct / 100, holesCheck.checked, fileName, "file", cut, true)); return; }
+    const shapes = sliceToShapes(slice, pct / 100, holesCheck.checked, fileName, newId(), cut);
     state.shapes = [...state.shapes, ...shapes];
     state.selectedShapeIds = shapes.map((s: any) => s.id);
     appendToConsole(
@@ -344,14 +355,26 @@ function showStlDialog(
 
   // Start: Ansicht "Oben" mit automatisch gesuchter Höhe
   applyView("top");
+  // Neu einlesen: wie beim letzten Mal
+  const st = re?.start;
+  if (st) {
+    overlay.querySelectorAll<HTMLButtonElement>(".stl-view-btn").forEach(x => x.classList.toggle("active", x.dataset.view === st.v));
+    scaleInput.value = String(st.p);
+    holesCheck.checked = st.holes;
+    applyView(st.v as StlView);
+    if (!st.feat) setSliderToHeight(vc.minW + st.h);
+    if (st.feat) { featCheck.checked = true; featCheck.dispatchEvent(new Event("change")); } else update();
+  }
 }
 
 /**
  * Wandelt das Schnitt-Ergebnis in Formen für den Arbeitsbereich um.
  * Das Teil wird 10 mm vom Nullpunkt (unten links) entfernt abgelegt.
+ * `run`/`cut` = Herkunft (reimportMatch.ts): Lage im Modell (u, v × Faktor). `raw` = nicht ablegen, in Modell-Koordinaten lassen.
  */
-function sliceToShapes(slice: SliceResult, factor: number, withHoles: boolean, fileName: string): any[] {
+function sliceToShapes(slice: SliceResult, factor: number, withHoles: boolean, fileName: string, run: string, cut: MeshCut, raw = false): any[] {
   const MARGIN_MM = 10;
+  const toFile = fileFrame(slice.minU, slice.minV, factor, MARGIN_MM);
   const shapes: any[] = [];
 
   for (const loop of slice.loops) {
@@ -361,7 +384,9 @@ function sliceToShapes(slice: SliceResult, factor: number, withHoles: boolean, f
       y: ((p.v - slice.minV) * factor + MARGIN_MM) * MM_TO_PIXEL
     }));
     const mode = !loop.closed ? "on-line" : loop.isHole ? "inside" : "outside";
-    shapes.push(createPolyline(points, loop.closed, mode, { source: fileName }));
+    const s = createPolyline(raw ? points.map(p => applyPt(toFile, p)) : points, loop.closed, mode, { source: fileName });
+    stampImport(s, raw ? null : toFile, { f: run, m: cut });
+    shapes.push(s);
   }
   // Jedes Teil (Außenkontur + Löcher) als eigene Gruppe
   assignPartGroups(shapes);
@@ -369,18 +394,26 @@ function sliceToShapes(slice: SliceResult, factor: number, withHoles: boolean, f
 }
 
 /** Erkannte Formen → Fräs-Formen mit Art und Tiefe (Taschen zuerst, dann Löcher, Umriss zuletzt) */
-function featuresToShapes(f: FeatureResult, factor: number, fileName: string): any[] {
+function featuresToShapes(f: FeatureResult, factor: number, fileName: string, run: string, cut: MeshCut, raw = false): any[] {
   const MARGIN_MM = 10;
+  const toFile = fileFrame(f.minU, f.minV, factor, MARGIN_MM);
   const order = { pocket: 0, inside: 1, outside: 2 };
   const shapes = [...f.features].sort((a, b) => order[a.kind] - order[b.kind] || a.depth - b.depth).map(x => {
     const points = x.points.map(p => ({
       x: ((p.u - f.minU) * factor + MARGIN_MM) * MM_TO_PIXEL,
       y: ((p.v - f.minV) * factor + MARGIN_MM) * MM_TO_PIXEL
     }));
-    return createPolyline(points, true, x.kind, { source: fileName, millingDepth: -+(x.depth * factor).toFixed(3) });
+    const s = createPolyline(raw ? points.map(p => applyPt(toFile, p)) : points, true, x.kind, { source: fileName, millingDepth: -+(x.depth * factor).toFixed(3) });
+    stampImport(s, raw ? null : toFile, { f: run, m: cut, d: s.millingDepth });
+    return s;
   });
   assignPartGroups(shapes);
   return shapes;
+}
+
+/** Bett → Modell: dort, wo das Teil im Modell liegt (nur verschoben) */
+function fileFrame(minU: number, minV: number, factor: number, margin: number): Mat {
+  return [1, 0, 0, 1, (minU * factor - margin) * MM_TO_PIXEL, (minV * factor - margin) * MM_TO_PIXEL];
 }
 
 function escapeHtml(s: string): string {

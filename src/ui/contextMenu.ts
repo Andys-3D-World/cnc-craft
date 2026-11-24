@@ -21,6 +21,7 @@ import { isLaser, isPlasma } from "../machineMode";
 import { refreshLaserPanel } from "./laserPanel";
 import { EXPORT_FORMATS, exportDrawing, formatLabel } from "./exportMenu";
 import { linkState } from "../editor/linked";
+import { canReimport, knownSources } from "./reimportPanel";
 
 export interface MenuItem {
   label: string;
@@ -226,6 +227,7 @@ function shapeMenu(): MenuEntry[] {
     "sep",
     { label: t("cm.group"), ico: "group", key: ctrl("G"), run: cmd("group"), disabled: n < 2 },
     { label: t("cm.ungroup"), ico: "ungroup", key: ctrl("U"), run: cmd("ungroup"), disabled: !grouped },
+    ...(sel.some(canReimport) ? [{ label: t("cm.reimport"), ico: "reimport", run: () => { commands.reimport(); } }] : []),
     { label: t("cm.heal"), ico: "heal", run: cmd("heal") },
     ...(isLaser() || isPlasma() ? [] : [{ label: t("cm.relief"), ico: "relief", run: cmd("relief") }]),
     { label: t("cm.keepOut"), ico: "keepOut", run: cmd("keepOut") },
@@ -282,6 +284,7 @@ function canvasMenu(): MenuEntry[] {
   return [
     { label: t("cm.paste"), ico: "paste", key: ctrl("V"), run: cmd("paste"), disabled: !hasClipboard() },
     { label: t("cm.import"), ico: "import", key: ctrl("I"), run: cmd("importFile") },
+    { label: t("cm.reimport"), ico: "reimport", run: () => { commands.reimport(); }, disabled: !knownSources().length },
     "sep",
     { label: t("cm.selectAll"), ico: "selectAll", key: ctrl("A"), run: cmd("selectAll"), disabled: !any },
     { label: t("cm.dedupe"), ico: "dedupe", run: cmd("dedupe"), disabled: !any },

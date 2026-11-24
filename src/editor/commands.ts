@@ -48,6 +48,7 @@ import { openSerialDialog } from "./serial";
 import { openThicknessDialog } from "./thickness";
 import { openDogboneDialog } from "./dogbone";
 import { openSplitPanel } from "../ui/splitPanel";
+import { openReimport } from "../ui/reimportPanel";
 import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllowed } from "./nest";
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
@@ -292,6 +293,7 @@ export const commands: Record<string, () => void> = {
   cutStart: () => openCutStartDialog(),
   reverseDir: () => reverseDirection(),
   importFile: () => { importWithDialog(); },
+  reimport: () => openReimport(log),
   openProject: () => { openProjectWithDialog(); },
   saveProject: () => { saveProject(false); },
   saveProjectAs: () => { saveProject(true); },

@@ -17,7 +17,8 @@
  */
 import { app, bedSizeMm, toWorld } from "./editorState";
 import { isLight } from "../theme";
-import { takeHistory, putHistory, type HistoryState } from "./history";
+import { takeHistory, putHistory, checkpoint, checkpointTagged, setTagHook, type HistoryState } from "./history";
+import { solveConstraints } from "./dims";
 import { markDirty } from "./projectDirty";
 import { t } from "../i18n/i18n";
 import { MM_TO_PIXEL, groupBounds, shapeBounds, translateShape, type Bounds } from "../shapeTransform";
@@ -71,6 +72,76 @@ export function linkLists(): any[][] {
 /** All lists except the drawing on screen (originals may lie there) */
 export function otherLists(): any[][] {
   return beds.flatMap((b, i) => (i === active ? [b.other ?? []] : [b.shapes, b.other ?? []]));
+}
+
+// ---------------------------------------------------------------------
+// One action over all beds and sides (re-import a drawing): one undo step everywhere
+// ---------------------------------------------------------------------
+
+export interface SheetList { bed: number; hidden: boolean; side: Side | null; shapes: any[] }
+
+/** All shape lists with their place; pieces of a split part are left out (they are made from their original) */
+export function sheetLists(): SheetList[] {
+  return beds.flatMap((b, i) => {
+    if (b.piece) return [];
+    const two = b.two?.on === true, shown: Side = b.back ? "back" : "front";
+    const list: SheetList[] = [{ bed: i, hidden: false, side: two ? shown : null, shapes: i === active ? app().shapes : b.shapes }];
+    if (b.other?.length) list.push({ bed: i, hidden: true, side: shown === "back" ? "front" : "back", shapes: b.other });
+    return list;
+  });
+}
+
+/** Put new lists in place (same order as sheetLists()); changed beds lose their "done" mark */
+export function replaceSheets(old: SheetList[], next: any[][], dirty: boolean[]) {
+  checkpoint();
+  const tag = "t" + Math.random().toString(36).slice(2);
+  const st = app();
+  old.forEach((l, k) => {
+    const b = beds[l.bed];
+    const visible = !l.hidden && l.bed === active;
+    if (!dirty[k]) { if (visible) checkpointTagged(tag); return; } // Ctrl+Z works here too when only other beds changed
+    const step = (h: HistoryState | null | undefined): HistoryState => {
+      const was = JSON.stringify(l.shapes);
+      const undo = h && h.committed === was ? h.undo : [];
+      return { committed: JSON.stringify(next[k]), undo: [...undo, { s: was, tag }], redo: [] };
+    };
+    b.done = false;
+    if (l.hidden) { b.otherHist = step(b.otherHist); b.other = next[k]; return; }
+    if (!visible) { b.hist = step(b.hist); b.shapes = next[k]; return; }
+    st.shapes = next[k];
+    b.shapes = next[k];
+    const ids = new Set(next[k].map(s => s.id));
+    st.selectedShapeIds = st.selectedShapeIds.filter((id: string) => ids.has(id));
+    solveConstraints(); // parts that hang on a dimension follow now, not as a step of their own
+    checkpointTagged(tag);
+  });
+  markDirty();
+  changed();
+}
+
+/** Undo/redo of such an action: the other beds and sides go along, if they were not changed since */
+function moveTagged(tag: string, dir: "undo" | "redo") {
+  const stuck: string[] = [];
+  const go = (list: any[], h: HistoryState | null | undefined, i: number): any[] | null => {
+    if (!h) return null;
+    const from = dir === "undo" ? h.undo : h.redo, to = dir === "undo" ? h.redo : h.undo;
+    const top = from[from.length - 1];
+    if (top?.tag !== tag || h.committed !== JSON.stringify(list)) {
+      if (from.some(e => e.tag === tag)) stuck.push(bedName(i));
+      return null;
+    }
+    from.pop();
+    to.push({ s: h.committed!, tag });
+    h.committed = top.s;
+    return JSON.parse(top.s);
+  };
+  beds.forEach((b, i) => {
+    if (i !== active) { const l = go(b.shapes, b.hist, i); if (l) b.shapes = l; }
+    const o = go(b.other ?? [], b.otherHist, i);
+    if (o) b.other = o;
+  });
+  if (stuck.length) log(t("reimp.undoStuck", { beds: stuck.join(", ") }));
+  shown = "";
 }
 
 /**
@@ -395,6 +466,7 @@ export function initBeds(onRedraw: () => void, onLog: (s: string) => void, onFit
   redraw = onRedraw;
   log = onLog;
   fitAll = onFit;
+  setTagHook(moveTagged);
   const canvas = document.getElementById("cnc-canvas") as HTMLCanvasElement | null;
   if (canvas) initCanvasMouse(canvas);
   const holder = document.querySelector(".canvas-panel .canvas-holder");

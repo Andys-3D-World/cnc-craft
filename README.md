@@ -24,7 +24,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   clock faces, wood joints (finger joints, dovetails), slot-together shelves, vent grilles,
   labels, keychains and three-layer photo frames
 - Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF, OBJ and STEP – big files
-  are read in background threads
+  are read in background threads; re-import a changed drawing and keep all settings of its shapes
 - Split a large part into pieces with joints (puzzle knobs, fingers or butt joint) – router, laser and plasma
 - 3D view of the finished parts, node graph for reusable workflows
 

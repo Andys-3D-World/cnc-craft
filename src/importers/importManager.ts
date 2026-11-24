@@ -15,7 +15,7 @@
  */
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { readFile, writeFile } from "@tauri-apps/plugin-fs";
-import { ImportResult, ImpPath, Pt, joinPaths, resultBounds, decodeText } from "./common";
+import { ImportResult, ImpOrigin, ImpPath, Pt, joinPaths, resultBounds, decodeText } from "./common";
 import { parseSvg } from "./svgImport";
 import { parseDxf } from "./dxfImport";
 import { parseHpgl, parseGcode } from "./plotImport";
@@ -31,6 +31,7 @@ import { createPolyline, createCircle, newId, MM_TO_PIXEL, pathArea, pointInPath
 import { updateDimensionInputs } from "../uiInputs";
 import { bedSizeMm } from "../editor/editorState";
 import { assignPartGroups } from "../editor/parts";
+import { checkpoint } from "../editor/history";
 import { t } from "../i18n/i18n";
 import { toolsUsedBy, mergeProjectTools } from "../toolLibrary";
 import { getMachineMode, setMachineMode } from "../machineMode";
@@ -39,7 +40,9 @@ import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
 import { graphForProject, loadProjectGraph } from "../nodes/graphStore";
 import { isDirty, markDirty, markClean, clearRecovery } from "../editor/projectDirty";
-import { askUnsaved } from "../ui/unsavedDialog";
+import { askChoice, askUnsaved } from "../ui/unsavedDialog";
+import { stampImport, cleanImp } from "../reimportMatch";
+import { openReimportPanel, knownSources, shapesOf } from "../ui/reimportPanel";
 
 export const IMPORT_EXTENSIONS = {
   vector: ["svg", "dxf", "pdf", "ai", "plt", "hpgl", "hpg"],
@@ -48,6 +51,9 @@ export const IMPORT_EXTENSIONS = {
   gcode: ["nc", "gcode", "gc", "tap", "ngc", "cnc"],
   project: ["cncc"]
 };
+/** „Zeichnung neu einlesen“ geht mit diesen Formaten (nicht mit nachgezeichneten Bildern und G-Code) */
+export const REIMPORT_EXTENSIONS = [...IMPORT_EXTENSIONS.vector, ...IMPORT_EXTENSIONS.model];
+const extOf = (name: string) => (name.split(".").pop() || "").toLowerCase();
 
 let ctx = {
   state: null as any,
@@ -104,14 +110,21 @@ export async function importWithDialog() {
 
 /** Datei-Inhalt importieren (vom Dialog oder per Drag & Drop) */
 export async function importBytes(name: string, bytes: Uint8Array, fullPath?: string) {
-  const ext = (name.split(".").pop() || "").toLowerCase();
+  const ext = extOf(name);
   const { log } = ctx;
   try {
+    // dieselbe Datei ist schon im Projekt: neu einlesen oder noch einmal einfügen?
+    if (REIMPORT_EXTENSIONS.includes(ext) && knownSources().some(s => s.name === name)) {
+      const r = await askChoice(t("reimp.askTitle"), t("reimp.askText", { name }), [
+        { key: "cancel", label: t("dlg.cancel"), cancel: true },
+        { key: "again", label: t("reimp.askAgain") },
+        { key: "update", label: t("reimp.askUpdate"), primary: true }
+      ]);
+      if (r === "cancel") return;
+      if (r === "update") { await reimportBytes(name, name, bytes); return; }
+    }
     let res: ImportResult | null = null;
-    if (ext === "svg") res = parseSvg(decodeText(bytes));
-    else if (ext === "dxf") res = parseDxf(decodeText(bytes));
-    else if (ext === "pdf" || ext === "ai") res = await parsePdf(bytes);
-    else if (["plt", "hpgl", "hpg"].includes(ext)) res = parseHpgl(decodeText(bytes));
+    if (IMPORT_EXTENSIONS.vector.includes(ext)) res = await parseVector(ext, bytes);
     else if (IMPORT_EXTENSIONS.gcode.includes(ext)) res = parseGcode(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.image.includes(ext)) {
       // Bild: gravieren (Bild-Form) oder nachzeichnen (Konturen)
@@ -131,6 +144,61 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     insertResult(res, name, ext !== "nc" && !IMPORT_EXTENSIONS.gcode.includes(ext));
   } catch (err) {
     log(`${t("imp.error")} ${name}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+async function parseVector(ext: string, bytes: Uint8Array): Promise<ImportResult> {
+  if (ext === "svg") return parseSvg(decodeText(bytes));
+  if (ext === "dxf") return parseDxf(decodeText(bytes));
+  if (ext === "pdf" || ext === "ai") return parsePdf(bytes);
+  return parseHpgl(decodeText(bytes));
+}
+
+/**
+ * Zeichnung neu einlesen: geänderte Datei wählen, mit den Formen von `source` vergleichen und fragen.
+ * Gelesen wird nur die Datei, die gerade im Dialog gewählt wurde (Pfade werden nicht gemerkt).
+ */
+export async function reimportWithDialog(source: string) {
+  const model = IMPORT_EXTENSIONS.model.includes(extOf(source));
+  const list = model ? IMPORT_EXTENSIONS.model : IMPORT_EXTENSIONS.vector;
+  const sel = await open({
+    multiple: false, directory: false, title: t("reimp.dlgTitle", { name: source }),
+    filters: [{ name: t(model ? "imp.fModel" : "imp.fVector"), extensions: [...list, ...list.map(e => e.toUpperCase())] }]
+  });
+  if (!sel) return;
+  const p = pathOf(sel), name = String(p).split(/[\\/]/).pop() || source;
+  try { await reimportBytes(source, name, await readFile(p)); }
+  catch (err) { ctx.log(`${t("imp.error")} ${name}: ${err instanceof Error ? err.message : String(err)}`); }
+}
+
+/** Inhalt der geänderten Datei mit den Formen von `source` vergleichen; es wird erst nach der Bestätigung etwas geändert */
+export async function reimportBytes(source: string, name: string, bytes: Uint8Array) {
+  const { log } = ctx;
+  const ext = extOf(name);
+  const asNew = () => { void importFresh(name, bytes); };
+  if (IMPORT_EXTENSIONS.model.includes(ext)) {
+    // 3D-Modell: wieder mit Ansicht und Schnitthöhe, vorbelegt mit denen vom letzten Mal
+    const last = shapesOf(source).map(s => cleanImp(s.imp)?.m).find(Boolean) ?? null;
+    await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log, {
+      start: last,
+      take: shapes => openReimportPanel({ source, name, shapes, mesh: true, warnings: [], log, redraw: ctx.redraw, asNew })
+    });
+    return;
+  }
+  const res = await parseVector(ext, bytes);
+  const built = buildShapes(res, source, true, false, "file");
+  if (!built) { log(t("imp.noShapes", { name })); return; }
+  openReimportPanel({ source, name, shapes: built.shapes, mesh: false, warnings: res.warnings, log, redraw: ctx.redraw, asNew });
+}
+
+/** Ganz normal einfügen (aus dem Vergleich heraus, wenn die Datei nichts mehr mit der alten zu tun hat) */
+async function importFresh(name: string, bytes: Uint8Array) {
+  const ext = extOf(name);
+  try {
+    if (IMPORT_EXTENSIONS.model.includes(ext)) await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, ctx.log);
+    else { insertResult(await parseVector(ext, bytes), name, true); checkpoint(); }
+  } catch (err) {
+    ctx.log(`${t("imp.error")} ${name}: ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -182,8 +250,13 @@ async function insertEngraveImage(name: string, bytes: Uint8Array) {
 // ERGEBNIS IN DEN ARBEITSBEREICH EINFÜGEN
 // =====================================================================
 
-function insertResult(res: ImportResult, name: string, autoModes: boolean) {
-  const { state, log } = ctx;
+interface Built { shapes: any[]; parts: number; texts: number; bounds: NonNullable<ReturnType<typeof resultBounds>>; inside: boolean; open: number }
+
+/**
+ * Formen aus dem Ergebnis einer Datei. `place`: auf dem Bett (liegt sie nicht darauf, bei X10/Y10), sonst so, wie die
+ * Datei sie hat (für „Zeichnung neu einlesen“). `run` = Kennung dieses Imports, null = ohne Herkunft an den Formen.
+ */
+function buildShapes(res: ImportResult, name: string, autoModes: boolean, place: boolean, run: string | null): Built | null {
 
   // Text in Konturen umwandeln (DXF-Texte). Jeder Text bleibt als Ganzes zusammen.
   const textPaths: (ImpPath & { textIdx: number })[] = [];
@@ -191,8 +264,8 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
     try {
       const tr = traceText({ text: t.text, font: t.font || "Arial", heightMm: t.height, bold: false, italic: false, align: "left", lineSpacing: 170, letterSpacing: 0 });
       const rad = (t.rotation * Math.PI) / 180, c = Math.cos(rad), s = Math.sin(rad);
-      for (const loop of tr.loops) {
-        textPaths.push({ textIdx, pts: loop.map(q => ({ x: t.x + q.x * c - q.y * s, y: t.y + q.x * s + q.y * c })), closed: true });
+      for (const [k, loop] of tr.loops.entries()) {
+        textPaths.push({ textIdx, keys: t.keys?.map(key => `${key}#${k}`), layer: t.layer, pts: loop.map(q => ({ x: t.x + q.x * c - q.y * s, y: t.y + q.x * s + q.y * c })), closed: true });
       }
     } catch { /* Schrift nicht verfügbar */ }
   });
@@ -200,16 +273,12 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
   const paths = joinPaths(res.paths, 0.01);
   const all: ImportResult = { ...res, paths: [...paths, ...textPaths] };
   const b = resultBounds(all);
-  if (!b) {
-    log(t("imp.noShapes", { name }));
-    res.warnings.forEach(w => log(`${t("log.note")} ${w}`));
-    return;
-  }
+  if (!b) return null;
 
   // Platzierung: liegt alles auf dem Bett, bleibt es, wo es ist. Sonst nach X10/Y10.
   const bed = bedSizeMm();
   const inside = b.minX >= -1e-6 && b.minY >= -1e-6 && b.maxX <= bed.w + 1e-6 && b.maxY <= bed.h + 1e-6;
-  const dx = inside ? 0 : 10 - b.minX, dy = inside ? 0 : 10 - b.minY;
+  const dx = inside || !place ? 0 : 10 - b.minX, dy = inside || !place ? 0 : 10 - b.minY;
   const P = (p: Pt) => ({ x: (p.x + dx) * MM_TO_PIXEL, y: (p.y + dy) * MM_TO_PIXEL });
 
   // Außen/Innen automatisch: Verschachtelungstiefe jeder geschlossenen Kontur
@@ -241,14 +310,19 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
     return (depth.get(key) || 0) % 2 === 0 ? "outside" : "inside";
   };
 
+  // Herkunft: wo die Form in der Datei liegt (Bett → Datei nur verschoben), Kennung und Ebene
+  const toFile: [number, number, number, number, number, number] = [1, 0, 0, 1, -dx * MM_TO_PIXEL, -dy * MM_TO_PIXEL];
+  const stamp = (s: any, o: ImpOrigin) => { if (run) stampImport(s, dx || dy ? toFile : null, { f: run, k: o.keys, l: o.layer }); };
   const shapes: any[] = [];
   paths.forEach((p, idx) => {
     if (p.pts.length < 2) return;
     shapes.push(createPolyline(p.pts.map(P), p.closed, p.closed ? modeFor(`path${idx}`) : "on-line", { source: name }));
+    stamp(shapes[shapes.length - 1], p);
   });
   res.circles.forEach((c, idx) => {
     const s = createCircle((c.cx + dx) * MM_TO_PIXEL, (c.cy + dy) * MM_TO_PIXEL, c.r * MM_TO_PIXEL, modeFor(`circle${idx}`));
     s.source = name;
+    stamp(s, c);
     shapes.push(s);
   });
   // Jedes Teil (Außenkontur + Löcher) wird eine eigene Gruppe -> einzeln verschiebbar
@@ -257,7 +331,21 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
   textPaths.forEach(p => {
     if (!textGroups.has(p.textIdx)) textGroups.set(p.textIdx, "text-" + newId());
     shapes.push(createPolyline(p.pts.map(P), true, "on-line", { groupId: textGroups.get(p.textIdx), isText: true, source: name }));
+    stamp(shapes[shapes.length - 1], p);
   });
+  return { shapes, parts, texts: textGroups.size, bounds: b, inside, open: paths.filter(p => !p.closed).length };
+}
+
+function insertResult(res: ImportResult, name: string, autoModes: boolean) {
+  const { state, log } = ctx;
+  const built = buildShapes(res, name, autoModes, true, REIMPORT_EXTENSIONS.includes(extOf(name)) ? newId() : null);
+  if (!built) {
+    log(t("imp.noShapes", { name }));
+    res.warnings.forEach(w => log(`${t("log.note")} ${w}`));
+    return;
+  }
+  const { shapes, parts, bounds: b, inside, open } = built;
+  const bed = bedSizeMm();
 
   state.shapes = [...state.shapes, ...shapes];
   state.selectedShapeIds = shapes.map(s => s.id);
@@ -265,9 +353,8 @@ function insertResult(res: ImportResult, name: string, autoModes: boolean) {
   ctx.redraw();
 
   const w = (b.maxX - b.minX).toFixed(1), h = (b.maxY - b.minY).toFixed(1);
-  const open = paths.filter(p => !p.closed).length;
   log(`[Import] ${name}: ${res.info}`);
-  log(t("imp.inserted", { parts: parts + textGroups.size, n: shapes.length, w, h }) + (open ? ", " + t("imp.openLines", { n: open }) : "") + (inside ? "" : " " + t("imp.moved")));
+  log(t("imp.inserted", { parts: parts + built.texts, n: shapes.length, w, h }) + (open ? ", " + t("imp.openLines", { n: open }) : "") + (inside ? "" : " " + t("imp.moved")));
   if (res.texts.length) log(t("imp.texts", { n: res.texts.length }));
   if (b.maxX - b.minX > bed.w || b.maxY - b.minY > bed.h) log(t("imp.tooLarge"));
   res.warnings.forEach(wn => log(`${t("log.note")} ${wn}`));

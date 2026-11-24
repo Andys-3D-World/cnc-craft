@@ -24,7 +24,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Flex-Scharniere, Lineale und Zifferblätter, Holzverbindungen (Fingerzinken, Schwalbenschwanz), Steckregale,
   Lüftungsgitter, Schilder, Schlüsselanhänger und dreilagige Bilderrahmen
 - Import von SVG, DXF, PDF, PLT und Bildern (Umriss oder Mittellinie nachzeichnen), 3D-Modelle als STL, 3MF, OBJ und STEP –
-  große Dateien werden im Hintergrund gelesen
+  große Dateien werden im Hintergrund gelesen; geänderte Zeichnung neu einlesen, alle Einstellungen der Formen bleiben
 - Großes Teil in Stücke mit Fugen teilen (Puzzle, Finger oder stumpf) – Fräse, Laser und Plasma
 - 3D-Ansicht der fertigen Teile, Node-Graph für wiederverwendbare Abläufe
 

@@ -10,7 +10,7 @@
  * Einzelne Linien/Bögen werden danach automatisch zu geschlossenen Konturen verbunden.
  */
 import {
-  ImportResult, emptyResult, Mat, matMul, matApply, matTranslate, matScale, matRotate,
+  ImportResult, ImpOrigin, emptyResult, Mat, matMul, matApply, matTranslate, matScale, matRotate,
   matScaleFactor, matIsUniform, arcPoints, ellipsePoints, bulgePoints, CURVE_TOL, Pt
 } from "./common";
 import { t } from "../i18n/i18n";
@@ -113,17 +113,24 @@ export function parseDxf(text: string): ImportResult {
   const counts: Record<string, number> = {};
   const skipped: Record<string, number> = {};
 
-  const emit = (list: Entity[], m: Mat, depth: number) => {
+  // Herkunft der Formen für „Zeichnung neu einlesen“: Handle (Gruppe 5), bei Blöcken mit dem Handle der Einfügung davor, und Ebene
+  let origin: ImpOrigin = {};
+  const emit = (list: Entity[], m: Mat, depth: number, inBlock?: { key: string; layer: string }) => {
     if (depth > 20) return;
     for (const e of list) {
       counts[e.type] = (counts[e.type] || 0) + 1;
+      const handle = getStr(e.pairs, 5) || "", own = getStr(e.pairs, 8) || "";
+      // Ebene „0“ im Block heißt: Ebene der Einfügung
+      const layer = inBlock && (own === "0" || !own) ? inBlock.layer : own;
+      const key = handle && (!inBlock || inBlock.key) ? (inBlock ? inBlock.key + "/" : "") + handle : "";
+      origin = { ...(key ? { keys: [key] } : {}), ...(layer ? { layer } : {}) };
       if (!handleEntity(e, m, depth)) skipped[e.type] = (skipped[e.type] || 0) + 1;
     }
   };
 
   const addPath = (pts: Pt[], closed: boolean, m: Mat) => {
     if (pts.length < 2) return;
-    res.paths.push({ pts: pts.map(p => matApply(m, p.x, p.y)), closed });
+    res.paths.push({ pts: pts.map(p => matApply(m, p.x, p.y)), closed, ...origin });
   };
 
   const handleEntity = (e: Entity, m0: Mat, depth: number): boolean => {
@@ -142,7 +149,7 @@ export function parseDxf(text: string): ImportResult {
         if (r <= 0) return true;
         if (matIsUniform(m)) {
           const c = matApply(m, cx, cy);
-          res.circles.push({ cx: c.x, cy: c.y, r: r * matScaleFactor(m) });
+          res.circles.push({ cx: c.x, cy: c.y, r: r * matScaleFactor(m), ...origin });
         } else {
           const pts = arcPoints(cx, cy, r, 0, Math.PI * 2, tol); pts.pop();
           addPath(pts, true, m);
@@ -214,13 +221,15 @@ export function parseDxf(text: string): ImportResult {
         const sx = getNum(p, 41, 1), sy = getNum(p, 42, 1);
         const rot = (getNum(p, 50) * Math.PI) / 180;
         const cols = Math.max(1, getNum(p, 70, 1)), rows = Math.max(1, getNum(p, 71, 1));
+        const insert = origin;
         const dc = getNum(p, 44), dr = getNum(p, 45);
         for (let r = 0; r < rows; r++) {
           for (let c = 0; c < cols; c++) {
             // Reihen/Spalten liegen im gedrehten Koordinatensystem
             const off = matApply(matRotate(rot), c * dc, r * dr);
             const bm = matMul(m, matMul(matTranslate(ix + off.x, iy + off.y), matMul(matRotate(rot), matMul(matScale(sx, sy), matTranslate(-blk.base.x, -blk.base.y)))));
-            emit(blk.entities, bm, depth + 1);
+            const at = r || c ? `@${r}:${c}` : "";
+            emit(blk.entities, bm, depth + 1, { key: insert.keys ? insert.keys[0] + at : "", layer: insert.layer ?? "" });
           }
         }
         return true;
@@ -242,7 +251,7 @@ export function parseDxf(text: string): ImportResult {
         const mrot = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
         // MTEXT-Einfügepunkt ist meist oben links -> grob nach unten verschieben
         const topLeft = e.type === "MTEXT" && [1, 2, 3, 0].includes(getNum(p, 71, 1));
-        res.texts.push({ text: txt, x: pos.x, y: topLeft ? pos.y - h * s : pos.y, height: h * s, rotation: rot + mrot });
+        res.texts.push({ text: txt, x: pos.x, y: topLeft ? pos.y - h * s : pos.y, height: h * s, rotation: rot + mrot, ...origin });
         return true;
       }
       case "POINT":

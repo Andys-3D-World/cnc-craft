@@ -66,6 +66,7 @@ import { solveConstraints } from "./editor/dims";
 import { initBeds, refreshBeds, relabelBeds, gcodeFileName, drawOtherBeds } from "./editor/beds";
 import { initTwoSidedPanel, refreshTwoSided, drawTwoSided } from "./ui/twoSidedPanel";
 import { initSplitPanel, drawSplit } from "./ui/splitPanel";
+import { drawReimport } from "./ui/reimportPanel";
 import { initCommands, zoomFit } from "./editor/commands";
 import { setTextRedraw } from "./editor/textTool";
 import { initImports, importBytes } from "./importers/importManager";
@@ -193,6 +194,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawTwoSided(ctx);    // Zweiseitig fräsen: Rohteil, Wendelinie, Stifte, andere Seite blass
         drawSplit(ctx);       // Großes Teil teilen: Fugen und Stück-Namen
+        drawReimport(ctx);    // Zeichnung neu einlesen: was sich ändern würde
         drawOverlay(ctx, canvas);
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
         refreshMillProfilePicker();

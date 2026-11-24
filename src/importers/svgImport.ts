@@ -10,7 +10,7 @@
  * Texte in SVG werden NICHT übernommen (dafür "Objekt in Pfad umwandeln" im Grafikprogramm).
  */
 import {
-  ImportResult, emptyResult, Mat, IDENTITY, matMul, matApply, matTranslate, matScale, matRotate,
+  ImportResult, ImpOrigin, emptyResult, Mat, IDENTITY, matMul, matApply, matTranslate, matScale, matRotate,
   matScaleFactor, matIsUniform, flattenCubic, flattenQuad, arcSegments, CURVE_TOL, Pt
 } from "./common";
 import { t } from "../i18n/i18n";
@@ -63,7 +63,11 @@ export function parseSvg(text: string): ImportResult {
   // Ohne Obergrenze friert eine präparierte Datei von wenigen KB das Programm ein.
   let visits = 0, tooBig = false;
 
-  const walk = (el: Element, m: Mat, depth: number) => {
+  // Herkunft der Formen für „Zeichnung neu einlesen“: id des Elements (bei <use> mit dessen id davor) und Ebene (Inkscape)
+  let origin: ImpOrigin = {}, sub = 0;
+  const from = (): ImpOrigin => ({ ...(origin.keys ? { keys: [origin.keys[0] + (sub ? "#" + sub : "")] } : {}), ...(origin.layer ? { layer: origin.layer } : {}) });
+
+  const walk = (el: Element, m: Mat, depth: number, use: string | null = "", layer = "") => {
     if (depth > 50 || tooBig) return;
     if (++visits > SVG_MAX_VISITS) { tooBig = true; return; }
     const tag = el.localName.toLowerCase();
@@ -72,13 +76,18 @@ export function parseSvg(text: string): ImportResult {
 
     const t = el.getAttribute("transform");
     const mm = t ? matMul(m, parseTransform(t)) : m;
+    const id = el.getAttribute("id") || "";
+    if (tag === "g" && el.getAttribute("inkscape:groupmode") === "layer") layer = el.getAttribute("inkscape:label") || id;
+    // Kopie über ein <use> ohne id: keine eindeutige Kennung
+    origin = { ...(id && use !== null ? { keys: [use + id] } : {}), ...(layer ? { layer } : {}) };
+    sub = 0;
 
     switch (tag) {
       case "svg":
       case "g":
       case "a":
       case "switch":
-        for (const c of Array.from(el.children)) walk(c, mm, depth + 1);
+        for (const c of Array.from(el.children)) walk(c, mm, depth + 1, use, layer);
         return;
       case "use": {
         const href = el.getAttribute("href") || el.getAttribute("xlink:href") || "";
@@ -86,8 +95,9 @@ export function parseSvg(text: string): ImportResult {
         if (!ref) return;
         const x = num(el, "x"), y = num(el, "y");
         const um = matMul(mm, matTranslate(x, y));
-        if (ref.localName.toLowerCase() === "symbol") for (const c of Array.from(ref.children)) walk(c, um, depth + 1);
-        else walk(ref, um, depth + 1);
+        const inner = id && use !== null ? use + id + "/" : null;
+        if (ref.localName.toLowerCase() === "symbol") for (const c of Array.from(ref.children)) walk(c, um, depth + 1, inner, layer);
+        else walk(ref, um, depth + 1, inner, layer);
         return;
       }
       case "path": addPathData(el.getAttribute("d") || "", mm); return;
@@ -122,19 +132,20 @@ export function parseSvg(text: string): ImportResult {
         skippedImage++;
         return;
       default:
-        for (const c of Array.from(el.children)) walk(c, mm, depth + 1);
+        for (const c of Array.from(el.children)) walk(c, mm, depth + 1, use, layer);
     }
   };
 
   const addPoly = (pts: Pt[], closed: boolean, m: Mat) => {
     if (pts.length < 2) return;
-    res.paths.push({ pts: pts.map(p => matApply(m, p.x, p.y)), closed });
+    res.paths.push({ pts: pts.map(p => matApply(m, p.x, p.y)), closed, ...from() });
+    sub++; // weitere Teilpfade desselben Elements
   };
 
   const addEllipse = (cx: number, cy: number, rx: number, ry: number, m: Mat) => {
     if (rx === ry && matIsUniform(m)) {
       const c = matApply(m, cx, cy);
-      res.circles.push({ cx: c.x, cy: c.y, r: rx * matScaleFactor(m) });
+      res.circles.push({ cx: c.x, cy: c.y, r: rx * matScaleFactor(m), ...from() });
       return;
     }
     const tol = CURVE_TOL / matScaleFactor(m);

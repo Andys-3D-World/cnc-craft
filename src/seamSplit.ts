@@ -952,7 +952,7 @@ export function splitFingerprint(shapes: any[], setup: SplitSetup, toolInfo = ""
   // die gewählten Schneid-Ebenen (Laser) zählen nur, wenn es welche gibt – ältere Fingerabdrücke bleiben gültig
   const what: any[] = [shapes, setup.seams, toolInfo];
   if (setup.cutLayers?.length) what.push(setup.cutLayers);
-  const text = JSON.stringify(what, (k, v) => (k === "img" || k === "id" || k === "made" ? undefined : typeof v === "number" ? Math.round(v * 1000) / 1000 : v));
+  const text = JSON.stringify(what, (k, v) => (k === "img" || k === "id" || k === "made" || k === "imp" ? undefined : typeof v === "number" ? Math.round(v * 1000) / 1000 : v));
   let h1 = 0x811c9dc5, h2 = 0x1b873593;
   for (let i = 0; i < text.length; i++) {
     const c = text.charCodeAt(i);
