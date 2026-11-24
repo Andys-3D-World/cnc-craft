@@ -40,6 +40,7 @@
  *
  * Einheiten: Formen kommen in Welt-Pixeln (shapeTransform.ts), gerechnet wird in mm, Y nach oben.
  */
+import { fluteFits, fluteSettings } from "./fluting.ts";
 import polygonClipping from "polygon-clipping";
 import type { MultiPolygon, Polygon, Ring } from "polygon-clipping";
 import { offsetArea, type XY } from "./joints.ts";
@@ -139,7 +140,7 @@ export type IssueCode =
   | "noOutlineLaser"  // Laser: keine geschlossene Form auf einer Ebene, die eine Linie schneidet
   | "noOutlinePlasma" // Plasma: keine geschlossene Form mit „Außen“ oder „Innen“
   | "kerf0"         // Laser: Schnittspalt nicht gemessen → die Fuge wird um einen Spalt weiter
-  | "fillLine"      // Laser: n Flächen „Füllen + Linie“ über einer Fuge – ihre Linie läuft auch an der Fuge entlang
+  | "flute" | "fillLine"      // Laser: n Flächen „Füllen + Linie“ über einer Fuge – ihre Linie läuft auch an der Fuge entlang
   | "imageCut"      // Laser: n Bilder am Rahmen der Stücke zugeschnitten
   | "knobSmall"     // Noppe zu klein für den Fräser (v = kleinster Kopf-Ø)
   | "fingerSmall"   // Finger zu schmal für den Fräser (v = kleinste Breite)
@@ -153,6 +154,7 @@ export type IssueCode =
   | "plain"         // auf der ganzen Fuge hat keine Verbindung Platz
   | "fragments"     // ein Stück besteht aus n losen Teilen
   | "sliver"        // ein Stück hat einen sehr schmalen Rest (w × h)
+  | "flute"         // n Flöten liegen über einer Fuge: an der Fuge volle Tiefe
   | "drill"         // n Bohrungen/Gewinde liegen auf einer Fuge und fehlen in den Stücken (x, y = erste)
   | "chamfer"       // n Fasen an geteilten Konturen weggelassen
   | "image"         // n Bilder liegen über einer Fuge und bleiben ganz in einem Stück
@@ -493,7 +495,7 @@ function virtuals(s: any, fallback: number): Virt[] {
   return out;
 }
 
-const CONTOUR_KEYS = ["tabN", "tabLen", "tabH", "skinH", "skinCut", "skinFeed", "leadIn", "leadOut", "leadType", "leadLen"];
+const CONTOUR_KEYS = ["tabN", "tabLen", "tabH", "skinH", "skinCut", "skinFeed", "leadIn", "leadOut", "leadType", "leadLen", "tro", "troW", "troStep", "troDown"];
 
 /** Einstellungen, die ein neu entstandenes Stück einer Form von ihr erbt */
 function carry(v: Virt, contour: boolean): Record<string, any> {
@@ -673,7 +675,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
     // offene Linie: alle Punkte in der Zelle und kein Abschnitt verlässt sie
     return ring.every(q => inArea(c.terr, q[0], q[1])) && clipLine(ring as XY[], c.terr).length === 1;
   };
-  let lostDrill = 0, lostChamfer = 0, images = 0, imagesCut = 0, fillLines = 0, firstDrill: XY | null = null;
+  let cutFlutes = 0, lostDrill = 0, lostChamfer = 0, images = 0, imagesCut = 0, fillLines = 0, firstDrill: XY | null = null;
   const wholeRings: { box: Box; area: number }[][] = cells.map(() => []);
   const crossing: Info[] = [];
   const idMap = cells.map(() => new Map<string, string>());
@@ -810,7 +812,11 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
           for (const run of runs) {
             if (!run.some(q => inArea(c.outer, q[0], q[1])) && !clipLine(run, c.outer).length) continue;
             const pts = (loop ? run.slice(0, -1) : run).map(q => ({ x: q[0] * PX, y: q[1] * PX }));
-            c.shapes.push(createPolyline(pts, loop, v.out ?? v.mode, carry(v, false)));
+            // Flöte (fluting.ts): Ein-/Auslauf nur am Stück mit dem Anfang bzw. Ende der Linie; an der Fuge volle Tiefe
+            const fl = !loop && !i.closed && v.mode === "on-line" && fluteFits(v.src) ? fluteSettings(v.src) : null;
+            const part = fl ? { flute: true, fluteIn: same(run[0], path[0]) ? fl.in : 0, fluteOut: same(run[run.length - 1], path[path.length - 1]) ? fl.out : 0, fluteStart: fl.start, fluteEnd: fl.end, ...(fl.linear ? { fluteEase: "linear" } : {}) } : {};
+            if (fl) cutFlutes++;
+            c.shapes.push(createPolyline(pts, loop, v.out ?? v.mode, { ...carry(v, false), ...part }));
           }
         }
       }
@@ -818,6 +824,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   }
   if (lostDrill) issues.push({ code: "drill", level: "warn", n: lostDrill, x: Math.round(firstDrill![0] * 10) / 10, y: Math.round(firstDrill![1] * 10) / 10 });
   if (lostChamfer) issues.push({ code: "chamfer", level: "warn", n: lostChamfer });
+  if (cutFlutes) issues.push({ code: "flute", level: "warn", n: cutFlutes });
   if (images) issues.push({ code: "image", level: "warn", n: images });
   if (imagesCut) issues.push({ code: "imageCut", level: "warn", n: imagesCut });
   if (fillLines) issues.push({ code: "fillLine", level: "warn", n: fillLines });

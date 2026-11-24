@@ -18,9 +18,9 @@ import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { getTools, MillingTool } from "../toolLibrary";
 import { loadGcodeFromText } from "../machineStream";
 import { openFacingDialog } from "./facingDialog";
-import { Job3D, Path3D, loadModel3d, computePaths3d, cancelPaths3d, gcode3d, stats3d, computeRotaryField } from "../cam3d";
+import { Job3D, Path3D, loadModel3d, computePaths3d, cancelPaths3d, gcode3d, stats3d, computeRotaryField, cutterShape } from "../cam3d";
 import { cylinderCarveScene } from "../view3d/scenes";
-import { cutDiameter } from "../toolLibrary";
+import { cutDiameter, isBallTip, stepDia } from "../toolLibrary";
 import { rotary, setRotary, applyRotary, rotaryCheck } from "../rotary";
 import { axesToMachine } from "../rotaryWrap";
 import { HeightField, detailLoss } from "../relief/heightField.ts";
@@ -67,7 +67,7 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     x0: 10, y0: 10, sizeX: +span[0].toFixed(2), sizeY: +span[1].toFixed(2), height: +span[2].toFixed(2),
     thick: Math.ceil(span[2] + 2), keep: true, margin: true,
     rough: true, roughTool: pick(["endmill", "bullnose", "facemill"]), roughDown: 0, roughOver: 0, allow: 0.5,
-    finish: true, finishTool: pick(["ball"]), finishOver: 0, dir: "x", tol: 0.02, finishDown: 0,
+    finish: true, finishTool: pick(["ball", "taper"]), finishOver: 0, dir: "x", tol: 0.02, finishDown: 0,
     rmode: "flat", raxis: (span[0] >= span[1] && span[0] >= span[2] ? 0 : span[1] >= span[2] ? 1 : 2) as 0 | 1 | 2,
     rlen: 0, rcore: 6, rsides: 2, rdir: "x"
   };
@@ -90,8 +90,8 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   const tool = (id: string) => tools.find(x => x.id === id) || null;
   const defaults = () => {
     const r = tool(o.roughTool), f = tool(o.finishTool);
-    if (r) { o.roughDown = +(r.stepZ || 1).toFixed(2); o.roughOver = +(r.diameter * 0.4).toFixed(2); }
-    if (f) { o.finishOver = +(f.diameter * (f.type === "ball" ? 0.1 : 0.4)).toFixed(2); o.finishDown = +(f.stepZ || 1).toFixed(2); }
+    if (r) { o.roughDown = +(r.stepZ || 1).toFixed(2); o.roughOver = +(stepDia(r) * 0.4).toFixed(2); }
+    if (f) { o.finishOver = +(stepDia(f) * (isBallTip(f) ? 0.1 : 0.4)).toFixed(2); o.finishDown = +(f.stepZ || 1).toFixed(2); }
   };
   defaults();
 
@@ -219,11 +219,12 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   const reliefWarnings = (): string[] => {
     const ft = o.finish ? tool(o.finishTool) : null;
     if (!ft) return [t("rlf.warnNoFinish")];
-    if (ft.type !== "ball") return [t("rlf.warnNotBall", { name: ft.name })];
-    const key = [cutDiameter(ft), o.sizeX, o.sizeY, o.height].join("|");
-    if (lossCache.key !== key) lossCache = { key, ...detailLoss(relief!.field, o.sizeX, o.sizeY, o.height, cutDiameter(ft) / 2) };
+    if (!isBallTip(ft)) return [t("rlf.warnNotBall", { name: ft.name })];
+    const dTip = ft.type === "taper" ? stepDia(ft) : cutDiameter(ft);
+    const key = [dTip, o.sizeX, o.sizeY, o.height].join("|");
+    if (lossCache.key !== key) lossCache = { key, ...detailLoss(relief!.field, o.sizeX, o.sizeY, o.height, dTip / 2) };
     if (lossCache.share < COARSE_SHARE) return [];
-    return [t("rlf.warnCoarse", { name: ft.name, d: cutDiameter(ft), p: Math.round(lossCache.share * 100), w: lossCache.worst.toFixed(1) })];
+    return [t("rlf.warnCoarse", { name: ft.name, d: dTip, p: Math.round(lossCache.share * 100), w: lossCache.worst.toFixed(1) })];
   };
   const warnings = (): string[] => {
     const w: string[] = [];
@@ -345,14 +346,14 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     info.textContent = t("c3d.progLoad");
     await loadModel3d(rotaryMesh().tris);
     const field = async (op: NonNullable<Job3D["rough"]>, lineGap: number | null, allowance: number, key: string): Promise<RField> => {
-      const r = cutDiameter(op.tool) / 2;
+      const r = (op.tool.type === "taper" ? stepDia(op.tool) : cutDiameter(op.tool)) / 2;
       let dx = Math.min(0.5, Math.max(0.1, r / 4));
       let nt = Math.max(36, Math.ceil(C / Math.max(0.05, lineGap ?? dx)));
       let nx = Math.ceil(o.rlen / dx) + 1;
       // höchstens 4 Mio. Punkte
       while (nx * nt > 4e6) { if (lineGap === null) nt = Math.ceil(nt * 0.8); dx *= 1.25; nx = Math.ceil(o.rlen / dx) + 1; }
       dx = o.rlen / (nx - 1);
-      const h = await computeRotaryField({ ball: op.tool.type === "ball", diameter: 2 * r, allowance, x0: 0, dx, nx, nt, core }, prog(my, key));
+      const h = await computeRotaryField({ ...cutterShape(op.tool), allowance, x0: 0, dx, nx, nt, core }, prog(my, key));
       return { x0: 0, dx, nx, nt, h };
     };
     const out: Path3D[] = [];
@@ -483,13 +484,13 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   $<HTMLSelectElement>("c3d-rtool").addEventListener("change", e => {
     o.roughTool = (e.target as HTMLSelectElement).value;
     const r = tool(o.roughTool);
-    if (r) { o.roughDown = +(r.stepZ || 1).toFixed(2); o.roughOver = +(r.diameter * 0.4).toFixed(2); }
+    if (r) { o.roughDown = +(r.stepZ || 1).toFixed(2); o.roughOver = +(stepDia(r) * 0.4).toFixed(2); }
     fill(); save_(); stale();
   });
   $<HTMLSelectElement>("c3d-ftool").addEventListener("change", e => {
     o.finishTool = (e.target as HTMLSelectElement).value;
     const f = tool(o.finishTool);
-    if (f) { o.finishOver = +(f.diameter * (f.type === "ball" ? 0.1 : 0.4)).toFixed(2); o.finishDown = +(f.stepZ || 1).toFixed(2); }
+    if (f) { o.finishOver = +(stepDia(f) * (isBallTip(f) ? 0.1 : 0.4)).toFixed(2); o.finishDown = +(f.stepZ || 1).toFixed(2); }
     fill(); save_(); stale();
   });
   if (rotary.on) {

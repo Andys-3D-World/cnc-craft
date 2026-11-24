@@ -10,7 +10,7 @@
  * Alles ohne Bibliothek, nur SVG-Text – funktioniert in der App und im Test-Browser.
  */
 
-export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "spotdrill" | "reamer" | "facemill" | "threadmill";
+export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "spotdrill" | "reamer" | "facemill" | "threadmill" | "taper";
 export type Helix = "up" | "down" | "compression" | "straight";
 
 /** Die Maße, die man zum Zeichnen braucht (Teil von MillingTool) */
@@ -22,8 +22,8 @@ export interface ToolGeom {
   length: number;     // Gesamtlänge
   flutes: number;     // Anzahl Schneiden
   helix: Helix;
-  angle: number;      // Spitzenwinkel (V, Fase, Senker, Bohrer)
-  tipDia: number;     // Spitzen-Ø (V-Stichel/Fase)
+  angle: number;      // Spitzenwinkel (V, Fase, Senker, Bohrer); konisch: ganzer Kegelwinkel (beide Seiten)
+  tipDia: number;     // Spitzen-Ø (V-Stichel/Fase); konisch: Ø der Kugelspitze
   cornerR: number;    // Eckenradius (Torusfräser)
   pitch?: number;     // Steigung (Gewindefräser), z. B. 1 für M6
   threadSingle?: boolean; // Einzahn-Gewindefräser: ein Zahn unten, schneidet jede Steigung
@@ -35,12 +35,24 @@ const n = (v: number) => (Math.round(v * 100) / 100).toString();
 const fmt = (v: number) => (Math.round(v * 1000) / 1000).toString();
 let uid = 0;
 
+/**
+ * KONISCHER FRÄSER: Höhe der Schneide über der Spitze im Abstand r von der Mitte –
+ * erst die Kugelspitze, dann ohne Absatz der Kegel (gleiche Rechnung wie taper_h in cam3d.rs)
+ */
+export function taperHeight(g: Pick<ToolGeom, "diameter" | "angle" | "tipDia">, r: number): number {
+  const R = g.diameter / 2, tip = Math.min(R, Math.max(0, g.tipDia / 2));
+  const half = Math.max(0.25, Math.min(85, g.angle / 2)) * Math.PI / 180;
+  const rt = tip * Math.cos(half);
+  return r <= rt ? tip - Math.sqrt(Math.max(0, tip * tip - r * r)) : tip - tip * Math.sin(half) + (r - rt) / Math.tan(half);
+}
+
 /** Höhe des kegeligen Teils bei V/Fase/Senker/Bohrer (in mm) */
 export function coneHeight(g: ToolGeom): number {
   const R = g.diameter / 2;
   const half = Math.max(1, Math.min(179, g.angle)) / 2 * Math.PI / 180;
   if (g.type === "vbit" || g.type === "chamfer" || g.type === "countersink") return Math.max(0, (R - g.tipDia / 2)) / Math.tan(half);
   if (g.type === "drill" || g.type === "spotdrill") return R / Math.tan(half);
+  if (g.type === "taper") return taperHeight(g, R);
   return 0;
 }
 
@@ -67,6 +79,16 @@ function cutterProfile(g: ToolGeom): { pts: P[]; top: number } {
     case "vbit": case "chamfer": case "countersink": {
       const h = coneHeight(g);
       pts.push([0, 0], [g.tipDia / 2, 0], [R, h]);
+      top = Math.max(top, h);
+      if (top > h + 1e-6) pts.push([R, top]);
+      break;
+    }
+    case "taper": {
+      const h = coneHeight(g), tip = Math.min(R, Math.max(0, g.tipDia / 2));
+      const rt = tip * Math.cos(Math.max(0.25, Math.min(85, g.angle / 2)) * Math.PI / 180);
+      if (rt > 1e-6) for (let i = 0; i <= 8; i++) { const x = rt * Math.sin(i / 8 * Math.PI / 2); pts.push([x, taperHeight(g, x)]); }
+      else pts.push([0, 0]);
+      pts.push([R, h]);
       top = Math.max(top, h);
       if (top > h + 1e-6) pts.push([R, top]);
       break;
@@ -149,12 +171,12 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
   let stripes = "";
   const conical = g.type === "vbit" || g.type === "chamfer" || g.type === "countersink";
   const fl = Math.max(1, Math.min(12, Math.round(g.flutes)));
-  if (g.helix === "straight" || conical) {
+  if (g.helix === "straight" || conical || g.type === "taper") {
     for (let i = 0; i < fl; i++) {
       const a = (i + 0.5) / fl * Math.PI;
       const xr = Math.cos(a);
       if (Math.abs(xr) > 0.97) continue;
-      const tx = R * xr, bx = (conical ? g.tipDia / 2 : R) * xr;
+      const tx = R * xr, bx = (conical || g.type === "taper" ? g.tipDia / 2 : R) * xr;
       stripes += `<line x1="${n(X(bx))}" y1="${n(Y(0))}" x2="${n(X(tx))}" y2="${n(Y(top))}" />`;
     }
   } else {
@@ -199,7 +221,7 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
       dims += `<text x="${n(X(g.shankDia / 2) + 6)}" y="${n(yS)}">${tr("tl.g.shankShort")} Ø ${fmt(g.shankDia)}</text>`;
     }
     // Winkel
-    if (conical || g.type === "drill" || g.type === "spotdrill") {
+    if (conical || g.type === "drill" || g.type === "spotdrill" || g.type === "taper") {
       dims += `<text x="${n(cx)}" y="${n(Y(coneHeight(g) * 0.5) + 4)}" text-anchor="middle" class="tg-angle">${fmt(g.angle)}°</text>`;
     }
     if (g.type === "threadmill") {

@@ -7,6 +7,8 @@
  *
  * Werte werden übernommen, sobald du Enter drückst oder das Feld verlässt.
  */
+import { FLUTE_DEFAULT, fluteFits, fluteSettings } from "./fluting";
+import { TRO_DEFAULT, TRO_STEP_MAX, TRO_STEP_MIN, TRO_W_MAX, TRO_W_MIN, troFits, troSettings } from "./trochoid";
 import { MM_TO_PIXEL, groupBounds, translateShape, scaleShape, rotateShape } from "./shapeTransform";
 import { cleanMillDir } from "./millDir";
 import { leadOptions, LEAD_MIN, LEAD_MAX, LEAD_DEFAULT_LEN } from "./millLead";
@@ -132,6 +134,44 @@ export function setupUiInputs(redraw: () => void) {
     redraw();
   }));
 
+  // Trochoidal je Form (trochoid.ts): nur geschlossene Formen außen/innen; ohne Häkchen keine Angaben an der Form
+  const field = (id: string) => parseFloat((document.getElementById(id) as HTMLInputElement | null)?.value || "");
+  const between = (v: number, d: number, lo: number, hi: number) => (Number.isFinite(v) ? Math.max(lo, Math.min(hi, v)) : d);
+  ["dim-tro", "dim-tro-w", "dim-tro-step", "dim-tro-down"].forEach(id => document.getElementById(id)?.addEventListener("change", () => {
+    const state = getState();
+    if (!state) return;
+    const on = (document.getElementById("dim-tro") as HTMLInputElement).checked, down = field("dim-tro-down");
+    for (const s of selected(state)) {
+      delete s.tro; delete s.troW; delete s.troStep; delete s.troDown;
+      if (!on || !troFits(s)) continue;
+      s.tro = true;
+      s.troW = between(field("dim-tro-w"), TRO_DEFAULT.w, TRO_W_MIN, TRO_W_MAX);
+      s.troStep = between(field("dim-tro-step"), TRO_DEFAULT.step, TRO_STEP_MIN, TRO_STEP_MAX);
+      if (down > 0) s.troDown = between(down, 1, 0.05, 200);
+    }
+    updateDimensionInputs(null);
+    redraw();
+  }));
+  // Flöte je Form (fluting.ts): nur offene Linien „auf Linie“
+  ["dim-flute", "dim-flute-in", "dim-flute-out", "dim-flute-start", "dim-flute-end", "dim-flute-ease"].forEach(id => document.getElementById(id)?.addEventListener("change", () => {
+    const state = getState();
+    if (!state) return;
+    const on = (document.getElementById("dim-flute") as HTMLInputElement).checked;
+    const linear = (document.getElementById("dim-flute-ease") as HTMLSelectElement).value === "linear";
+    for (const s of selected(state)) {
+      delete s.flute; delete s.fluteIn; delete s.fluteOut; delete s.fluteStart; delete s.fluteEnd; delete s.fluteEase;
+      if (!on || !fluteFits(s)) continue;
+      s.flute = true;
+      s.fluteIn = between(field("dim-flute-in"), FLUTE_DEFAULT.in, 0, 5000);
+      s.fluteOut = between(field("dim-flute-out"), FLUTE_DEFAULT.out, 0, 5000);
+      s.fluteStart = between(field("dim-flute-start"), FLUTE_DEFAULT.start, 0, 100);
+      s.fluteEnd = between(field("dim-flute-end"), FLUTE_DEFAULT.end, 0, 100);
+      if (linear) s.fluteEase = "linear";
+    }
+    updateDimensionInputs(null);
+    redraw();
+  }));
+
   // Zwiebelhaut je Form (onionSkin.ts): ohne Häkchen keine Angaben an der Form, alles wie bisher.
   // Gesetzt wird sie nur an Formen, bei denen sie wirken kann (geschlossen, außen/innen) – die anderen bleiben, wie sie sind.
   const skinOn = document.getElementById("dim-skin-on") as HTMLInputElement | null;
@@ -206,6 +246,19 @@ export function updateDimensionInputs(_shape: any) {
       (document.getElementById("dim-lead-len") as HTMLInputElement).value = String(lo.len);
     }
   }
+  // Trochoidal und Flöte: die erste passende Form der Auswahl; passt keine, ist das Häkchen gesperrt
+  const opt = (id: string, fits: (s: any) => boolean, on: boolean) => {
+    const el = document.getElementById(id) as HTMLInputElement | null, box = document.getElementById(id + "-opts");
+    if (el) { el.checked = on; el.disabled = !shapes.some(fits); }
+    if (box) box.style.display = on ? "" : "none";
+  };
+  const put = (id: string, v: number | string) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el) el.value = String(v); };
+  const tro = troSettings(shapes.find(s => troFits(s) && troSettings(s)));
+  opt("dim-tro", troFits, !!tro);
+  if (tro) { put("dim-tro-w", tro.w); put("dim-tro-step", tro.step); put("dim-tro-down", tro.down > 0 ? tro.down : ""); }
+  const fl = fluteSettings(shapes.find(s => fluteFits(s) && fluteSettings(s)));
+  opt("dim-flute", fluteFits, !!fl);
+  if (fl) { put("dim-flute-in", fl.in); put("dim-flute-out", fl.out); put("dim-flute-start", fl.start); put("dim-flute-end", fl.end); put("dim-flute-ease", fl.linear ? "linear" : "smooth"); }
   // Haltestege der ersten Form zeigen (ohne eigene Werte: keine Stege, Länge/Höhe bleiben stehen)
   const s0 = shapes[0];
   const set = (id: string, v: any) => { const el = document.getElementById(id) as HTMLInputElement | null; if (el && typeof v === "number") el.value = String(v); };

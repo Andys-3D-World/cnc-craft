@@ -91,6 +91,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
             ${num("tl.g.neck", "neck", src.neckDia ?? TYPE_DEFAULTS.threadmill.neckDia ?? 0, "0.05", "mm", "te-neck", "tl.neckTip")}
             ${num("tl.g.pitch", "pitch", src.pitch ?? TYPE_DEFAULTS.threadmill.pitch ?? 1, "0.05", "mm", "te-pitch", "tl.pitchTip")}
             ${num("tl.g.tip", "tip", src.tipDia, "0.05", "mm", "te-tip", "tl.tipTip")}
+            <div class="te-calc-res te-taper">${esc(t("tl.taperHint"))}</div>
             ${num("tl.g.corner", "corner", src.cornerR, "0.1", "mm", "te-corner")}
             <div class="te-row"><span>${esc(t("tl.g.flutes"))}</span>
               <span class="te-flutes">${fluteBtns}<input id="${p}flutes" type="number" min="1" max="12" step="1" value="${src.flutes}"></span></div>
@@ -176,18 +177,19 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     const g = read();
     root.querySelectorAll<HTMLElement>(".te-type").forEach(b => b.classList.toggle("active", b.dataset.type === type));
     const cone = CONE_TYPES.includes(type);
-    root.querySelectorAll<HTMLElement>(".te-cone").forEach(e => { e.style.display = cone || type === "threadmill" ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-cone").forEach(e => { e.style.display = cone || type === "threadmill" || type === "taper" ? "" : "none"; });
     const single = type === "threadmill" && q("single").checked;
     root.querySelectorAll<HTMLElement>(".te-single").forEach(e => { e.style.display = type === "threadmill" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-neck").forEach(e => { e.style.display = single ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-pitch").forEach(e => { e.style.display = type === "threadmill" && !single ? "" : "none"; });
-    root.querySelectorAll<HTMLElement>(".te-tip").forEach(e => { e.style.display = type === "vbit" || type === "chamfer" ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-tip").forEach(e => { e.style.display = type === "vbit" || type === "chamfer" || type === "taper" ? "" : "none"; });
+    root.querySelectorAll<HTMLElement>(".te-taper").forEach(e => { e.style.display = type === "taper" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".te-corner").forEach(e => { e.style.display = type === "bullnose" ? "" : "none"; });
-    root.querySelectorAll<HTMLElement>(".te-wear").forEach(e => { e.style.display = cone ? "none" : ""; });
+    root.querySelectorAll<HTMLElement>(".te-wear").forEach(e => { e.style.display = cone || type === "taper" ? "none" : ""; });
     root.querySelectorAll<HTMLElement>(".te-helix-row").forEach(e => { e.style.display = cone && type !== "drill" ? "none" : ""; });
     // Schneidenlänge 0 = automatisch (Kegelhöhe)
     const fl = q("flutelen");
-    fl.placeholder = cone ? fmt(coneHeight(g)) : "";
+    fl.placeholder = cone || type === "taper" ? fmt(coneHeight(g)) : "";
     root.querySelectorAll<HTMLElement>(".te-flute").forEach(b => b.classList.toggle("active", +b.dataset.z! === g.flutes));
     const w = h.compact ? 210 : 250, hh = h.compact ? 250 : 300;
     q<HTMLElement>("side").innerHTML = toolSideSvg(g, { w, h: hh, dims: true, t });
@@ -234,7 +236,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     }
     if (id === p + "dia") {
       const d = val("dia");
-      const cone = type === "vbit" || type === "chamfer" || type === "countersink" || type === "facemill";
+      const cone = type === "vbit" || type === "chamfer" || type === "countersink" || type === "facemill" || type === "taper";
       if (!cone && d > 0 && Math.abs(val("shank") - prevDia) < 1e-6) q("shank").value = String(d);
       if (d > 0) prevDia = d;
       q("real").placeholder = d > 0 ? String(d) : "";
@@ -262,8 +264,9 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     const w = val("wear");
     if (w && !(Math.abs(w) <= Math.min(1, dia / 2))) { const f = q("real").value ? q("real") : q("wear"); f.focus(); f.classList.add("dlg-invalid"); return; }
     const g = read();
-    if ((type === "vbit" || type === "chamfer") && !(g.tipDia < g.diameter)) { q("tip").focus(); q("tip").classList.add("dlg-invalid"); return; }
+    if ((type === "vbit" || type === "chamfer" || type === "taper") && !(g.tipDia < g.diameter)) { q("tip").focus(); q("tip").classList.add("dlg-invalid"); return; }
     if ((CONE_TYPES.includes(type) || type === "threadmill") && !(val("angle") >= 10 && val("angle") <= 170)) { q("angle").focus(); q("angle").classList.add("dlg-invalid"); return; }
+    if (type === "taper" && !(val("angle") >= 1 && val("angle") <= 60)) { q("angle").focus(); q("angle").classList.add("dlg-invalid"); return; }
     if (type === "threadmill" && !(val("pitch") >= 0.2 && val("pitch") <= 10)) { q("pitch").focus(); q("pitch").classList.add("dlg-invalid"); return; }
     const data: Partial<MillingTool> = { ...g, name };
     delete (data as any).id;
@@ -429,7 +432,7 @@ export function renderToolPage(withEditor = true) {
         <div class="tlp-ico">${toolIconSvg(tl, 22, 44, toolColor(tl))}</div>
         <div class="tlp-txt">
           <div class="tlp-name"><b style="color:${toolColor(tl)}">T${toolNumber(tl)}</b> ${esc(tl.name)}</div>
-          <div class="tlp-info">${esc(toolTypeName(tl))} · ${fmtDia(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))}${tl.type === "threadmill" ? ` · ${esc(tl.threadSingle ? t("tl.single") : `P${fmt(tl.pitch || 1)}`)}` : ""}${tl.coating && tl.coating !== "none" ? ` · ${COATING_LABEL[tl.coating]}` : ""} · S${tl.rpm} · ${isInch() ? fmtFeed(tl.feedrate) : "F" + tl.feedrate}</div>
+          <div class="tlp-info">${esc(toolTypeName(tl))} · ${fmtDia(tl.diameter)}${tl.wearOffset && !CONE_TYPES.includes(tl.type) && tl.type !== "taper" ? ` (${esc(t("tl.wearInfo", { d: fmt(cutDiameter(tl)) }))})` : ""} · ${esc(t("tl.flutesN", { n: tl.flutes }))}${tl.type === "threadmill" ? ` · ${esc(tl.threadSingle ? t("tl.single") : `P${fmt(tl.pitch || 1)}`)}` : ""}${tl.coating && tl.coating !== "none" ? ` · ${COATING_LABEL[tl.coating]}` : ""} · S${tl.rpm} · ${isInch() ? fmtFeed(tl.feedrate) : "F" + tl.feedrate}</div>
         </div>
         <button class="tlp-star${def ? " on" : ""}" data-act="default" data-tip="${esc(t(def ? "tl.isDefault" : "tl.makeDefault"))}">${def ? "★" : "☆"}</button>
       </div>`;

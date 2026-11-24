@@ -148,18 +148,26 @@ pub struct Model {
 pub enum Cutter {
     Flat(f64),
     Ball(f64),
+    /// Konischer Fräser: Kugelspitze (Radius tip), dann Kegel mit der Steigung k = dz/dr bis zum Radius r
+    Taper { tip: f64, k: f64, r: f64 },
 }
 
 impl Cutter {
+    /// Kegel mit Kugelspitze; angle = ganzer Kegelwinkel in Grad (beide Seiten zusammen)
+    pub fn taper(tip: f64, angle: f64, r: f64) -> Cutter {
+        let half = (angle.clamp(0.5, 170.0) / 2.0).to_radians();
+        Cutter::Taper { tip: tip.clamp(0.0, r), k: 1.0 / half.tan(), r }
+    }
     pub fn r(self) -> f64 {
         match self {
-            Cutter::Flat(r) | Cutter::Ball(r) => r,
+            Cutter::Flat(r) | Cutter::Ball(r) | Cutter::Taper { r, .. } => r,
         }
     }
     fn grown(self, a: f64) -> Cutter {
         match self {
             Cutter::Flat(r) => Cutter::Flat(r + a),
             Cutter::Ball(r) => Cutter::Ball(r + a),
+            Cutter::Taper { tip, k, r } => Cutter::Taper { tip: tip + a, k, r: r + a },
         }
     }
 }
@@ -284,6 +292,7 @@ impl Model {
                     let h = match c {
                         Cutter::Flat(r) => flat_tri(f, x, y, r),
                         Cutter::Ball(r) => ball_tri(f, x, y, r),
+                        Cutter::Taper { tip, k, r } => taper_tri(f, x, y, tip, k, r),
                     };
                     if h > best {
                         best = h;
@@ -394,6 +403,100 @@ fn ball_tri(f: &Facet, cx: f64, cy: f64, r: f64) -> f64 {
         let st = sc + rr * slope / kk;
         if (0.0..=l).contains(&st) {
             best = best.max(p[2] + slope * sc + rr * kk - r);
+        }
+    }
+    best
+}
+
+/// Höhe der Schneide über der Spitze im Abstand d von der Mitte (Kugelspitze, dann Kegel); wächst und ist konvex
+fn taper_h(d: f64, tip: f64, k: f64) -> f64 {
+    // Übergang Kugel → Kegel: dort ist die Kugel so steil wie der Kegel
+    let s = (1.0 + k * k).sqrt();
+    let dt = tip * k / s;
+    if d <= dt {
+        tip - (tip * tip - d * d).max(0.0).sqrt()
+    } else {
+        tip - tip / s + (d - dt) * k
+    }
+}
+
+/// Konischer Fräser (Kugelspitze + Kegel, Radius r oben) gegen ein Dreieck: Höhe der Spitze
+fn taper_tri(f: &Facet, cx: f64, cy: f64, tip: f64, k: f64, r: f64) -> f64 {
+    let mut best = f64::NEG_INFINITY;
+    let r2 = r * r;
+    for v in &f.p {
+        let d2 = (v[0] - cx).powi(2) + (v[1] - cy).powi(2);
+        if d2 <= r2 {
+            best = best.max(v[2] - taper_h(d2.sqrt(), tip, k));
+        }
+    }
+    // Fläche: Berührpunkt bergauf dort, wo die Schneide so steil ist wie die Fläche – sonst am Rand
+    if f.n[2] > 1e-9 {
+        let nxy = f.n[0].hypot(f.n[1]);
+        let g = nxy / f.n[2];
+        let d = if g > k { r } else { (tip * g / (1.0 + g * g).sqrt()).min(r) };
+        let (px, py) = if nxy > 1e-12 { (cx - d * f.n[0] / nxy, cy - d * f.n[1] / nxy) } else { (cx, cy) };
+        if inside_xy(&f.p, px, py) {
+            best = best.max(plane_z(f, px, py) - taper_h(d, tip, k));
+        }
+    }
+    // Kanten: z(t) − h(Abstand) ist entlang der Kante konkav → Höchstwert durch Eingrenzen
+    for e in 0..3 {
+        let (p, q) = (f.p[e], f.p[(e + 1) % 3]);
+        if p[2].max(q[2]) <= best {
+            continue;
+        }
+        let (dx, dy) = (q[0] - p[0], q[1] - p[1]);
+        let a = dx * dx + dy * dy;
+        if a < 1e-18 {
+            continue;
+        }
+        let (fx, fy) = (p[0] - cx, p[1] - cy);
+        let b = 2.0 * (fx * dx + fy * dy);
+        let c = fx * fx + fy * fy - r2;
+        let disc = b * b - 4.0 * a * c;
+        if disc < 0.0 {
+            continue;
+        }
+        let sq = disc.sqrt();
+        let (mut lo, mut hi) = (((-b - sq) / (2.0 * a)).max(0.0), ((-b + sq) / (2.0 * a)).min(1.0));
+        if lo > hi {
+            continue;
+        }
+        let val = |t: f64| {
+            let d = ((fx + t * dx).powi(2) + (fy + t * dy).powi(2)).sqrt().min(r);
+            p[2] + t * (q[2] - p[2]) - taper_h(d, tip, k)
+        };
+        best = best.max(val(lo)).max(val(hi));
+        // goldener Schnitt: bis das Stück kürzer als ein Tausendstel mm ist
+        const G: f64 = 0.618_033_988_749_894_9;
+        let len = a.sqrt();
+        let (mut t1, mut t2) = (hi - G * (hi - lo), lo + G * (hi - lo));
+        let (mut v1, mut v2) = (val(t1), val(t2));
+        for _ in 0..40 {
+            if (hi - lo) * len < 1e-3 {
+                break;
+            }
+            if v1 < v2 {
+                lo = t1;
+                t1 = t2;
+                v1 = v2;
+                t2 = lo + G * (hi - lo);
+                v2 = val(t2);
+            } else {
+                hi = t2;
+                t2 = t1;
+                v2 = v1;
+                t1 = hi - G * (hi - lo);
+                v1 = val(t1);
+            }
+        }
+        // die Grenzen mitnehmen: an einem Knick (spitze Kegelspitze über der Kante) liegt der Höchstwert genau dort
+        best = best.max(v1).max(v2).max(val(lo)).max(val(hi));
+        // Lot auf die Kante: bei einem spitzen Kegel der Höchstwert
+        let tn = (-b / (2.0 * a)).clamp(0.0, 1.0);
+        if (fx + tn * dx).powi(2) + (fy + tn * dy).powi(2) <= r2 {
+            best = best.max(val(tn));
         }
     }
     best
@@ -724,12 +827,19 @@ pub struct ToolOp {
     /// Toleranz beim Ausdünnen (mm)
     #[serde(default)]
     pub tolerance: f64,
+    /// konischer Fräser: ganzer Kegelwinkel in Grad (0 = keiner) und Ø der Kugelspitze
+    #[serde(default)]
+    pub taper_angle: f64,
+    #[serde(default)]
+    pub tip_dia: f64,
 }
 
 impl ToolOp {
     fn cutter(&self) -> Cutter {
         let r = (self.diameter / 2.0).max(0.01);
-        if self.ball {
+        if self.taper_angle.is_finite() && self.taper_angle > 0.0 && self.tip_dia.is_finite() {
+            Cutter::taper(self.tip_dia / 2.0, self.taper_angle, r)
+        } else if self.ball {
             Cutter::Ball(r)
         } else {
             Cutter::Flat(r)
@@ -1137,6 +1247,11 @@ pub struct RotaryJob {
     /// tiefer als dieser Radius geht der Fräser nie (Kern, der das Teil hält)
     #[serde(default)]
     pub core: f64,
+    /// konischer Fräser wie bei ToolOp
+    #[serde(default)]
+    pub taper_angle: f64,
+    #[serde(default)]
+    pub tip_dia: f64,
 }
 
 /// Radius der Fräserspitze je Winkel und X-Stelle: out[j · nx + i].
@@ -1150,7 +1265,14 @@ pub fn rotary_field(src: &[Tri], job: &RotaryJob, cancel: &AtomicBool, prog: Pro
     }
     let a = if job.allowance.is_finite() { job.allowance.max(0.0) } else { 0.0 };
     let r = (job.diameter / 2.0).max(0.01);
-    let c = if job.ball { Cutter::Ball(r) } else { Cutter::Flat(r) }.grown(a);
+    let c = if job.taper_angle.is_finite() && job.taper_angle > 0.0 && job.tip_dia.is_finite() {
+        Cutter::taper(job.tip_dia / 2.0, job.taper_angle, r)
+    } else if job.ball {
+        Cutter::Ball(r)
+    } else {
+        Cutter::Flat(r)
+    }
+    .grown(a);
     let reach = c.r() + 1e-9;
     let core = if job.core.is_finite() { job.core.max(0.0) } else { 0.0 };
     let done = std::sync::atomic::AtomicUsize::new(0);
@@ -1256,7 +1378,7 @@ mod tests {
 
     #[test]
     fn rotary_cylinder_and_direction() {
-        let job = RotaryJob { ball: true, diameter: 4.0, allowance: 0.0, x0: -10.0, dx: 1.0, nx: 21, nt: 36, core: 2.0 };
+        let job = RotaryJob { ball: true, diameter: 4.0, allowance: 0.0, x0: -10.0, dx: 1.0, nx: 21, nt: 36, core: 2.0, taper_angle: 0.0, tip_dia: 0.0 };
         let stop = AtomicBool::new(false);
         let f = rotary_field(&cylinder(10.0, 30.0, 720), &job, &stop, &|_, _| {}).unwrap();
         assert_eq!(f.len(), 21 * 36);
@@ -1348,6 +1470,63 @@ mod tests {
     }
 
     #[test]
+    fn taper_against_dense_sampling() {
+        // zufällige Dreiecke: der abgesenkte konische Fräser darf nie tiefer stehen als die dichte Abtastung erlaubt
+        // (sonst schneidet er ins Modell) und kaum höher
+        let mut seed = 12345u64;
+        let mut rnd = || {
+            seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            ((seed >> 33) as f64) / ((1u64 << 31) as f64)
+        };
+        for &(tip, angle, r) in &[(0.25, 10.0, 1.5875), (0.5, 8.0, 1.5875), (0.0, 30.0, 3.0), (1.0, 60.0, 3.0), (3.0, 10.0, 3.0)] {
+            let c = Cutter::taper(tip, angle, r);
+            let Cutter::Taper { k, .. } = c else { unreachable!() };
+            for _ in 0..60 {
+                let t: Tri = [0, 1, 2].map(|_| [rnd() * 8.0 - 4.0, rnd() * 8.0 - 4.0, rnd() * 8.0 - 8.0]);
+                let m = Model::new(vec![t], -50.0);
+                let mut s = m.scratch();
+                let got = m.drop(0.0, 0.0, c, &mut s);
+                let n = 600;
+                let mut brute = -50.0f64;
+                for i in 0..=n {
+                    for j in 0..=(n - i) {
+                        let (u, v) = (i as f64 / n as f64, j as f64 / n as f64);
+                        let w = 1.0 - u - v;
+                        let q = [0, 1, 2].map(|e| t[0][e] * u + t[1][e] * v + t[2][e] * w);
+                        let d = q[0].hypot(q[1]);
+                        if d <= r {
+                            brute = brute.max(q[2] - taper_h(d, tip, k));
+                        }
+                    }
+                }
+                assert!(got >= brute - 1e-6, "cuts into the model: {got} < {brute} tip={tip} angle={angle} {t:?}");
+                assert!(got <= brute + 0.6, "too high: {got} > {brute} tip={tip} angle={angle} {t:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn taper_shape_and_hemisphere() {
+        // Kugelspitze und Kegel schließen ohne Absatz an, die Höhe passt zu Hand gerechneten Werten
+        let half = 5f64.to_radians();
+        let (tip, k) = (0.5, 1.0 / half.tan());
+        assert!((taper_h(0.0, tip, k)).abs() < 1e-12);
+        let dt = tip * half.cos();
+        assert!((taper_h(dt, tip, k) - (tip - tip * half.sin())).abs() < 1e-9);
+        assert!((taper_h(1.5, tip, k) - (tip - tip * half.sin() + (1.5 - dt) / half.tan())).abs() < 1e-9);
+        // oben auf einer Halbkugel und an flachen Flanken berührt nur die Kugelspitze → wie ein Kugelfräser
+        let m = Model::new(hemisphere(20.0, 256, 96), -1.0);
+        let mut s = m.scratch();
+        for x in [0.0, 5.0, 12.0] {
+            let want = ((20.0f64 + tip).powi(2) - x * x).sqrt() - tip;
+            assert!((m.drop(x, 0.0, Cutter::taper(tip, 10.0, 1.5), &mut s) - want).abs() < 0.02, "x={x}");
+            // Aufmaß: Fräser dicker und höher
+            let wa = ((20.0f64 + tip + 0.5).powi(2) - x * x).sqrt() - tip - 0.5;
+            assert!((m.drop(x, 0.0, Cutter::taper(tip, 10.0, 1.5).grown(0.5), &mut s) - wa).abs() < 0.02);
+        }
+    }
+
+    #[test]
     fn pyramid_faces_edges_apex() {
         let (a, hp) = (20.0, 10.0);
         let m = Model::new(pyramid(a, hp), -1.0);
@@ -1418,8 +1597,8 @@ mod tests {
         Job {
             place: Place { x0: 10.0, y0: 10.0, size_x: 40.0, size_y: 40.0, height: 10.0 },
             margin: true,
-            rough: rough.then(|| ToolOp { ball: false, diameter: 6.0, step_down: 3.0, step_over: 2.5, allowance: 0.5, dir: String::new(), tolerance: 0.01 }),
-            finish: finish.then(|| ToolOp { ball: true, diameter: 3.0, step_down: 2.0, step_over: 0.5, allowance: 0.0, dir: "x".into(), tolerance: 0.01 }),
+            rough: rough.then(|| ToolOp { ball: false, diameter: 6.0, step_down: 3.0, step_over: 2.5, allowance: 0.5, dir: String::new(), tolerance: 0.01, taper_angle: 0.0, tip_dia: 0.0 }),
+            finish: finish.then(|| ToolOp { ball: true, diameter: 3.0, step_down: 2.0, step_over: 0.5, allowance: 0.0, dir: "x".into(), tolerance: 0.01, taper_angle: 0.0, tip_dia: 0.0 }),
             stock_top: 0.0,
             floor: None,
             bounds: None,
@@ -1496,8 +1675,8 @@ mod tests {
         let j = Job {
             place: Place { x0: 0.0, y0: 0.0, size_x: w, size_y: h, height: depth },
             margin: false,
-            rough: Some(ToolOp { ball: false, diameter: 4.0, step_down: 1.5, step_over: 1.6, allowance: 0.3, dir: String::new(), tolerance: 0.0 }),
-            finish: Some(ToolOp { ball: true, diameter: 2.0 * r, step_down: 0.0, step_over: 0.4, allowance: 0.0, dir: "x".into(), tolerance: 0.02 }),
+            rough: Some(ToolOp { ball: false, diameter: 4.0, step_down: 1.5, step_over: 1.6, allowance: 0.3, dir: String::new(), tolerance: 0.0, taper_angle: 0.0, tip_dia: 0.0 }),
+            finish: Some(ToolOp { ball: true, diameter: 2.0 * r, step_down: 0.0, step_over: 0.4, allowance: 0.0, dir: "x".into(), tolerance: 0.02, taper_angle: 0.0, tip_dia: 0.0 }),
             stock_top: 0.0,
             floor: None,
             bounds: None,

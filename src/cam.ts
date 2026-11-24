@@ -35,6 +35,8 @@ import { optimizeCutOrder, CutItem } from "./cutOrder";
 import { applyCut, applyCutClosed, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSetting";
 import { twoSidedJob } from "./twoSidedJob";
 import type { Side } from "./twoSided";
+import { fluteFits, flutePasses, fluteSettings, type FluteOpts } from "./fluting";
+import { helixZ, trochoidPlan, troFits, troSettings } from "./trochoid";
 import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan, type SkinSettings } from "./onionSkin";
 import { postCtx } from "./post/postContext";
 import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
@@ -443,14 +445,14 @@ const generateGcodeInner = (shapes: any): string | null => {
   };
   /** Andere Formen im Weg? Der Fräser muss mit seinem Radius (und etwas Luft) daran vorbeikommen */
   let leadOthers: { pts: P[]; closed: boolean; owner: any }[] | null = null;
-  const leadFree = (shape: any) => (pts: P[]): boolean => {
+  const leadFree = (shape: any, extra = 0) => (pts: P[]): boolean => {
     if (!leadOthers) {
       leadOthers = [];
       for (const s of shapes) {
         try { for (const p of shapeToPaths(s)) leadOthers.push({ pts: p.pts.map(q => toMachine(q.x, q.y)), closed: p.closed, owner: s }); } catch { /* ohne Bahn */ }
       }
     }
-    const base = shape.opOf ?? shape, keep = toolRadius + 0.1;
+    const base = shape.opOf ?? shape, keep = toolRadius + 0.1 + extra;
     for (const o of leadOthers) {
       if (o.owner === base || (base.parentChainId && o.owner.parentChainId === base.parentChainId)) continue;
       for (const p of pts) if (distToPath(p, o.pts, o.closed) < keep) return false;
@@ -576,6 +578,63 @@ const generateGcodeInner = (shapes: any): string | null => {
     // Schlichtgang: mit „Wegfahren“ zurück auf die freie Schrupp-Bahn, bevor es nach oben geht
     if (entry && curLead?.out) gcode += `G1 X${entry.x.toFixed(3)} Y${entry.y.toFixed(3)}\n`;
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+  };
+
+  /** FLÖTE (fluting.ts): offene Linie mit Tiefe nach Kurve – jeder Durchgang fährt nur das Stück, das tiefer liegt */
+  const millFlute = (shape: any, o: FluteOpts) => {
+    gcode += `${c("gc.flute")}\n`;
+    for (const path of shapeToPaths(shape)) {
+      const run = applyCut(path.pts.map(q => toMachine(q.x, q.y)), false, shape);
+      for (const p of flutePasses(run, passes, o)) {
+        const a = p.pts[0];
+        gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${a.x.toFixed(3)} Y${a.y.toFixed(3)}\nG1 Z${a.z.toFixed(3)} F${PLUNGE_FEED}\n`;
+        p.pts.slice(1).forEach((q, i) => { gcode += `G1 X${q.x.toFixed(3)} Y${q.y.toFixed(3)} Z${q.z.toFixed(3)}${i === 0 ? ` F${feedXY}` : ""}\n`; });
+      }
+    }
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+  };
+
+  /**
+   * TROCHOIDAL (trochoid.ts): die Nut neben der Kontur in kleinen Kreisen freiräumen, bevor die normale Kontur kommt.
+   * Bei Haltestegen nur bis zu deren Oberkante. Ist die ganze Kontur frei, fährt die Kontur danach in einem Zug auf
+   * Tiefe (passes wird dafür gekürzt); mit An-/Wegfahren oder in engen Ecken bleibt sie bei den normalen Durchgängen.
+   */
+  const millTrochoid = (shape: any, poly: P[], side: "outside" | "inside", allow: number, tab: TabSettings | null) => {
+    const o = troSettings(shape);
+    if (!o || !troFits(shape) || passTop < 0) return;
+    const no = (key: string) => { const w = t(key, { n: formCounter }); if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w); };
+    const target = passes[passes.length - 1];
+    if (!(target < -1e-6)) return;
+    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "reamer" || curTool.type === "threadmill" || curTool.type === "taper")) return no("gcw.troTool");
+    const plan = trochoidPlan(poly, side, toolRadius, allow, o);
+    if (!plan) return no("gcw.troNoRoom");
+    // andere Formen: der Fräser braucht neben der Mitte den Kreisradius und seinen eigenen Radius Platz
+    const free = leadFree(shape, plan.rho);
+    const every = Math.max(1, Math.floor(toolRadius / 2 / Math.max(1e-6, 2 * toolRadius * o.step / 100)));
+    for (const l of plan.loops) if (!free(l.filter((_, i) => i % every === 0).map(x => x.c))) return no("gcw.troNear");
+    const zTab = tab ? (skinDepth ?? target) + tab.h : -Infinity;
+    const bottom = zTab < -0.001 ? Math.max(target, zTab) : target;
+    const levels = depthPasses(bottom, o.down > 0 ? Math.max(0.05, o.down) : stepZ);
+    const flip = cleanMillDir(shape.millDir) === "conventional", cmd = flip ? "G2" : "G3";
+    gcode += `${c("gc.trochoid", { w: (2 * (toolRadius + plan.rho)).toFixed(2), s: (2 * toolRadius * o.step / 100).toFixed(2) })}\n`;
+    for (const list of plan.loops) {
+      const first = list[0];
+      const ring = (at: { c: P; start: P }, z?: number) => `${cmd} X${at.start.x.toFixed(3)} Y${at.start.y.toFixed(3)}${z === undefined ? "" : ` Z${z.toFixed(3)}`} I${(at.c.x - at.start.x).toFixed(3)} J${(at.c.y - at.start.y).toFixed(3)}\n`;
+      gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${first.start.x.toFixed(3)} Y${first.start.y.toFixed(3)}\n`;
+      levels.forEach((z, li) => {
+        const top = li > 0 ? levels[li - 1] : 0;
+        // Anfang = Ende des Umlaufs: dort ist bis zur vorigen Ebene alles frei. Eintauchen in einer Schraube
+        if (li > 0) gcode += `G1 X${first.start.x.toFixed(3)} Y${first.start.y.toFixed(3)} F${feedXY}\n`;
+        gcode += `G1 Z${top.toFixed(3)} F${PLUNGE_FEED}\n`;
+        helixZ(top, z, plan.rho, rampTan).forEach((zz, i) => { gcode += i === 0 ? ring(first, zz).replace("\n", ` F${feedXY}\n`) : ring(first, zz); });
+        list.forEach((at, i) => {
+          if (i > 0) gcode += `G1 X${at.start.x.toFixed(3)} Y${at.start.y.toFixed(3)}\n`;
+          gcode += ring(at);
+        });
+      });
+    }
+    gcode += `G0 Z${SAFE_Z.toFixed(2)}\n`;
+    if (plan.full && !curLead) passes = bottom > target + 1e-6 ? [bottom, ...depthPasses(target, stepZ, bottom)] : [target];
   };
 
   // ---- TASCHE: Kontur in mm (Kreise als Vieleck) und die Inseln darin ----
@@ -930,8 +989,10 @@ const generateGcodeInner = (shapes: any): string | null => {
   const alreadyChained = new Set<string>();
   /** Vorschub-Anpassung nur bei Fräsern mit Schneide am Umfang – nicht Bohren, V-Carve, Fase, adaptive Tasche */
   const adaptsFeed = (shape: any): boolean => {
-    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "reamer" || curTool.type === "threadmill")) return false;
+    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "reamer" || curTool.type === "threadmill" || curTool.type === "taper")) return false;
     if (shape.restOf) return true;
+    // Trochoidal und Flöten: kleine Kreise bzw. Tiefe nach Kurve – der Eingriff ist dort schon geregelt
+    if ((troSettings(shape) && troFits(shape)) || (fluteSettings(shape) && fluteFits(shape))) return false;
     const mode = shape.millingMode || "outside";
     if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer" || mode === "face") return false;
     return !(mode === "pocket" && pocketStrategy === "adaptive");
@@ -1099,7 +1160,7 @@ const generateGcodeInner = (shapes: any): string | null => {
       return;
     }
     // V-Stichel, Bohrer und Senker taugen nicht für Konturen mit Fräser-Versatz/Taschen
-    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "spotdrill" || curTool.type === "reamer" || curTool.type === "countersink" || curTool.type === "threadmill")) {
+    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "spotdrill" || curTool.type === "reamer" || curTool.type === "countersink" || curTool.type === "threadmill" || curTool.type === "taper")) {
       const w = t("gcw.toolType", { name: curTool.name, type: t("tl.type." + curTool.type) });
       if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w);
     }
@@ -1112,8 +1173,12 @@ const generateGcodeInner = (shapes: any): string | null => {
     if (skin) gcode += `${c("gc.skin", { h: skin.skin.toFixed(2), t: skin.stock.toFixed(2) })}\n`;
 
     const pocketOuter = mode === "pocket" ? closedMm(shape) : null;
+    const flute = fluteFits(shape) ? fluteSettings(shape) : null;
     if (pocketOuter) {
       millPocket(shape, pocketOuter);
+    }
+    else if (flute && passes[passes.length - 1] < 0) {
+      millFlute(shape, flute);
     }
     else if (shape.type === "line") {
       const s0 = toMachine(shape.x, shape.y);
@@ -1132,11 +1197,13 @@ const generateGcodeInner = (shapes: any): string | null => {
       const center = toMachine(shape.x, shape.y);
       const radiusPx = Math.abs(shape.w);
       const radiusFinal = radiusPx / MM_TO_PIXEL + offset;
+      const allPasses = passes;
       // Schlichtgang: erst mit Aufmaß (außen größer, innen kleiner), danach auf Maß
       let allow = !last && (mode === "outside" || mode === "inside") ? finishAllow(shape) : 0;
       if (allow > 0 && mode === "inside" && radiusFinal - allow <= 0.05) { lastGcodeWarnings.push(t("gcw.finishSkip", { n: formCounter, a: allow })); allow = 0; }
       const radiusMm = radiusFinal + (mode === "outside" ? allow : -allow);
       const tab = mode !== "on-line" ? tabSettings(shape) : null;
+      if (!last && (mode === "outside" || mode === "inside")) millTrochoid(shape, makeEllipsePoints(center.x, center.y, radiusPx / MM_TO_PIXEL, radiusPx / MM_TO_PIXEL), mode, allow, tab);
       const circSide = mode === "outside" || mode === "inside" ? mode : null;
       const dir = circSide ? cleanMillDir(shape.millDir) : "";
       const cmd = circleCmd(circSide ?? "outside", dir);
@@ -1191,6 +1258,7 @@ const generateGcodeInner = (shapes: any): string | null => {
         gcode += `${c("gc.circleTooSmall")}\n`;
         lastGcodeWarnings.push(t("gcw.circleTooSmall", { n: formCounter }));
       }
+      passes = allPasses;
       };
       cutCircle(false);
       if (skin) skinLater(skin, mode, () => cutCircle(true));
@@ -1262,6 +1330,8 @@ const generateGcodeInner = (shapes: any): string | null => {
         const orient = (loop: P[]) => applyCutClosed(dir ? orientLoop(loop, mode as "outside" | "inside", dir)
           : ((mode === "outside") !== (polygonArea(loop) > 0) ? [loop[0], ...loop.slice(1).reverse()] : loop), shape);
         const tab = tabSettings(shape);
+        const allPasses = passes;
+        if (!last && loops.length) millTrochoid(shape, pts, mode as "outside" | "inside", allow, tab);
         const rough = loops.map(orient);
         const side = mode as "outside" | "inside";
         rough.forEach(path => {
@@ -1276,6 +1346,7 @@ const generateGcodeInner = (shapes: any): string | null => {
             if (!tab || !millTabbed(path, shape, tab, rough)) millPath(path, true, rough.map(l => ({ pts: l, closed: true })));
           });
         }
+        passes = allPasses;
         };
         cutLoops(false);
         if (skin) skinLater(skin, mode, () => cutLoops(true));

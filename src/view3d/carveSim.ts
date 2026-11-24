@@ -10,7 +10,7 @@
  * Nur Anzeige – rechnet in Stücken, damit die Oberfläche flüssig bleibt.
  */
 import { parseGcodeProgram } from "../sim/gcodeParser.ts";
-import type { ToolGeom } from "../toolGraphics.ts";
+import { taperHeight, type ToolGeom } from "../toolGraphics.ts";
 
 export interface CarveResult {
   nx: number; ny: number;      // Zellen
@@ -39,6 +39,7 @@ export function profile(tool: ToolGeom | null): (r: number) => number {
     const tr = Math.min(R, Math.max(0, (tool?.tipDia ?? 0) / 2)), k = 1 / Math.tan(Math.max(0.05, half));
     return r => (r > R ? Infinity : r <= tr ? 0 : (r - tr) * k);
   }
+  if (type === "taper" && tool) return r => (r > R ? Infinity : taperHeight(tool, r));
   return r => (r > R ? Infinity : 0);
 }
 

@@ -8,6 +8,8 @@
  *                Spindel/Laser/Brenner mit Overrides (spindlePanel.ts), Antasten
  *   Objekt ohne Auswahl: nur Ebenen + Hinweis (Abschnitte .needs-sel sind dann versteckt)
  */
+import { FLUTE_DEFAULT } from "../fluting";
+import { TRO_DEFAULT, TRO_STEP_MAX, TRO_STEP_MIN, TRO_W_MAX, TRO_W_MIN } from "../trochoid";
 import { icon } from "./icons";
 import { t, T, tip, ph } from "../i18n/i18n";
 import { toolPickerHtml, toolSummaryHtml } from "./toolPicker";
@@ -129,6 +131,27 @@ export function renderRightPanel(container: HTMLElement) {
                 </select>
                 <input type="number" id="dim-lead-len" value="3" min="0.1" max="50" step="0.5" class="prop-input" style="width: 54px;">
               </span>
+            </div>
+            <!-- Trochoidal (trochoid.ts): geschlossene Formen außen/innen -->
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.troTip")}>${T("rp.tro")}<input type="checkbox" id="dim-tro" style="width:auto;"></label>
+            <div id="dim-tro-opts" style="display:none;">
+              <div class="prop-row" ${tip("rp.troWTip")}>${T("rp.troW")}<input type="number" id="dim-tro-w" value="${TRO_DEFAULT.w}" min="${TRO_W_MIN}" max="${TRO_W_MAX}" step="5" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.troStepTip")}>${T("rp.troStep")}<input type="number" id="dim-tro-step" value="${TRO_DEFAULT.step}" min="${TRO_STEP_MIN}" max="${TRO_STEP_MAX}" step="1" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.troDownTip")}>${T("rp.troDown")}<input type="number" id="dim-tro-down" min="0.05" max="200" step="0.5" class="prop-input" ${ph("rp.troDownPh")}></div>
+            </div>
+            <!-- Flöte (fluting.ts): offene Linien auf Linie -->
+            <label class="prop-row" style="cursor:pointer;" ${tip("rp.fluteTip")}>${T("rp.flute")}<input type="checkbox" id="dim-flute" style="width:auto;"></label>
+            <div id="dim-flute-opts" style="display:none;">
+              <div class="prop-row" ${tip("rp.fluteInTip")}>${T("rp.fluteIn")}<input type="number" id="dim-flute-in" value="${FLUTE_DEFAULT.in}" min="0" max="5000" step="1" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.fluteStartTip")}>${T("rp.fluteStart")}<input type="number" id="dim-flute-start" value="${FLUTE_DEFAULT.start}" min="0" max="100" step="5" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.fluteOutTip")}>${T("rp.fluteOut")}<input type="number" id="dim-flute-out" value="${FLUTE_DEFAULT.out}" min="0" max="5000" step="1" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.fluteEndTip")}>${T("rp.fluteEnd")}<input type="number" id="dim-flute-end" value="${FLUTE_DEFAULT.end}" min="0" max="100" step="5" class="prop-input"></div>
+              <div class="prop-row" ${tip("rp.fluteEaseTip")}>${T("rp.fluteEase")}
+                <select id="dim-flute-ease" class="prop-input" style="width: 110px;">
+                  <option value="smooth" data-i18n="rp.fluteSmooth">${t("rp.fluteSmooth")}</option>
+                  <option value="linear" data-i18n="rp.fluteLinear">${t("rp.fluteLinear")}</option>
+                </select>
+              </div>
             </div>
               </div>
             </details>

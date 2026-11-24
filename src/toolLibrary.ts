@@ -6,7 +6,7 @@
  * "Standard-Werkzeug" (activeTool).
  *
  * Ein Werkzeug hat wie in Estlcam eine Art (Schaftfräser, Kugelfräser, Torusfräser,
- * V-Stichel, Fasenfräser, Senker, Bohrer, Anbohrer, Reibahle, Planfräser, Gewindefräser), Schneidenzahl, Spiral-Richtung,
+ * V-Stichel, Fasenfräser, Senker, Bohrer, Anbohrer, Reibahle, Planfräser, Gewindefräser, konischer Fräser), Schneidenzahl, Spiral-Richtung,
  * Maße (Ø, Schaft, Schneidenlänge, Gesamtlänge, Winkel, Spitze, Eckenradius) und
  * Schnittdaten. Der Schnittdaten-Rechner schlägt Drehzahl, Vorschub und Zustellung vor
  * (Material + Werkzeug + Grenzen der Maschine aus den Werkzeug-Einstellungen).
@@ -41,7 +41,12 @@ export interface MillingTool extends ToolGeom {
   device?: string;     // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
-export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "spotdrill", "reamer", "facemill", "threadmill"];
+export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "spotdrill", "reamer", "facemill", "threadmill", "taper"];
+/** Fräser, der beim 3D-Schlichten über eine Kugelspitze läuft (auch konisch) */
+export const isBallTip = (tl: { type: ToolType }) => tl.type === "ball" || tl.type === "taper";
+/** Ø, der für den Bahnabstand zählt: beim konischen Fräser die Spitze, sonst der Fräser-Ø */
+export const stepDia = (tl: { type: ToolType; diameter: number; tipDia: number }) => tl.type === "taper" ? Math.max(0.1, Math.min(tl.tipDia, tl.diameter)) : tl.diameter;
+
 /** Arten mit Kegel-Spitze (Winkel zählt) */
 export const CONE_TYPES: ToolType[] = ["vbit", "chamfer", "countersink", "drill", "spotdrill"];
 
@@ -59,7 +64,9 @@ export const TYPE_DEFAULTS: Record<ToolType, Omit<ToolGeom, "type">> = {
   facemill:    { diameter: 25, shankDia: 8,     fluteLen: 3,  length: 45, flutes: 2, helix: "straight", angle: 0,   tipDia: 0,   cornerR: 0 },
   // Gewindefräser – Einzahn für M8 (Ø6,5, Hals Ø4,7, Schulterlänge 24): schneidet jede Steigung.
   // angle = Flankenwinkel (metrisch 60°), pitch = Steigung (nur mehrzahnige Fräser)
-  threadmill:  { diameter: 6.5, shankDia: 8,    fluteLen: 24, length: 60, flutes: 3, helix: "straight", angle: 60,  tipDia: 0,   cornerR: 0, pitch: 1.25, threadSingle: true, neckDia: 4.7 }
+  threadmill:  { diameter: 6.5, shankDia: 8,    fluteLen: 24, length: 60, flutes: 3, helix: "straight", angle: 60,  tipDia: 0,   cornerR: 0, pitch: 1.25, threadSingle: true, neckDia: 4.7 },
+  // Konischer Fräser mit Kugelspitze (R0,5): angle = ganzer Kegelwinkel (4° je Seite)
+  taper:       { diameter: 3.175, shankDia: 3.175, fluteLen: 0, length: 38, flutes: 2, helix: "up",     angle: 8,   tipDia: 1,   cornerR: 0 }
 };
 
 export function typeGeom(type: ToolType): ToolGeom {
@@ -189,8 +196,8 @@ export function calcCutData(tool: ToolGeom & { toolMat?: ToolMat }, materialId: 
   const m = MATERIALS.find(x => x.id === materialId) || MATERIALS[0];
   const hss = tool.toolMat === "hss";
   const conical = tool.type === "vbit" || tool.type === "chamfer" || tool.type === "countersink";
-  // V-Stichel & Co. schneiden im Mittel mit ungefähr dem halben Durchmesser
-  const dEff = Math.max(0.2, conical ? Math.max(tool.tipDia, tool.diameter * 0.5) : tool.diameter);
+  // V-Stichel & Co. schneiden im Mittel mit ungefähr dem halben Durchmesser, ein konischer Fräser mehr mit der Spitze
+  const dEff = Math.max(0.2, tool.type === "taper" ? (Math.min(tool.tipDia, tool.diameter) * 2 + tool.diameter) / 3 : conical ? Math.max(tool.tipDia, tool.diameter * 0.5) : tool.diameter);
   const vc = m.vc * (hss ? 0.35 : 1);
   let rpm = vc * 1000 / (Math.PI * dEff);
   const maxRpm = st.maxRpm > 0 ? st.maxRpm : 24000;
@@ -335,7 +342,7 @@ function changed() {
  * Kegel-Werkzeuge und Bohrer schneiden über ihre Form – dort zählt der Ausgleich nicht.
  */
 export function cutDiameter(tool: Pick<MillingTool, "type" | "diameter" | "wearOffset">): number {
-  if (CONE_TYPES.includes(tool.type)) return tool.diameter;
+  if (CONE_TYPES.includes(tool.type) || tool.type === "taper") return tool.diameter;
   return Math.max(0.01, tool.diameter - (tool.wearOffset || 0));
 }
 
@@ -480,7 +487,7 @@ export function toolLabel(tool: MillingTool): string {
 
 /** Kurzinfo: "Schaftfräser · 2 Schneiden · Ø 3 mm · 1.5 mm/Durchgang · F1200 · S18000" */
 export function toolInfo(tool: MillingTool): string {
-  return `${toolTypeName(tool)} · ${t("tl.flutesN", { n: tool.flutes })}${CONE_TYPES.includes(tool.type) ? ` · ${fmt(tool.angle)}°` : ""}${tool.type === "threadmill" ? (tool.threadSingle ? ` · ${t("tl.single")}` : ` · P${fmt(tool.pitch || 1)}`) : ""} · `
+  return `${toolTypeName(tool)} · ${t("tl.flutesN", { n: tool.flutes })}${CONE_TYPES.includes(tool.type) || tool.type === "taper" ? ` · ${fmt(tool.angle)}°` : ""}${tool.type === "taper" ? ` · R${fmt(tool.tipDia / 2)}` : ""}${tool.type === "threadmill" ? (tool.threadSingle ? ` · ${t("tl.single")}` : ` · P${fmt(tool.pitch || 1)}`) : ""} · `
     + t("tool.info", { d: fmt(tool.diameter), z: fmt(tool.stepZ), f: tool.feedrate, s: tool.rpm });
 }
 

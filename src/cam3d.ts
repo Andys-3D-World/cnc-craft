@@ -66,10 +66,17 @@ export async function loadModel3d(pos: Float32Array): Promise<number> {
   return invoke<number>("cam3d_load", meshToStl(pos));
 }
 
+/** Form des Fräsers für den Rechenkern: Kugel, konisch (Kugelspitze + Kegel) oder wie ein Schaftfräser */
+export function cutterShape(tool: MillingTool): CutterShape {
+  const taper = tool.type === "taper" && tool.angle > 0;
+  return { ball: tool.type === "ball", diameter: cutDiameter(tool), taperAngle: taper ? tool.angle : 0, tipDia: taper ? tool.tipDia : 0 };
+}
+export interface CutterShape { ball: boolean; diameter: number; taperAngle: number; tipDia: number }
+
 /** Bahnen rechnen. onProgress(0…1, "rough" | "finish") */
 export async function computePaths3d(job: Job3D, onProgress: (f: number, stage: string) => void): Promise<Path3D[]> {
   const op = (o: Op3D | null) => o && {
-    ball: o.tool.type === "ball", diameter: cutDiameter(o.tool), stepDown: o.stepDown, stepOver: o.stepOver,
+    ...cutterShape(o.tool), stepDown: o.stepDown, stepOver: o.stepOver,
     allowance: o.allowance, dir: o.dir, tolerance: o.tolerance
   };
   const un = await listen<{ p: number; stage: string }>("cam3d-progress", e => onProgress(e.payload.p, e.payload.stage));
@@ -82,7 +89,7 @@ export async function computePaths3d(job: Job3D, onProgress: (f: number, stage: 
 }
 
 /** Drehachse rundum: Höhenfeld aus dem App-Kern (cam3d.rs → rotary_field), Modell vorher mit loadModel3d laden */
-export async function computeRotaryField(job: { ball: boolean; diameter: number; allowance: number; x0: number; dx: number; nx: number; nt: number; core: number },
+export async function computeRotaryField(job: CutterShape & { allowance: number; x0: number; dx: number; nx: number; nt: number; core: number },
   onProgress: (f: number) => void): Promise<Float32Array> {
   const un = await listen<{ p: number; stage: string }>("cam3d-progress", e => onProgress(e.payload.p));
   try {
