@@ -53,7 +53,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 
 **Plasma**
 - Kerf compensation, lead-ins, pierce points, material presets (40 A / 60 A air plasma), sheet height probing,
-  torch height control (THC)
+  torch height control (THC), lead-outs, heat spreading, pierce counter, alignment of tilted sheets
 - Shortest cut order, rapids go around parts already cut, remnant sheet management (used areas are not cut again)
 
 **Simulation**

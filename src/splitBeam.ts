@@ -75,7 +75,7 @@ export function plasmaSplitOptions(bed: { w: number; h: number }): SplitOptions 
     const onLine = (s.millingMode || "outside") === "on-line";
     // der Brenner fährt den halben Spalt neben der Kontur, der Einstich liegt noch die Anfahrlänge weiter draußen –
     // und mit „Leerfahrten um ausgeschnittene Teile“ führt der Umweg so weit um den Rahmen der Bahn herum (rapidAvoid.ts)
-    return { cut: !onLine, fill: false, line: true, kerf: Math.max(0, c.kerf), margin: onLine ? 0 : Math.max(0, c.kerf) / 2 + Math.max(0, c.leadIn, plasmaSettings.avoidCut ? PLASMA_AVOID : 0) };
+    return { cut: !onLine, fill: false, line: true, kerf: Math.max(0, c.kerf), margin: onLine ? 0 : Math.max(0, c.kerf) / 2 + Math.max(0, c.leadIn, c.leadOut, plasmaSettings.avoidCut ? PLASMA_AVOID : 0) };
   };
   return { bed, radiusOf: NO_RADIUS, kind: "plasma", beam };
 }
@@ -89,5 +89,5 @@ export function beamFingerprint(kind: Exclude<SplitKind, "mill">, shapes: any[],
     const cut = laserCutLayers(shapes, setup).list.filter(c => c.on).map(c => c.id).join(",");
     return `laser|${laserSettings.kerf}|${laserSettings.avoidCut ? 1 : 0}|${getLayers().map(l => `${l.id}:${l.mode}:${l.leadIn}`).join(",")}|${activeLayer?.id ?? ""}|${cut}`;
   }
-  return `plasma|${plasmaSettings.avoidCut ? 1 : 0}|${getCuts().map(c => `${c.id}:${c.kerf}:${c.leadIn}`).join(",")}|${activeCut?.id ?? ""}`;
+  return `plasma|${plasmaSettings.avoidCut ? 1 : 0}|${getCuts().map(c => `${c.id}:${c.kerf}:${c.leadIn}${c.leadOut > 0 ? ":" + c.leadOut : ""}`).join(",")}|${activeCut?.id ?? ""}`;
 }

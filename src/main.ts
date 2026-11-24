@@ -355,7 +355,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initOpsPanel(redraw, appendToConsole);
     initLaserPanel(redraw);
     initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
-    initPlasmaPanel(redraw);
+    initPlasmaPanel(redraw, appendToConsole);
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
     initTwoSidedPanel(redraw, appendToConsole);

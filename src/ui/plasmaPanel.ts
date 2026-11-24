@@ -17,6 +17,7 @@ import {
 import { getMachineMode, MODE_CHANGED } from "../machineMode";
 import { PLASMA_OPS, plasmaOpOf, SPOT_MS_MIN, SPOT_MS_MAX } from "../plasmaSpot";
 import { checkpoint } from "../editor/history";
+import { addPierces, countPierces, loadPierces, resetPierces, setPierceLimit, PIERCES_CHANGED } from "../pierceCount";
 
 function state(): any { return (window as any).cncState; }
 function selectedShapes(): any[] {
@@ -57,11 +58,15 @@ export function plasmaSettingsHtml(): string {
         <label class="prop-row" style="cursor:pointer;" ${tip("plasma.probeTip")}><span>${T("plasma.probe")}</span><input type="checkbox" id="plasma-probe" style="width:auto;"></label>
         <div class="prop-row" ${tip("plasma.probeOffsetTip")}>${T("plasma.probeOffset")}<input type="number" id="plasma-probe-offset" step="0.1" class="prop-input"></div>
         <div class="prop-row" ${tip("plasma.probeDistTip")}>${T("plasma.probeDist")}<input type="number" id="plasma-probe-dist" min="5" max="500" step="5" class="prop-input"></div>
+        <div class="prop-row" ${tip("plasma.probeSkipTip")}>${T("plasma.probeSkip")}<input type="number" id="plasma-probe-skip" min="0" max="1000" step="10" class="prop-input"></div>
         <div class="prop-row" ${tip("plasma.overcutTip")}>${T("plasma.overcut")}<input type="number" id="plasma-overcut" min="0" step="0.5" class="prop-input"></div>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.avoidCutTip")}><span>${T("cam.avoidCut")}</span><input type="checkbox" id="plasma-avoid" style="width:auto;"></label>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.optOrderTip")}><span>${T("cam.optOrder")}</span><input type="checkbox" id="plasma-order" style="width:auto;"></label>
+        <label class="prop-row" style="cursor:pointer;" ${tip("plasma.spreadTip")}><span>${T("plasma.spread")}</span><input type="checkbox" id="plasma-spread" style="width:auto;"></label>
         <div class="prop-row" ${tip("pop.spotMaxTip")}>${T("pop.spotMax")}<input type="number" id="plasma-spotmax" min="0" max="100" step="1" class="prop-input"></div>
         <div class="prop-row" ${tip("pop.spotTimeTip")}>${T("pop.spotTime")}<input type="number" id="plasma-spottime" min="${SPOT_MS_MIN}" max="${SPOT_MS_MAX}" step="10" class="prop-input"></div>
+        <div class="prop-row" ${tip("pierce.tip")}>${T("pierce.label")}<span style="display:flex;gap:6px;align-items:center;"><b id="pierce-count"></b><button id="pierce-reset" type="button" class="btn-secondary btn-compact">${T("pierce.reset")}</button></span></div>
+        <div class="prop-row" ${tip("pierce.limitTip")}>${T("pierce.limit")}<input type="number" id="pierce-limit" min="0" step="50" class="prop-input"></div>
         <div class="tool-scope">${T("plasma.hint")}</div>
       </div>
     </div>
@@ -101,7 +106,7 @@ export function syncThc() {
   window.dispatchEvent(new CustomEvent("cnc-thc-changed"));
 }
 
-export function initPlasmaPanel(redraw: () => void) {
+export function initPlasmaPanel(redraw: () => void, log: (s: string) => void = () => {}) {
   const list = document.getElementById("plasma-cut-list");
   let lastClick = { id: "", time: 0 };
   const edit = (id: string) => {
@@ -138,13 +143,13 @@ export function initPlasmaPanel(redraw: () => void) {
   });
 
   // ---- Einstellungen ----
-  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "probeDist" | "overcut" | "antiDive" | "smallHole" | "holeSpeed" | "spotMax" | "spotTime") => {
+  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "probeDist" | "overcut" | "antiDive" | "smallHole" | "holeSpeed" | "spotMax" | "spotTime" | "probeSkip") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.value = String(plasmaSettings[key]);
     el.addEventListener("change", () => { setPlasmaSettings({ [key]: parseFloat(el.value) }); el.value = String(plasmaSettings[key]); redraw(); });
   };
-  const bindCheck = (id: string, key: "useZ" | "probe" | "avoidCut" | "optimizeOrder") => {
+  const bindCheck = (id: string, key: "useZ" | "probe" | "avoidCut" | "optimizeOrder" | "spread") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.checked = plasmaSettings[key];
@@ -152,15 +157,17 @@ export function initPlasmaPanel(redraw: () => void) {
   };
   const syncEnabled = () => {
     const z = plasmaSettings.useZ;
-    ["plasma-safez", "plasma-probe", "plasma-probe-offset", "plasma-probe-dist"].forEach(id => {
+    ["plasma-safez", "plasma-probe", "plasma-probe-offset", "plasma-probe-dist", "plasma-probe-skip"].forEach(id => {
       const el = document.getElementById(id) as HTMLInputElement | null;
-      if (el) el.disabled = !z || ((id === "plasma-probe-offset" || id === "plasma-probe-dist") && !plasmaSettings.probe);
+      if (el) el.disabled = !z || (id.startsWith("plasma-probe-") && !plasmaSettings.probe);
     });
   };
   bindNum("plasma-safez", "safeZ");
   bindNum("plasma-probe-offset", "probeOffset");
   bindNum("plasma-probe-dist", "probeDist");
   bindNum("plasma-overcut", "overcut");
+  bindNum("plasma-probe-skip", "probeSkip");
+  bindCheck("plasma-spread", "spread");
   bindCheck("plasma-usez", "useZ");
   bindCheck("plasma-probe", "probe");
   bindCheck("plasma-avoid", "avoidCut");
@@ -195,7 +202,7 @@ export function initPlasmaPanel(redraw: () => void) {
   // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
   const syncFields = () => {
     const nums: [string, keyof typeof plasmaSettings][] = [["plasma-safez", "safeZ"], ["plasma-probe-offset", "probeOffset"], ["plasma-probe-dist", "probeDist"], ["plasma-overcut", "overcut"],
-      ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-spotmax", "spotMax"], ["plasma-spottime", "spotTime"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
+      ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-spotmax", "spotMax"], ["plasma-spottime", "spotTime"], ["plasma-probe-skip", "probeSkip"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
     for (const [id, key] of nums) {
       const el = document.getElementById(id) as HTMLInputElement | null;
       if (el && document.activeElement !== el) el.value = String(plasmaSettings[key]);
@@ -208,9 +215,31 @@ export function initPlasmaPanel(redraw: () => void) {
     if (av) av.checked = plasmaSettings.avoidCut;
     const or = document.getElementById("plasma-order") as HTMLInputElement | null;
     if (or) or.checked = plasmaSettings.optimizeOrder;
+    const sp = document.getElementById("plasma-spread") as HTMLInputElement | null;
+    if (sp) sp.checked = plasmaSettings.spread;
     syncEnabled();
     syncThc();
   };
+  // ---- Einstiche seit dem Düsenwechsel (pierceCount.ts) ----
+  const showPierces = () => {
+    const p = loadPierces(), c = document.getElementById("pierce-count"), l = document.getElementById("pierce-limit") as HTMLInputElement | null;
+    if (c) { c.textContent = String(p.count); c.style.color = p.limit > 0 && p.count >= p.limit ? "var(--color-warning)" : ""; }
+    if (l && document.activeElement !== l) l.value = String(p.limit);
+  };
+  document.getElementById("pierce-reset")?.addEventListener("click", () => {
+    if (window.confirm(t("pierce.confirm", { n: loadPierces().count }))) resetPierces();
+  });
+  (document.getElementById("pierce-limit") as HTMLInputElement | null)?.addEventListener("change", e => setPierceLimit(parseFloat((e.target as HTMLInputElement).value)));
+  window.addEventListener(PIERCES_CHANGED, showPierces);
+  window.addEventListener("cnc-job-done", (e: Event) => {
+    const d = (e as CustomEvent).detail || {};
+    if (d.simulated || d.mode !== "plasma" || !Array.isArray(d.lines)) return;
+    const n = countPierces(d.lines, d.from || 0, d.aborted ? d.line : d.lines.length);
+    const reached = addPierces(n);
+    if (n) log(t("pierce.job", { n, total: loadPierces().count }));
+    if (reached) log(t("pierce.reached", { n: loadPierces().limit }));
+  });
+  showPierces();
   window.addEventListener(PLASMA_CHANGED, () => { syncFields(); refreshPlasmaPanel(true); });
   window.addEventListener(MODE_CHANGED, () => refreshPlasmaPanel(true));
   window.addEventListener("cnc-language-changed", () => refreshPlasmaPanel(true));

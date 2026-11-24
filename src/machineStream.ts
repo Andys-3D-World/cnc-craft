@@ -184,7 +184,7 @@ function emitDone(aborted: boolean, simulated: boolean, s: typeof streamState = 
   s.abortLine = aborted ? s.currentLine : -1;
   window.dispatchEvent(new CustomEvent("cnc-job-done", {
     detail: {
-      aborted, line: s.currentLine, lines: s.loadedLines,
+      aborted, line: s.currentLine, lines: s.loadedLines, from: s.sentOrigin?.[0] ?? 0, // Fortsetzen: erste gesendete Zeile
       label: s.label, simulated, mode, bed: s.bed
     }
   }));

@@ -54,7 +54,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 
 **Plasma**
 - Schnittspalt-Ausgleich, Anfahrbahnen, Einstichpunkte, Materialvorlagen (40 A / 60 A Luftplasma), Blechhöhe
-  abtasten, Höhenregelung (THC)
+  abtasten, Höhenregelung (THC), Ausfahrbahnen, Wärme verteilen, Einstichzähler, schiefe Platten ausrichten
 - Kürzeste Schnittreihenfolge, Eilfahrten umfahren fertige Teile, Restplatten-Verwaltung (verbrauchte Fläche wird
   nicht nochmal geschnitten)
 

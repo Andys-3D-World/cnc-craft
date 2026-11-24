@@ -20,9 +20,9 @@ import { createImageShape } from "../raster/imageShape";
 import { NO_ADJUST, presetSettings } from "../raster/dither";
 import { getLayers } from "../laserLayers";
 import { rasterPlan } from "./toImage";
-import { applyFit, fitProblem, orderMarks, twoPointFit } from "./printCut";
+import { applyFit, fitProblem, orderMarks, plateFit, plateProblem, twoPointFit } from "./printCut";
 import { machine } from "../machine";
-import { isLaser } from "../machineMode";
+import { isLaser, isPlasma } from "../machineMode";
 import { CutDir, cutDirOf, cutMark, cutStartOf, effectiveDirection, fractionAt, isClimb } from "../cutSetting";
 import { createPolyline, newId, MM_TO_PIXEL, Path, Pt, distanceToShape, groupBounds, rotateShape, shapeBounds, shapeToPaths, shearShape, translateShape, updatePolylineBounds } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
@@ -637,6 +637,7 @@ export function openToImageDialog() {
 // (Laser-Bereich, spindlePanel.ts: nur solange gedrückt, mit Zeitgrenze), gefahren wird mit den normalen Jog-Knöpfen.
 
 export function openPrintCutDialog() {
+  if (isPlasma()) { openPlateAlignDialog(); return; }
   if (!isLaser()) { log(t("pc.laserOnly")); return; }
   const marks = selectedShapes().filter((s: any) => s.type !== "image");
   if (marks.length !== 2) { log(t("pc.select")); return; }
@@ -692,6 +693,11 @@ export function openPrintCutDialog() {
       commit();
     }
   });
+  bindReadButtons(panel);
+}
+
+/** „Position lesen“ neben X/Y der beiden Punkte – liest nur, fährt nichts */
+function bindReadButtons(panel: ToolPanel) {
   ([1, 2] as const).forEach(n => panel.$<HTMLButtonElement>(`#pc-read${n}`).addEventListener("click", () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
     if (machine.job.active || (machine.status.state && machine.status.state !== "Idle")) { log(t("pc.notIdle", { s: esc(machine.status.state || "") })); return; }
@@ -699,6 +705,58 @@ export function openPrintCutDialog() {
     panel.$(`#pc-y${n}`).value = machine.status.wpos[1].toFixed(3);
     panel.el.dispatchEvent(new Event("change"));
   }));
+}
+
+// =====================================================================
+// PLASMA: schief liegende Platte – Zeichnung an Ecke und Kante ausrichten (Rechnung: plateFit in printCut.ts)
+// =====================================================================
+// Wie Print & Cut: schickt nichts an die Maschine und zündet nichts, es liest nur die Position.
+
+function openPlateAlignDialog() {
+  if (!app().shapes.length) { log(t("plate.empty")); return; }
+  const mm = (v: number) => (v / MM_TO_PIXEL).toFixed(2);
+  const point = (n: 1 | 2) => `
+    <div style="display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--border-color);border-radius:8px;">
+      <div style="font-size:0.85rem;font-weight:600;">${t("plate.p" + n)}</div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <label style="font-size:0.8rem;">X <input id="pc-x${n}" type="number" data-unit="mm" step="0.1" style="width:72px;"></label>
+        <label style="font-size:0.8rem;">Y <input id="pc-y${n}" type="number" data-unit="mm" step="0.1" style="width:72px;"></label>
+        <button id="pc-read${n}" type="button" class="btn-secondary" style="flex:1;">${t("pc.read")}</button>
+      </div>
+    </div>`;
+  const read = (p: ToolPanel) => {
+    const val = (id: string) => parseFloat(p.$(id).value) * MM_TO_PIXEL;
+    const c = { x: val("#pc-x1"), y: val("#pc-y1") }, e = { x: val("#pc-x2"), y: val("#pc-y2") };
+    return [c.x, c.y, e.x, e.y].every(Number.isFinite) ? plateFit(c, e) : null;
+  };
+  const panel = openToolPanel({
+    id: "plate-align-panel", ico: "printCut", title: t("plate.title"), ok: "✔ " + t("pc.run"), redraw: redrawFn,
+    body: `
+      <div style="font-size:0.8rem;color:var(--text-muted);">${t("plate.steps")}</div>
+      <div style="font-size:0.8rem;padding:8px;border-radius:8px;border:1px solid var(--lt-amber,#ffb454);color:var(--lt-amber,#ffb454);">${t("plate.safety")}</div>
+      ${point(1)}${point(2)}`,
+    onChange: p => {
+      const f = read(p);
+      if (!f) { livePreview.paths = []; p.info(t("plate.waiting")); return; }
+      livePreview.paths = app().shapes.flatMap(outlineOf).map((q: Path) => ({ closed: q.closed, pts: q.pts.map(k => applyFit(f, k)) }));
+      const problem = plateProblem(f, MM_TO_PIXEL), o = applyFit(f, { x: 0, y: 0 });
+      const deg = ((f.angle * 180) / Math.PI).toFixed(2);
+      if (problem) p.info(t(problem === "angle" ? "plate.angle" : "pc.tooClose", { deg }), true);
+      else p.info(t("plate.info", { deg, x: mm(o.x), y: mm(o.y) }));
+    },
+    onOk: p => {
+      const f = read(p);
+      if (!f) { p.info(t("plate.waiting"), true); return false; }
+      if (plateProblem(f, MM_TO_PIXEL)) return false;
+      const st = app();
+      st.shapes.forEach((s: any) => { rotateShape(s, f.center.x, f.center.y, f.angle); translateShape(s, f.dx, f.dy); });
+      log(t("plate.done", { deg: ((f.angle * 180) / Math.PI).toFixed(2) }));
+      const bed = bedSizeMm(), w = bed.w * MM_TO_PIXEL, h = bed.h * MM_TO_PIXEL;
+      if (st.shapes.some((s: any) => { const b = shapeBounds(s); return b && (b.minX < -0.1 || b.minY < -0.1 || b.maxX > w + 0.1 || b.maxY > h + 0.1); })) log(t("plate.out"));
+      commit();
+    }
+  });
+  bindReadButtons(panel);
 }
 
 // =====================================================================

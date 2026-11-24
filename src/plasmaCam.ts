@@ -9,7 +9,7 @@
  *   3. Startpunkt an einer Ecke (dort sieht man den Ansatz am wenigsten)
  *   4. Anfahrbahn (Lead-in) vom Abfall her: außen von außen, bei Löchern aus dem Loch
  *   5. Einstechen: auf Einstechhöhe, Brenner an (M3), warten, auf Schneidhöhe, schneiden
- *   6. Überlauf am Ende, Brenner aus (M5), hoch auf Sicherheitshöhe
+ *   6. Überlauf am Ende, auf Wunsch Ausfahrbahn in den Abfall, Brenner aus (M5), hoch auf Sicherheitshöhe
  *
  * Höhenregelung (THC):
  *   - externe Box: nach dem Einstechen (Maschine steht ohnehin) über M8/M7 freigeben,
@@ -35,6 +35,7 @@ import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
 import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo } from "./cutSetting";
 import { boxOf, nearestOrder, resolveOp } from "./plasmaSpot";
+import { spreadOrder } from "./heatSpread";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
@@ -45,6 +46,7 @@ export interface PlasmaPlan {
   closed: boolean;
   lead: Pt | null;    // Einstichpunkt der Anfahrbahn (mm) – null = direkt auf der Kontur
   over: Pt[];         // Überlauf-Punkte nach dem Schließen
+  out: Pt | null;     // Ende der Ausfahrbahn im Abfall (mm) – null = keine
   area: number;
   hole: boolean;      // Innenkontur (Loch)
   size: number;       // größte Ausdehnung der Kontur in mm
@@ -75,7 +77,7 @@ function sigOf(shape: any, cut: PlasmaCut): string {
   const pts = shape.points || [];
   for (let i = 0; i < pts.length; i++) { a += pts[i].x * (i % 7 + 1); b += pts[i].y * (i % 5 + 1); }
   return [shape.type, shape.millingMode, shape.x, shape.y, shape.w, shape.h, shape.midX, shape.midY, pts.length,
-    a.toFixed(3), b.toFixed(3), cut.kerf, cut.leadIn, plasmaSettings.overcut,
+    a.toFixed(3), b.toFixed(3), cut.kerf, cut.leadIn, cut.leadOut, plasmaSettings.overcut, cut.leadOut > 0 ? plasmaSettings.smallHole : 0,
     shape.tabMode, shape.tabN, shape.tabLen, JSON.stringify(shape.tabPts || []), shape.cutStart, shape.cutDir].join("|");
 }
 
@@ -96,7 +98,7 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
     const pts = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL, y: p.y / MM_TO_PIXEL }));
 
     if (!path.closed || mode === "on-line") {
-      res.plans.push({ pts: applyCut(pts, path.closed, shape), closed: path.closed, lead: null, over: [], area: 0, hole: false, size: extent(pts), runs: null });
+      res.plans.push({ pts: applyCut(pts, path.closed, shape), closed: path.closed, lead: null, over: [], out: null, area: 0, hole: false, size: extent(pts), runs: null });
       continue;
     }
     const outside = mode === "outside";
@@ -130,13 +132,26 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
       const tr = tabRuns(shape, loop, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), (Number(shape.tabLen) || 0) + cut.kerf);
       if (tr?.rotated) lead = null;
       if (tr?.rotated && cutStartOf(shape) !== null) res.startInTab = true;
-      res.plans.push({ pts: loop, closed: true, lead, over: tr ? [] : overcutPoints(loop, plasmaSettings.overcut), area: Math.abs(polygonArea(loop)), hole: !outside, size: extent(loop), runs: tr ? tr.runs : null });
+      const over = tr ? [] : overcutPoints(loop, plasmaSettings.overcut);
+      const plan: PlasmaPlan = { pts: loop, closed: true, lead, over, out: null, area: Math.abs(polygonArea(loop)), hole: !outside, size: extent(loop), runs: tr ? tr.runs : null };
+      // Ausfahrbahn vom Ende (nach dem Überlauf) in den Abfall. Nicht mit Haltestegen (endet am Steg) und nicht bei
+      // kleinen Löchern: dort macht sie aus dem Loch eine Kerbe
+      if (cut.leadOut > 0 && !tr && !isSmallHole(plan)) plan.out = leadPoint(loopFrom(loop, over), outside, cut.leadOut);
+      res.plans.push(plan);
     }
   }
   return res;
 }
 
 const lastOf = (pts: Pt[]) => pts[pts.length - 1];
+
+/** Kontur ab dem Ende des Überlaufs: erster Punkt = dort, wo der Brenner steht */
+function loopFrom(loop: Pt[], over: Pt[]): Pt[] {
+  if (!over.length) return loop;
+  const end = lastOf(over), k = over.length; // der Überlauf hat k Punkte: k − 1 ganze Strecken und ein Stück der nächsten
+  const rest = loop.slice(k % loop.length).concat(loop.slice(0, k % loop.length));
+  return Math.hypot(rest[0].x - end.x, rest[0].y - end.y) < 1e-6 ? rest : [end, ...rest];
+}
 
 /** größte Ausdehnung (Breite oder Höhe) */
 function extent(pts: Pt[]): number {
@@ -299,6 +314,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   const thcOff = S.thc === "external" ? `M9 ${c("pgc.thcOff")}`
     : S.thc === "grblhal" ? `M62 P2 ${c("pgc.thcOff")}` : "";
   if (S.thc === "external" && S.useZ && !S.probe) warnings.push(t("pgw.thcProbe"));
+  if (S.probeSkip > 0 && S.probe && S.useZ && S.thc !== "none") warnings.push(t("pgw.probeSkipThc"));
 
   let g = "";
   g += `G21 ${c("gc.unitMm")}\n`;
@@ -319,6 +335,22 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
     pos = to;
   };
 
+  // Blechhöhe abtasten. Ist der letzte Messpunkt nah genug, gilt seine Höhe weiter (probeSkip). Aber nur, wenn seitdem keine
+  // Höhenregelung lief: die verstellt Z, ohne dass die Steuerung es weiß – dann wäre die alte Höhe falsch.
+  let probedAt: Pt | null = null, probesSaved = 0;
+  const probe = (at: Pt) => {
+    if (S.probeSkip > 0 && probedAt && Math.hypot(at.x - probedAt.x, at.y - probedAt.y) <= S.probeSkip + 1e-9) {
+      probesSaved++;
+      g += `${c("pgc.probeSkip")}\n`;
+      return;
+    }
+    // relativ ab der aktuellen Höhe – ein fester Zielwert reicht nicht, wenn Z0 weit über dem Blech liegt
+    g += `G91 G38.2 Z${n(-S.probeDist)} F${PROBE_FEED} ${c("pgc.probe")}\n`;
+    g += `G90\n`;
+    g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
+    probedAt = at;
+  };
+
   order.forEach((cut, ci) => {
     g += `\n${c("pgc.cut", { i: ci + 1, name: cut.name, f: cut.speed, k: cut.kerf })}\n`;
     const plans: PlasmaPlan[] = [];
@@ -337,17 +369,17 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
     // offene Linien zuerst, dann geschlossene von klein nach groß
     plans.sort((a, b) => (a.closed ? 1 : 0) - (b.closed ? 1 : 0) || a.area - b.area);
     // kürzeste Leerfahrten: Einstichpunkte bleiben, Löcher weiter vor ihrem Teil (siehe cutOrder.ts)
-    if (S.optimizeOrder && plans.length > 1) {
+    if ((S.optimizeOrder || S.spread) && plans.length > 1) {
       const items: CutItem[] = plans.map(p => ({
         entry: p.runs ? (p.lead || p.runs[0][0]) : (p.lead || p.pts[0]),
-        exit: p.runs ? lastOf(p.runs[p.runs.length - 1]) : p.over.length ? lastOf(p.over) : p.closed ? p.pts[0] : lastOf(p.pts),
+        exit: p.runs ? lastOf(p.runs[p.runs.length - 1]) : p.out ? p.out : p.over.length ? lastOf(p.over) : p.closed ? p.pts[0] : lastOf(p.pts),
         pts: p.pts, closed: p.closed
       }));
       const from = pos || { x: 0, y: 0 };
-      const steps = optimizeCutOrder(items, from);
+      const steps = S.spread ? spreadOrder(items, from).map(index => ({ index, reversed: false, start: 0 })) : optimizeCutOrder(items, from);
       const before = travelLength(items, items.map((_, i) => ({ index: i, reversed: false, start: 0 })), from);
       const after = travelLength(items, steps, from);
-      g += `${c("gc.orderOpt", { a: Math.round(before), b: Math.round(after) })}\n`;
+      g += `${c(S.spread ? "pgc.spread" : "gc.orderOpt", { a: Math.round(before), b: Math.round(after) })}\n`;
       plans.splice(0, plans.length, ...steps.map(st => plans[st.index]));
     }
 
@@ -357,11 +389,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
       g += `${c("pgc.spot", { n: spotted })}\n`;
       rapid(at);
       if (S.useZ) {
-        if (S.probe) {
-          g += `G91 G38.2 Z${n(-S.probeDist)} F${PROBE_FEED} ${c("pgc.probe")}\n`;
-          g += `G90\n`;
-          g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
-        }
+        if (S.probe) probe(at);
         g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;
       }
       g += `M3 S1000 ${c("pgc.torchOn")}\n`;
@@ -382,7 +410,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
         const targets: Pt[] = [];
         if (p.lead) targets.push(p.pts[0]);
         for (let i = 1; i < p.pts.length; i++) targets.push(p.pts[i]);
-        if (p.closed) { targets.push(p.pts[0]); targets.push(...p.over); }
+        if (p.closed) { targets.push(p.pts[0]); targets.push(...p.over); if (p.out) targets.push(p.out); }
         pieces.push({ start: p.lead || p.pts[0], targets });
       }
       pieces.forEach((pc, k) => {
@@ -391,19 +419,14 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
         g += `${c("pgc.pierce", { n: pierces })}${small ? " " + c("pgc.smallHole", { d: n(p.size), p: S.holeSpeed }) : ""}${k > 0 ? " " + c("gc.tab") : ""}\n`;
         rapid(start);
         if (S.useZ) {
-          if (S.probe) {
-            // relativ ab der aktuellen Höhe – ein fester Zielwert reicht nicht, wenn Z0 weit über dem Blech liegt
-            g += `G91 G38.2 Z${n(-S.probeDist)} F${PROBE_FEED} ${c("pgc.probe")}\n`;
-            g += `G90\n`;
-            g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
-          }
+          if (S.probe) probe(start);
           g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;
         }
         g += `M3 S1000 ${c("pgc.torchOn")}\n`;
         if (cut.pierceDelay > 0) g += `G4 P${n(cut.pierceDelay)} ${c("pgc.pierceDelay")}\n`;
         if (S.useZ) g += `G1 Z${n(cut.cutHeight)} F${Z_FEED} ${c("pgc.cutHeight")}\n`;
         // THC erst freigeben, wenn die Maschine auf Schneidhöhe steht (vor der ersten Bewegung)
-        if (thc) g += `${thcOn}\n`;
+        if (thc) { g += `${thcOn}\n`; probedAt = null; }
         g += `G1 F${n(small ? cut.speed * S.holeSpeed / 100 : cut.speed)}\n`;
 
         // Anti-Dive: nur grblHAL kann mitten in der Bewegung ohne Anhalten sperren
@@ -424,6 +447,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
 
   if (smallHoles) g += `${c("pgc.smallHoles", { n: smallHoles })}\n`;
   if (spotted) g += `${c("pgc.spots", { n: spotted })}\n`;
+  if (probesSaved) g += `${c("pgc.probesSaved", { n: probesSaved })}\n`;
   if (skipped) { g += `${c("pgc.skipped", { n: skipped })}\n`; warnings.push(t("pgw.skipped", { n: skipped })); }
   // nichts zu tun (alles ausgelassen): kein Programm
   if (skipped && !pierces && !spotted) return { gcode: null, warnings };
@@ -471,6 +495,16 @@ export function drawPlasmaLeads(ctx: CanvasRenderingContext2D, shapes: any[], sx
         ctx.moveTo(sx(px(p.lead.x)), sy(px(p.lead.y)));
         ctx.lineTo(sx(px(st.x)), sy(px(st.y)));
         ctx.stroke();
+      }
+      if (p.out) {
+        const e = p.over.length ? lastOf(p.over) : st;
+        ctx.strokeStyle = cut.color;
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.moveTo(sx(px(e.x)), sy(px(e.y)));
+        ctx.lineTo(sx(px(p.out.x)), sy(px(p.out.y)));
+        ctx.stroke();
+        ctx.setLineDash([]);
       }
       // Einstich: kleiner Kreis mit Kreuz
       const x = sx(px(pierce.x)), y = sy(px(pierce.y));

@@ -125,7 +125,7 @@ export function orientPts(it: CutItem, s: CutStep): Pt[] {
  * Wer muss vor wem? preds[b] = alle Konturen, die in der geschlossenen Kontur b liegen.
  * "Liegt in": Rahmen ganz innerhalb, kleinere Fläche und erster Punkt in der Kontur.
  */
-function precedence(items: CutItem[]): number[][] {
+export function precedence(items: CutItem[]): number[][] {
   const n = items.length;
   const box = items.map(it => bbox(it.pts));
   const area = items.map(it => it.closed ? Math.abs(polyArea(it.pts)) : 0);

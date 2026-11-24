@@ -42,6 +42,22 @@ export function applyFit(f: TwoPointFit, p: P): P {
 
 export type FitProblem = "" | "tooClose" | "lengthOff";
 
+/** Schiefe Platte: mehr Drehung als das ist eher ein Messfehler (Bogenmaß) */
+export const MAX_PLATE_ANGLE = (20 * Math.PI) / 180;
+
+/**
+ * Schiefe Platte ausrichten: c = Ecke unten links, e = Punkt auf der unteren Kante weiter rechts (gemessen).
+ * Die Zeichnung wird so gedreht und verschoben, dass ihr Nullpunkt auf der Ecke und ihre X-Richtung auf der Kante liegt.
+ */
+export function plateFit(c: P, e: P): TwoPointFit {
+  return twoPointFit({ x: 0, y: 0 }, { x: Math.hypot(e.x - c.x, e.y - c.y), y: 0 }, c, e);
+}
+
+export function plateProblem(f: TwoPointFit, unitsPerMm = 1): "" | "tooClose" | "angle" {
+  if (f.lengthB < MIN_MARK_DISTANCE_MM * unitsPerMm) return "tooClose";
+  return Math.abs(f.angle) > MAX_PLATE_ANGLE ? "angle" : "";
+}
+
 /** Kann man mit diesen Werten ausrichten? unitsPerMm = Einheiten der Punkte je mm (Welt-Pixel: 2) */
 export function fitProblem(f: TwoPointFit, unitsPerMm = 1): FitProblem {
   const min = MIN_MARK_DISTANCE_MM * unitsPerMm;

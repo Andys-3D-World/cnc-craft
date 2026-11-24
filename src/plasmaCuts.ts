@@ -27,6 +27,7 @@ export interface PlasmaCut {
   pierceDelay: number;  // s
   cutHeight: number;    // mm
   leadIn: number;       // Anfahrlänge in mm (0 = direkt auf der Kontur einstechen)
+  leadOut: number;      // Ausfahrlänge in mm: am Ende ins Abfallstück hinaus (0 = aus)
   material: string;     // Material (frei, z. B. "Baustahl") – nur zur Übersicht
   thickness: number;    // Blechdicke in mm (0 = keine Angabe)
   amps: number;         // Stromstärke am Gerät in A (0 = keine Angabe)
@@ -57,6 +58,8 @@ export interface PlasmaSettings {
   optimizeOrder: boolean; // Reihenfolge mit kürzesten Leerfahrten (siehe cutOrder.ts)
   spotMax: number;      // Löcher bis zu diesem Durchmesser nur ankörnen statt schneiden (0 = aus, siehe plasmaSpot.ts)
   spotTime: number;     // so lange brennt der Brenner beim Ankörnen (ms)
+  probeSkip: number;    // nicht neu abtasten, wenn der letzte Messpunkt höchstens so viele mm weg ist (0 = immer abtasten)
+  spread: boolean;      // Wärme verteilen: immer weit weg vom letzten Schnitt weiter (heatSpread.ts), hat Vorrang vor kurzen Wegen
 }
 
 export type ThcMode = "none" | "external" | "grblhal";
@@ -71,7 +74,7 @@ let cuts: PlasmaCut[] = [];
 export const plasmaSettings: PlasmaSettings = {
   safeZ: 10, useZ: true, probe: false, probeOffset: 0, probeDist: 100, overcut: 1,
   thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true, optimizeOrder: true,
-  spotMax: 0, spotTime: 100
+  spotMax: 0, spotTime: 100, probeSkip: 0, spread: false
 };
 
 export function initPlasmaCuts() {
@@ -119,6 +122,7 @@ function sanitize(x: any): PlasmaCut {
     pierceDelay: num(x.pierceDelay, 0.5, 0, 30),
     cutHeight: num(x.cutHeight, 1.5, 0, 50),
     leadIn: num(x.leadIn, 3, 0, 50),
+    leadOut: num(x.leadOut, 0, 0, 50),
     material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
     thickness: num(x.thickness, 0, 0, 200),
     amps: num(x.amps, 0, 0, 1000),
@@ -243,6 +247,8 @@ export function setPlasmaSettings(s: Partial<PlasmaSettings>, notify = true) {
   if (s.optimizeOrder !== undefined) plasmaSettings.optimizeOrder = !!s.optimizeOrder;
   if (s.spotMax !== undefined) plasmaSettings.spotMax = num(s.spotMax, plasmaSettings.spotMax, 0, 100);
   if (s.spotTime !== undefined) plasmaSettings.spotTime = num(s.spotTime, plasmaSettings.spotTime, SPOT_MS_MIN, SPOT_MS_MAX);
+  if (s.probeSkip !== undefined) plasmaSettings.probeSkip = num(s.probeSkip, plasmaSettings.probeSkip, 0, 1000);
+  if (s.spread !== undefined) plasmaSettings.spread = !!s.spread;
   if (notify) changed();
 }
 
@@ -250,7 +256,7 @@ export function mergeProjectCuts(list: any, shapes: any[]): number {
   const incoming = sanitizeList(list);
   let added = 0;
   for (const c of incoming) {
-    const same = cuts.find(x => x.name === c.name && x.speed === c.speed && x.kerf === c.kerf && x.pierceDelay === c.pierceDelay);
+    const same = cuts.find(x => x.name === c.name && x.speed === c.speed && x.kerf === c.kerf && x.pierceDelay === c.pierceDelay && x.leadOut === c.leadOut);
     let newId = c.id;
     if (same) newId = same.id;
     else {
@@ -328,6 +334,7 @@ export function openCutDialog(cut: PlasmaCut | null, onDone?: (c: PlasmaCut | nu
       ${row("plasma.pierceDelay", "pc-pd", src.pierceDelay, "0.1", "s")}
       ${row("plasma.cutHeight", "pc-ch", src.cutHeight, "0.1", "mm")}
       ${row("plasma.leadIn", "pc-lead", src.leadIn, "0.5", "mm")}
+      ${row("plasma.leadOut", "pc-leadout", src.leadOut, "0.5", "mm")}
       <div class="dlg-hint">${t("plasma.dlgHint")}</div>
       <div class="dlg-buttons">
         ${!isNew && cuts.length > 1 ? `<button id="pc-del" class="btn-secondary dlg-danger">🗑</button>` : ""}
@@ -367,7 +374,8 @@ export function openCutDialog(cut: PlasmaCut | null, onDone?: (c: PlasmaCut | nu
       pierceHeight: parseFloat(q("pc-ph").value),
       pierceDelay: parseFloat(q("pc-pd").value),
       cutHeight: parseFloat(q("pc-ch").value),
-      leadIn: parseFloat(q("pc-lead").value)
+      leadIn: parseFloat(q("pc-lead").value),
+      leadOut: parseFloat(q("pc-leadout").value)
     };
     if (cut) { updateCut(cut.id, data); close(getCut(cut.id)); }
     else close(addCut(data));

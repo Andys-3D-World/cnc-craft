@@ -204,7 +204,7 @@ function mountEditor(root: HTMLElement, cut: PlasmaCut | null) {
   const used = new Set(getCuts().map(c => c.color));
   const src: PlasmaCut = cut ? { ...cut } : {
     id: "", name: "", color: LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[0],
-    speed: 1500, kerf: 1.5, pierceHeight: 3.8, pierceDelay: 0.5, cutHeight: 1.5, leadIn: 3,
+    speed: 1500, kerf: 1.5, pierceHeight: 3.8, pierceDelay: 0.5, cutHeight: 1.5, leadIn: 3, leadOut: 0,
     material: "", thickness: 0, amps: 0, notes: ""
   };
   const num = (key: string, id: string, value: number, step: string, unit: string, tipKey = "") => `
@@ -233,6 +233,7 @@ function mountEditor(root: HTMLElement, cut: PlasmaCut | null) {
             ${num("laser.speed", "speed", src.speed, "100", "mm/min")}
             ${num("plasma.kerf", "kerf", src.kerf, "0.1", "mm", "plib.kerfTip")}
             ${num("plasma.leadIn", "lead", src.leadIn, "0.5", "mm", "plib.leadTip")}
+            ${num("plasma.leadOut", "leadout", src.leadOut, "0.5", "mm", "plasma.leadOutTip")}
           </fieldset>
           <fieldset><legend>${esc(t("plib.heights"))}</legend>
             ${num("plasma.pierceHeight", "ph", src.pierceHeight, "0.1", "mm", "plib.phTip")}
@@ -277,7 +278,7 @@ function mountEditor(root: HTMLElement, cut: PlasmaCut | null) {
     if (!(val("speed") > 0)) { q("speed").focus(); q("speed").classList.add("dlg-invalid"); return; }
     const data: Partial<PlasmaCut> = {
       name, color,
-      speed: val("speed"), kerf: val("kerf"), leadIn: val("lead"),
+      speed: val("speed"), kerf: val("kerf"), leadIn: val("lead"), leadOut: val("leadout"),
       pierceHeight: val("ph"), pierceDelay: val("pd"), cutHeight: val("ch"),
       material: q("material").value.trim(), thickness: val("thick") || 0, amps: val("amps") || 0,
       notes: q<HTMLTextAreaElement>("notes").value
