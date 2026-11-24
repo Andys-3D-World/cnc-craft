@@ -1,10 +1,13 @@
 /**
  * KNOTEN-EDITOR: Abläufe zusammenstecken statt Schritt für Schritt klicken
  *
- *  links:  Liste der Knoten (anklicken oder aufs Feld ziehen)
- *  Mitte:  Feld mit Knoten und Leitungen – Ausgang (rechts am Knoten) auf Eingang (links) ziehen.
- *          Leeres Feld ziehen / rechte Maustaste = verschieben, Rad = Zoom, Entf = Knoten löschen,
- *          Leitung anklicken = entfernen, Eingang wegziehen = Leitung lösen
+ *  links:  Liste der Knoten mit Suchfeld. Anklicken hängt den Knoten gleich hinter den gewählten Knoten
+ *          (passt er nicht, kommt er lose aufs Feld); aufs Feld ziehen geht auch.
+ *  Mitte:  Feld mit Knoten und Leitungen – Ausgang (rechts am Knoten) auf Eingang (links) ziehen; beim Ziehen
+ *          leuchten die passenden Anschlüsse. Leitung auf einem Knoten loslassen = erster passender Eingang,
+ *          im Leeren loslassen = Liste der passenden Knoten. Doppelklick / Rechtsklick ins Leere = Knoten suchen.
+ *          Leeres Feld ziehen = verschieben, Rad = Zoom, Entf = Knoten löschen, Leitung anklicken = entfernen,
+ *          Eingang wegziehen = Leitung lösen, Strg+Z / Strg+Y = Rückgängig / Wiederholen, Strg+D = Knoten doppeln
  *  rechts: Einstellungen des gewählten Knotens + große Vorschau
  *  „Aufs Bett“ legt das Ergebnis aller Ausgabe-Knoten auf das Bett (ersetzt das vorige Ergebnis).
  *
@@ -12,10 +15,11 @@
  */
 import { t } from "../i18n/i18n";
 import {
-  Graph, GraphNode, NodeDef, NodeResult, ParamDef, PortType, allNodeDefs, connect, createNode, evaluate, nodeDef,
-  nodeInputs, removeNode
+  Graph, GraphNode, GraphHistory, NodeDef, NodeResult, ParamDef, PortType, MAX_TEXT, allNodeDefs, attachAfter, attachBefore,
+  cloneNode, connect, createNode, downstream, evaluate, fittingInput, makesCycle, missingInputs, nodeDef, nodeInputs, removeNode
 } from "./graph";
 import { registerAllNodes, NODE_CATS, fresh } from "./nodeDefs";
+import { preloadNodeData } from "./moreNodes";
 import { currentGraph, rememberGraph } from "./graphStore";
 import { openRecipePanel, closeRecipePanel } from "./recipePanel";
 import { app } from "../editor/editorState";
@@ -35,6 +39,13 @@ const plain = (s: string) => s.replace(/^\[[^\]]*\]\s*/, "");
 
 const cache = new Map<string, NodeResult>();
 
+/** Beschriftung einer Einstellung (eigener Schlüssel oder "ng.p.<key>") */
+const paramLabel = (p: ParamDef) => t(p.label || "ng.p." + p.key);
+/** Suchtext eines Knotens: Name + Beschreibung, klein geschrieben */
+const searchText = (d: NodeDef) => (t("ng.n." + d.type) + " " + t("ng.d." + d.type)).toLowerCase();
+/** Abstand, in dem ein neuer Knoten neben seinen Vorgänger gesetzt wird */
+const NODE_STEP = 260;
+
 export function openNodeEditor(log: (s: string) => void) {
   registerAllNodes();
   const g = currentGraph();
@@ -48,6 +59,8 @@ export function openNodeEditor(log: (s: string) => void) {
       <div class="ng-top">
         <h3>🔗 ${t("ng.title")}</h3>
         <span class="dlg-hint ng-help">${t("ng.hint")}</span>
+        <button id="ng-undo" class="btn-secondary" title="${t("ng.ui.undo")}" aria-label="${t("ng.ui.undo")}">↶</button>
+        <button id="ng-redo" class="btn-secondary" title="${t("ng.ui.redo")}" aria-label="${t("ng.ui.redo")}">↷</button>
         <button id="ng-fit" class="btn-secondary" title="${t("ng.fit")}">⤢</button>
         <button id="ng-tpl-btn" class="btn-secondary">📚 ${t("ng.tpl.title")}</button>
         <button id="ng-clear" class="btn-secondary">${t("ng.clear")}</button>
@@ -56,13 +69,20 @@ export function openNodeEditor(log: (s: string) => void) {
       </div>
       <div class="ng-main">
         <div class="ng-pal">
-          ${NODE_CATS.map(c => `<div class="ng-cat">${t("ng.cat." + c)}</div>
-            ${defsByCat(c).map(d => `<button class="ng-add" draggable="true" data-type="${d.type}" title="${t("ng.d." + d.type)}"><span>${d.icon}</span>${t("ng.n." + d.type)}</button>`).join("")}`).join("")}
+          <input type="search" class="prop-input ng-search" placeholder="${t("ng.ui.search")}" aria-label="${t("ng.ui.search")}">
+          <div class="dlg-hint ng-pal-tip">${t("ng.ui.palTip")}</div>
+          ${NODE_CATS.map(c => `<div class="ng-cat" data-cat="${c}">${t("ng.cat." + c)}</div>
+            ${defsByCat(c).map(d => `<button class="ng-add" draggable="true" data-type="${d.type}" data-cat="${c}" title="${t("ng.d." + d.type)}"><span>${d.icon}</span>${t("ng.n." + d.type)}</button>`).join("")}`).join("")}
+          <div class="dlg-hint ng-none" hidden>${t("ng.ui.noHit")}</div>
         </div>
         <div class="ng-view" tabindex="0">
           <div class="ng-world">
             <svg class="ng-wires" width="1" height="1"></svg>
             <div class="ng-nodes"></div>
+          </div>
+          <div class="ng-legend">
+            ${(["shapes", "image", "number"] as PortType[]).map(ty => `<span><i style="--pc:${PORT_COLOR[ty]}"></i>${t("ng.ui.type." + ty)}</span>`).join("")}
+            <span class="ng-legend-tip">${t("ng.ui.legendTip")}</span>
           </div>
         </div>
         <div class="ng-side"></div>
@@ -77,6 +97,11 @@ export function openNodeEditor(log: (s: string) => void) {
   let selected: string | null = g.nodes[0]?.id || null;
   let results = new Map<string, NodeResult>();
   let evalId = 0, evalTimer = 0;
+  const hist = new GraphHistory();
+  const undoBtn = q<HTMLButtonElement>("#ng-undo"), redoBtn = q<HTMLButtonElement>("#ng-redo");
+  /** Vor jeder Änderung aufrufen (gleicher tag kurz hintereinander = ein Schritt, z. B. Tippen in einem Feld) */
+  const mark = (tag = "") => { hist.mark(g, tag); syncUndo(); };
+  const syncUndo = () => { undoBtn.disabled = !hist.canUndo(); redoBtn.disabled = !hist.canRedo(); };
 
   // -------------------------------------------------------------------
   // Darstellung
@@ -84,14 +109,18 @@ export function openNodeEditor(log: (s: string) => void) {
 
   const applyCam = () => { world.style.transform = `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`; };
 
-  const portLabel = (d: NodeDef, name: string) => d.inputs.some(p => p.name === name) || d.outputs.some(p => p.name === name)
-    ? t("ng.port." + name) : t("ng.p." + name);
+  const portLabel = (d: NodeDef, name: string) => {
+    if (d.inputs.some(p => p.name === name) || d.outputs.some(p => p.name === name)) return t("ng.port." + name);
+    const p = d.params.find(x => x.key === name);
+    return p ? paramLabel(p) : name;
+  };
+  const pinTip = (ty: PortType, dir: "in" | "out") => t(dir === "in" ? "ng.ui.pinIn" : "ng.ui.pinOut", { type: t("ng.ui.type." + ty) });
 
   function nodeHtml(n: GraphNode): string {
     const d = nodeDef(n.type)!;
-    const ins = nodeInputs(d).map(p => `<div class="ng-pin in" data-node="${n.id}" data-port="${p.name}" data-type="${p.type}">
+    const ins = nodeInputs(d).map(p => `<div class="ng-pin in" data-node="${n.id}" data-port="${p.name}" data-type="${p.type}" title="${pinTip(p.type, "in")}">
         <i style="--pc:${PORT_COLOR[p.type]}"></i><span>${portLabel(d, p.name)}</span></div>`).join("");
-    const outs = d.outputs.map(p => `<div class="ng-pin out" data-node="${n.id}" data-port="${p.name}" data-type="${p.type}">
+    const outs = d.outputs.map(p => `<div class="ng-pin out" data-node="${n.id}" data-port="${p.name}" data-type="${p.type}" title="${pinTip(p.type, "out")}">
         <span>${portLabel(d, p.name)}</span><i style="--pc:${PORT_COLOR[p.type]}"></i></div>`).join("");
     return `<div class="ng-node${n.id === selected ? " sel" : ""} ng-c-${d.cat}" data-id="${n.id}" style="left:${n.x}px;top:${n.y}px;">
       <div class="ng-head"><span>${d.icon} ${t("ng.n." + n.type)}</span><button class="ng-del" title="${t("ng.del")}" aria-label="${t("ng.del")}">✕</button></div>
@@ -144,9 +173,9 @@ export function openNodeEditor(log: (s: string) => void) {
     const ctx = cv.getContext("2d")!;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-    if (typeof value === "number") {
+    if (typeof value === "string") {
       ctx.fillStyle = "#69db7c"; ctx.font = "600 22px system-ui, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      ctx.fillText(String(+value.toFixed(3)), W / 2, H / 2);
+      ctx.fillText(value, W / 2, H / 2);
       return;
     }
     const all = [...(image ? [image] : []), ...shapes];
@@ -175,7 +204,9 @@ export function openNodeEditor(log: (s: string) => void) {
     const o = r?.out || {};
     const shapes: any[] = Object.values(o).filter(Array.isArray).flat();
     const image = Object.values(o).find((v: any) => v && v.type === "image") || null;
-    const value = Object.values(o).find(v => typeof v === "number");
+    // Zahlen-Knoten: alle Zahlen nebeneinander (z. B. Breite × Höhe)
+    const nums = Object.values(o).filter(v => typeof v === "number") as number[];
+    const value = nums.length ? nums.map(v => String(+v.toFixed(3))).join(" × ") : undefined;
     return { shapes, image, value };
   }
 
@@ -184,6 +215,8 @@ export function openNodeEditor(log: (s: string) => void) {
     if (!r) return { text: "…", cls: "" };
     if (r.error) return { text: "⚠ " + t("ng.error", { e: r.error }), cls: "err" };
     if (r.warn) return { text: "⚠ " + plain(t(r.warn.key, r.warn.vars)), cls: "warn" };
+    const miss = missingInputs(g, n);
+    if (miss.length) return { text: "⚠ " + t("ng.ui.connect", { port: miss.map(m => t("ng.port." + m)).join(", ") }), cls: "warn" };
     const s = shown(n);
     const bits: string[] = [];
     if (s.image) { const m = imageSizeMm(s.image); bits.push(t("ng.imgInfo", { w: m.w.toFixed(0), h: m.h.toFixed(0) })); }
@@ -218,14 +251,15 @@ export function openNodeEditor(log: (s: string) => void) {
   const linked = (n: GraphNode, key: string) => g.links.some(l => l.to === n.id && l.inp === key);
 
   function paramHtml(n: GraphNode, p: ParamDef): string {
-    const label = `<span>${t("ng.p." + p.key)}</span>`;
+    const label = `<span>${paramLabel(p)}</span>`;
     const v = n.params[p.key];
     if (p.kind === "button") {
       const cnt = Array.isArray(n.params.shapes) ? n.params.shapes.length : 0;
       return `<button class="btn-secondary ng-take" data-key="${p.key}">📥 ${t("ng.take")}</button>
         <div class="dlg-hint">${cnt ? t("ng.taken", { n: cnt }) : t("ng.takeNone")}</div>`;
     }
-    if (p.kind === "check") return `<label class="eng-ck"><input type="checkbox" data-key="${p.key}" ${v ? "checked" : ""}> ${t("ng.p." + p.key)}</label>`;
+    if (p.kind === "check") return `<label class="eng-ck"><input type="checkbox" data-key="${p.key}" ${v ? "checked" : ""}> ${paramLabel(p)}</label>`;
+    if (p.kind === "text") return `<label class="ng-col">${label}<textarea class="prop-input ng-text" data-key="${p.key}" rows="2" maxlength="${MAX_TEXT}">${esc(String(v ?? ""))}</textarea></label>`;
     if (p.kind === "select") {
       const opts = typeof p.options === "function" ? p.options() : (p.options || []).map(o => ({ value: o, label: t(`ng.p.${p.key}.${o}`) }));
       return `<label class="ng-row">${label}<select class="prop-input" data-key="${p.key}">
@@ -249,15 +283,22 @@ export function openNodeEditor(log: (s: string) => void) {
       <div class="dlg-hint">${t("ng.d." + n.type)}</div>
       ${ps.map(p => paramHtml(n, p)).join("")}
       <canvas class="ng-big"></canvas>`;
-    side.querySelectorAll<HTMLInputElement | HTMLSelectElement>("[data-key]").forEach(el => {
+    side.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>("[data-key]").forEach(el => {
       if (el instanceof HTMLButtonElement) return;
-      el.addEventListener(el instanceof HTMLInputElement && el.type === "number" ? "input" : "change", () => {
+      const typing = el instanceof HTMLTextAreaElement || (el instanceof HTMLInputElement && el.type === "number");
+      el.addEventListener(typing ? "input" : "change", () => {
         const p = d.params.find(x => x.key === el.dataset.key)!;
         if (p.kind === "number") {
           const v = parseFloat(el.value);
           if (!Number.isFinite(v)) return;
+          mark(`p:${n.id}:${p.key}`);
           n.params[p.key] = Math.min(p.max ?? Infinity, Math.max(p.min ?? -Infinity, v));
-        } else if (p.kind === "check") n.params[p.key] = (el as HTMLInputElement).checked;
+          changed();
+          return;
+        }
+        mark(`p:${n.id}:${p.key}`);
+        if (p.kind === "text") n.params[p.key] = el.value.slice(0, MAX_TEXT);
+        else if (p.kind === "check") n.params[p.key] = (el as HTMLInputElement).checked;
         else n.params[p.key] = el.value;
         // Einstellungen, die andere ein-/ausblenden (z. B. Verfahren → Zellgröße)
         if (p.kind === "select" && d.params.some(x => x.when)) renderSide();
@@ -267,6 +308,7 @@ export function openNodeEditor(log: (s: string) => void) {
     side.querySelector<HTMLButtonElement>(".ng-take")?.addEventListener("click", () => {
       const sel = selectedShapes().filter((s: any) => !s.ngOut);
       if (!sel.length) { log(t("ng.takeNone")); return; }
+      mark();
       n.params.shapes = fresh(sel).map((c, i) => ({ ...c, id: sel[i].id }));
       renderSide();
       changed();
@@ -347,7 +389,7 @@ export function openNodeEditor(log: (s: string) => void) {
   }
 
   // -------------------------------------------------------------------
-  // Maus
+  // Knoten anlegen, löschen, wählen
   // -------------------------------------------------------------------
 
   const toWorld = (cx: number, cy: number) => {
@@ -355,24 +397,93 @@ export function openNodeEditor(log: (s: string) => void) {
     return { x: (cx - v.left - cam.x) / cam.z, y: (cy - v.top - cam.y) / cam.z };
   };
 
-  function addNode(type: string, x?: number, y?: number) {
-    let px = x, py = y;
-    if (px === undefined || py === undefined) {
+  const nodeEl = (id: string) => nodesEl.querySelector<HTMLElement>(`.ng-node[data-id="${id}"]`);
+  const heightOf = (n: GraphNode) => nodeEl(n.id)?.offsetHeight || 220;
+
+  /** Liegt an dieser Stelle schon ein Knoten, weiter nach unten rücken */
+  function freeSpot(n: GraphNode) {
+    for (let k = 0; k < 40; k++) {
+      const hit = g.nodes.find(o => o.id !== n.id && Math.abs(o.x - n.x) < 210 && n.y < o.y + heightOf(o) + 10 && n.y + 200 > o.y);
+      if (!hit) return;
+      n.y = hit.y + heightOf(hit) + 20;
+    }
+  }
+
+  type Wire = { node: string; port: string; dir: "in" | "out"; type: PortType };
+
+  /** Leitung vom losen Ende an den neuen Knoten: erster passender Ein- bzw. Ausgang */
+  function wireTo(w: Wire, id: string): boolean {
+    if (w.dir === "out") {
+      const inp = fittingInput(g, w.node, w.port, id);
+      return !!inp && connect(g, w.node, w.port, id, inp);
+    }
+    const d = nodeDef(g.nodes.find(n => n.id === id)?.type || "");
+    const out = d?.outputs.find(p => p.type === w.type);
+    return !!out && connect(g, id, out.name, w.node, w.port);
+  }
+
+  /**
+   * Neuer Knoten. Mit x/y: genau dort (lose, oder an der Leitung `wire`).
+   * Ohne: hinter den gewählten Knoten gehängt, wenn er passt – sonst lose in die Mitte des Felds.
+   */
+  function addNode(type: string, x?: number, y?: number, wire?: Wire): GraphNode | null {
+    if (!nodeDef(type)) return null;
+    mark();
+    const n = createNode(type, 0, 0)!;
+    g.nodes.push(n);
+    const sel = g.nodes.find(k => k.id === selected);
+    let placed = false;
+    if (x !== undefined && y !== undefined) {
+      n.x = Math.round(x); n.y = Math.round(y);
+      if (wire) wireTo(wire, n.id);
+      placed = true;
+    } else if (sel) {
+      const res = attachAfter(g, sel.id, n);
+      if (res) {
+        n.x = sel.x + NODE_STEP; n.y = sel.y;
+        const m = res.moved ? g.nodes.find(k => k.id === res.moved) : null;
+        // dazwischen gesetzt: alles dahinter rückt nach rechts
+        if (m && m.x < n.x + NODE_STEP - 10) {
+          const dx = n.x + NODE_STEP - m.x;
+          for (const id of downstream(g, m.id)) { const k = g.nodes.find(o => o.id === id); if (k && k !== n) k.x += dx; }
+        }
+        placed = true;
+      } else if (attachBefore(g, sel.id, n)) {
+        n.x = sel.x - NODE_STEP; n.y = sel.y;
+        placed = true;
+      }
+      if (placed) freeSpot(n);
+    }
+    if (!placed) {
       const v = view.getBoundingClientRect();
       const c = toWorld(v.left + v.width / 2, v.top + v.height / 3);
-      px = c.x - 90 + (g.nodes.length % 5) * 14; py = c.y + (g.nodes.length % 5) * 14;
+      n.x = Math.round(c.x - 90 + (g.nodes.length % 5) * 14); n.y = Math.round(c.y + (g.nodes.length % 5) * 14);
     }
-    const n = createNode(type, Math.round(px), Math.round(py));
-    if (!n) return;
-    g.nodes.push(n);
     selected = n.id;
+    changed(true);
+    renderSide();
+    // liegt der neue Knoten außerhalb des sichtbaren Felds: alles zeigen
+    const r = nodeEl(n.id)?.getBoundingClientRect(), v = view.getBoundingClientRect();
+    if (r && (r.left < v.left || r.right > v.right || r.top < v.top || r.bottom > v.bottom)) { fit(); renderWires(); }
+    return n;
+  }
+
+  function deleteNode(id: string) {
+    mark();
+    removeNode(g, id);
+    if (selected === id) selected = null;
     changed(true);
     renderSide();
   }
 
-  function deleteNode(id: string) {
-    removeNode(g, id);
-    if (selected === id) selected = null;
+  function duplicateNode(id: string) {
+    const n = g.nodes.find(k => k.id === id);
+    if (!n) return;
+    mark();
+    const c = cloneNode(n);
+    g.nodes.push(c);
+    freeSpot(c);
+    selected = c.id;
     changed(true);
     renderSide();
   }
@@ -383,6 +494,38 @@ export function openNodeEditor(log: (s: string) => void) {
     nodesEl.querySelectorAll(".ng-node").forEach(el => el.classList.toggle("sel", (el as HTMLElement).dataset.id === id));
     renderSide();
   }
+
+  function undoRedo(redo: boolean) {
+    if (!(redo ? hist.redo(g) : hist.undo(g))) return;
+    if (!g.nodes.some(n => n.id === selected)) selected = null;
+    syncUndo();
+    changed(true);
+    renderSide();
+  }
+
+  // -------------------------------------------------------------------
+  // Knoten-Liste links: Suche, Anklicken, Ziehen
+  // -------------------------------------------------------------------
+
+  const search = q<HTMLInputElement>(".ng-search");
+  const matches = (d: NodeDef, text: string) => text.trim().toLowerCase().split(/\s+/).filter(Boolean).every(w => searchText(d).includes(w));
+  function filterPalette() {
+    const cats = new Set<string>();
+    ov.querySelectorAll<HTMLElement>(".ng-add").forEach(b => {
+      const hit = matches(nodeDef(b.dataset.type!)!, search.value);
+      b.hidden = !hit;
+      if (hit) cats.add(b.dataset.cat!);
+    });
+    ov.querySelectorAll<HTMLElement>(".ng-cat").forEach(c => { c.hidden = !cats.has(c.dataset.cat!); });
+    q(".ng-none").hidden = cats.size > 0;
+    q(".ng-pal-tip").hidden = !!search.value.trim();
+  }
+  search.addEventListener("input", filterPalette);
+  search.addEventListener("keydown", e => {
+    if (e.key !== "Enter") return;
+    const first = [...ov.querySelectorAll<HTMLElement>(".ng-add")].find(b => !b.hidden);
+    if (first) { addNode(first.dataset.type!); search.select(); }
+  });
 
   ov.querySelectorAll<HTMLButtonElement>(".ng-add").forEach(b => {
     b.addEventListener("click", () => addNode(b.dataset.type!));
@@ -397,14 +540,97 @@ export function openNodeEditor(log: (s: string) => void) {
     addNode(type, p.x - 90, p.y - 14);
   });
 
+  // -------------------------------------------------------------------
+  // Schnell-Liste auf dem Feld: Doppelklick / Rechtsklick ins Leere, oder eine Leitung im Leeren loslassen
+  // -------------------------------------------------------------------
+
+  let quick: HTMLElement | null = null;
+  function closeQuick(): boolean {
+    const was = !!quick;
+    quick?.remove();
+    quick = null;
+    return was;
+  }
+
+  function openQuick(cx: number, cy: number, wire?: Wire) {
+    closeQuick();
+    const at = toWorld(cx, cy);
+    const fits = (d: NodeDef) => !wire || (wire.dir === "out" ? nodeInputs(d).some(p => p.type === wire.type) : d.outputs.some(p => p.type === wire.type));
+    const all = NODE_CATS.flatMap(c => allNodeDefs().filter(d => d.cat === c && fits(d)));
+    const el = document.createElement("div");
+    el.className = "ng-quick";
+    el.innerHTML = `<input type="search" class="prop-input" placeholder="${t("ng.ui.search")}" aria-label="${t("ng.ui.search")}">
+      ${wire ? `<div class="dlg-hint">${t("ng.ui.quickFor", { type: t("ng.ui.type." + wire.type) })}</div>` : ""}
+      <div class="ng-quick-list"></div>`;
+    const v = view.getBoundingClientRect();
+    el.style.left = Math.max(4, Math.min(v.width - 264, cx - v.left)) + "px";
+    el.style.top = Math.max(4, Math.min(v.height - 330, cy - v.top)) + "px";
+    view.appendChild(el);
+    quick = el;
+    const input = el.querySelector("input")!, list = el.querySelector<HTMLElement>(".ng-quick-list")!;
+    let hits: NodeDef[] = [], active = 0;
+    const choose = (d: NodeDef | undefined) => {
+      if (!d) return;
+      closeQuick();
+      // an einer Leitung zum Eingang: der neue Knoten liegt links vom losen Ende
+      addNode(d.type, at.x - (wire?.dir === "in" ? 200 : 0), at.y - 40, wire);
+      view.focus({ preventScroll: true });
+    };
+    const render = () => {
+      hits = all.filter(d => matches(d, input.value));
+      active = Math.min(active, Math.max(0, hits.length - 1));
+      list.innerHTML = hits.length ? hits.map((d, i) => `<button class="ng-quick-item${i === active ? " on" : ""}" data-i="${i}">
+        <span>${d.icon}</span><div><b>${t("ng.n." + d.type)}</b><small>${t("ng.d." + d.type)}</small></div></button>`).join("")
+        : `<div class="dlg-hint">${t("ng.ui.noHit")}</div>`;
+      list.querySelector(".on")?.scrollIntoView({ block: "nearest" });
+    };
+    input.addEventListener("input", () => { active = 0; render(); });
+    input.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        active = (active + (e.key === "ArrowDown" ? 1 : hits.length - 1)) % Math.max(1, hits.length);
+        render();
+      } else if (e.key === "Enter") { e.preventDefault(); choose(hits[active]); }
+    });
+    list.addEventListener("click", e => {
+      const b = (e.target as HTMLElement).closest<HTMLElement>(".ng-quick-item");
+      if (b) choose(hits[+b.dataset.i!]);
+    });
+    render();
+    input.focus({ preventScroll: true });
+  }
+
+  // -------------------------------------------------------------------
+  // Maus auf dem Feld
+  // -------------------------------------------------------------------
+
   type Drag =
-    | { kind: "pan"; sx: number; sy: number; cx: number; cy: number }
-    | { kind: "node"; node: GraphNode; dx: number; dy: number; el: HTMLElement }
-    | { kind: "wire"; node: string; port: string; dir: "in" | "out"; type: PortType };
+    | { kind: "pan"; sx: number; sy: number; cx: number; cy: number; moved: boolean }
+    | { kind: "node"; node: GraphNode; dx: number; dy: number; el: HTMLElement; marked: boolean }
+    | ({ kind: "wire" } & Wire);
   let drag: Drag | null = null;
+  /** wurde das Feld mit der rechten Taste gerade verschoben? Dann kein Menü */
+  let panned = false;
+
+  /** Beim Ziehen einer Leitung: passende Anschlüsse hervorheben, die anderen abblenden */
+  function markPins(w: Wire | null) {
+    view.classList.toggle("ng-wiring", !!w);
+    nodesEl.querySelectorAll<HTMLElement>(".ng-pin").forEach(pin => {
+      let ok = false;
+      if (w) {
+        const dir = pin.classList.contains("in") ? "in" : "out", other = pin.dataset.node!;
+        ok = dir !== w.dir && pin.dataset.type === w.type && other !== w.node
+          && !(w.dir === "out" ? makesCycle(g, w.node, other) : makesCycle(g, other, w.node));
+      }
+      pin.classList.toggle("ok", ok);
+    });
+  }
 
   view.addEventListener("mousedown", e => {
     const tgt = e.target as HTMLElement;
+    if (tgt.closest(".ng-quick")) return;
+    closeQuick();
+    if (tgt.closest(".ng-legend")) return;
     view.focus({ preventScroll: true });
     if (tgt.closest(".ng-del")) return;
     const pin = tgt.closest<HTMLElement>(".ng-pin");
@@ -416,6 +642,7 @@ export function openNodeEditor(log: (s: string) => void) {
         // Eingang mit Leitung: Leitung lösen und am anderen Ende weiterziehen
         const l = g.links.find(x => x.to === node && x.inp === port);
         if (l) {
+          mark();
           g.links = g.links.filter(x => x !== l);
           node = l.from; port = l.out; dir = "out";
           changed();
@@ -423,24 +650,26 @@ export function openNodeEditor(log: (s: string) => void) {
         }
       }
       drag = { kind: "wire", node, port, dir, type };
+      markPins(drag);
       const a = pinPos(node, port, dir)!;
       temp = dir === "out" ? { from: a, to: toWorld(e.clientX, e.clientY), type } : { from: toWorld(e.clientX, e.clientY), to: a, type };
       renderWires();
       return;
     }
-    const nodeEl = tgt.closest<HTMLElement>(".ng-node");
-    if (nodeEl && e.button === 0) {
-      const n = g.nodes.find(x => x.id === nodeEl.dataset.id)!;
+    const el = tgt.closest<HTMLElement>(".ng-node");
+    if (el && e.button === 0) {
+      const n = g.nodes.find(x => x.id === el.dataset.id)!;
       select(n.id);
       if (tgt.closest(".ng-head")) {
         e.preventDefault();
         const p = toWorld(e.clientX, e.clientY);
-        drag = { kind: "node", node: n, dx: p.x - n.x, dy: p.y - n.y, el: nodeEl };
+        drag = { kind: "node", node: n, dx: p.x - n.x, dy: p.y - n.y, el: nodeEl(n.id) || el, marked: false };
       }
       return;
     }
     const wire = tgt.closest<SVGPathElement>(".ng-wire-hit");
     if (wire && e.button === 0) {
+      mark();
       g.links.splice(+wire.dataset.link!, 1);
       changed();
       renderWires();
@@ -448,18 +677,29 @@ export function openNodeEditor(log: (s: string) => void) {
       return;
     }
     e.preventDefault();
-    if (e.button === 0 && !nodeEl) select(null);
-    drag = { kind: "pan", sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y };
+    if (e.button === 0 && !el) select(null);
+    panned = false;
+    drag = { kind: "pan", sx: e.clientX, sy: e.clientY, cx: cam.x, cy: cam.y, moved: false };
     view.style.cursor = "grabbing";
   });
-  view.addEventListener("contextmenu", e => e.preventDefault());
+  const emptySpot = (e: MouseEvent) => !(e.target as HTMLElement).closest(".ng-node, .ng-wire-hit, .ng-quick, .ng-legend");
+  view.addEventListener("contextmenu", e => {
+    e.preventDefault();
+    if (!emptySpot(e) || panned) return;
+    drag = null;
+    view.style.cursor = "";
+    openQuick(e.clientX, e.clientY);
+  });
+  view.addEventListener("dblclick", e => { if (emptySpot(e)) openQuick(e.clientX, e.clientY); });
 
   const onMove = (e: MouseEvent) => {
     if (!drag) return;
     if (drag.kind === "pan") {
+      if (Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 4) { drag.moved = true; panned = true; }
       cam.x = drag.cx + e.clientX - drag.sx; cam.y = drag.cy + e.clientY - drag.sy;
       applyCam();
     } else if (drag.kind === "node") {
+      if (!drag.marked) { mark(); drag.marked = true; }
       const p = toWorld(e.clientX, e.clientY);
       drag.node.x = Math.round(p.x - drag.dx); drag.node.y = Math.round(p.y - drag.dy);
       drag.el.style.left = drag.node.x + "px"; drag.el.style.top = drag.node.y + "px";
@@ -478,20 +718,40 @@ export function openNodeEditor(log: (s: string) => void) {
     if (d.kind === "node") { rememberGraph(); return; }
     if (d.kind === "wire") {
       temp = null;
-      const pin = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>(".ng-pin");
+      markPins(null);
+      const under = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const pin = under?.closest<HTMLElement>(".ng-pin"), onNode = under?.closest<HTMLElement>(".ng-node");
       if (pin && ov.contains(pin)) {
         const dir2 = pin.classList.contains("in") ? "in" : "out";
+        const before = JSON.stringify(g.links);
         const ok = d.dir === "out" && dir2 === "in" ? connect(g, d.node, d.port, pin.dataset.node!, pin.dataset.port!)
           : d.dir === "in" && dir2 === "out" ? connect(g, pin.dataset.node!, pin.dataset.port!, d.node, d.port) : false;
-        if (ok) { changed(); renderSide(); }
+        if (ok) wired(before);
+      } else if (onNode && ov.contains(onNode) && onNode.dataset.id !== d.node) {
+        // auf dem Knoten losgelassen: erster passender Anschluss
+        const before = JSON.stringify(g.links);
+        if (wireTo(d, onNode.dataset.id!)) wired(before);
+      } else if (under && view.contains(under) && !under.closest(".ng-legend")) {
+        // im Leeren losgelassen: Knoten vorschlagen, die an diese Leitung passen
+        openQuick(e.clientX, e.clientY, d);
       }
       renderWires();
     }
   };
+  /** Nach einer neuen Leitung: Stand davor für „Rückgängig“ merken, neu rechnen */
+  function wired(before: string) {
+    const now = g.links;
+    g.links = JSON.parse(before);
+    mark();
+    g.links = now;
+    changed();
+    renderSide();
+  }
   window.addEventListener("mousemove", onMove);
   window.addEventListener("mouseup", onUp);
 
   view.addEventListener("wheel", e => {
+    if ((e.target as HTMLElement).closest(".ng-quick")) return;
     e.preventDefault();
     const v = view.getBoundingClientRect();
     const mx = e.clientX - v.left, my = e.clientY - v.top;
@@ -525,8 +785,11 @@ export function openNodeEditor(log: (s: string) => void) {
 
   q("#ng-apply").onclick = () => { apply(); };
   q("#ng-fit").onclick = fit;
+  undoBtn.onclick = () => undoRedo(false);
+  redoBtn.onclick = () => undoRedo(true);
   q("#ng-clear").onclick = () => {
-    if (!window.confirm(t("ng.clearConfirm"))) return;
+    if (!g.nodes.length || !window.confirm(t("ng.clearConfirm"))) return;
+    mark();
     g.nodes = []; g.links = [];
     selected = null;
     changed(true);
@@ -539,6 +802,7 @@ export function openNodeEditor(log: (s: string) => void) {
     if (!empty && !window.confirm(t("ng.tpl.confirmLoad", { name }))) return;
     // übernommene Formen der jetzigen Quellen bleiben erhalten (Vorlage auf das gleiche Motiv anwenden)
     const taken = g.nodes.find(n => n.type === "source" && (n.params.shapes || []).length)?.params.shapes;
+    mark();
     g.nodes = ng.nodes; g.links = ng.links;
     if (taken) for (const n of g.nodes) if (n.type === "source" && !(n.params.shapes || []).length) n.params.shapes = taken;
     selected = g.nodes.find(n => n.type === "source")?.id || g.nodes[0]?.id || null;
@@ -562,9 +826,26 @@ export function openNodeEditor(log: (s: string) => void) {
   ov.addEventListener("keydown", e => {
     e.stopPropagation();
     const inField = (e.target as HTMLElement).closest("input, select, textarea");
-    if (e.key === "Escape") { if (!closeRecipePanel()) close(); }
-    else if ((e.key === "Delete" || e.key === "Backspace") && !inField && selected) { e.preventDefault(); deleteNode(selected); }
+    const cmd = e.ctrlKey || e.metaKey, key = e.key.toLowerCase();
+    if (e.key === "Escape") { if (!closeQuick() && !closeRecipePanel()) close(); }
+    else if (inField) return; // in Feldern gelten die üblichen Tasten (auch Strg+Z für den Text)
+    else if ((e.key === "Delete" || e.key === "Backspace") && selected) { e.preventDefault(); deleteNode(selected); }
+    else if (cmd && key === "z") { e.preventDefault(); undoRedo(e.shiftKey); }
+    else if (cmd && key === "y") { e.preventDefault(); undoRedo(true); }
+    else if (cmd && key === "d" && selected) { e.preventDefault(); duplicateNode(selected); }
+    else if (cmd && key === "f") { e.preventDefault(); search.focus(); search.select(); }
   });
+
+  // Schon etwas auf dem Bett gewählt und noch nichts übernommen: gleich in die erste Quelle „Vom Bett“ legen
+  const pre = selectedShapes().filter((s: any) => !s.ngOut);
+  const sources = g.nodes.filter(n => n.type === "source");
+  if (pre.length && sources.length && !sources.some(n => (n.params.shapes || []).length)) {
+    sources[0].params.shapes = fresh(pre).map((c, i) => ({ ...c, id: pre[i].id }));
+    log(t("ng.ui.autoTook", { n: pre.length }));
+  }
+  // Auswahlliste der Formen-Bibliothek: nachladen und die Einstellungen danach neu zeigen
+  preloadNodeData().then(() => { if (ov.isConnected) renderSide(); });
+  syncUndo();
 
   applyCam();
   renderNodes();

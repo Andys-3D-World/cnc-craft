@@ -15,10 +15,14 @@
 
 export type PortType = "shapes" | "image" | "number";
 
-export interface PortDef { name: string; type: PortType }
+/** need = ohne Leitung an diesem Eingang kommt nichts Sinnvolles heraus (Hinweis am Knoten) */
+export interface PortDef { name: string; type: PortType; need?: boolean }
 
-/** data = nicht sichtbar (z. B. übernommene Formen), button = Knopf ohne eigenen Wert */
-export type ParamKind = "number" | "select" | "check" | "button" | "data";
+/** data = nicht sichtbar (z. B. übernommene Formen), button = Knopf ohne eigenen Wert, text = freier Text */
+export type ParamKind = "number" | "select" | "check" | "button" | "data" | "text";
+
+/** längster Text in einer Text-Einstellung (auch aus fremden Dateien) */
+export const MAX_TEXT = 400;
 
 export interface ParamDef {
   key: string;
@@ -31,6 +35,8 @@ export interface ParamDef {
   port?: boolean;
   /** nur zeigen, wenn diese Bedingung zutrifft */
   when?: (p: Record<string, any>) => boolean;
+  /** Beschriftung: Schlüssel für t() – fehlt er, gilt "ng.p.<key>" */
+  label?: string;
 }
 
 export interface RunCtx {
@@ -41,7 +47,7 @@ export interface RunCtx {
 
 export interface NodeDef {
   type: string;
-  cat: "source" | "shape" | "image" | "number" | "output";
+  cat: "source" | "gen" | "shape" | "image" | "number" | "output";
   icon: string;
   inputs: PortDef[];
   outputs: PortDef[];
@@ -108,6 +114,139 @@ export function connect(g: Graph, from: string, out: string, to: string, inp: st
   g.links = g.links.filter(l => !(l.to === to && l.inp === inp));
   g.links.push({ from, out, to, inp });
   return true;
+}
+
+/** Erster freier Eingang von `to`, der zum Ausgang passt (sonst der erste passende, auch wenn er belegt ist) */
+export function fittingInput(g: Graph, from: string, out: string, to: string): string | null {
+  const ty = portType(g, from, out, "out");
+  const n = g.nodes.find(x => x.id === to);
+  const d = n && defs.get(n.type);
+  if (!ty || !d || makesCycle(g, from, to)) return null;
+  const fits = nodeInputs(d).filter(p => p.type === ty);
+  const free = fits.find(p => !g.links.some(l => l.to === to && l.inp === p.name));
+  return (free || fits[0])?.name ?? null;
+}
+
+/**
+ * Neuen Knoten hinter einen vorhandenen hängen: der erste Ausgang von `after`, zu dem der neue einen Eingang hat,
+ * wird verbunden. Ging dieser Ausgang bisher an genau einen Knoten und gibt der neue denselben Typ wieder aus,
+ * kommt der neue dazwischen (Quelle → neu → Rest). Der Knoten muss schon in g.nodes stehen.
+ * Ergebnis: null = passt nicht, sonst { moved } = Knoten, der jetzt hinter dem neuen hängt (oder null).
+ */
+export function attachAfter(g: Graph, after: string, node: GraphNode): { moved: string | null } | null {
+  const a = g.nodes.find(x => x.id === after);
+  const da = a && defs.get(a.type), dn = defs.get(node.type);
+  if (!a || !da || !dn || a.id === node.id) return null;
+  for (const o of da.outputs) {
+    // feste Eingänge zuerst – Zahlen-Eingänge der Einstellungen nur, wenn sonst nichts passt
+    const inp = [...dn.inputs, ...nodeInputs(dn).slice(dn.inputs.length)].find(p => p.type === o.type);
+    if (!inp) continue;
+    const old = g.links.filter(l => l.from === a.id && l.out === o.name);
+    if (!connect(g, a.id, o.name, node.id, inp.name)) continue;
+    const back = dn.outputs.find(p => p.type === o.type);
+    if (old.length === 1 && back) {
+      const l = old[0];
+      // connect ersetzt die alte Leitung am selben Eingang
+      if (connect(g, node.id, back.name, l.to, l.inp)) return { moved: l.to };
+    }
+    return { moved: null };
+  }
+  return null;
+}
+
+/**
+ * Neuen Knoten vor einen vorhandenen hängen: sein erster Ausgang geht an einen noch freien, passenden Eingang
+ * von `before` (z. B. Rechteck → freier Eingang „Formen“ der Ausgabe).
+ */
+export function attachBefore(g: Graph, before: string, node: GraphNode): boolean {
+  const b = g.nodes.find(x => x.id === before);
+  const db = b && defs.get(b.type), dn = defs.get(node.type);
+  if (!b || !db || !dn || b.id === node.id) return false;
+  for (const o of dn.outputs) {
+    const free = db.inputs.find(p => p.type === o.type && !g.links.some(l => l.to === b.id && l.inp === p.name));
+    if (free && connect(g, node.id, o.name, b.id, free.name)) return true;
+  }
+  return false;
+}
+
+/** Alle Knoten, die (über Leitungen) hinter diesem hängen – der Knoten selbst zählt mit */
+export function downstream(g: Graph, id: string): Set<string> {
+  const seen = new Set<string>(), stack = [id];
+  while (stack.length) {
+    const x = stack.pop()!;
+    if (seen.has(x)) continue;
+    seen.add(x);
+    for (const l of g.links) if (l.from === x) stack.push(l.to);
+  }
+  return seen;
+}
+
+/**
+ * Eingänge, an denen noch eine Leitung fehlt: alle mit `need`, und der erste feste Eingang,
+ * wenn an keinem festen Eingang etwas hängt. Leer = nichts zu melden.
+ */
+export function missingInputs(g: Graph, n: GraphNode): string[] {
+  const d = defs.get(n.type);
+  if (!d || !d.inputs.length) return [];
+  const has = (name: string) => g.links.some(l => l.to === n.id && l.inp === name);
+  const out = d.inputs.filter(p => p.need && !has(p.name)).map(p => p.name);
+  if (!out.length && !d.inputs.some(p => has(p.name))) out.push(d.inputs[0].name);
+  return out;
+}
+
+/** Kopie eines Knotens (ohne Leitungen), etwas versetzt */
+export function cloneNode(n: GraphNode): GraphNode {
+  return { ...n, params: paramsCopy(n), id: newNodeId(), x: n.x + 30, y: n.y + 30 };
+}
+
+/** Einstellungen kopieren; große übernommene Daten (kind "data") bleiben dieselbe Liste – sie werden nie verändert */
+function paramsCopy(n: GraphNode): Record<string, any> {
+  const d = defs.get(n.type), out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(n.params)) {
+    out[k] = d?.params.find(p => p.key === k)?.kind === "data" ? v : v && typeof v === "object" ? structuredClone(v) : v;
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------
+// Rückgängig / Wiederholen
+// ---------------------------------------------------------------------
+
+type Snap = { nodes: GraphNode[]; links: GraphLink[] };
+const snap = (g: Graph): Snap => ({ nodes: g.nodes.map(n => ({ ...n, params: paramsCopy(n) })), links: g.links.map(l => ({ ...l })) });
+
+/**
+ * Merkt sich Stände des Graphen. mark() VOR einer Änderung aufrufen; mit gleichem `tag` kurz hintereinander
+ * (z. B. Tippen in einem Feld) zählt nur der erste Aufruf.
+ */
+export class GraphHistory {
+  private undoList: Snap[] = [];
+  private redoList: Snap[] = [];
+  private lastTag = "";
+  private lastAt = 0;
+  private max: number;
+  constructor(max = 60) { this.max = max; }
+
+  mark(g: Graph, tag = "", now = Date.now()) {
+    if (tag && tag === this.lastTag && now - this.lastAt < 1200) { this.lastAt = now; return; }
+    this.lastTag = tag; this.lastAt = now;
+    this.undoList.push(snap(g));
+    if (this.undoList.length > this.max) this.undoList.shift();
+    this.redoList = [];
+  }
+  canUndo() { return this.undoList.length > 0; }
+  canRedo() { return this.redoList.length > 0; }
+  undo(g: Graph): boolean { return this.swap(g, this.undoList, this.redoList); }
+  redo(g: Graph): boolean { return this.swap(g, this.redoList, this.undoList); }
+
+  private swap(g: Graph, from: Snap[], to: Snap[]): boolean {
+    const s = from.pop();
+    if (!s) return false;
+    to.push(snap(g));
+    g.nodes = s.nodes; g.links = s.links;
+    this.lastTag = "";
+    return true;
+  }
 }
 
 export function removeNode(g: Graph, id: string) {
@@ -196,6 +335,7 @@ export function sanitizeGraph(x: any): Graph {
       const v = n.params?.[p.key];
       if (p.kind === "number") params[p.key] = Number.isFinite(+v) && v !== null && v !== "" ? +v : p.def;
       else if (p.kind === "check") params[p.key] = typeof v === "boolean" ? v : p.def;
+      else if (p.kind === "text") params[p.key] = typeof v === "string" ? v.slice(0, MAX_TEXT) : p.def;
       else params[p.key] = v !== undefined && typeof v === typeof p.def ? structuredClone(v) : structuredClone(p.def);
     }
     g.nodes.push({ id: n.id, type: n.type, x: +n.x || 0, y: +n.y || 0, params });

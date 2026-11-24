@@ -7,7 +7,7 @@
 import polygonClipping from "polygon-clipping";
 import { registerNode, NodeDef } from "./graph";
 import {
-  MM_TO_PIXEL, Pt, groupBounds, translateShape, scaleShape, rotateShape, cloneShape, newId, shapeToPaths,
+  Pt, groupBounds, translateShape, scaleShape, rotateShape, newId, shapeToPaths,
   createPolyline, createCircle, makeRectPoints, makePolygonPoints, pathArea, pointInPath
 } from "../shapeTransform";
 import { offsetPolygon } from "../polyOffset";
@@ -18,31 +18,10 @@ import { app } from "../editor/editorState";
 import { t } from "../i18n/i18n";
 import { RASTER_METHODS, CELL_METHODS, NO_ADJUST } from "../raster/dither";
 import { toImageUV, imageSizeMm } from "../raster/imageShape";
+import { PX, num, fresh, cloneImage } from "./nodeUtil";
+import { MORE_NODES } from "./moreNodes";
 
-const PX = MM_TO_PIXEL;
-
-/** Kopien mit neuen IDs; Gruppen bleiben zusammen, bekommen aber eigene Kennungen */
-export function fresh(list: any[]): any[] {
-  const gmap = new Map<string, string>();
-  return list.map(s => {
-    const c = s.type === "image" ? cloneImage(s) : cloneShape(s);
-    c.id = newId();
-    delete c.gen; // Kopie ist kein Generator-Lauf mehr
-    if (c.groupId) {
-      if (!gmap.has(c.groupId)) gmap.set(c.groupId, "grp-" + newId());
-      c.groupId = gmap.get(c.groupId);
-    }
-    return c;
-  });
-}
-
-/** Bild-Form kopieren, ohne die (große) Bild-Adresse durch JSON zu schicken */
-function cloneImage(s: any): any {
-  const src = s.img?.src || "";
-  const c = JSON.parse(JSON.stringify({ ...s, img: { ...s.img, src: "" } }));
-  c.img.src = src;
-  return c;
-}
+export { fresh };
 
 /** Bild für diesen Knoten: eigene, gleichbleibende ID (das gerasterte Ergebnis wird je ID zwischengespeichert) */
 function imageFor(s: any, nodeId: string): any {
@@ -55,8 +34,6 @@ function imageFor(s: any, nodeId: string): any {
 
 const closedRings = (list: any[]): Pt[][] =>
   list.flatMap(s => shapeToPaths(s).filter(p => p.closed && p.pts.length >= 3).map(p => p.pts));
-
-const num = (v: any, d = 0) => (Number.isFinite(+v) ? +v : d);
 
 /** Quelle „live“: aktuelle Formen auf dem Bett mit den IDs der Kopie (fehlende: die Kopie) */
 function liveShapes(p: Record<string, any>): any[] {
@@ -136,13 +113,13 @@ const defs: NodeDef[] = [
     inputs: [], outputs: [{ name: "value", type: "number" }],
     params: [
       { key: "a", kind: "number", def: 10, step: 1, port: true },
-      { key: "op", kind: "select", def: "add", options: ["add", "sub", "mul", "div"] },
+      { key: "op", kind: "select", def: "add", options: ["add", "sub", "mul", "div", "min", "max"] },
       { key: "b", kind: "number", def: 2, step: 1, port: true }
     ],
     run: (_i, p, ctx) => {
       const a = num(p.a), b = num(p.b);
       if (p.op === "div" && b === 0) { ctx.warn("ng.w.div0"); return { value: 0 }; }
-      return { value: p.op === "sub" ? a - b : p.op === "mul" ? a * b : p.op === "div" ? a / b : a + b };
+      return { value: p.op === "sub" ? a - b : p.op === "mul" ? a * b : p.op === "div" ? a / b : p.op === "min" ? Math.min(a, b) : p.op === "max" ? Math.max(a, b) : a + b };
     }
   },
 
@@ -499,8 +476,10 @@ let done = false;
 export function registerAllNodes() {
   if (done) return;
   done = true;
-  defs.forEach(registerNode);
+  // Reihenfolge = Reihenfolge in der Knoten-Liste: die Ausgabe bleibt der letzte Knoten
+  const out = defs.filter(d => d.cat === "output");
+  [...defs.filter(d => d.cat !== "output"), ...MORE_NODES, ...out].forEach(registerNode);
 }
 
 /** Reihenfolge der Gruppen in der Knoten-Liste */
-export const NODE_CATS: NodeDef["cat"][] = ["source", "shape", "image", "number", "output"];
+export const NODE_CATS: NodeDef["cat"][] = ["source", "gen", "shape", "image", "number", "output"];

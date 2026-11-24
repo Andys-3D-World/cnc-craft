@@ -1706,6 +1706,32 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .ng-tpl-save .prop-input { flex: 1; min-width: 0; }
 .ng-tpl-save .btn-secondary { flex: 1; }
 .ng-tpl-save input + .btn-secondary { flex: none; }
+/* Knotengraph: Suche, Schnell-Liste, Legende, passende Anschlüsse beim Ziehen */
+.ng-add[hidden], .ng-cat[hidden] { display: none; }
+.ng-search { width: 100%; flex: none; min-height: 28px; padding: 4px 8px; margin-bottom: 2px; }
+.ng-pal-tip { font-size: 0.7rem; margin-bottom: 2px; }
+.ng-c-gen .ng-head { background: rgba(32,201,151,0.15); }
+.ng-top #ng-undo, .ng-top #ng-redo { min-width: 34px; padding-left: 8px; padding-right: 8px; }
+.ng-top button:disabled { opacity: 0.4; cursor: default; }
+.ng-wiring .ng-pin { opacity: 0.3; }
+.ng-wiring .ng-pin.ok { opacity: 1; color: var(--text-main); }
+.ng-wiring .ng-pin.ok i { transform: scale(1.5); box-shadow: 0 0 0 1px var(--pc), 0 0 8px var(--pc); }
+.ng-pin i { transition: transform 0.12s ease; }
+.ng-legend { position: absolute; left: 8px; bottom: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; max-width: calc(100% - 16px); padding: 4px 9px;
+  border-radius: 999px; background: var(--bg-panel); border: 1px solid var(--border-subtle); font-size: 0.7rem; color: var(--text-muted); user-select: none; }
+.ng-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.ng-legend i { width: 9px; height: 9px; border-radius: 50%; background: var(--pc); }
+.ng-quick { position: absolute; z-index: 5; width: 260px; display: flex; flex-direction: column; gap: 5px; padding: 8px; background: var(--bg-panel);
+  border: 1px solid var(--border-color); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); font-size: 0.8rem; cursor: default; }
+.ng-quick-list { max-height: 250px; overflow: auto; display: flex; flex-direction: column; gap: 2px; }
+.ng-quick-item { display: flex; gap: 8px; align-items: flex-start; text-align: left; width: 100%; padding: 5px 7px; border-radius: var(--radius-sm); border: 1px solid transparent;
+  background: none; color: var(--text-main); cursor: pointer; }
+.ng-quick-item > span { width: 18px; text-align: center; flex: none; }
+.ng-quick-item small { display: block; color: var(--text-muted); font-size: 0.7rem; margin-top: 1px; }
+.ng-quick-item:hover, .ng-quick-item.on { border-color: var(--accent-color); background: var(--accent-glow); }
+.ng-col { display: flex; flex-direction: column; gap: 4px; }
+.ng-text { width: 100%; resize: vertical; font: inherit; }
+@media (prefers-reduced-motion: reduce) { .ng-pin i { transition: none; } }
 .rot-check { font-size: 0.76rem; line-height: 1.35; padding: 6px 8px; border-radius: 6px; background: rgba(128,128,128,0.1); color: var(--text-muted); }
 .rot-check.warn { background: rgba(245,159,0,0.12); color: var(--color-warning); }
 .rot-check.block { background: rgba(255,107,107,0.12); color: var(--color-danger); }

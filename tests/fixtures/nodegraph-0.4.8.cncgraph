@@ -1,0 +1,419 @@
+{
+ "format": "cnc-craft-nodegraph",
+ "version": 1,
+ "name": "Alles aus 0.4.8",
+ "graph": {
+  "nodes": [
+   {
+    "id": "s1",
+    "type": "source",
+    "x": 0,
+    "y": 40,
+    "params": {
+     "live": false,
+     "shapes": []
+    }
+   },
+   {
+    "id": "r1",
+    "type": "rect",
+    "x": 260,
+    "y": 40,
+    "params": {
+     "w": 120,
+     "h": 60,
+     "r": 6
+    }
+   },
+   {
+    "id": "c1",
+    "type": "circle",
+    "x": 520,
+    "y": 40,
+    "params": {
+     "d": 6
+    }
+   },
+   {
+    "id": "p1",
+    "type": "polygon",
+    "x": 780,
+    "y": 40,
+    "params": {
+     "sides": 6,
+     "d": 50
+    }
+   },
+   {
+    "id": "nu",
+    "type": "number",
+    "x": 1040,
+    "y": 40,
+    "params": {
+     "value": 10
+    }
+   },
+   {
+    "id": "ma",
+    "type": "math",
+    "x": 1300,
+    "y": 40,
+    "params": {
+     "a": 10,
+     "op": "div",
+     "b": 2
+    }
+   },
+   {
+    "id": "tr",
+    "type": "transform",
+    "x": 1560,
+    "y": 40,
+    "params": {
+     "dx": 0,
+     "dy": 0,
+     "angle": 15,
+     "scale": 100,
+     "mirror": "h"
+    }
+   },
+   {
+    "id": "pl",
+    "type": "place",
+    "x": 1820,
+    "y": 40,
+    "params": {
+     "x": 10,
+     "y": 50,
+     "anchor": "c"
+    }
+   },
+   {
+    "id": "of",
+    "type": "offset",
+    "x": 2080,
+    "y": 40,
+    "params": {
+     "dist": 2,
+     "dir": "both",
+     "keep": true
+    }
+   },
+   {
+    "id": "bo",
+    "type": "boolean",
+    "x": 2340,
+    "y": 40,
+    "params": {
+     "op": "subtract"
+    }
+   },
+   {
+    "id": "fi",
+    "type": "fillet",
+    "x": 2600,
+    "y": 40,
+    "params": {
+     "r": 3,
+     "chamfer": false
+    }
+   },
+   {
+    "id": "ar",
+    "type": "array",
+    "x": 2860,
+    "y": 40,
+    "params": {
+     "cols": 3,
+     "rows": 2,
+     "gapX": 5,
+     "gapY": 5
+    }
+   },
+   {
+    "id": "pa",
+    "type": "pattern",
+    "x": 3120,
+    "y": 40,
+    "params": {
+     "gapX": 3,
+     "gapY": 3,
+     "brick": true,
+     "clip": false
+    }
+   },
+   {
+    "id": "ne",
+    "type": "nest",
+    "x": 3380,
+    "y": 40,
+    "params": {
+     "gap": 3,
+     "margin": 5,
+     "rotate": "90",
+     "holes": true
+    }
+   },
+   {
+    "id": "ti",
+    "type": "tiles",
+    "x": 3640,
+    "y": 40,
+    "params": {
+     "w": 300,
+     "h": 300,
+     "toBeds": true
+    }
+   },
+   {
+    "id": "la",
+    "type": "layer",
+    "x": 3900,
+    "y": 40,
+    "params": {
+     "laser": "",
+     "mode": "",
+     "depth": 0
+    }
+   },
+   {
+    "id": "me",
+    "type": "merge",
+    "x": 4160,
+    "y": 40,
+    "params": {}
+   },
+   {
+    "id": "bg",
+    "type": "bgRemove",
+    "x": 4420,
+    "y": 40,
+    "params": {
+     "tol": 25
+    }
+   },
+   {
+    "id": "cu",
+    "type": "curve",
+    "x": 4680,
+    "y": 40,
+    "params": {
+     "shadows": 0,
+     "mids": 15,
+     "lights": 0
+    }
+   },
+   {
+    "id": "ad",
+    "type": "adjust",
+    "x": 4940,
+    "y": 40,
+    "params": {
+     "brightness": 0,
+     "contrast": 15,
+     "gamma": 1,
+     "sharpen": 30,
+     "invert": true
+    }
+   },
+   {
+    "id": "en",
+    "type": "engrave",
+    "x": 5200,
+    "y": 40,
+    "params": {
+     "method": "jarvis",
+     "interval": 0.1,
+     "threshold": 50,
+     "cell": 6,
+     "angle": 0
+    }
+   },
+   {
+    "id": "is",
+    "type": "imgSize",
+    "x": 5460,
+    "y": 40,
+    "params": {
+     "w": 80,
+     "x": 0,
+     "y": 0
+    }
+   },
+   {
+    "id": "mk",
+    "type": "mask",
+    "x": 5720,
+    "y": 40,
+    "params": {}
+   },
+   {
+    "id": "o1",
+    "type": "output",
+    "x": 5980,
+    "y": 40,
+    "params": {
+     "removeSrc": false
+    }
+   }
+  ],
+  "links": [
+   {
+    "from": "r1",
+    "out": "shapes",
+    "to": "bo",
+    "inp": "a"
+   },
+   {
+    "from": "c1",
+    "out": "shapes",
+    "to": "pl",
+    "inp": "shapes"
+   },
+   {
+    "from": "pl",
+    "out": "shapes",
+    "to": "bo",
+    "inp": "b"
+   },
+   {
+    "from": "bo",
+    "out": "shapes",
+    "to": "fi",
+    "inp": "shapes"
+   },
+   {
+    "from": "fi",
+    "out": "shapes",
+    "to": "ar",
+    "inp": "shapes"
+   },
+   {
+    "from": "ar",
+    "out": "shapes",
+    "to": "me",
+    "inp": "a"
+   },
+   {
+    "from": "p1",
+    "out": "shapes",
+    "to": "tr",
+    "inp": "shapes"
+   },
+   {
+    "from": "tr",
+    "out": "shapes",
+    "to": "of",
+    "inp": "shapes"
+   },
+   {
+    "from": "of",
+    "out": "shapes",
+    "to": "me",
+    "inp": "b"
+   },
+   {
+    "from": "me",
+    "out": "shapes",
+    "to": "la",
+    "inp": "shapes"
+   },
+   {
+    "from": "la",
+    "out": "shapes",
+    "to": "o1",
+    "inp": "shapes"
+   },
+   {
+    "from": "nu",
+    "out": "value",
+    "to": "ma",
+    "inp": "a"
+   },
+   {
+    "from": "ma",
+    "out": "value",
+    "to": "ar",
+    "inp": "gapX"
+   },
+   {
+    "from": "s1",
+    "out": "image",
+    "to": "bg",
+    "inp": "image"
+   },
+   {
+    "from": "bg",
+    "out": "image",
+    "to": "cu",
+    "inp": "image"
+   },
+   {
+    "from": "cu",
+    "out": "image",
+    "to": "ad",
+    "inp": "image"
+   },
+   {
+    "from": "ad",
+    "out": "image",
+    "to": "en",
+    "inp": "image"
+   },
+   {
+    "from": "en",
+    "out": "image",
+    "to": "is",
+    "inp": "image"
+   },
+   {
+    "from": "is",
+    "out": "image",
+    "to": "mk",
+    "inp": "image"
+   },
+   {
+    "from": "r1",
+    "out": "shapes",
+    "to": "mk",
+    "inp": "shapes"
+   },
+   {
+    "from": "mk",
+    "out": "image",
+    "to": "o1",
+    "inp": "image"
+   },
+   {
+    "from": "s1",
+    "out": "shapes",
+    "to": "ne",
+    "inp": "shapes"
+   },
+   {
+    "from": "ne",
+    "out": "shapes",
+    "to": "ti",
+    "inp": "shapes"
+   },
+   {
+    "from": "r1",
+    "out": "shapes",
+    "to": "pa",
+    "inp": "area"
+   },
+   {
+    "from": "c1",
+    "out": "shapes",
+    "to": "pa",
+    "inp": "motif"
+   },
+   {
+    "from": "pa",
+    "out": "shapes",
+    "to": "me",
+    "inp": "c"
+   }
+  ]
+ }
+}

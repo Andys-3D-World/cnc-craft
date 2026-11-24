@@ -16,3 +16,6 @@ the first one too. `tests/postProcess.test.ts` sends both through every post-pro
 To make them again after a change to the generator: start the preview, build the drawing above and call
 `generateGcode(shapes)` – once as it is, once inside `withPost()` (src/post/postExport.ts) with LinuxCNC and
 "Tool table" chosen.
+
+`nodegraph-0.4.8.cncgraph` is a node-graph template file as version 0.4.8 wrote it: every node type of that version
+with the settings and connections it had then. `tests/nodeGraph.test.ts` loads it to make sure old templates keep working.
