@@ -19,6 +19,12 @@
   - *Pierces since nozzle change*: counts how often plasma jobs on the machine fired the torch, with a reset and a reminder from a number you choose.
   - *Align a tilted sheet* (the command of *Print & Cut*, in plasma mode): read the lower left corner and a point on the lower edge, and the drawing is turned and moved to fit. The window only reads the position, it does not move or fire anything.
   - Checked with tests, with the G-code check and by comparing 71 generator programs with the state before (unchanged). **Not tried on a real plasma table:** start with scrap, and with the torch off first.
+- **Laser, four additions (programs stay the same until you use them):**
+  - *Fill style* per layer: *Lines* as before, *Crosshatch* (once more turned by 90°) or *Rings* along the contour from the inside out. The rings follow wall and holes together, so no spot is burnt twice; contours that are too narrow or too complex for rings are filled with lines, with a note.
+  - *Overcut* per layer: after closing a contour the laser goes on along it for this distance.
+  - *Z per pass* per layer: before every further cutting pass Z goes down a little so that the focus follows the cut, at most 2 mm per pass, 5 mm in all and never more than the material thickness, only with the laser off, and up again at the end of the layer. Every job with it gets a note to check the room for the nozzle. After a stop Z is still lower. Off by default; test fields (material test, test card) never move down by themselves. No effect on Ruida and K40.
+  - *Barcodes* in the QR code window: Code 128 (text) and EAN-13 (with check digit), also with *Serial numbers*. Checked by reading 16 codes with the barcode reader of macOS.
+  - Checked with tests on the real G-code, with the G-code check and by comparing 71 generator programs with the state before (unchanged). **Not tried on a real laser:** try *Z per pass* without material and at low power first.
 
 **Fixed**
 - **Loaded files, lines that begin with a comment were left out:** a line like `(up) G0 Z5` was taken for a pure comment when a G-code file was loaded, so the machine never got the command. A missing retract means the cutter moves on at depth. Only lines without any command are left out now. CNC Craft's own programs do not contain such lines and are unchanged. **If you run G-code from other programs, please update.**

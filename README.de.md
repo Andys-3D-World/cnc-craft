@@ -15,7 +15,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 - Zeichenwerkzeuge mit Bézier-Kurven und Knotenbearbeitung, Text mit 26+ Schriften, Einlinien-Schriften und allen
   Systemschriften, Maße und Bedingungen, Verschmelzen und Ritzen, Muster, Vervielfältigen / „Bett füllen“,
   verknüpfte Kopien, die dem Original folgen, Verschachteln (auch in Reststücke)
-- Formen-Bibliothek, QR-Codes, Seriennummern und variabler Text, mehrere Betten pro Projekt (wie Druckplatten im Slicer)
+- Formen-Bibliothek, QR-Codes, Strichcodes, Seriennummern und variabler Text, mehrere Betten pro Projekt (wie Druckplatten im Slicer)
 - **Generatoren:** Boxen mit Fingerzinken (20 Arten, mit 3D-Ansicht), Puzzles, Deko-Anhänger für jede Jahreszeit
   (Weihnachten, Ostern, Halloween, Frühling, Sommer, Herbst, Liebe – auch zweilagig mit Landschaft),
   3D-Steckanhänger, Wort-Kachel-Anhänger, Schattenboxen / Lichterbögen mit LED-Ausschnitten und Ständer, Buchstaben-Topper,

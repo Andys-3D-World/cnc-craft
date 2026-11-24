@@ -14,8 +14,12 @@
 import { t } from "./i18n/i18n";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 import { cleanScanPoints, type ScanPoint } from "./scanOffset";
+import { cleanZStep } from "./zPerPass";
 
 export type LaserMode = "line" | "fill" | "fill+line";
+/** Füllen: Linien in eine Richtung, über Kreuz (zweites Mal um 90° gedreht) oder Ringe entlang der Kontur (ringFill.ts) */
+export type FillKind = "lines" | "cross" | "rings";
+export const FILL_KINDS: FillKind[] = ["lines", "cross", "rings"];
 
 export interface LaserLayer {
   id: string;
@@ -29,8 +33,11 @@ export interface LaserLayer {
   passes: number;     // Durchgänge
   interval: number;   // Linienabstand beim Füllen in mm
   angle: number;      // Winkel der Füll-Linien in Grad
+  fillKind: FillKind; // wie die Fläche gefüllt wird
   air: boolean;       // Luftunterstützung (M8)
   leadIn: number;     // Freischnitt: Anfahrlänge in mm bei geschlossenen Konturen (0 = aus)
+  overcut: number;    // Überlauf: nach dem Schließen so viele mm weiter auf der Kontur (0 = aus)
+  zStep: number;      // Z je Durchgang: so viel mm tiefer je weiterem Linien-Durchgang (0 = aus, Grenzen in zPerPass.ts)
   material: string;   // Material (frei, z. B. "Pappel-Sperrholz") – nur zur Übersicht
   thickness: number;  // Materialdicke in mm (0 = keine Angabe)
   notes: string;      // Notiz
@@ -128,8 +135,11 @@ function sanitize(x: any): LaserLayer {
     passes: Math.round(num(x.passes, 1, 1, 100)),
     interval: num(x.interval, 0.1, 0.01, 10),
     angle: num(x.angle, 0, -180, 180),
+    fillKind: FILL_KINDS.includes(x.fillKind) ? x.fillKind : "lines",
     air: !!x.air,
     leadIn: num(x.leadIn, 0, 0, 20),
+    overcut: num(x.overcut, 0, 0, 20),
+    zStep: cleanZStep(x.zStep),
     material: typeof x.material === "string" ? x.material.slice(0, 60) : "",
     thickness: num(x.thickness, 0, 0, 200),
     notes: typeof x.notes === "string" ? x.notes.slice(0, 500) : "",
@@ -193,7 +203,8 @@ export function effectiveLayer(shape: any): LaserLayer | null {
   if (Number.isFinite(o.scanMm)) { extra.scanMm = num(o.scanMm, 0, -2, 2); tail += `_sc${extra.scanMm}`; }
   if (Number.isFinite(o.zOff) && o.zOff > 0) { extra.zOff = num(o.zOff, 0, 0, 5); tail += `_z${extra.zOff}`; }
   return {
-    ...l, power, speed, fillPower: power, fillSpeed: speed, interval, ...extra,
+    // Testfelder fahren nie von selbst tiefer
+    ...l, power, speed, fillPower: power, fillSpeed: speed, interval, zStep: 0, ...extra,
     id: `${l.id}~${power}_${speed}_${interval}${tail}`,
     name: layerHasFill(l) ? `${l.name} ${interval} mm` : l.name
   };
@@ -323,7 +334,8 @@ export function mergeProjectLayers(list: any, shapes: any[]): number {
   const incoming = sanitizeList(list);
   let added = 0;
   for (const l of incoming) {
-    const same = layers.find(x => x.name === l.name && x.mode === l.mode && x.power === l.power && x.speed === l.speed && x.passes === l.passes);
+    const same = layers.find(x => x.name === l.name && x.mode === l.mode && x.power === l.power && x.speed === l.speed && x.passes === l.passes
+      && x.fillKind === l.fillKind && x.overcut === l.overcut && x.zStep === l.zStep);
     let newId = l.id;
     if (same) newId = same.id;
     else {
@@ -420,9 +432,13 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       ${row("laser.passes", "ll-passes", src.passes, "1", "×")}
       ${row("laser.interval", "ll-interval", src.interval, "0.01", "mm", 'data-fill="1"')}
       ${row("laser.angle", "ll-angle", src.angle, "15", "°", 'data-fill="1"')}
+      <label class="dlg-row" data-fill="1" data-tip="${esc(t("laser.fillKindTip"))}"><span>${t("laser.fillKind")}</span>
+        <select id="ll-fillkind" style="width:150px;">${FILL_KINDS.map(k => `<option value="${k}" ${src.fillKind === k ? "selected" : ""}>${t("laser.fillKind." + k)}</option>`).join("")}</select></label>
       ${row("laser.fillPower", "ll-fill-power", src.fillPower, "1", "%", 'data-both="1"')}
       ${row("laser.fillSpeed", "ll-fill-speed", src.fillSpeed, "100", "mm/min", 'data-both="1"')}
       ${row("laser.leadIn", "ll-leadin", src.leadIn, "0.5", "mm", `data-line="1" data-tip="${esc(t("laser.leadInTip"))}"`)}
+      ${row("laser.overcut", "ll-overcut", src.overcut, "0.5", "mm", `data-line="1" data-tip="${esc(t("laser.overcutTip"))}"`)}
+      ${row("laser.zStep", "ll-zstep", src.zStep, "0.1", "mm", `data-line="1" data-tip="${esc(t("laser.zStepTip"))}"`)}
       <label class="dlg-row"><span>${t("laser.air")}</span><input id="ll-air" type="checkbox" ${src.air ? "checked" : ""} style="width:auto;"></label>
       <div class="dlg-hint">${t("laser.dlgHint")}</div>
       <div class="dlg-buttons">
@@ -476,6 +492,9 @@ export function openLayerDialog(layer: LaserLayer | null, onDone?: (l: LaserLaye
       interval: parseFloat(q("ll-interval").value),
       angle: parseFloat(q("ll-angle").value),
       leadIn: parseFloat(q("ll-leadin").value) || 0,
+      overcut: parseFloat(q("ll-overcut").value) || 0,
+      zStep: parseFloat(q("ll-zstep").value) || 0,
+      fillKind: q("ll-fillkind").value as FillKind,
       fillPower: parseFloat(q("ll-fill-power").value),
       fillSpeed: parseFloat(q("ll-fill-speed").value),
       air: (q("ll-air") as HTMLInputElement).checked

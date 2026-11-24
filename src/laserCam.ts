@@ -8,6 +8,7 @@
  * - "Linie": jede Kontur wird abgefahren, kleine/innere Konturen zuerst (Teile fallen
  *   sonst heraus, bevor ihre Löcher geschnitten sind). Mit "Reihenfolge optimieren" in der
  *   Reihenfolge mit den kürzesten Leerfahrten (Innenleben weiter zuerst, siehe cutOrder.ts).
+ *   Wahlweise über Kreuz oder in Ringen (ringFill.ts). Konturen: Überlauf am Ende, Z je Durchgang (zPerPass.ts).
  * - Bilder (Bildgravur): Zeile für Zeile, abwechselnd hin und zurück, vor allen Konturen der Ebene
  *   (siehe raster/imageShape.ts). Gerastert = Laser an/aus, Graustufen = Leistung folgt der Helligkeit.
  * - Leistung: S = Leistung% × S-Max ($30). M4 = dynamische Leistung (empfohlen),
@@ -15,7 +16,9 @@
  */
 import { MM_TO_PIXEL, shapeToPaths, Pt } from "./shapeTransform";
 import { polygonArea, pointInPoly } from "./polyOffset";
-import { cornerIndex, leadPoint } from "./plasmaCam";
+import { cornerIndex, leadPoint, overcutPoints } from "./plasmaCam";
+import { ringFill } from "./ringFill";
+import { zDepths } from "./zPerPass";
 import { cornerPowerPath } from "./cornerPower";
 import { tabRuns } from "./tabs";
 import { RapidPlanner } from "./rapidAvoid";
@@ -130,12 +133,28 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     if (layerHasFill(layer)) {
       if (open.length) warnings.push(t("lgw.openNoFill", { name: layer.name, n: open.length }));
       if (closed.length) {
-        const res = hatch(closed, layer.interval, layer.angle);
+        // Ringe entlang der Kontur; was dafür zu schmal oder zu aufwendig ist, bekommt Linien
+        const ring = layer.fillKind === "rings" ? ringFill(closed, layer.interval) : null;
+        if (ring && ring.rest.length) warnings.push(t("lgw.ringRest", { name: layer.name, n: ring.rest.length }));
+        const res = hatch(ring ? ring.rest : closed, layer.interval, layer.angle);
+        // über Kreuz: noch einmal um 90° gedreht
+        if (layer.fillKind === "cross") {
+          const b = hatch(closed, layer.interval, layer.angle + 90);
+          res.segs.push(...b.segs);
+          res.clipped ||= b.clipped;
+        }
         if (res.clipped) warnings.push(t("lgw.tooManyLines", { name: layer.name, max: MAX_SCANLINES }));
         for (let pass = 0; pass < layer.passes; pass++) {
           if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
-          g += `${c("lgc.fill", { n: res.segs.length })}\n`;
+          g += `${c("lgc.fill", { n: res.segs.length + (ring ? ring.paths.length : 0) })}\n`;
           if (both) g += `F${n(fillF)}\n`;
+          for (const p of ring ? ring.paths : []) {
+            g += `G0 X${n(p.pts[0].x)} Y${n(p.pts[0].y)} S0\n`;
+            g += `G1 X${n(p.pts[1].x)} Y${n(p.pts[1].y)} S${fillS}\n`;
+            for (let i = 2; i < p.pts.length; i++) g += `G1 X${n(p.pts[i].x)} Y${n(p.pts[i].y)}\n`;
+            if (p.closed) g += `G1 X${n(p.pts[0].x)} Y${n(p.pts[0].y)}\n`;
+            pos = p.closed ? p.pts[0] : lastOf(p.pts);
+          }
           for (const raw of res.segs) {
             const sg = scanMm ? shiftSeg(raw, scanMm) : raw;
             g += `G0 X${n(sg[0])} Y${n(sg[1])} S0\n`;
@@ -178,8 +197,14 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
         paths.splice(0, paths.length, ...steps.map(st => ({ ...paths[st.index], pts: orientPts(items[st.index], st) })));
       }
       if (both) g += `F${n(layer.speed)}\n`; // nach dem Füllen wieder die Linien-Geschwindigkeit
+      // Z je Durchgang: relativ und nur mit Laser aus (S0); am Ende der Ebene wieder genauso weit hoch
+      const depths = zDepths(layer.passes, layer.zStep, layer.thickness);
+      const deepest = depths[depths.length - 1];
+      if (deepest > 0) warnings.push(t("lgw.zStep", { name: layer.name, z: deepest }));
       for (let pass = 0; pass < layer.passes; pass++) {
         if (layer.passes > 1) g += `${c("lgc.pass", { i: pass + 1, n: layer.passes })}\n`;
+        const down = pass > 0 ? depths[pass] - depths[pass - 1] : 0;
+        if (down > 0) g += `${c("lgc.zDown", { z: n(depths[pass]) })}\nG91\nG0 Z${n(-down)} S0\nG90\n`;
         for (const p of paths) {
           if (p.runs) {
             // mit Haltestegen: jedes Stück schneiden, über den Steg mit Laser aus springen
@@ -204,13 +229,15 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
             continue;
           }
           const pts = p.pts;
+          // Überlauf: nach dem Schließen ein Stück weiter auf der Kontur, damit am Start nichts hängen bleibt
+          const over = p.closed && layer.overcut > 0 ? overcutPoints(openLoop(pts), layer.overcut) : [];
           // Freischnitt: im Abfall einstechen und zur Kontur fahren
           if (p.lead) rapid(p.lead, " " + c("lgc.leadIn"));
           else rapid(pts[0]);
           if (corner) {
             // ohne M4: in Ecken weniger Leistung, wo die Maschine bremst – auch beim Anfahren aus dem Stand
             // (nach der Leerfahrt) und am Ende; darum immer als offener Weg vom Einstich bis zurück zum Start
-            const way = [...(p.lead ? [p.lead] : []), ...pts, ...(p.closed ? [pts[0]] : [])];
+            const way = [...(p.lead ? [p.lead] : []), ...pts, ...(p.closed ? [pts[0], ...over] : [])];
             let last = -1;
             for (const m of cornerPowerPath(way, false, layer.speed, S, corner)) {
               g += `G1 X${n(m.x)} Y${n(m.y)}${m.s !== last ? ` S${m.s}` : ""}\n`;
@@ -221,12 +248,14 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
             g += `G1 X${n(pts[1].x)} Y${n(pts[1].y)} S${S}\n`;
             for (let i = 2; i < pts.length; i++) g += `G1 X${n(pts[i].x)} Y${n(pts[i].y)}\n`;
             if (p.closed) g += `G1 X${n(pts[0].x)} Y${n(pts[0].y)}\n`;
+            for (const o of over) g += `G1 X${n(o.x)} Y${n(o.y)}\n`;
           }
-          pos = p.closed ? pts[0] : pts[pts.length - 1];
+          pos = over.length ? lastOf(over) : p.closed ? pts[0] : pts[pts.length - 1];
           // ganz ausgeschnitten (ohne Haltestege) -> kann kippen, ab jetzt umfahren (einmal reicht)
           if (avoid && p.closed && pass === 0) avoid.addCut(pts);
         }
       }
+      if (deepest > 0) g += `${c("lgc.zBack")}\nG91\nG0 Z${n(deepest)} S0\nG90\n`;
     }
     if (layer.air) g += `M9 ${c("lgc.airOff")}\n`;
     if (layer.zOff) g += `${c("lgc.zBack")}\nG91\nG0 Z${n(-layer.zOff)} S0\nG90\n`;
@@ -239,6 +268,8 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
 }
 
 const lastOf = (pts: Pt[]) => pts[pts.length - 1];
+/** geschlossene Kontur ohne doppelten Anfangspunkt am Ende */
+const openLoop = (pts: Pt[]) => (pts.length > 2 && Math.hypot(pts[0].x - lastOf(pts).x, pts[0].y - lastOf(pts).y) < 1e-6 ? pts.slice(0, -1) : pts);
 
 /**
  * Freischnitt (Lead-in) für eine geschlossene Kontur: Start an der schärfsten Ecke, Einstich

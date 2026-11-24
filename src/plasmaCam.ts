@@ -272,7 +272,7 @@ export function leadPoint(loop: Pt[], outside: boolean, len: number): Pt | null 
 }
 
 /** Punkte für den Überlauf: vom Startpunkt aus ein Stück die Kontur entlang */
-function overcutPoints(loop: Pt[], len: number): Pt[] {
+export function overcutPoints(loop: Pt[], len: number): Pt[] {
   const out: Pt[] = [];
   let rest = len;
   for (let i = 1; i <= loop.length && rest > 1e-6; i++) {

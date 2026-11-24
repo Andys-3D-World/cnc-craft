@@ -12,7 +12,7 @@ import { t } from "../i18n/i18n";
 import { formatScanText, parseScanText } from "../scanOffset";
 import {
   LaserLayer, LaserMode, LAYER_COLORS, LAYERS_CHANGED, getLayers, getLayer, addLayer, updateLayer, removeLayer,
-  duplicateLayer, moveLayer, activeLayer, setActiveLayer, layerInfo, laserSettings, setLaserSettings
+  duplicateLayer, moveLayer, activeLayer, setActiveLayer, layerInfo, laserSettings, setLaserSettings, FILL_KINDS, type FillKind
 } from "../laserLayers";
 import { openLaserPresetDialog } from "./laserPresetDialog";
 import { fmtLenShort, unitName } from "../units";
@@ -32,7 +32,7 @@ const MODES: LaserMode[] = ["line", "fill", "fill+line"];
 // ---------------------------------------------------------------------
 
 /** Kleines Bild: Form mit Loch, je nach Art umrandet und/oder schraffiert */
-export function laserPreviewSvg(l: Pick<LaserLayer, "color" | "mode" | "interval" | "angle" | "power" | "passes" | "air">, size = 200): string {
+export function laserPreviewSvg(l: Pick<LaserLayer, "color" | "mode" | "interval" | "angle" | "power" | "passes" | "air"> & { fillKind?: FillKind }, size = 200): string {
   const fill = l.mode !== "line", line = l.mode !== "fill";
   // Linienabstand übertrieben groß zeigen, sonst sieht man nichts
   const gap = Math.max(3.5, Math.min(16, l.interval * 45));
@@ -42,7 +42,10 @@ export function laserPreviewSvg(l: Pick<LaserLayer, "color" | "mode" | "interval
   if (fill) {
     const lines: string[] = [];
     for (let y = -150; y <= 150; y += gap) lines.push(`<line x1="-150" y1="${y.toFixed(2)}" x2="150" y2="${y.toFixed(2)}"/>`);
-    hatch = `<g clip-path="url(#llp-clip)"><g transform="translate(100 100) rotate(${-l.angle})" stroke="${l.color}" stroke-width="1.6" opacity="${op}">${lines.join("")}</g></g>`;
+    const g = (a: number) => `<g transform="translate(100 100) rotate(${a})" stroke="${l.color}" stroke-width="1.6" opacity="${op}">${lines.join("")}</g>`;
+    // Ringe: nur angedeutet (Kreise um das Loch und Rechtecke an der Wand reichen fürs Bild)
+    const rings = () => { let o = ""; for (let r = 26 + gap; r < 120; r += gap) o += `<circle cx="100" cy="100" r="${r.toFixed(1)}"/>`; return `<g fill="none" stroke="${l.color}" stroke-width="1.6" opacity="${op}">${o}</g>`; };
+    hatch = `<g clip-path="url(#llp-clip)">${l.fillKind === "rings" ? rings() : g(-l.angle) + (l.fillKind === "cross" ? g(90 - l.angle) : "")}</g>`;
   }
   const outline = line ? `<path d="${path}" fill="none" fill-rule="evenodd" stroke="${l.color}" stroke-width="2.4" opacity="${op}"/>` : "";
   const badges = [
@@ -205,7 +208,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
   const used = new Set(getLayers().map(l => l.color));
   const src: LaserLayer = layer ? { ...layer } : {
     id: "", name: "", color: LAYER_COLORS.find(c => !used.has(c)) || LAYER_COLORS[0], mode: "line",
-    power: 50, speed: 1000, fillPower: 50, fillSpeed: 1000, passes: 1, interval: 0.1, angle: 0, air: false, leadIn: 0, material: "", thickness: 0, notes: ""
+    power: 50, speed: 1000, fillPower: 50, fillSpeed: 1000, passes: 1, interval: 0.1, angle: 0, fillKind: "lines", air: false, leadIn: 0, overcut: 0, zStep: 0, material: "", thickness: 0, notes: ""
   };
   const num = (key: string, id: string, value: number, step: string, unit: string, cls = "", tipKey = "", min = "0") => `
     <label class="te-row ${cls}" ${tipKey ? `data-tip="${esc(t(tipKey))}"` : ""}><span>${esc(t(key))}</span>
@@ -236,6 +239,8 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
             ${num("laser.passes", "passes", src.passes, "1", "×", "", "llib.passesTip", "1")}
             <label class="te-row"><span>${esc(t("laser.air"))}</span><input id="lp-air" type="checkbox" ${src.air ? "checked" : ""} style="width:auto;"></label>
             ${num("laser.leadIn", "leadin", src.leadIn, "0.5", "mm", "llp-line", "laser.leadInTip")}
+            ${num("laser.overcut", "overcut", src.overcut, "0.5", "mm", "llp-line", "laser.overcutTip")}
+            ${num("laser.zStep", "zstep", src.zStep, "0.1", "mm", "llp-line", "laser.zStepTip")}
           </fieldset>
           <fieldset class="llp-fill"><legend>${esc(t("llib.fill"))}</legend>
             ${num("laser.fillPower", "fill-power", src.fillPower, "1", "%", "llp-both", "llib.fillPowerTip")}
@@ -243,6 +248,8 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
             ${num("laser.interval", "interval", src.interval, "0.01", "mm", "", "llib.intervalTip")}
             <div class="te-calc-res" id="lp-dpi"></div>
             ${num("laser.angle", "angle", src.angle, "15", "°", "", "", "-180")}
+            <label class="te-row" data-tip="${esc(t("laser.fillKindTip"))}"><span>${esc(t("laser.fillKind"))}</span>
+              <select id="lp-fillkind">${FILL_KINDS.map(k => `<option value="${k}"${src.fillKind === k ? " selected" : ""}>${esc(t("laser.fillKind." + k))}</option>`).join("")}</select></label>
           </fieldset>
           <fieldset><legend>${esc(t("llib.material"))}</legend>
             <label class="te-row"><span>${esc(t("llib.matName"))}</span>
@@ -273,7 +280,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
     root.querySelectorAll<HTMLElement>(".llp-line").forEach(e => { e.style.display = mode !== "fill" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".llp-both").forEach(e => { e.style.display = mode === "fill+line" ? "" : "none"; });
     root.querySelectorAll<HTMLElement>(".llp-mode").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
-    const prev = { color, mode, interval: val("interval") || 0.1, angle: val("angle") || 0, power: val("power") || 0, passes: Math.max(1, Math.round(val("passes") || 1)), air: q("air").checked };
+    const prev = { color, mode, interval: val("interval") || 0.1, angle: val("angle") || 0, power: val("power") || 0, passes: Math.max(1, Math.round(val("passes") || 1)), air: q("air").checked, fillKind: q<HTMLSelectElement>("fillkind").value as FillKind };
     q<HTMLElement>("preview").innerHTML = laserPreviewSvg(prev, 210);
     q<HTMLElement>("prevlabel").textContent = t("laser.info", { mode: t("laser.mode." + mode), p: f2(prev.power), f: f2(val("speed") || 0) })
       + (prev.passes > 1 ? ` · ${prev.passes}×` : "");
@@ -300,6 +307,7 @@ function mountEditor(root: HTMLElement, layer: LaserLayer | null) {
       name, color, mode,
       power: val("power"), speed: val("speed"), passes: val("passes"),
       interval: val("interval"), angle: val("angle"), air: q("air").checked, leadIn: val("leadin") || 0,
+      overcut: val("overcut") || 0, zStep: val("zstep") || 0, fillKind: q<HTMLSelectElement>("fillkind").value as FillKind,
       fillPower: val("fill-power"), fillSpeed: val("fill-speed"),
       material: q("material").value.trim(), thickness: val("thick") || 0,
       notes: q<HTMLTextAreaElement>("notes").value
