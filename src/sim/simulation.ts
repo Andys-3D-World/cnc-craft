@@ -23,7 +23,7 @@ import { motionLimits } from "./motionLimits";
 import { getMachineMode } from "../machineMode";
 import { zonesFromShapes } from "../keepOutShapes";
 import { state as appState } from "../main";
-import { SimProgram, MOVE_CUT, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
+import { SimProgram, MOVE_CUT, MOVE_RAPID, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
 import { parseGcodeAsync, WORKER_MIN_LINES } from "./parseAsync";
 import { SimView, ViewPreset } from "./simView";
 import { loadGcodeFromText, streamState, liveEditFloor, patchRunningJob } from "../machineStream";
@@ -48,8 +48,12 @@ import type { ToolGeom } from "../toolGraphics";
 import { fmtLen, fmtLenU, fmtLong, unitName } from "../units";
 import { esc } from "../setupSheet";
 import type { SimNote } from "./simNotes";
+import { lineHtml } from "../gcodeRef";
+import { openGcodeRef, refTip } from "../ui/gcodeRefDialog";
+import { haltLines, nextStop, scaledTime, stepLine, type Stop } from "./simStops";
+import { EXAMPLES, SNIPPETS } from "./examples";
 
-type Source = "design" | "job" | "none";
+type Source = "design" | "job" | "example" | "none";
 
 const ROW_H = 18;
 const SPEEDS = [1, 2, 5, 10, 25, 50, 100, 250, 1000];
@@ -62,6 +66,12 @@ let simTime = 0;
 let playing = false;
 let started = false;        // wurde abgespielt/gescrubbt? (sonst alles "fertig" zeigen)
 let speed = 10;
+// Anhalten beim Abspielen (simStops.ts) – nur auf dem Bildschirm, nie an der Maschine
+let single = false;
+let stopAtHalts = true;
+const breaks = new Set<number>();
+let halts: number[] = [];
+let feedPct = 100;          // Vorschub-Regler der Simulation in %
 let live = false;
 let lastFrame = 0;
 let log: (s: string) => void = () => {};
@@ -112,6 +122,10 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
         <div class="sim-toolbar">
           <span class="sim-source" id="sim-source">${t("sim.noProgram")}</span>
           <span style="flex:1"></span>
+          <select id="sim-example" class="sim-example" ${tip("sim.exTip")}>
+            <option value="">📁 ${t("sim.exTitle")}</option>
+            ${EXAMPLES.map(x => `<option value="${x.id}">${t("sim.ex." + x.id)}</option>`).join("")}
+          </select>
           <div class="sim-seg">
             <button class="sim-btn" data-view="top" ${tip("sim.viewTopTip")}>${T("sim.viewTop")}</button>
             <button class="sim-btn" data-view="iso" ${tip("sim.view3dTip")}>${T("sim.view3d")}</button>
@@ -148,6 +162,14 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
           <input type="range" id="sim-slider" min="0" max="1000" step="1" value="0">
           <span class="sim-time" id="sim-time">0:00 / 0:00</span>
         </div>
+        <div class="sim-controls sim-controls2">
+          <button class="sim-btn" id="sim-prev" ${tip("sim.prevTip")}>◂|</button>
+          <button class="sim-btn" id="sim-next" ${tip("sim.nextTip")}>|▸</button>
+          <label class="sim-check" ${tip("sim.singleTip")}><input type="checkbox" id="sim-single"> ${T("sim.single")}</label>
+          <label class="sim-check" ${tip("sim.haltTip")}><input type="checkbox" id="sim-halt" checked> ${T("sim.halt")}</label>
+          <label class="sim-check sim-feed" ${tip("sim.feedTip")}>${T("sim.feed")} <input type="range" id="sim-feed" min="10" max="200" step="5" value="100"> <b id="sim-feed-val">100 %</b></label>
+          <span class="sim-stop-msg" id="sim-stop-msg"></span>
+        </div>
       </div>
 
       <aside class="sim-side">
@@ -176,6 +198,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
         </div>
         <div class="sim-box sim-code-box">
           <h4>${T("sim.code")} <span id="sim-line-info"></span>
+            <button class="sim-btn sim-ed-toggle" id="sim-ref" ${tip("gref.btnTip")}>📚</button>
             <button class="sim-btn sim-ed-toggle" id="sim-ed-toggle" ${tip("sim.ed.editTip")}>✏️ ${T("sim.ed.edit")}</button></h4>
           <div class="sim-ed-bar" id="sim-ed-bar" style="display:none">
             <button class="sim-btn" id="sim-ed-undo" ${tip("sim.ed.undoTip")}>↶</button>
@@ -188,6 +211,9 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
               <option value="M0">M0 – ${t("sim.ed.insPause")}</option>
               <option value="F">F… – ${t("sim.ed.insFeed")}</option>
               <option value="G4">G4 P1 – ${t("sim.ed.insDwell")}</option>
+              <optgroup label="${t("sim.snTitle")}">
+                ${SNIPPETS.map(x => `<option value="sn:${x.id}">${t("sim.sn." + x.id)}</option>`).join("")}
+              </optgroup>
             </select>
             <span style="flex:1"></span>
             <button class="btn-primary" id="sim-ed-apply">✓ ${T("sim.ed.apply")}</button>
@@ -285,6 +311,26 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     seek((parseFloat((e.target as HTMLInputElement).value) / 1000) * prog.totalTime);
   });
 
+  $("sim-ref").addEventListener("click", () => openGcodeRef());
+  $<HTMLInputElement>("sim-single").addEventListener("change", e => { single = (e.target as HTMLInputElement).checked; });
+  $<HTMLInputElement>("sim-halt").addEventListener("change", e => { stopAtHalts = (e.target as HTMLInputElement).checked; });
+  $<HTMLInputElement>("sim-feed").addEventListener("input", e => { feedPct = parseFloat((e.target as HTMLInputElement).value) || 100; updateFeed(); });
+  for (const [id, dir] of [["sim-prev", -1], ["sim-next", 1]] as const) $(id).addEventListener("click", () => {
+    if (!prog || live) return;
+    playing = false;
+    seek(stepLine(prog, simTime, dir));
+  });
+  $<HTMLSelectElement>("sim-example").addEventListener("change", e => {
+    const sel = e.target as HTMLSelectElement, x = EXAMPLES.find(v => v.id === sel.value);
+    sel.value = "";
+    if (!x) return;
+    // läuft ein Job, bleibt seine Anzeige stehen; offene Änderungen nicht stillschweigend verwerfen
+    if (streamState.isRunning) { log(t("stream.alreadyRunning")); return; }
+    if (editing) { showEditMsg(t("sim.exEdit")); return; }
+    setSimProgram(x.lines.slice(), t("sim.ex." + x.id), "example");
+    log(t("sim.exLoaded", { name: t("sim.ex." + x.id) }));
+  });
+
   $("sim-to-job").addEventListener("click", () => {
     // echter G-Code aus der Zeichnung (die Vorschau kann bei der Drehachse abgewickelt sein)
     if (prog) void okToBuild().then(ok => { if (ok) buildJob(appState.shapes, log); });
@@ -316,6 +362,12 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     const row = (e.target as HTMLElement).closest("[data-line]") as HTMLElement | null;
     if (!row || !prog) return;
     const line = parseInt(row.dataset.line!, 10);
+    // Zeilennummer angeklickt: Haltepunkt an/aus
+    if ((e.target as HTMLElement).classList.contains("sim-ln") && !editing) {
+      if (!breaks.delete(line)) breaks.add(line);
+      renderCodeList();
+      return;
+    }
     selectLine(line);
     if (live) { renderCodeList(); return; }
     const i = firstMoveOfLine(prog, line);
@@ -419,7 +471,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     }
   });
 
-  window.addEventListener("cnc-language-changed", () => { updateInfo(); updateUI(); updateJobState(); updateEditUI(); updateCarveUI(true); });
+  window.addEventListener("cnc-language-changed", () => { renderCodeList(); updateInfo(); updateUI(); updateJobState(); updateEditUI(); updateCarveUI(true); });
   window.addEventListener("cnc-redraw", () => { const b = bedSizeMm(); view.setBed(b.w, b.h); });
 
   const b = bedSizeMm();
@@ -489,6 +541,7 @@ function showSimProgram(p: SimProgram, name: string, src: Source) {
   view.setBed(b.w, b.h);
   view.setZones(getMachineMode() === "mill" ? zonesFromShapes(appState.shapes) : []);
   prog = p;
+  newStops(p);
   source = src;
   label = name;
   simTime = 0;
@@ -512,6 +565,25 @@ function showSimProgram(p: SimProgram, name: string, src: Source) {
   renderCodeList();
 }
 
+/** Warum steht die Simulation? (leer = läuft oder frei gewählt) */
+function showStop(s: Stop | null) {
+  const el = $("sim-stop-msg");
+  el.textContent = s && s.why !== "single" ? t("sim.stop." + s.why, { n: s.line + 1 }) : "";
+  if (s && s.why !== "single") scrollCodeTo(s.line, true);
+}
+
+function updateFeed() {
+  $("sim-feed-val").textContent = `${feedPct} %` + (prog && feedPct !== 100 ? ` → ${fmtTime(scaledTime(prog, feedPct / 100))}` : "");
+}
+
+/** Neues Programm: alte Haltepunkte gehören nicht dazu */
+function newStops(p: SimProgram) {
+  breaks.clear();
+  halts = haltLines(p.lines);
+  showStop(null);
+  updateFeed();
+}
+
 /** Zeitpunkt kurz vor dem Ende einer Bewegung (so bleibt ihre Zeile die aktuelle) */
 function moveEnd(i: number): number {
   if (!prog) return 0;
@@ -521,6 +593,7 @@ function moveEnd(i: number): number {
 function togglePlay() {
   if (!prog || live) return;
   if (!playing && simTime >= prog.totalTime - 1e-6) simTime = 0;
+  showStop(null);
   playing = !playing;
   started = true;
   lastFrame = performance.now();
@@ -529,6 +602,7 @@ function togglePlay() {
 
 function seek(time: number) {
   if (!prog) return;
+  showStop(null);
   started = true;
   simTime = Math.max(0, Math.min(prog.totalTime, time));
   applyTime(true);
@@ -544,7 +618,11 @@ function tick(now: number) {
   updateCarveUI();
   if (playing && prog) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
-    simTime += dt * speed;
+    const at = positionAt(prog, simTime).i;
+    const to = simTime + dt * speed * (at >= 0 && prog.type[at] !== MOVE_RAPID ? feedPct / 100 : 1);
+    const stop = single || breaks.size || (stopAtHalts && halts.length) ? nextStop(prog, simTime, to, { single, breaks, halts: stopAtHalts ? halts : [] }) : null;
+    simTime = stop ? stop.time : to;
+    if (stop) { playing = false; showStop(stop); }
     if (simTime >= prog.totalTime) { simTime = prog.totalTime; playing = false; }
     applyTime(true, true);
   } else if (live && prog && liveAt && streamState.onMachine && now - liveFrame >= liveFrameGap()) {
@@ -645,7 +723,7 @@ function updateUI() {
   slider.disabled = !has || live;
   $<HTMLButtonElement>("sim-play").disabled = !has || live;
   $("sim-source").textContent = prog
-    ? `${source === "job" ? t("sim.sourceJob") : t("sim.sourceDesign")}: ${label}`
+    ? `${t(source === "job" ? "sim.sourceJob" : source === "example" ? "sim.sourceExample" : "sim.sourceDesign")}: ${label}`
     : t("sim.noProgram");
   if (prog && started) {
     const p = positionAt(prog, simTime);
@@ -711,10 +789,13 @@ function updateJobState() {
   const el = $("sim-job-state");
   const toJob = $<HTMLButtonElement>("sim-to-job");
   toJob.style.display = source === "design" ? "block" : "none";
+  // Beispiel: der geladene Job ist ein anderer als das Bild – von hier aus nicht starten (Stopp bleibt immer)
+  for (const id of ["sim-job-start", "sim-job-resume"]) $<HTMLButtonElement>(id).disabled = source === "example" && !streamState.isRunning;
   const st = streamState;
   if (st.isRunning) el.textContent = (st.isPaused ? t("sim.jobPaused") : t("sim.jobRunning")) + ` – ${st.currentLine}/${st.totalLines}`;
   else if (st.totalLines) el.textContent = t("sim.jobReady", { n: st.totalLines });
   else el.textContent = t("sim.jobNone");
+  if (source === "example" && !st.isRunning) el.textContent = t("sim.exOnly");
 }
 
 // ---------------- Material ----------------
@@ -759,10 +840,11 @@ function carveTools(lines: string[]): (ToolGeom | null)[] {
  * (3D-Fläche), bleibt etwas Boden darunter, damit keine falschen Löcher entstehen.
  */
 function autoThickness(p: SimProgram, dia: number): number {
-  const deep = -p.cutMinZ;
+  let deep = -p.cutMinZ, low = 0;
   let len = 0, x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, flat = 0, sloped = 0;
   for (let i = 0; i < p.n; i++) {
     if (p.type[i] !== MOVE_CUT) continue;
+    low = Math.max(low, -p.z1[i]);
     const l = Math.hypot(p.x1[i] - p.x0[i], p.y1[i] - p.y0[i]);
     if (Math.abs(p.z1[i] - p.z0[i]) > 0.01) sloped += l; else flat += l;
     if (Math.abs(p.z0[i] - p.cutMinZ) > 0.01 || Math.abs(p.z1[i] - p.cutMinZ) > 0.01) continue;
@@ -770,6 +852,8 @@ function autoThickness(p: SimProgram, dia: number): number {
     x0 = Math.min(x0, p.x0[i], p.x1[i]); x1 = Math.max(x1, p.x0[i], p.x1[i]);
     y0 = Math.min(y0, p.y0[i], p.y1[i]); y1 = Math.max(y1, p.y0[i], p.y1[i]);
   }
+  // schräge Bahnen (senkrechte Bögen, 3D-Fläche) gehen tiefer, als die waagerechten zeigen
+  if (sloped >= flat) deep = Math.max(deep, low);
   // Anteil der Fläche, den die Bahnen auf der tiefsten Ebene überstreichen
   const area = (x1 - x0 + dia) * (y1 - y0 + dia);
   // meist schräge Bahnen = 3D-Fläche
@@ -905,9 +989,9 @@ function renderCodeList() {
       html += `<div class="sim-row edit${cls}" data-line="${i}" style="top:${i * ROW_H}px"><span>${i + 1}</span><i id="sim-ed-slot"></i></div>`;
       continue;
     }
-    // G-Code aus Dateien ist fremder Text -> immer maskieren
-    const txt = lines[i].replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]!));
-    html += `<div class="sim-row${cls}" data-line="${i}" style="top:${i * ROW_H}px"><span>${i < floor ? "🔒" : i + 1}</span>${txt || "&nbsp;"}</div>`;
+    // G-Code aus Dateien ist fremder Text -> lineHtml maskiert jedes Stück
+    const txt = lineHtml(lines[i], refTip);
+    html += `<div class="sim-row${cls}" data-line="${i}" style="top:${i * ROW_H}px"><span class="sim-ln${breaks.has(i) ? " bp" : ""}">${i < floor ? "🔒" : i + 1}</span>${txt || "&nbsp;"}</div>`;
   }
   // offenes Eingabefeld beim Neuaufbau behalten (Fokus und Cursor bleiben)
   const focused = !!edInput && document.activeElement === edInput;
@@ -958,6 +1042,7 @@ function leaveEdit(discard: boolean) {
   closeEdit();
   if (discard && changed && prog) {
     prog = parseSim(editBase);
+    halts = haltLines(editBase);
     view.replaceProgram(prog);
     rebuildCarve();
     if (source === "job" && streamState.isRunning) simTime = timeBeforeLine(prog, streamState.currentLine);
@@ -987,9 +1072,11 @@ function change(next: string[], sel = selLine) {
 
 function setDraft(next: string[], sel: number) {
   draft = next;
+  breaks.clear(); // Zeilen verschieben sich beim Bearbeiten
   selLine = Math.min(sel, next.length - 1);
   hiLine = selLine;
   prog = parseSim(draft);
+  halts = haltLines(draft);
   view.replaceProgram(prog);
   rebuildCarve();
   view.setHighlight(hiLine);
@@ -1046,6 +1133,14 @@ function insertLine(kind: string) {
   closeInput(true);
   const at = selLine >= 0 ? selLine + 1 : draft.length;
   if (lockedMsg(at)) return;
+  const sn = kind.startsWith("sn:") ? SNIPPETS.find(x => x.id === kind.slice(3)) : null;
+  if (sn) {
+    const all = draft.slice();
+    all.splice(at, 0, ...sn.lines);
+    change(all, at);
+    scrollCodeTo(at, true);
+    return;
+  }
   const text = kind === "M0" ? `M0 (${ascii(tMm("sim.ed.insPause"))})` : kind === "G4" ? "G4 P1" : kind === "F" ? "F" + guessFeed(at) : "";
   const next = draft.slice();
   next.splice(at, 0, text);
@@ -1163,7 +1258,8 @@ async function applyEdit() {
   }
   if (streamState.isRunning) { showEditMsg(t("stream.alreadyRunning")); return; }
   keepViewOnce = true;
-  if (!loadGcodeFromText(lines.join("\n"), label || t("sim.loadedJob"), log, streamState.fromFile)) { keepViewOnce = false; return; }
+  // Beispiel oder Datei: fremder G-Code, mit Prüfung
+  if (!loadGcodeFromText(lines.join("\n"), label || t("sim.loadedJob"), log, source === "example" || (source === "job" && streamState.fromFile))) { keepViewOnce = false; return; }
   // cnc-job-loaded hat die Bearbeitung beendet und den neuen Job angezeigt
   log(t("sim.ed.applied"));
 }

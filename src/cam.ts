@@ -712,9 +712,15 @@ const generateGcodeInner = (shapes: any): string | null => {
     const b = shape.type === "circle" ? null : shapeBounds(shape);
     const cPx = b ? { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 } : { x: shape.x, y: shape.y };
     const holeDia = (b ? Math.max(b.maxX - b.minX, b.maxY - b.minY) : 2 * Math.abs(shape.w)) / MM_TO_PIXEL;
-    if (Math.abs(holeDia - toolDiameter) > 0.05) lastGcodeWarnings.push(t("gcw.drillSize", { n: formCounter, h: holeDia.toFixed(2), d: toolDiameter }));
+    // Anbohrer: zentriert nur, sein Ø muss nicht zum Loch passen
+    if (curTool?.type !== "spotdrill" && Math.abs(holeDia - toolDiameter) > 0.05) lastGcodeWarnings.push(t("gcw.drillSize", { n: formCounter, h: holeDia.toFixed(2), d: toolDiameter }));
     const p = toMachine(cPx.x, cPx.y);
     gcode += `G0 Z${SAFE_Z.toFixed(2)}\nG0 X${p.x.toFixed(3)} Y${p.y.toFixed(3)}\nG0 Z${DRILL_CLEAR.toFixed(2)}\n`;
+    // Reibahle: in einem Zug auf Tiefe und mit Vorschub wieder heraus (Eilgang nach oben macht Riefen)
+    if (curTool?.type === "reamer") {
+      gcode += `G1 Z${passes[passes.length - 1].toFixed(3)} F${PLUNGE_FEED}\nG1 Z${DRILL_CLEAR.toFixed(2)}\nG0 Z${SAFE_Z.toFixed(2)}\n`;
+      return;
+    }
     passes.forEach((z, i) => {
       if (i > 0) gcode += `G0 Z${DRILL_CLEAR.toFixed(2)} ${c("gc.peck")}\nG0 Z${(passes[i - 1] + 0.3).toFixed(3)}\n`;
       gcode += `G1 Z${z.toFixed(3)} F${PLUNGE_FEED}\n`;
@@ -924,7 +930,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   const alreadyChained = new Set<string>();
   /** Vorschub-Anpassung nur bei Fräsern mit Schneide am Umfang – nicht Bohren, V-Carve, Fase, adaptive Tasche */
   const adaptsFeed = (shape: any): boolean => {
-    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "threadmill")) return false;
+    if (curTool && (CONE_TYPES.includes(curTool.type) || curTool.type === "drill" || curTool.type === "reamer" || curTool.type === "threadmill")) return false;
     if (shape.restOf) return true;
     const mode = shape.millingMode || "outside";
     if (mode === "drill" || mode === "vcarve" || mode === "vplug" || mode === "chamfer" || mode === "face") return false;
@@ -1093,7 +1099,7 @@ const generateGcodeInner = (shapes: any): string | null => {
       return;
     }
     // V-Stichel, Bohrer und Senker taugen nicht für Konturen mit Fräser-Versatz/Taschen
-    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "countersink" || curTool.type === "threadmill")) {
+    if (curTool && mode !== "on-line" && (curTool.type === "vbit" || curTool.type === "drill" || curTool.type === "spotdrill" || curTool.type === "reamer" || curTool.type === "countersink" || curTool.type === "threadmill")) {
       const w = t("gcw.toolType", { name: curTool.name, type: t("tl.type." + curTool.type) });
       if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w);
     }

@@ -6,7 +6,7 @@
  * "Standard-Werkzeug" (activeTool).
  *
  * Ein Werkzeug hat wie in Estlcam eine Art (Schaftfräser, Kugelfräser, Torusfräser,
- * V-Stichel, Fasenfräser, Senker, Bohrer, Planfräser, Gewindefräser), Schneidenzahl, Spiral-Richtung,
+ * V-Stichel, Fasenfräser, Senker, Bohrer, Anbohrer, Reibahle, Planfräser, Gewindefräser), Schneidenzahl, Spiral-Richtung,
  * Maße (Ø, Schaft, Schneidenlänge, Gesamtlänge, Winkel, Spitze, Eckenradius) und
  * Schnittdaten. Der Schnittdaten-Rechner schlägt Drehzahl, Vorschub und Zustellung vor
  * (Material + Werkzeug + Grenzen der Maschine aus den Werkzeug-Einstellungen).
@@ -41,9 +41,9 @@ export interface MillingTool extends ToolGeom {
   device?: string;     // Werkstatt-Sync: Rechner der letzten Änderung
 }
 
-export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "facemill", "threadmill"];
+export const TOOL_TYPES: ToolType[] = ["endmill", "ball", "bullnose", "vbit", "chamfer", "countersink", "drill", "spotdrill", "reamer", "facemill", "threadmill"];
 /** Arten mit Kegel-Spitze (Winkel zählt) */
-export const CONE_TYPES: ToolType[] = ["vbit", "chamfer", "countersink", "drill"];
+export const CONE_TYPES: ToolType[] = ["vbit", "chamfer", "countersink", "drill", "spotdrill"];
 
 /** Typische Maße je Art – für neue Werkzeuge und die Bilder auf den Art-Knöpfen */
 export const TYPE_DEFAULTS: Record<ToolType, Omit<ToolGeom, "type">> = {
@@ -54,6 +54,8 @@ export const TYPE_DEFAULTS: Record<ToolType, Omit<ToolGeom, "type">> = {
   chamfer:     { diameter: 12, shankDia: 6,     fluteLen: 0,  length: 50, flutes: 2, helix: "straight", angle: 90,  tipDia: 1,   cornerR: 0 },
   countersink: { diameter: 12, shankDia: 6,     fluteLen: 0,  length: 45, flutes: 3, helix: "straight", angle: 90,  tipDia: 0,   cornerR: 0 },
   drill:       { diameter: 3,  shankDia: 3,     fluteLen: 20, length: 61, flutes: 2, helix: "up",       angle: 118, tipDia: 0,   cornerR: 0 },
+  spotdrill:   { diameter: 6,  shankDia: 6,     fluteLen: 10, length: 50, flutes: 2, helix: "straight", angle: 90,  tipDia: 0,   cornerR: 0 },
+  reamer:      { diameter: 6,  shankDia: 6,     fluteLen: 26, length: 93, flutes: 6, helix: "straight", angle: 0,   tipDia: 0,   cornerR: 0 },
   facemill:    { diameter: 25, shankDia: 8,     fluteLen: 3,  length: 45, flutes: 2, helix: "straight", angle: 0,   tipDia: 0,   cornerR: 0 },
   // Gewindefräser – Einzahn für M8 (Ø6,5, Hals Ø4,7, Schulterlänge 24): schneidet jede Steigung.
   // angle = Flankenwinkel (metrisch 60°), pitch = Steigung (nur mehrzahnige Fräser)
@@ -72,10 +74,11 @@ export interface ToolSettings {
   minRpm: number;    // kleinste Drehzahl der Spindel (0 = egal)
   maxRpm: number;    // größte Drehzahl der Spindel
   maxFeed: number;   // größter sinnvoller Vorschub der Maschine (mm/min)
+  spindleW: number;  // Leistung der Spindel in Watt (0 = unbekannt) – nur für die Belastungs-Anzeige (cutLoad.ts)
   material: string;  // Material, das der Rechner vorschlägt
 }
 const KEY_SETTINGS = "cnc_craft_tool_settings";
-export const toolSettings: ToolSettings = { minRpm: 0, maxRpm: 24000, maxFeed: 3000, material: "softwood" };
+export const toolSettings: ToolSettings = { minRpm: 0, maxRpm: 24000, maxFeed: 3000, spindleW: 0, material: "softwood" };
 
 /**
  * MATERIAL-DATENBANK für den Rechner (Hartmetall-Fräser, Hobby-/Portalfräsen):
@@ -201,11 +204,14 @@ export function calcCutData(tool: ToolGeom & { toolMat?: ToolMat }, materialId: 
   if (feed > maxFeed) { feed = maxFeed; limited = true; }
   let stepZ = m.ap * dEff * (conical ? 0.5 : 1);
   if (tool.type === "drill") stepZ = Math.max(0.5, dEff * (m.ap >= 0.5 ? 1 : 0.5)); // Spanbrech-Tiefe
+  // Anbohrer und Reibahle setzen nicht ab: eine Zustellung = ganze Schneide. Reiben langsam (halbe Drehzahl)
+  if (tool.type === "spotdrill" || tool.type === "reamer") stepZ = Math.max(0.5, tool.fluteLen);
+  if (tool.type === "reamer") { rpm = Math.max(st.minRpm > 0 ? st.minRpm : 0, rpm * 0.5); feed *= 0.5; }
   // Gewindefräser: das ganze Zahnprofil schneidet gleichzeitig -> halber Vorschub, Zustellung = eine Steigung
   if (tool.type === "threadmill") { feed *= tool.threadSingle ? 0.35 : 0.5; stepZ = Math.max(0.2, tool.pitch || 1); }
   if (tool.fluteLen > 0 && !conical) stepZ = Math.min(stepZ, tool.fluteLen);
   stepZ = Math.max(0.05, stepZ);
-  const plunge = tool.type === "drill" ? feed * 0.5 : feed * 0.3;
+  const plunge = tool.type === "drill" || tool.type === "spotdrill" || tool.type === "reamer" ? feed * 0.5 : feed * 0.3;
   const r = (v: number, s: number) => Math.round(v / s) * s;
   return {
     rpm: r(rpm, 100), feedrate: Math.max(10, r(feed, 10)), plungeFeed: Math.max(20, r(plunge, 10)),
@@ -218,6 +224,7 @@ export function setToolSettings(s: Partial<ToolSettings>) {
   if (s.minRpm !== undefined) toolSettings.minRpm = num(s.minRpm, toolSettings.minRpm, 0, 100000);
   if (s.maxRpm !== undefined) toolSettings.maxRpm = num(s.maxRpm, toolSettings.maxRpm, 100, 100000);
   if (s.maxFeed !== undefined) toolSettings.maxFeed = num(s.maxFeed, toolSettings.maxFeed, 10, 100000);
+  if (s.spindleW !== undefined) toolSettings.spindleW = num(s.spindleW, toolSettings.spindleW, 0, 30000);
   if (s.material !== undefined && MATERIALS.some(m => m.id === s.material)) toolSettings.material = s.material;
   try { localStorage.setItem(KEY_SETTINGS, JSON.stringify(toolSettings)); } catch { /* egal */ }
   window.dispatchEvent(new CustomEvent(TOOLS_CHANGED));

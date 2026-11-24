@@ -34,7 +34,7 @@ export function profile(tool: ToolGeom | null): (r: number) => number {
     const cr = Math.min(R, Math.max(0, tool?.cornerR ?? 0)), flat = R - cr;
     return r => (r > R ? Infinity : r <= flat ? 0 : cr - Math.sqrt(Math.max(0, cr * cr - (r - flat) ** 2)));
   }
-  if (type === "vbit" || type === "chamfer" || type === "countersink" || type === "drill") {
+  if (type === "vbit" || type === "chamfer" || type === "countersink" || type === "drill" || type === "spotdrill") {
     const half = ((tool?.angle || (type === "drill" ? 118 : 90)) * Math.PI) / 360;
     const tr = Math.min(R, Math.max(0, (tool?.tipDia ?? 0) / 2)), k = 1 / Math.tan(Math.max(0.05, half));
     return r => (r > R ? Infinity : r <= tr ? 0 : (r - tr) * k);

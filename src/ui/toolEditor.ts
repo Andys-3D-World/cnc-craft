@@ -2,7 +2,7 @@
  * WERKZEUG-EDITOR – wie der Werkzeug-Dialog in Estlcam
  *
  *   - Art per Bild wählen: Schaftfräser, Kugelfräser, Torusfräser, V-Stichel, Fasenfräser,
- *     Senker, Bohrer, Planfräser
+ *     Senker, Bohrer, Anbohrer, Reibahle, Planfräser
  *   - Schneidenzahl (1, 2, 3, 4, 6 …) mit Ansicht von unten, Spiral-Richtung
  *     (aufwärts / abwärts / Kompression / gerade), Schneidstoff (Hartmetall / HSS)
  *   - Maße passend zur Art (Winkel nur bei Kegel-Werkzeugen, Eckenradius nur beim Torusfräser …)
@@ -22,6 +22,7 @@ import {
 } from "../toolLibrary";
 import { COATINGS, COATING_LABEL } from "../toolCoating";
 import { openMaterialDb } from "./materialDbDialog";
+import { cutLoad } from "../cutLoad";
 import { toolSideSvg, toolEndSvg, toolIconSvg, coneHeight } from "../toolGraphics";
 import { fmtDia, fmtFeed, isInch } from "../units";
 
@@ -34,7 +35,7 @@ const FLUTE_CHOICES = [1, 2, 3, 4, 6];
 /** Vorschlag für den Namen, z. B. "3 mm Schaftfräser 2-schneidig" oder "V-Stichel 60° Ø6" */
 export function autoToolName(x: { type: ToolType; diameter: number; flutes: number; angle: number; pitch?: number; threadSingle?: boolean }): string {
   const typ = toolTypeName(x);
-  if (x.type === "vbit" || x.type === "chamfer" || x.type === "countersink") return t("tl.autoNameAngle", { type: typ, a: fmt(x.angle), d: fmt(x.diameter) });
+  if (x.type === "vbit" || x.type === "chamfer" || x.type === "countersink" || x.type === "spotdrill") return t("tl.autoNameAngle", { type: typ, a: fmt(x.angle), d: fmt(x.diameter) });
   if (x.type === "threadmill") return x.threadSingle
     ? t("tl.autoNameSingle", { type: typ, d: fmt(x.diameter) })
     : t("tl.autoNamePitch", { type: typ, p: fmt(x.pitch || 1), d: fmt(x.diameter) });
@@ -118,6 +119,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
               <button type="button" id="${p}calc" class="btn-secondary">🧮 ${esc(t("tl.calc"))}</button>
             </div>
             <div class="te-calc-res" id="${p}calcres"></div>
+            <div class="te-load" id="${p}load" data-tip="${esc(t("load.tip"))}"></div>
           </fieldset>
           <label class="te-row te-notes"><span>${esc(t("tl.notes"))}</span>
             <textarea id="${p}notes" rows="2" placeholder="${esc(t("tl.notesPh"))}">${esc(src.notes || "")}</textarea></label>
@@ -158,6 +160,18 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     notes: q<HTMLTextAreaElement>("notes").value
   });
 
+  /** Belastung bei voller Nutbreite (cutLoad.ts) */
+  const showLoad = (g: MillingTool) => {
+    const el = q<HTMLElement>("load"), mat = q<HTMLSelectElement>("mat").value;
+    const r = cutLoad(g, mat, calcCutData(g, mat), toolSettings.spindleW, toolSettings.maxRpm);
+    el.style.display = r ? "" : "none";
+    if (!r) return;
+    const n = (v: number, d: number) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString(undefined, { maximumFractionDigits: d });
+    const w = (v: number) => n(v, v < 10 ? 1 : 0);
+    el.innerHTML = `<div>${esc(t("load.line", { mat: materialName(mat), fz: n(r.fz, 4), q: n(r.q, 2) }))}</div>`
+      + (r.watt ? `<div>${esc(t("load.power", { a: w(r.watt[0]), b: w(r.watt[1]) }))}${r.avail ? ` ${esc(t("load.avail", { w: w(r.avail) }))}` : ""}</div>` : `<div class="te-load-dim">${esc(t("load.noPower"))}</div>`)
+      + r.warn.map(x => `<div class="te-load-warn">⚠ ${esc(t("load.warn." + x))}</div>`).join("");
+  };
   const refresh = () => {
     const g = read();
     root.querySelectorAll<HTMLElement>(".te-type").forEach(b => b.classList.toggle("active", b.dataset.type === type));
@@ -179,6 +193,7 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     q<HTMLElement>("side").innerHTML = toolSideSvg(g, { w, h: hh, dims: true, t });
     q<HTMLElement>("end").innerHTML = toolEndSvg(g, h.compact ? 70 : 84);
     q<HTMLElement>("endlabel").textContent = t("tl.flutesN", { n: g.flutes });
+    showLoad(g);
     if (lastAuto !== null && (q("name").value === lastAuto || q("name").value === "")) {
       lastAuto = autoToolName(g);
       q("name").value = lastAuto;
@@ -378,6 +393,7 @@ export function renderToolPage(withEditor = true) {
             <label class="te-row" data-tip="${esc(t("tl.set.maxRpmTip"))}"><span>${esc(t("tl.set.maxRpm"))}</span><span class="dlg-num"><input id="tps-maxrpm" type="number" min="100" step="1000"><em>${esc(t("unit.rpm"))}</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.minRpmTip"))}"><span>${esc(t("tl.set.minRpm"))}</span><span class="dlg-num"><input id="tps-minrpm" type="number" min="0" step="1000"><em>${esc(t("unit.rpm"))}</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.maxFeedTip"))}"><span>${esc(t("tl.set.maxFeed"))}</span><span class="dlg-num"><input id="tps-maxfeed" type="number" min="10" step="100"><em>mm/min</em></span></label>
+            <label class="te-row" data-tip="${esc(t("tl.set.spindleTip"))}"><span>${esc(t("tl.set.spindle"))}</span><span class="dlg-num"><input id="tps-spindle" type="number" min="0" step="50"><em>W</em></span></label>
             <label class="te-row"><span>${esc(t("tl.set.material"))}</span><span class="tps-matrow"><select id="tps-mat"></select>
               <button id="tps-matdb" class="btn-secondary btn-icon" type="button" data-tip="${esc(t("matdb.btnTip"))}">📚</button></span></label>
             <button id="tps-all" class="btn-secondary" data-tip="${esc(t("tl.set.allTip"))}">🧮 ${esc(t("tl.set.all"))}</button>
@@ -437,7 +453,7 @@ export function renderToolPage(withEditor = true) {
   if (matSel && document.activeElement !== matSel) {
     matSel.innerHTML = MATERIALS.map(m => `<option value="${esc(m.id)}">${esc(materialName(m.id))}</option>`).join("");
   }
-  setv("tps-maxfeed", String(toolSettings.maxFeed)); setv("tps-mat", toolSettings.material);
+  setv("tps-maxfeed", String(toolSettings.maxFeed)); setv("tps-spindle", String(toolSettings.spindleW)); setv("tps-mat", toolSettings.material);
   (page.querySelector("#tp-dup") as HTMLButtonElement).disabled = pageNew || !pageSel;
   (page.querySelector("#tp-up") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, -1);
   (page.querySelector("#tp-down") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, 1);
@@ -515,12 +531,12 @@ function bindPage(page: HTMLElement) {
   };
   page.querySelector("#tp-up")!.addEventListener("click", () => move(-1));
   page.querySelector("#tp-down")!.addEventListener("click", () => move(1));
-  const bind = (id: string, key: "maxRpm" | "minRpm" | "maxFeed" | "material") => {
+  const bind = (id: string, key: "maxRpm" | "minRpm" | "maxFeed" | "spindleW" | "material") => {
     const el = page.querySelector("#" + id) as HTMLInputElement;
     el.addEventListener("change", () => setToolSettings({ [key]: key === "material" ? el.value : parseFloat(el.value) } as any));
   };
   page.querySelector("#tps-matdb")?.addEventListener("click", () => openMaterialDb());
-  bind("tps-maxrpm", "maxRpm"); bind("tps-minrpm", "minRpm"); bind("tps-maxfeed", "maxFeed"); bind("tps-mat", "material");
+  bind("tps-maxrpm", "maxRpm"); bind("tps-minrpm", "minRpm"); bind("tps-maxfeed", "maxFeed"); bind("tps-spindle", "spindleW"); bind("tps-mat", "material");
   // Alle Werkzeuge für das gewählte Material neu berechnen
   page.querySelector("#tps-all")!.addEventListener("click", () => {
     const mat = toolSettings.material;

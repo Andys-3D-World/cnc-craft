@@ -23,7 +23,8 @@ const TYPE_MAP: Record<string, ToolType> = {
   "chamfer mill": "chamfer",
   "face mill": "facemill",
   "drill": "drill",
-  "spot drill": "drill",
+  "spot drill": "spotdrill",
+  "reamer": "reamer",
   "counter sink": "countersink",
   "thread mill": "threadmill",
 };
@@ -86,7 +87,7 @@ export function fusionToTools(data: any, material = "softwood"): FusionImport {
       if (num(g.TA) !== undefined) t.angle = num(g.TA)! * 2;
       t.tipDia = mm(g["tip-diameter"]) ?? 0;
     }
-    if (type === "drill" || type === "countersink") t.angle = num(g.SIG);
+    if (type === "drill" || type === "spotdrill" || type === "countersink") t.angle = num(g.SIG);
     if (type === "threadmill") {
       t.pitch = mm(g.TP);
       t.angle = num(g["thread-profile-angle"]) ?? 60;

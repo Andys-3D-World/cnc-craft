@@ -10,7 +10,7 @@
  * Alles ohne Bibliothek, nur SVG-Text – funktioniert in der App und im Test-Browser.
  */
 
-export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "facemill" | "threadmill";
+export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "spotdrill" | "reamer" | "facemill" | "threadmill";
 export type Helix = "up" | "down" | "compression" | "straight";
 
 /** Die Maße, die man zum Zeichnen braucht (Teil von MillingTool) */
@@ -40,7 +40,7 @@ export function coneHeight(g: ToolGeom): number {
   const R = g.diameter / 2;
   const half = Math.max(1, Math.min(179, g.angle)) / 2 * Math.PI / 180;
   if (g.type === "vbit" || g.type === "chamfer" || g.type === "countersink") return Math.max(0, (R - g.tipDia / 2)) / Math.tan(half);
-  if (g.type === "drill") return R / Math.tan(half);
+  if (g.type === "drill" || g.type === "spotdrill") return R / Math.tan(half);
   return 0;
 }
 
@@ -71,7 +71,7 @@ function cutterProfile(g: ToolGeom): { pts: P[]; top: number } {
       if (top > h + 1e-6) pts.push([R, top]);
       break;
     }
-    case "drill": {
+    case "drill": case "spotdrill": {
       const h = coneHeight(g);
       pts.push([0, 0], [R, h]);
       top = Math.max(top, h);
@@ -98,7 +98,7 @@ function cutterProfile(g: ToolGeom): { pts: P[]; top: number } {
       if (top > teeth * P + 1e-6) pts.push([Ri, top]);
       break;
     }
-    default: // endmill, facemill
+    default: // endmill, facemill, reamer
       pts.push([0, 0], [R, 0], [R, top]);
   }
   return { pts, top };
@@ -199,7 +199,7 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
       dims += `<text x="${n(X(g.shankDia / 2) + 6)}" y="${n(yS)}">${tr("tl.g.shankShort")} Ø ${fmt(g.shankDia)}</text>`;
     }
     // Winkel
-    if (conical || g.type === "drill") {
+    if (conical || g.type === "drill" || g.type === "spotdrill") {
       dims += `<text x="${n(cx)}" y="${n(Y(coneHeight(g) * 0.5) + 4)}" text-anchor="middle" class="tg-angle">${fmt(g.angle)}°</text>`;
     }
     if (g.type === "threadmill") {

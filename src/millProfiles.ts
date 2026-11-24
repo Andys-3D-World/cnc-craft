@@ -112,7 +112,7 @@ export function clampCut(v: CutValues, tool: CutTool, st: CutLimits): CutValues 
     plungeFeed = v.plungeFeed;
     if (plungeFeed > maxFeed) { plungeFeed = maxFeed; limited = true; }
   } else {
-    const share = Math.max(10, Math.round((feedrate * (tool.type === "drill" ? 0.5 : 0.3)) / 10) * 10);
+    const share = Math.max(10, Math.round((feedrate * (tool.type === "drill" || tool.type === "spotdrill" || tool.type === "reamer" ? 0.5 : 0.3)) / 10) * 10);
     plungeFeed = tool.plungeFeed && tool.plungeFeed > 0 ? Math.min(tool.plungeFeed, share) : share;
   }
   return { feedrate, rpm, stepZ, plungeFeed, limited };
