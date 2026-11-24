@@ -44,7 +44,7 @@ T = {
    ("♻️", "Remnant sheets", "Used areas are remembered – parts placed on them are not cut again."),
    ("🔒", "Private", "No telemetry, no account, no cloud. Your drawings stay on your computer."),
    ("🔄", "Updates in the app", "One click to update – signed updates straight from GitHub.")],
-  nh="New in 0.4.8", nl="FluidNC boards connect properly again: CNC Craft 0.4.7 took one of FluidNC's answers for a restart and started over without end, over USB and Wi-Fi. New: save G-code files for LinuxCNC, Mach3 and Mach4, in millimetres or inches (not yet tried on those controllers, testers welcome).",
+  nh="New in 0.4.9", nl="Split a large part: cut parts that are bigger than your machine as pieces with joints, on router, laser and plasma (not yet cut on a real machine, testers welcome). Linked copies follow their original. The node graph is easier to use and has 16 new nodes. Fixed: laser and plasma detours no longer leave the work area.",
   news=[("new/sim-mill.jpg", "Live material removal – milled anodized aluminium turns bare silver"), ("new/sim-laser.jpg", "Laser: engraving and cut on birch"),
         ("new/sim-rotary.jpg", "Rotary axis: the part turns, the cutter stays on top"), ("gen/wordtiles.png", "Word tile ornaments"),
         ("gen/shadowbox.png", "Shadow boxes with LED cut-outs"), ("gen/slotornament.png", "3D slot ornaments")],
@@ -120,7 +120,7 @@ T = {
    ("♻️", "Restplatten", "Verbrauchte Flächen werden gemerkt – Teile darauf werden nicht noch einmal geschnitten."),
    ("🔒", "Privat", "Keine Telemetrie, kein Konto, keine Cloud. Deine Zeichnungen bleiben auf deinem Rechner."),
    ("🔄", "Updates im Programm", "Ein Klick zum Aktualisieren – unterschriebene Updates direkt von GitHub.")],
-  nh="Neu in 0.4.8", nl="FluidNC-Boards verbinden sich wieder richtig: CNC Craft 0.4.7 hielt eine Antwort von FluidNC für einen Neustart und fing ohne Ende von vorn an, per USB und WLAN. Neu: G-Code-Dateien für LinuxCNC, Mach3 und Mach4 speichern, in Millimeter oder Zoll (an diesen Steuerungen noch nicht ausprobiert, Tester willkommen).",
+  nh="Neu in 0.4.9", nl="Großes Teil teilen: Teile, die größer als die Maschine sind, in Stücken mit Fugen schneiden, auf Fräse, Laser und Plasma (noch auf keiner echten Maschine geschnitten, Tester willkommen). Verknüpfte Kopien folgen ihrem Original. Der Knotengraph ist einfacher und hat 16 neue Knoten. Behoben: Umwege bei Laser und Plasma verlassen die Arbeitsfläche nicht mehr.",
   news=[("new/sim-mill.jpg", "Materialabtrag live – gefrästes eloxiertes Alu wird blank silbern"), ("new/sim-laser.jpg", "Laser: Gravur und Schnitt auf Birke"),
         ("new/sim-rotary.jpg", "Drehachse: das Teil dreht sich, der Fräser bleibt oben"), ("gen/wordtiles.png", "Wort-Kachel-Anhänger"),
         ("gen/shadowbox.png", "Schattenboxen mit LED-Ausschnitten"), ("gen/slotornament.png", "3D-Steckanhänger")],
@@ -253,7 +253,7 @@ def page(lang):
       <a id="dl-main" class="btn primary" href="#download" data-mac="{t["dlmac"]}" data-win="{t["dlwin"]}" data-linux="{t["dllinux"]}">⬇ <span>{t["dl"]}</span></a>
       <a class="btn" href="{GH}">{t["gh"]}</a>
     </div>
-    <div class="dl-note">{t["note"]} <span data-version>0.4.8</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
+    <div class="dl-note">{t["note"]} <span data-version>0.4.9</span> <span id="dl-os-note" data-mac="{t["notemac"]}" data-win="{t["notewin"]}" data-linux="{t["notelinux"]}"></span></div>
     {pic(first[0], t["heroalt"], "(max-width: 1072px) calc(100vw - 32px), 1040px", ' class="hero-shot" fetchpriority="high"')}
   </div>
 </div>

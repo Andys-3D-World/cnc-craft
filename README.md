@@ -5,7 +5,7 @@
 Free, open-source software for **laser engravers, CNC routers and plasma cutters** – design, CAM and machine control
 in one app, so you no longer switch between three programs. Runs on macOS, Windows and Linux.
 
-**Status: 0.4.8 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
+**Status: 0.4.9 Beta** – please test, report bugs, and try machines without a workpiece / at low power first.
 
 ![CNC Craft – drawing and toolpaths](docs/screenshots/en/01-design-router.png)
 
@@ -25,6 +25,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   labels, keychains and three-layer photo frames
 - Import SVG, DXF, PDF, PLT and images (trace outlines or centerlines), 3D models as STL, 3MF, OBJ and STEP – big files
   are read in background threads
+- Split a large part into pieces with joints (puzzle knobs, fingers or butt joint) – router, laser and plasma
 - 3D view of the finished parts, node graph for reusable workflows
 
 **Router (CAM)**
