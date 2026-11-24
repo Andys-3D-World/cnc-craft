@@ -2,6 +2,17 @@
 
 ## Next version (unreleased)
 
+**New**
+- **Simulation says what it does not show:** G-code from other programs can contain commands the simulation does not follow. Until now it skipped them silently and the picture looked normal. A box *Not everything simulated* in the simulation now lists them with their line (click to go there), and the console names the first one: cutter compensation (`G41`/`G42`), rotation (`G68`), a change to another zero point (`G55` …), subprograms and macros (`M98`, `G65`), variables and loops, moves to stored or machine positions (`G28`, `G53`), axes that are not drawn, and every other G command that is not known. CNC Craft's own programs give no such note (checked with 74 programs from the generators in router, laser and plasma mode).
+- **Loaded G-code files are checked:** the G-code check so far only looked at programs made by CNC Craft. Files opened with *Load G-code for machine* are now checked too, with the rules that hold for any program: broken values, brackets in comments that do not match, a cut without a feed rate, laser power out of range, rapid moves with the torch on, and a tool that is never switched off. It only warns.
+
+**Fixed**
+- **Loaded files, lines that begin with a comment were left out:** a line like `(up) G0 Z5` was taken for a pure comment when a G-code file was loaded, so the machine never got the command. A missing retract means the cutter moves on at depth. Only lines without any command are left out now. CNC Craft's own programs do not contain such lines and are unchanged. **If you run G-code from other programs, please update.**
+- **Simulation, arcs in the other planes:** arcs after `G18` and `G19` (upright arcs in X/Z and Y/Z) were drawn lying flat. They are drawn in their plane now, also as helix and with `R`, and absolute arc centres (`G90.1`) are read.
+- **Simulation, `G92`:** moving the zero point inside a program (`G92`, `G92.1` to `G92.3`) was ignored; the path after it is now drawn in the right place.
+
+The simulation of CNC Craft's own programs is unchanged (74 programs with 591,839 moves compared number by number). Checked with tests and in the program preview, the arcs also against the machine limit check. **Not tried on a real machine.**
+
 ## 0.4.9 Beta
 
 **New**

@@ -4,18 +4,21 @@
  * Wandelt G-Code in eine Liste von Bewegungen um (gerade Stücke; Bögen werden fein unterteilt).
  * Jede Bewegung weiß, aus welcher Zeile sie stammt und wann sie beginnt (Zeitschätzung).
  *
- * Verstanden wird: G0/G1/G2/G3 (I/J- und R-Schreibweise, auch Helix mit Z), G17, G20/G21, G90/G91,
+ * Verstanden wird: G0/G1/G2/G3 (I/J/K- und R-Schreibweise, auch Helix) in allen drei Ebenen (G17/G18/G19), G20/G21,
+ * G90/G91, G90.1/G91.1 (Mittelpunkt absolut/relativ), G92 bis G92.3 (Nullpunkt im Job verschieben),
  * F (Vorschub), M3/M4/M5 (Spindel/Laser/Plasma an/aus, S0 = aus), G4 (Warten, zählt zur Zeit),
  * G38.x (Antasten – wird nicht nachgebildet), Kommentare ( ) und ;
  * A (Drehachse, Grad): nur gemerkt (a0/a1) – die Anzeige um den Zylinder macht sim/rotarySim.ts
  * Bohrzyklen G73/G74/G81–G85/G89 (G98/G99, R/Z/Q/P bleiben gültig bis G80) – so, wie cycles.rs sie
  * vor dem Senden in G0/G1 umwandelt
+ * Alles andere kommt in „notes“ (simNotes.ts) – die Bahn wird dann nicht stillschweigend falsch gezeigt
  *
  * Bewegungsarten:  0 = Eilgang (G0), 1 = Schnitt (G1-G3 mit Werkzeug an), 2 = Leerfahrt (G1 mit Werkzeug aus)
  * Enthält die Datei gar keine M3/M4/M5-Befehle, gilt jede G1-G3-Bewegung als Schnitt.
  */
 
 import { planDurations, type MotionLimits } from "./motionPlan.ts";
+import { SimNotes, type SimNote } from "./simNotes.ts";
 
 export const MOVE_RAPID = 0;
 export const MOVE_CUT = 1;
@@ -43,6 +46,8 @@ export interface SimProgram {
   bounds: { minX: number; minY: number; minZ: number; maxX: number; maxY: number; maxZ: number };
   cutMinZ: number;            // tiefste Schnitt-Höhe
   cutMaxZ: number;
+  /** was die Simulation nicht nachbildet (fehlt = nichts) */
+  notes?: SimNote[];
   /** nur wenn der G-Code eine A-Achse hat: Winkel (Grad) am Anfang/Ende jeder Bewegung */
   a0?: Float32Array; a1?: Float32Array;
   /** um die Drehachse gewickelt (rotarySim.ts): Achse bei y = 0, z = −R; flat = Maße vor dem Wickeln */
@@ -89,7 +94,12 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   const hasSpindle = lines.some(l => /\bM0?[345]\b/i.test(stripComments(l)));
 
   let x = 0, y = 0, z = 0;
-  let absolute = true, inch = false;
+  let absolute = true, inch = false, plane = 17, arcAbs = false;
+  // G92: Versatz je Achse (x, y, z bleiben die gezeichnete Lage) und ob die Lage schon bekannt ist
+  let ox = 0, oy = 0, oz = 0;
+  let kept = [0, 0, 0];
+  let kx = false, ky = false, kz = false;
+  const notes = new SimNotes();
   let motion = 0;
   let feed = opts.defaultFeed ?? 1000;
   let toolCmdOn = false;  // M3/M4 aktiv
@@ -148,7 +158,11 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
       else if (g === 91) absolute = false;
       else if (g === 20) inch = true;
       else if (g === 21) inch = false;
+      else if (g === 17 || g === 18 || g === 19) plane = g;
+      else if (g === 90.1) arcAbs = true;
+      else if (g === 91.1) arcAbs = false;
     }
+    notes.line(code, gs, ms, words, li, absolute, plane);
     const f = inch ? 25.4 : 1;
     if (words.F !== undefined) feed = words.F * f;
 
@@ -164,25 +178,50 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
     // G4 P = warten (Sekunden; bei GRBL immer Sekunden)
     if (gs.includes(4)) { if (words.P !== undefined) dwell += Math.max(0, words.P); stopNext = true; continue; }
     // Antasten (G38.2 usw.): Ergebnis ist unbekannt -> nicht nachbilden
-    if (gs.some(g => g >= 38 && g < 39)) continue;
+    if (gs.some(g => g >= 38 && g < 39)) {
+      if (words.X !== undefined) kx = false;
+      if (words.Y !== undefined) ky = false;
+      if (words.Z !== undefined) kz = false;
+      continue;
+    }
+    // G92: die jetzige Stelle bekommt neue Werte. Ist die Lage unbekannt (Programmanfang, nach dem Antasten),
+    // gibt es nichts zu verschieben – dann gilt einfach der angegebene Wert.
+    if (gs.includes(92)) {
+      if (words.X !== undefined) { if (kx) ox = x - words.X * f; else { x = words.X * f; ox = 0; kx = true; } }
+      if (words.Y !== undefined) { if (ky) oy = y - words.Y * f; else { y = words.Y * f; oy = 0; ky = true; } }
+      if (words.Z !== undefined) { if (kz) oz = z - words.Z * f; else { z = words.Z * f; oz = 0; kz = true; } }
+      kept = [ox, oy, oz];
+      continue;
+    }
+    if (gs.includes(92.1)) { ox = oy = oz = 0; kept = [0, 0, 0]; }
+    else if (gs.includes(92.2)) { ox = oy = oz = 0; }
+    else if (gs.includes(92.3)) { [ox, oy, oz] = kept; }
 
     // Zyklus-Werte auch von Zeilen ohne Loch merken (z. B. "G99 G83 R1 Q2")
     if (cycle) {
-      if (words.R !== undefined) cR = words.R * f;
+      if (words.R !== undefined) cR = words.R * f + oz;
       if (words.Q !== undefined) cQ = Math.abs(words.Q * f);
       if (words.P !== undefined) cP = words.P;
     }
     if (hasA) na = words.A === undefined ? a : (absolute ? words.A : a + words.A);
     const hasXYZ = words.X !== undefined || words.Y !== undefined || words.Z !== undefined || (hasA && na !== a);
     if (!hasXYZ) continue;
-    // G53/G28 usw. nicht nachbilden
-    if (gs.some(g => g === 28 || g === 30 || g === 53 || g === 92)) continue;
+    // G53/G28 usw. nicht nachbilden (Lage in Werkstück-Koordinaten unbekannt)
+    if (gs.some(g => g === 28 || g === 30 || g === 53)) {
+      if (words.X !== undefined) kx = false;
+      if (words.Y !== undefined) ky = false;
+      if (words.Z !== undefined) kz = false;
+      continue;
+    }
+    if (words.X !== undefined) kx = true;
+    if (words.Y !== undefined) ky = true;
+    if (words.Z !== undefined) kz = true;
 
     // Bohrzyklus: ein Loch an X/Y (Z = Bohrtiefe, nicht Position)
     if (cycle && absolute) {
-      if (words.Z !== undefined) cZ = words.Z * f;
-      const hx = words.X === undefined ? x : words.X * f;
-      const hy = words.Y === undefined ? y : words.Y * f;
+      if (words.Z !== undefined) cZ = words.Z * f + oz;
+      const hx = words.X === undefined ? x : words.X * f + ox;
+      const hy = words.Y === undefined ? y : words.Y * f + oy;
       if (cR === undefined || cZ === undefined || cZ > cR) { x = hx; y = hy; continue; }
       const r = cR, zb = cZ, ret = retractInitial ? Math.max(z, r) : r;
       const kind = spindleOn ? MOVE_CUT : MOVE_TRAVEL;
@@ -211,31 +250,39 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
       continue;
     }
 
-    const nx = words.X === undefined ? x : (absolute ? words.X * f : x + words.X * f);
-    const ny = words.Y === undefined ? y : (absolute ? words.Y * f : y + words.Y * f);
-    const nz = words.Z === undefined ? z : (absolute ? words.Z * f : z + words.Z * f);
+    const nx = words.X === undefined ? x : (absolute ? words.X * f + ox : x + words.X * f);
+    const ny = words.Y === undefined ? y : (absolute ? words.Y * f + oy : y + words.Y * f);
+    const nz = words.Z === undefined ? z : (absolute ? words.Z * f + oz : z + words.Z * f);
     const kind = motion === 0 ? MOVE_RAPID : (spindleOn ? MOVE_CUT : MOVE_TRAVEL);
 
     if (motion === 0 || motion === 1) {
       add(x, y, z, nx, ny, nz, kind, li, feed);
     } else {
-      // Bogen (XY-Ebene), Z läuft linear mit (Helix)
+      // Bogen in der gewählten Ebene, die dritte Achse läuft linear mit (Helix). u/v = Achsen der Ebene, w = dritte:
+      // G17: X/Y, Z · G18: Z/X, Y · G19: Y/Z, X (Reihenfolge wie GRBL, dann stimmt die Drehrichtung)
+      const xz = plane === 18, yz = plane === 19;
+      const u0 = xz ? z : yz ? y : x, v0 = xz ? x : yz ? z : y, w0 = xz ? y : yz ? x : z;
+      const u1 = xz ? nz : yz ? ny : nx, v1 = xz ? nx : yz ? nz : ny, w1 = xz ? ny : yz ? nx : nz;
+      const iu = xz ? words.K : yz ? words.J : words.I, iv = xz ? words.I : yz ? words.K : words.J;
       let cx: number, cy: number;
-      if (words.R !== undefined && words.I === undefined && words.J === undefined) {
+      if (words.R !== undefined && iu === undefined && iv === undefined) {
         const r = words.R * f;
-        const dx = nx - x, dy = ny - y, d = Math.hypot(dx, dy);
+        const dx = u1 - u0, dy = v1 - v0, d = Math.hypot(dx, dy);
         if (d < 1e-9) { x = nx; y = ny; z = nz; continue; }
         const h = Math.sqrt(Math.max(0, r * r - (d / 2) ** 2));
         const sgn = (motion === 2) === (r > 0) ? -1 : 1;
-        cx = x + dx / 2 + (sgn * h * -dy) / d;
-        cy = y + dy / 2 + (sgn * h * dx) / d;
+        cx = u0 + dx / 2 + (sgn * h * -dy) / d;
+        cy = v0 + dy / 2 + (sgn * h * dx) / d;
+      } else if (arcAbs) {
+        cx = iu === undefined ? u0 : iu * f + (xz ? oz : yz ? oy : ox);
+        cy = iv === undefined ? v0 : iv * f + (xz ? ox : yz ? oz : oy);
       } else {
-        cx = x + (words.I || 0) * f;
-        cy = y + (words.J || 0) * f;
+        cx = u0 + (iu || 0) * f;
+        cy = v0 + (iv || 0) * f;
       }
-      const r = Math.hypot(x - cx, y - cy);
-      const a0 = Math.atan2(y - cy, x - cx);
-      const a1 = Math.atan2(ny - cy, nx - cx);
+      const r = Math.hypot(u0 - cx, v0 - cy);
+      const a0 = Math.atan2(v0 - cy, u0 - cx);
+      const a1 = Math.atan2(v1 - cy, u1 - cx);
       let sweep = a1 - a0;
       if (motion === 2) { while (sweep >= -1e-9) sweep -= Math.PI * 2; }
       else { while (sweep <= 1e-9) sweep += Math.PI * 2; }
@@ -247,9 +294,10 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
         na = aS + (aE - aS) * (s / segs);
         const tt = s / segs;
         const a = a0 + sweep * tt;
-        const qx = s === segs ? nx : cx + r * Math.cos(a);
-        const qy = s === segs ? ny : cy + r * Math.sin(a);
-        const qz = z + (nz - z) * tt;
+        const qu = s === segs ? u1 : cx + r * Math.cos(a);
+        const qv = s === segs ? v1 : cy + r * Math.sin(a);
+        const qw = w0 + (w1 - w0) * tt;
+        const qx = xz ? qv : yz ? qw : qu, qy = xz ? qw : yz ? qu : qv, qz = xz ? qu : yz ? qv : qw;
         arcNow = r; arcInside = s > 1 ? 1 : 0;
         add(px, py, pz, qx, qy, qz, kind, li, feed);
         px = qx; py = qy; pz = qz;
@@ -283,8 +331,10 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
   if (n === 0) { minX = minY = minZ = maxX = maxY = maxZ = 0; }
   if (cutMinZ === Infinity) { cutMinZ = minZ; cutMaxZ = maxZ; }
 
+  const noteList = notes.list();
   return {
     lines, n,
+    ...(noteList.length ? { notes: noteList } : {}),
     x0: Float32Array.from(x0), y0: Float32Array.from(y0), z0: Float32Array.from(z0),
     x1: Float32Array.from(x1), y1: Float32Array.from(y1), z1: Float32Array.from(z1),
     type: Uint8Array.from(type), line: Uint32Array.from(lineNo),
@@ -297,7 +347,8 @@ export function parseGcodeProgram(lines: string[], opts: ParseOptions = {}): Sim
 }
 
 function stripComments(l: string): string {
-  return l.replace(/\([^)]*\)/g, "").replace(/;.*$/, "").trim();
+  // nicht geschlossene Klammer: der Rest ist Kommentar (wie beim Senden)
+  return l.replace(/\([^)]*(?:\)|$)/g, "").replace(/;.*$/, "").trim();
 }
 
 /** Index der Bewegung, die zur Zeit t läuft (binäre Suche) */

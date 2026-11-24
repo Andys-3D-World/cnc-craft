@@ -14,6 +14,7 @@
 import { t } from "./i18n/i18n";
 import type { MachineMode } from "./machineMode";
 import { resumeWcs } from "./wcs";
+import { hasCommand } from "./jobLines";
 
 export interface ResumeMark { line: number; label: string }
 
@@ -132,7 +133,7 @@ export function resumeMarks(content: string): ResumeMark[] {
   for (const raw of content.split(/\r?\n/)) {
     const l = raw.trim();
     if (!l || l.startsWith("%") || l.startsWith(";")) continue;
-    if (l.startsWith("(")) {
+    if (!hasCommand(l)) {
       const m = l.match(/^\(-{2,}\s*(.*?)\s*-*\)$/);
       if (m && m[1]) marks.push({ line: n, label: m[1].slice(0, 80) });
       continue;

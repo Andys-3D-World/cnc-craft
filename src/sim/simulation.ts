@@ -46,6 +46,8 @@ import { materialView, materialById } from "../materialView";
 import { ascii as gcAscii, allBuiltinTexts } from "../i18n/i18n";
 import type { ToolGeom } from "../toolGraphics";
 import { fmtLen, fmtLenU, fmtLong, unitName } from "../units";
+import { esc } from "../setupSheet";
+import type { SimNote } from "./simNotes";
 
 type Source = "design" | "job" | "none";
 
@@ -153,6 +155,10 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
           <h4>${T("sim.info")}</h4>
           <div class="sim-info" id="sim-info"></div>
         </div>
+        <div class="sim-box sim-warn-box" id="sim-note-box" style="display:none">
+          <h4>⚠ <span id="sim-note-title"></span> <span id="sim-note-n"></span></h4>
+          <div class="sim-warn-list" id="sim-note-list"></div>
+        </div>
         <div class="sim-box sim-warn-box" id="sim-warn-box" style="display:none">
           <h4>⚠ ${T("sim.warnTitle")} <span id="sim-warn-n"></span></h4>
           <div class="sim-warn-list" id="sim-warn-list"></div>
@@ -254,7 +260,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
   view.showMaterial = showMaterial;
   view.onChange = () => updateCarveUI(true);
   // Warnung angeklickt -> Zeile zeigen, Simulation dorthin
-  $("sim-warn-list").addEventListener("click", e => {
+  for (const id of ["sim-warn-list", "sim-note-list"]) $(id).addEventListener("click", e => {
     const row = (e.target as HTMLElement).closest("[data-wline]") as HTMLElement | null;
     if (!row || !prog) return;
     const line = parseInt(row.dataset.wline!, 10);
@@ -649,8 +655,34 @@ function updateUI() {
   }
 }
 
+/** Was an diesem Programm auffällt: nicht nachgebildete Befehle (simNotes.ts) und die Prüfung der Datei (fileCheck.ts) */
+function noteText(n: SimNote): string {
+  return t("sim.note." + n.kind, { c: n.code }) + (n.count > 1 ? ` (${n.count}×)` : "");
+}
+const notesLogged = new WeakSet<string[]>();
+function updateNotes() {
+  const box = $("sim-note-box");
+  const notes = prog?.notes ?? [];
+  const issues = prog && source === "job" && prog.lines === streamState.loadedLines ? streamState.fileIssues : [];
+  box.style.display = notes.length + issues.length ? "flex" : "none";
+  if (!prog || !(notes.length + issues.length)) return;
+  $("sim-note-title").textContent = t(notes.length ? "sim.noteTitle" : "sim.fileTitle");
+  $("sim-note-n").textContent = String(notes.length + issues.length);
+  // Nur Befehlsnamen und feste Texte, trotzdem esc(): der G-Code kommt aus fremden Dateien
+  $("sim-note-list").innerHTML =
+    notes.map(n => `<div class="sim-warn-row" data-wline="${n.line}"><b>${t("sim.warnLine", { n: n.line + 1 })}</b> ${esc(noteText(n))}</div>`).join("") +
+    issues.slice(0, 50).map(i => `<div class="sim-warn-row" data-wline="${i.line - 1}"><b>${t("sim.warnLine", { n: i.line })}</b> ${esc(t("fcheck." + i.rule))}</div>`).join("") +
+    (issues.length > 50 ? `<div class="sim-muted">… +${issues.length - 50}</div>` : "");
+  // einmal je Programm auch in die Konsole: den Reiter sieht nicht jeder an
+  if (notes.length && source === "job" && !notesLogged.has(prog.lines)) {
+    notesLogged.add(prog.lines);
+    log(t("sim.noteLog", { n: notes.length, line: notes[0].line + 1, text: noteText(notes[0]) }));
+  }
+}
+
 function updateInfo() {
   if (!$) return;
+  updateNotes();
   const el = $("sim-info");
   if (!prog) { el.innerHTML = `<div class="sim-muted">${t(preparing ? "sim.preparing" : "sim.noProgram")}</div>`; return; }
   // Drehachse: Maße vor dem Wickeln (wie im G-Code), dazu Durchmesser und Drehbereich
@@ -1131,7 +1163,7 @@ async function applyEdit() {
   }
   if (streamState.isRunning) { showEditMsg(t("stream.alreadyRunning")); return; }
   keepViewOnce = true;
-  if (!loadGcodeFromText(lines.join("\n"), label || t("sim.loadedJob"), log)) { keepViewOnce = false; return; }
+  if (!loadGcodeFromText(lines.join("\n"), label || t("sim.loadedJob"), log, streamState.fromFile)) { keepViewOnce = false; return; }
   // cnc-job-loaded hat die Bearbeitung beendet und den neuen Job angezeigt
   log(t("sim.ed.applied"));
 }

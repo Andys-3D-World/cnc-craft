@@ -24,6 +24,10 @@ import { ensureWcsForJob } from "./wcsSync";
 import { macroRunning } from "./macroRun";
 import { toolChangeBusy, tcAbort } from "./toolChange";
 import { limitsAllowStart } from "./ui/limitGuard";
+import { checkFileLines } from "./fileCheck";
+import { jobLines } from "./jobLines";
+import type { LintIssue } from "./gcodeLint";
+import { laserSettings } from "./laserLayers";
 
 // Zustand des aktuellen Jobs
 export const streamState = {
@@ -38,6 +42,8 @@ export const streamState = {
   onMachine: false,         // läuft gerade an der echten Maschine?
   sentOrigin: null as number[] | null, // je gesendeter Zeile die Original-Zeile (Höhenkarte, Fortsetzen; sonst 1:1)
   compensated: false,       // mit Höhenkarte gesendet? (dann keine Live-Bearbeitung: neue Zeilen wären nicht angepasst)
+  fromFile: false,            // aus einer Datei (auch danach bearbeitet): fremder G-Code
+  fileIssues: [] as LintIssue[], // was an der Datei auffällt (fileCheck.ts) – nur Hinweis, gestartet wird weiter von Hand
   marks: [] as ResumeMark[],  // Formen/Ebenen im Job (zum Fortsetzen)
   abortLine: -1               // nach einem Abbruch: so viele Zeilen hatte die Maschine bestätigt (-1 = kein Abbruch)
 };
@@ -66,7 +72,7 @@ export async function loadGcodeFromFile(appendToConsole: (t: string) => void): P
     appendToConsole(t("stream.reading"));
     const filePath = typeof selectedFile === "object" && selectedFile !== null ? (selectedFile as any).path : selectedFile;
     const content = await readTextFile(filePath);
-    return loadGcodeFromText(content, String(filePath).split(/[\\/]/).pop() || "G-Code", appendToConsole);
+    return loadGcodeFromText(content, String(filePath).split(/[\\/]/).pop() || "G-Code", appendToConsole, true);
   } catch (err) {
     appendToConsole(t("stream.loadError", { e: String(err) }));
     return false;
@@ -76,7 +82,7 @@ export async function loadGcodeFromFile(appendToConsole: (t: string) => void): P
 /**
  * G-Code-Text als Job bereitlegen (aus Datei oder direkt aus der Zeichnung / Simulation).
  */
-export function loadGcodeFromText(content: string, label: string, appendToConsole: (t: string) => void): boolean {
+export function loadGcodeFromText(content: string, label: string, appendToConsole: (t: string) => void, fromFile = false): boolean {
   if (streamState.isRunning) { appendToConsole(t("stream.alreadyRunning")); return false; }
   streamState.loadedLines = jobLines(content.split(/\r?\n/));
   streamState.totalLines = streamState.loadedLines.length;
@@ -87,15 +93,14 @@ export function loadGcodeFromText(content: string, label: string, appendToConsol
   streamState.abortLine = -1;
   streamState.label = label;
   streamState.bed = stockBed();
+  streamState.fromFile = fromFile;
+  streamState.fileIssues = fromFile ? checkFileLines(streamState.loadedLines, { kind: getMachineMode(), sMax: laserSettings.sMax }) : [];
   appendToConsole(t("stream.loaded", { n: streamState.totalLines }));
+  const first = streamState.fileIssues[0];
+  if (first) appendToConsole(t("stream.fileWarn", { n: streamState.fileIssues.length, line: first.line, text: first.text, why: t("fcheck." + first.rule) }));
   updateJobDisplay();
   window.dispatchEvent(new CustomEvent("cnc-job-loaded", { detail: { lines: streamState.loadedLines, label } }));
   return true;
-}
-
-/** Leerzeilen und reine Kommentarzeilen raus (Werkzeugwechsel "M0 (…)" bleibt drin) – so zählt auch der Rust-Teil */
-export function jobLines(lines: string[]): string[] {
-  return lines.map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith("(") && !l.startsWith("%") && !l.startsWith(";"));
 }
 
 // ---------------- Live-Bearbeitung eines laufenden Jobs ----------------
