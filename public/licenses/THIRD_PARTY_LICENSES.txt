@@ -1880,7 +1880,7 @@ limitations under the License.
 
 ##############################################################################
 Used by:
-  - cookie 0.18.2 (MIT OR Apache-2.0) – LICENSE-APACHE
+  - cookie 0.18.3 (MIT OR Apache-2.0) – LICENSE-APACHE
 
 Apache License
                         Version 2.0, January 2004
@@ -2088,7 +2088,7 @@ limitations under the License.
 
 ##############################################################################
 Used by:
-  - cookie 0.18.2 (MIT OR Apache-2.0) – LICENSE-MIT
+  - cookie 0.18.3 (MIT OR Apache-2.0) – LICENSE-MIT
 
 Copyright (c) 2017 Sergio Benitez
 Copyright (c) 2014 Alex Crichton
