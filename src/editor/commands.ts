@@ -21,6 +21,7 @@ import { openShapeLibrary } from "./shapeLibrary";
 import { openView3D } from "../ui/view3dDialog";
 import { openStlExport } from "../ui/stlExportDialog";
 import { openNodeEditor } from "../nodes/nodeEditor";
+import { openStencilDialog } from "./stencilTool";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { openHealDialog } from "../ui/healDialog";
@@ -283,6 +284,7 @@ export const commands: Record<string, () => void> = {
   array: () => openArrayDialog(),
   copiesOnPath: () => openCopiesOnPathDialog(),
   perforate: () => openPerforateDialog(),
+  stencilBridge: () => openStencilDialog(log, redrawFn, () => { done(); checkpoint(); }),
   fontTest: () => openFontTester(log),
   label: () => openGenerator("label", log, () => { done(); checkpoint(); }),
   keychain: () => openGenerator("keychain", log, () => { done(); checkpoint(); }),

@@ -101,6 +101,7 @@ const P: Record<string, string> = {
   keychain: `<circle cx="7" cy="12" r="4"/><circle cx="7" cy="12" r="1.5"/><path d="M11 10h8a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-8"/>`,
   frame: `<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="7.5" y="7.5" width="9" height="9"/><path d="M7.5 15l3-3 2.5 2.5 1.5-1.5 2 2"/>`,
   copiesOnPath: `<path d="M3 18c4-10 14-10 18-2" stroke-dasharray="2 2.5" opacity=".6"/><rect x="3" y="12" width="4" height="4" rx=".7"/><rect x="10" y="6.5" width="4" height="4" rx=".7"/><rect x="17" y="10" width="4" height="4" rx=".7"/>`,
+  stencilBridge: `<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.6"/><path d="M11 3.6v4.9M13 3.6v4.9" opacity=".9"/>`,
   perforate: `<path d="M3 12h3.5M9 12h3.5M15 12h3.5M21 12h0"/><path d="M4 6h16M4 18h16" opacity=".35"/>`,
   fontTest: `<path d="M4 18l4-12 4 12M5.5 14h5"/><path d="M15 8h6M18 8v10M16 18h4"/>`,
   array: `<rect x="3" y="3" width="5" height="5" rx=".8"/><rect x="9.5" y="3" width="5" height="5" rx=".8"/><rect x="16" y="3" width="5" height="5" rx=".8"/><rect x="3" y="9.5" width="5" height="5" rx=".8"/><rect x="9.5" y="9.5" width="5" height="5" rx=".8"/><rect x="16" y="9.5" width="5" height="5" rx=".8"/><rect x="3" y="16" width="5" height="5" rx=".8"/><rect x="9.5" y="16" width="5" height="5" rx=".8"/><rect x="16" y="16" width="5" height="5" rx=".8"/>`,

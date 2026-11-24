@@ -15,6 +15,7 @@
 import { t } from "./i18n/i18n";
 import { LAYER_COLORS } from "./laserLayers";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
+import { SPOT_MS_MIN, SPOT_MS_MAX } from "./plasmaSpot";
 
 export interface PlasmaCut {
   id: string;
@@ -54,6 +55,8 @@ export interface PlasmaSettings {
   holeSpeed: number;    // Geschwindigkeit für kleine Löcher in % der Schnittgeschwindigkeit
   avoidCut: boolean;    // Leerfahrten um schon ausgeschnittene Teile herum (gekippte Teile, siehe rapidAvoid.ts)
   optimizeOrder: boolean; // Reihenfolge mit kürzesten Leerfahrten (siehe cutOrder.ts)
+  spotMax: number;      // Löcher bis zu diesem Durchmesser nur ankörnen statt schneiden (0 = aus, siehe plasmaSpot.ts)
+  spotTime: number;     // so lange brennt der Brenner beim Ankörnen (ms)
 }
 
 export type ThcMode = "none" | "external" | "grblhal";
@@ -67,7 +70,8 @@ export let activeCut: PlasmaCut | null = null;
 let cuts: PlasmaCut[] = [];
 export const plasmaSettings: PlasmaSettings = {
   safeZ: 10, useZ: true, probe: false, probeOffset: 0, probeDist: 100, overcut: 1,
-  thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true, optimizeOrder: true
+  thc: "none", thcOut: "M8", antiDive: 5, smallHole: 25, holeSpeed: 60, avoidCut: true, optimizeOrder: true,
+  spotMax: 0, spotTime: 100
 };
 
 export function initPlasmaCuts() {
@@ -237,6 +241,8 @@ export function setPlasmaSettings(s: Partial<PlasmaSettings>, notify = true) {
   if (s.holeSpeed !== undefined) plasmaSettings.holeSpeed = num(s.holeSpeed, plasmaSettings.holeSpeed, 10, 100);
   if (s.avoidCut !== undefined) plasmaSettings.avoidCut = !!s.avoidCut;
   if (s.optimizeOrder !== undefined) plasmaSettings.optimizeOrder = !!s.optimizeOrder;
+  if (s.spotMax !== undefined) plasmaSettings.spotMax = num(s.spotMax, plasmaSettings.spotMax, 0, 100);
+  if (s.spotTime !== undefined) plasmaSettings.spotTime = num(s.spotTime, plasmaSettings.spotTime, SPOT_MS_MIN, SPOT_MS_MAX);
   if (notify) changed();
 }
 

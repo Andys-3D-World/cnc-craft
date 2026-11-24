@@ -7,11 +7,12 @@
  *  - Abfrage beim Start / beim Wechsel der Maschinenart: "Liegt die Platte noch drauf?"
  *  - Nach einem Job an der Maschine: verbrauchte Fläche automatisch markieren
  */
-import { t, T, tip } from "../i18n/i18n";
+import { t, T, tip, ph } from "../i18n/i18n";
 import {
   getStock, hasUsedArea, usedPercent, newPlate, undoLastMark, markFromGcode, cutWidthFor,
-  findFreeSpot, stockOptions, saveStockOptions, drawStockPreview, STOCK_CHANGED
+  findFreeSpot, stockOptions, saveStockOptions, drawStockPreview, STOCK_CHANGED, plateSnapshot, loadPlateSnapshot
 } from "../stock";
+import { cleanRemnants, dropRemnant, freeArea, putRemnant, MAX_NAME, type Remnant } from "../remnants";
 import { getMachineMode, MODE_CHANGED, MachineMode } from "../machineMode";
 import { translateShape } from "../shapeTransform";
 import { generateGcode, noGcodeMessage } from "../cam";
@@ -39,6 +40,14 @@ export function stockSectionHtml(): string {
           <button id="stock-new" class="btn-secondary btn-compact" ${tip("stock.newTip")}>🆕 ${T("stock.new")}</button>
         </div>
         <div class="tool-scope">${T("stock.hint")}</div>
+        <div class="prop-row" ${tip("rem.tip")}><span>${T("rem.title")}</span>
+          <select id="rem-list" class="prop-input" style="width: 150px;"></select></div>
+        <div class="rp-grid2">
+          <button id="rem-load" class="btn-secondary btn-compact" ${tip("rem.loadTip")}>${T("rem.load")}</button>
+          <button id="rem-delete" class="btn-secondary btn-compact">${T("rem.delete")}</button>
+        </div>
+        <div class="prop-row"><input type="text" id="rem-name" class="prop-input" maxlength="${MAX_NAME}" style="flex:1;min-width:0;width:auto;" ${ph("rem.namePh")}>
+          <button id="rem-save" class="btn-secondary btn-compact" style="flex:none;width:auto;" ${tip("rem.saveTip")}>${T("rem.save")}</button></div>
       </div>
     </div>`;
 }
@@ -69,7 +78,51 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     if ($("stock-skip-used")) $("stock-skip-used")!.checked = stockOptions.skipUsed;
     const undo = $("stock-undo") as HTMLButtonElement | null;
     if (undo) undo.disabled = !s.undo;
+    refreshRemnants();
   };
+
+  // ---- Reststücke: Platte unter einem Namen ablegen und später wieder auflegen ----
+  const REM_KEY = "cnc_craft_remnants";
+  const remnants = (): Remnant[] => { try { return cleanRemnants(JSON.parse(localStorage.getItem(REM_KEY) || "[]")); } catch { return []; } };
+  const mine = () => remnants().filter(r => r.mode === getMachineMode());
+  const refreshRemnants = () => {
+    const sel = document.getElementById("rem-list") as HTMLSelectElement | null;
+    if (!sel) return;
+    const keep = sel.value, list = mine();
+    sel.innerHTML = list.length
+      ? list.map(r => `<option value="${esc(r.name)}">${esc(r.name)} · ${esc(t("rem.item", { w: r.w, h: r.h, a: freeArea(r).toFixed(2) }))}</option>`).join("")
+      : `<option value="">${esc(t("rem.none"))}</option>`;
+    if (list.some(r => r.name === keep)) sel.value = keep;
+    for (const id of ["rem-load", "rem-delete"]) { const b = document.getElementById(id) as HTMLButtonElement | null; if (b) b.disabled = !list.length; }
+  };
+  const picked = () => mine().find(r => r.name === (document.getElementById("rem-list") as HTMLSelectElement | null)?.value);
+  document.getElementById("rem-save")?.addEventListener("click", () => {
+    const name = ($("rem-name")?.value || "").trim();
+    if (!name) { log(t("rem.needName")); $("rem-name")?.focus(); return; }
+    const all = remnants();
+    if (all.some(r => r.name === name && r.mode === getMachineMode()) && !window.confirm(t("rem.confirmReplace", { name }))) return;
+    const next = putRemnant(all, { name, mode: getMachineMode(), ...plateSnapshot(), date: new Date().toISOString() });
+    if (!next) { log(t("rem.full")); return; }
+    try { localStorage.setItem(REM_KEY, JSON.stringify(next)); } catch { log(t("rem.full")); return; }
+    $("rem-name")!.value = "";
+    refreshRemnants();
+    (document.getElementById("rem-list") as HTMLSelectElement).value = name;
+    log(t("rem.saved", { name }));
+  });
+  document.getElementById("rem-load")?.addEventListener("click", () => {
+    const r = picked();
+    if (!r) return;
+    if (hasUsedArea() && !window.confirm(t("rem.confirmLoad", { name: r.name }))) return;
+    if (!loadPlateSnapshot(r, r.name)) { log(t("rem.bad", { name: r.name })); return; }
+    log(t("rem.loaded", { name: r.name, w: r.w, h: r.h, p: r.percent.toFixed(1) }));
+  });
+  document.getElementById("rem-delete")?.addEventListener("click", () => {
+    const r = picked();
+    if (!r || !window.confirm(t("rem.confirmDelete", { name: r.name }))) return;
+    try { localStorage.setItem(REM_KEY, JSON.stringify(dropRemnant(remnants(), r.name, r.mode))); } catch { /* egal */ }
+    refreshRemnants();
+    log(t("rem.deleted", { name: r.name }));
+  });
 
   // ---- Größe ----
   const resize = () => {

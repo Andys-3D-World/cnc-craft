@@ -184,6 +184,27 @@ export function newPlate(w?: number, h?: number) {
   save(mode);
 }
 
+/** Stand der Platte zum Ablegen als Reststück (remnants.ts) */
+export function plateSnapshot(): { w: number; h: number; cell: number; used: string; percent: number } {
+  const s = getStock();
+  return { w: s.w, h: s.h, cell: s.cell, used: encode(s.used), percent: usedPercent(s) };
+}
+
+/**
+ * Abgelegtes Reststück wieder als Platte der aktuellen Maschinenart und des aktiven Betts auflegen.
+ * false = die Daten passen nicht (anderes Raster als diese Größe hier bekäme) – dann bleibt alles, wie es ist.
+ */
+export function loadPlateSnapshot(d: { w: number; h: number; cell: number; used: string }, label: string): boolean {
+  const mode = getMachineMode();
+  const s = blank(d.w, d.h);
+  if (s.cell !== d.cell) return false;
+  s.used = decode(d.used, s.cols * s.rows);
+  s.jobs = [{ date: new Date().toISOString(), label, percent: usedPercent(s) }];
+  stocks.set(mode + ":" + bedIdx, s);
+  save(mode);
+  return true;
+}
+
 /**
  * Platte aus der Kamera-Erkennung (Beta): Platte = ganzes Bett, alles ohne Material ist „verbraucht“
  * (außerhalb der erkannten Platte und ihre Löcher). isUsed(x, y) in mm. Mit „Letzte Markierung zurück“

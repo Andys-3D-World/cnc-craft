@@ -15,6 +15,8 @@ import {
   plasmaSettings, setPlasmaSettings, PLASMA_CHANGED
 } from "../plasmaCuts";
 import { getMachineMode, MODE_CHANGED } from "../machineMode";
+import { PLASMA_OPS, plasmaOpOf, SPOT_MS_MIN, SPOT_MS_MAX } from "../plasmaSpot";
+import { checkpoint } from "../editor/history";
 
 function state(): any { return (window as any).cncState; }
 function selectedShapes(): any[] {
@@ -35,6 +37,12 @@ export function plasmaCutsHtml(): string {
         <div id="plasma-cut-list" class="ll-list"></div>
         <button id="plasma-cut-new" class="btn-secondary btn-compact" ${tip("plasma.newTip")}>＋ ${T("plasma.newCut")}</button>
         <div id="plasma-cut-scope" class="tool-scope"></div>
+        <div class="prop-row" id="plasma-op-row" style="display:none;" ${tip("pop.tip")}>${T("pop.label")}
+          <select id="plasma-op" class="prop-input" style="width: 130px;">
+            <option value="" disabled hidden data-i18n="pop.mixed">${T("pop.mixed")}</option>
+            ${PLASMA_OPS.map(o => `<option value="${o}" data-i18n="pop.${o}">${T("pop." + o)}</option>`).join("")}
+          </select>
+        </div>
       </div>
     </div>`;
 }
@@ -52,6 +60,8 @@ export function plasmaSettingsHtml(): string {
         <div class="prop-row" ${tip("plasma.overcutTip")}>${T("plasma.overcut")}<input type="number" id="plasma-overcut" min="0" step="0.5" class="prop-input"></div>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.avoidCutTip")}><span>${T("cam.avoidCut")}</span><input type="checkbox" id="plasma-avoid" style="width:auto;"></label>
         <label class="prop-row" style="cursor:pointer;" ${tip("cam.optOrderTip")}><span>${T("cam.optOrder")}</span><input type="checkbox" id="plasma-order" style="width:auto;"></label>
+        <div class="prop-row" ${tip("pop.spotMaxTip")}>${T("pop.spotMax")}<input type="number" id="plasma-spotmax" min="0" max="100" step="1" class="prop-input"></div>
+        <div class="prop-row" ${tip("pop.spotTimeTip")}>${T("pop.spotTime")}<input type="number" id="plasma-spottime" min="${SPOT_MS_MIN}" max="${SPOT_MS_MAX}" step="10" class="prop-input"></div>
         <div class="tool-scope">${T("plasma.hint")}</div>
       </div>
     </div>
@@ -128,11 +138,11 @@ export function initPlasmaPanel(redraw: () => void) {
   });
 
   // ---- Einstellungen ----
-  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "probeDist" | "overcut" | "antiDive" | "smallHole" | "holeSpeed") => {
+  const bindNum = (id: string, key: "safeZ" | "probeOffset" | "probeDist" | "overcut" | "antiDive" | "smallHole" | "holeSpeed" | "spotMax" | "spotTime") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.value = String(plasmaSettings[key]);
-    el.addEventListener("change", () => { setPlasmaSettings({ [key]: parseFloat(el.value) }); el.value = String(plasmaSettings[key]); });
+    el.addEventListener("change", () => { setPlasmaSettings({ [key]: parseFloat(el.value) }); el.value = String(plasmaSettings[key]); redraw(); });
   };
   const bindCheck = (id: string, key: "useZ" | "probe" | "avoidCut" | "optimizeOrder") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
@@ -158,6 +168,18 @@ export function initPlasmaPanel(redraw: () => void) {
   bindNum("plasma-antidive", "antiDive");
   bindNum("plasma-smallhole", "smallHole");
   bindNum("plasma-holespeed", "holeSpeed");
+  bindNum("plasma-spotmax", "spotMax");
+  bindNum("plasma-spottime", "spotTime");
+  // Bearbeitung der gewählten Formen: automatisch / schneiden / ankörnen / auslassen
+  const opSel = document.getElementById("plasma-op") as HTMLSelectElement | null;
+  opSel?.addEventListener("change", () => {
+    const shapes = selectedShapes();
+    if (!shapes.length || !PLASMA_OPS.includes(opSel.value as any)) return;
+    for (const s of shapes) { if (opSel.value === "auto") delete s.plasmaOp; else s.plasmaOp = opSel.value; }
+    refreshPlasmaPanel(true);
+    redraw();
+    checkpoint();
+  });
   const bindSel = (id: string, key: "thc" | "thcOut") => {
     const el = document.getElementById(id) as HTMLSelectElement | null;
     if (!el) return;
@@ -173,7 +195,7 @@ export function initPlasmaPanel(redraw: () => void) {
   // Einstellungen von woanders geändert (Bibliothek, Import): Felder nachziehen
   const syncFields = () => {
     const nums: [string, keyof typeof plasmaSettings][] = [["plasma-safez", "safeZ"], ["plasma-probe-offset", "probeOffset"], ["plasma-probe-dist", "probeDist"], ["plasma-overcut", "overcut"],
-      ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
+      ["plasma-antidive", "antiDive"], ["plasma-smallhole", "smallHole"], ["plasma-holespeed", "holeSpeed"], ["plasma-spotmax", "spotMax"], ["plasma-spottime", "spotTime"], ["plasma-thc", "thc"], ["plasma-thc-out", "thcOut"]];
     for (const [id, key] of nums) {
       const el = document.getElementById(id) as HTMLInputElement | null;
       if (el && document.activeElement !== el) el.value = String(plasmaSettings[key]);
@@ -201,7 +223,7 @@ export function refreshPlasmaPanel(force = false) {
   if (!list || !st) return;
   if (getMachineMode() !== "plasma" && !force) return;
   const sig = st.selectedShapeIds.join(",") + "|" + st.shapes.length + "|"
-    + st.shapes.map((s: any) => s.plasmaCutId || "").join(",") + "|" + (activeCut?.id || "");
+    + st.shapes.map((s: any) => (s.plasmaCutId || "") + (s.plasmaOp || "")).join(",") + "|" + (activeCut?.id || "");
   if (!force && sig === lastSig) return;
   lastSig = sig;
 
@@ -226,4 +248,10 @@ export function refreshPlasmaPanel(force = false) {
     </div>`).join("");
   const scope = document.getElementById("plasma-cut-scope");
   if (scope) scope.textContent = shapes.length ? t("plasma.scopeSelection", { n: shapes.length }) : t("plasma.scopeDefault");
+  const opRow = document.getElementById("plasma-op-row"), opSel = document.getElementById("plasma-op") as HTMLSelectElement | null;
+  if (opRow && opSel) {
+    opRow.style.display = shapes.length ? "" : "none";
+    const ops = new Set(shapes.map(plasmaOpOf));
+    opSel.value = ops.size === 1 ? [...ops][0] : "";
+  }
 }

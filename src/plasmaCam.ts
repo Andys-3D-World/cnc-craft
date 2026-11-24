@@ -34,6 +34,7 @@ import { RapidPlanner } from "./rapidAvoid";
 import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
 import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo } from "./cutSetting";
+import { boxOf, nearestOrder, resolveOp } from "./plasmaSpot";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
 const PROBE_FEED = 300;
@@ -51,6 +52,17 @@ export interface PlasmaPlan {
 }
 
 interface ShapePlan { plans: PlasmaPlan[]; tooSmall: boolean; leadShort: boolean; dirByHand?: boolean; startInTab?: boolean }
+
+/**
+ * Was mit einer Form geschieht (plasmaSpot.ts): schneiden, nur die Mitte ankörnen (dann der Punkt in mm) oder auslassen.
+ */
+export function shapeOp(shape: any): { op: "cut" | "skip" } | { op: "spot"; at: Pt } {
+  const paths = shapeToPaths(shape).filter(p => p.pts.length >= 2);
+  const op = resolveOp(shape, paths, plasmaSettings.spotMax * MM_TO_PIXEL);
+  if (op !== "spot") return { op };
+  const c = boxOf(paths)!.centre;
+  return { op: "spot", at: { x: c.x / MM_TO_PIXEL, y: c.y / MM_TO_PIXEL } };
+}
 
 // ---------------------------------------------------------------------
 // Planung (mit Zwischenspeicher – wird auch fürs Zeichnen benutzt)
@@ -296,7 +308,7 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   if (S.thc === "grblhal") g += `${c("pgc.thcHal")}\nM64 P2 ${c("pgc.thcOff")}\n`;
   g += `${c("pgc.header", { n: order.length })}\n`;
   if (S.useZ) g += `G0 Z${n(S.safeZ)} ${c("gc.safeZ")}\n`;
-  let pierces = 0, smallHoles = 0;
+  let pierces = 0, smallHoles = 0, spotted = 0, skipped = 0;
   // Leerfahrten um schon ausgeschnittene Teile herum (sie können kippen)
   // The detours stay on the bed (rapidAvoid.ts). No bed size without a page (tests) -> not limited there
   const avoid = S.avoidCut ? new RapidPlanner(AVOID_MARGIN, typeof document !== "undefined" ? bedSizeMm() : null) : null;
@@ -310,7 +322,11 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   order.forEach((cut, ci) => {
     g += `\n${c("pgc.cut", { i: ci + 1, name: cut.name, f: cut.speed, k: cut.kerf })}\n`;
     const plans: PlasmaPlan[] = [];
+    const spots: Pt[] = [];
     byCut.get(cut.id)!.forEach((s, si) => {
+      const what = shapeOp(s);
+      if (what.op === "skip") { skipped++; return; }
+      if (what.op === "spot") { spots.push(what.at); return; }
       const sp = planShape(s, cut);
       if (sp.tooSmall) warnings.push(t("pgw.tooSmall", { name: cut.name, n: si + 1, k: cut.kerf }));
       if (sp.leadShort) warnings.push(t("pgw.leadShort", { name: cut.name, n: si + 1 }));
@@ -333,6 +349,25 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
       const after = travelLength(items, steps, from);
       g += `${c("gc.orderOpt", { a: Math.round(before), b: Math.round(after) })}\n`;
       plans.splice(0, plans.length, ...steps.map(st => plans[st.index]));
+    }
+
+    // Ankörnen zuerst (solange noch nichts ausgeschnitten ist): Brenner kurz an, ohne Bewegung, ohne Höhenregelung
+    for (const at of nearestOrder(spots, pos || { x: 0, y: 0 })) {
+      spotted++;
+      g += `${c("pgc.spot", { n: spotted })}\n`;
+      rapid(at);
+      if (S.useZ) {
+        if (S.probe) {
+          g += `G91 G38.2 Z${n(-S.probeDist)} F${PROBE_FEED} ${c("pgc.probe")}\n`;
+          g += `G90\n`;
+          g += `G92 Z${n(S.probeOffset)} ${c("pgc.probeSet")}\n`;
+        }
+        g += `G0 Z${n(cut.pierceHeight)} ${c("pgc.pierceHeight")}\n`;
+      }
+      g += `M3 S1000 ${c("pgc.torchOn")}\n`;
+      g += `G4 P${n(S.spotTime / 1000)} ${c("pgc.spotTime")}\n`;
+      g += `M5 ${c("pgc.torchOff")}\n`;
+      if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
     }
 
     for (const p of plans) {
@@ -388,6 +423,10 @@ export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warn
   });
 
   if (smallHoles) g += `${c("pgc.smallHoles", { n: smallHoles })}\n`;
+  if (spotted) g += `${c("pgc.spots", { n: spotted })}\n`;
+  if (skipped) { g += `${c("pgc.skipped", { n: skipped })}\n`; warnings.push(t("pgw.skipped", { n: skipped })); }
+  // nichts zu tun (alles ausgelassen): kein Programm
+  if (skipped && !pierces && !spotted) return { gcode: null, warnings };
   g += `\nM5\n`;
   if (thcOff) g += `${S.thc === "grblhal" ? "M64 P2" : "M9"}\n`;
   if (S.useZ) g += `G0 Z${n(S.safeZ)}\n`;
@@ -409,6 +448,19 @@ export function drawPlasmaLeads(ctx: CanvasRenderingContext2D, shapes: any[], sx
   for (const s of shapes) {
     const cut = cutForShape(s);
     if (!cut) continue;
+    const what = shapeOp(s);
+    if (what.op === "skip") continue;
+    if (what.op === "spot") {
+      // Ankörn-Punkt: Kreuz mit Punkt in der Mitte
+      const x = sx(px(what.at.x)), y = sy(px(what.at.y));
+      ctx.strokeStyle = cut.color;
+      ctx.beginPath();
+      ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6);
+      ctx.stroke();
+      ctx.fillStyle = "#fff";
+      ctx.beginPath(); ctx.arc(x, y, 2, 0, Math.PI * 2); ctx.fill();
+      continue;
+    }
     const sp = planShape(s, cut);
     for (const p of sp.plans) {
       const st = p.pts[0];
