@@ -17,7 +17,7 @@ import { commands, hasClipboard } from "../editor/commands";
 import { runInSelection } from "../editor/genEdit";
 import { checkpoint } from "../editor/history";
 import { getLayers } from "../laserLayers";
-import { isLaser, isPlasma } from "../machineMode";
+import { isLaser, isMill, isPlasma } from "../machineMode";
 import { refreshLaserPanel } from "./laserPanel";
 import { EXPORT_FORMATS, exportDrawing, formatLabel } from "./exportMenu";
 import { linkState } from "../editor/linked";
@@ -229,7 +229,7 @@ function shapeMenu(): MenuEntry[] {
     { label: t("cm.ungroup"), ico: "ungroup", key: ctrl("U"), run: cmd("ungroup"), disabled: !grouped },
     ...(sel.some(canReimport) ? [{ label: t("cm.reimport"), ico: "reimport", run: () => { commands.reimport(); } }] : []),
     { label: t("cm.heal"), ico: "heal", run: cmd("heal") },
-    ...(isLaser() || isPlasma() ? [] : [{ label: t("cm.relief"), ico: "relief", run: cmd("relief") }]),
+    ...(!isMill() ? [] : [{ label: t("cm.relief"), ico: "relief", run: cmd("relief") }]),
     ...(isPlasma() ? [] : [{ label: t("cm.deco"), ico: "texture", sub: [
       { label: t("deco.texture"), ico: "texture", run: cmd("texture") },
       ...(isLaser() ? [] : [{ label: t("deco.ridge"), ico: "ridge", run: cmd("ridge") }, { label: t("deco.moulding"), ico: "moulding", run: cmd("moulding") }])

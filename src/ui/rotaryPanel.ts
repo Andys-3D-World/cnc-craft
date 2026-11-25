@@ -14,7 +14,7 @@ import { openView3D } from "./view3dDialog";
 
 export function rotarySectionHtml(): string {
   return `
-    <div class="menu-section-unified not-plasma">
+    <div class="menu-section-unified not-plasma not-lathe">
       <h3 class="menu-trigger">⟳ ${T("rot.title")}</h3>
       <div class="menu-body rp-box">
         <label class="prop-row" style="cursor:pointer;" ${tip("rot.onTip")}><span>${T("rot.on")}</span><input type="checkbox" id="rot-on" style="width:auto;"></label>

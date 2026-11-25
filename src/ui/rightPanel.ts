@@ -18,6 +18,7 @@ import { opsPanelHtml } from "./opsPanel";
 import { modeSwitchHtml, laserLayersHtml, laserSettingsHtml } from "./laserPanel";
 import { rotarySectionHtml } from "./rotaryPanel";
 import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
+import { lathePanelHtml, latheZeroHtml } from "./lathePanel";
 import { stockSectionHtml } from "./stockPanel";
 import { twoSidedSectionHtml } from "./twoSidedPanel";
 import { machineLineHtml } from "./machineWizard";
@@ -59,7 +60,7 @@ export function renderRightPanel(container: HTMLElement) {
         <button id="btn-job-start" class="btn-secondary">▶ ${T("rp.start")}</button>
         <button id="btn-job-pause" class="btn-secondary job-icon" ${tip("m.pauseTip")}>⏸</button>
         <button id="btn-job-stop" class="btn-secondary job-stop" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
-        <button id="btn-job-resume" class="btn-secondary job-icon" ${tip("res.btnTip")}>⏭</button>
+        <button id="btn-job-resume" class="btn-secondary job-icon not-lathe" ${tip("res.btnTip")}>⏭</button>
       </div>
     </div>
     <div class="rp-tabs">
@@ -74,6 +75,7 @@ export function renderRightPanel(container: HTMLElement) {
       <div id="rp-object" class="rp-page active">
         ${laserLayersHtml()}
         ${plasmaCutsHtml()}
+        ${lathePanelHtml()}
         <div class="rp-nosel">${T("rp.noSel")}</div>
         <div class="menu-section-unified needs-sel">
           <h3 class="menu-trigger">${T("rp.properties")}</h3>
@@ -159,7 +161,7 @@ export function renderRightPanel(container: HTMLElement) {
         </div>
 
         <!-- Haltestege: Fräse (mit Höhe), Laser und Plasma (Werkzeug über dem Steg aus) -->
-        <div class="menu-section-unified needs-sel">
+        <div class="menu-section-unified not-lathe needs-sel">
           <h3 class="menu-trigger">${T("rp.tabsTitle")}</h3>
           <div class="menu-body rp-box">
             <div class="prop-row" ${tip("rp.tabsModeTip")}>${T("rp.tabsMode")}
@@ -255,7 +257,7 @@ export function renderRightPanel(container: HTMLElement) {
         <div class="m-dock">
             <div class="dro">
               <div style="color: #ff5757;">X <span id="pos-x">0.00</span></div>
-              <div style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
+              <div class="not-lathe" style="color: #34d17b;">Y <span id="pos-y">0.00</span></div>
               <div style="color: var(--lt-amber, #ffc043);">Z <span id="pos-z">0.00</span></div>
               <div id="dro-unit" class="dro-unit">mm</div>
             </div>
@@ -307,15 +309,15 @@ export function renderRightPanel(container: HTMLElement) {
             <div id="jog-hold-note" class="jog-hold-note" style="display: none;">${T("hj.unsupported")}</div>
             <div id="jog-pad" style="display: flex; gap: 14px; align-items: center; justify-content: center; margin-bottom: 5px;">
               <div style="width: 140px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
-                <button class="btn-jog btn-diag" data-cmd="X-1 Y1">↖</button>
-                <button id="jog-y-plus" class="btn-jog" data-cmd="Y1">Y+</button>
-                <button class="btn-jog btn-diag" data-cmd="X1 Y1">↗</button>
+                <button class="btn-jog btn-diag lathe-ghost" data-cmd="X-1 Y1">↖</button>
+                <button id="jog-y-plus" class="btn-jog lathe-ghost" data-cmd="Y1">Y+</button>
+                <button class="btn-jog btn-diag lathe-ghost" data-cmd="X1 Y1">↗</button>
                 <button id="jog-x-minus" class="btn-jog" data-cmd="X-1">X−</button>
                 <button id="jog-home" class="btn-jog btn-home" ${tip("m.jogStopTip")}>■</button>
                 <button id="jog-x-plus" class="btn-jog" data-cmd="X1">X+</button>
-                <button class="btn-jog btn-diag" data-cmd="X-1 Y-1">↙</button>
-                <button id="jog-y-minus" class="btn-jog" data-cmd="Y-1">Y−</button>
-                <button class="btn-jog btn-diag" data-cmd="X1 Y-1">↘</button>
+                <button class="btn-jog btn-diag lathe-ghost" data-cmd="X-1 Y-1">↙</button>
+                <button id="jog-y-minus" class="btn-jog lathe-ghost" data-cmd="Y-1">Y−</button>
+                <button class="btn-jog btn-diag lathe-ghost" data-cmd="X1 Y-1">↘</button>
               </div>
               <div class="not-ruida not-k40" style="width: 1px; height: 110px; background: var(--border-color);"></div>
               <div class="not-ruida not-k40" style="display: flex; flex-direction: column; gap: 8px; width: 50px;">
@@ -344,20 +346,22 @@ export function renderRightPanel(container: HTMLElement) {
               <button id="m-unlock" class="btn-secondary not-ruida" ${tip("m.unlockTip")}>🔓 ${T("m.unlock")}</button>
               <button id="m-home" class="btn-secondary" ${tip("m.homeTip")}>⌂ ${T("m.home")}</button>
               <button id="m-reset" class="btn-secondary" ${tip("m.resetTip")}>⟲ ${T("m.reset")}</button>
-              <button id="m-zero-xy" class="btn-secondary not-ruida not-k40" ${tip("m.zeroXYTip")}>◎ XY=0</button>
+              <button id="m-zero-xy" class="btn-secondary not-lathe not-ruida not-k40" ${tip("m.zeroXYTip")}>◎ XY=0</button>
               <button id="m-zero-z" class="btn-secondary not-ruida not-k40" ${tip("m.zeroZTip")}>⊥ Z=0</button>
-              <button id="m-goto-zero" class="btn-secondary" ${tip("m.gotoZeroTip")}>➜ 0,0</button>
+              <button id="m-goto-zero" class="btn-secondary not-lathe" ${tip("m.gotoZeroTip")}>➜ 0,0</button>
             </div>
             ${wcsRowHtml()}
           </div>
         </div>
 
-        <div class="menu-section-unified">
+        ${latheZeroHtml()}
+
+        <div class="menu-section-unified not-lathe">
           <h3 class="menu-trigger">${T("rp.positionJob")}</h3>
           <div class="menu-body rp-box">
             <button id="btn-job-frame" class="btn-secondary only-laser" ${tip("frame.tip")}>▢ ${T("frame.btn")}</button>
-            <button id="btn-job-here" class="btn-secondary not-ruida not-k40" ${tip("jobhere.tip")}>${icon("jobHere", 14)} ${T("jobhere.title")}</button>
-            <button id="btn-setup-sheet" class="btn-secondary" ${tip("sheet.tip")}>📋 ${T("sheet.btn")}</button>
+            <button id="btn-job-here" class="btn-secondary not-lathe not-ruida not-k40" ${tip("jobhere.tip")}>${icon("jobHere", 14)} ${T("jobhere.title")}</button>
+            <button id="btn-setup-sheet" class="btn-secondary not-lathe" ${tip("sheet.tip")}>📋 ${T("sheet.btn")}</button>
           </div>
         </div>
 

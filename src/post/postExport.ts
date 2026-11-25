@@ -3,14 +3,14 @@
  * and compare it with the neutral program. A file whose path differs is not handed out.
  */
 import { t, tMm, ascii } from "../i18n/i18n";
-import { isLaser, isPlasma } from "../machineMode";
+import { isMill } from "../machineMode";
 import { lintGcode } from "../gcodeLint";
 import { postCtx } from "./postContext";
 import { activePost, type ActivePost } from "./postSetting";
 import { postProcess } from "./postProcess";
 import { samePath } from "./pathCompare";
 
-export const currentPost = (): ActivePost => activePost(!isLaser() && !isPlasma());
+export const currentPost = (): ActivePost => activePost(isMill());
 
 /** Run a generator so that it writes what the chosen post needs (tool numbers). Always switched back afterwards. */
 export function withPost<T>(fn: () => T): T {

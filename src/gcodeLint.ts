@@ -14,7 +14,7 @@
  * Leistung, und eine Kontur mit einem S0-Stück ist keine Gerade. Es gibt keine Markierung im G-Code, die die Regel
  * abschaltet – nur die Form zählt, also auch bei G-Code aus anderen Programmen.
  */
-export type LintKind = "mill" | "laser" | "plasma";
+export type LintKind = "mill" | "laser" | "plasma" | "lathe";
 export interface LintOptions { kind: LintKind; bedW?: number; bedH?: number; sMax?: number; maxLine?: number }
 export interface LintIssue { rule: string; line: number; text: string }
 
@@ -149,6 +149,9 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
       if (!(feed > 0)) add("cut-without-feed", n, raw);
       if (o.kind === "mill") {
         if (nz !== null && nz < 0 && !on) add("cut-spindle-off", n, raw);
+      } else if (o.kind === "lathe") {
+        // Drehen: Vorschub in X oder Z nur mit laufender Spindel (Spindel von Hand: dann steht kein M3 im Programm)
+        if (everOn && !on && (xyMoves || nz !== z)) add("cut-spindle-off", n, raw);
       } else if (xyMoves) {
         if (!on) add("cut-tool-off", n, raw);
         else if (o.kind === "laser") {
@@ -185,7 +188,7 @@ export function lintGcode(code: string, o: LintOptions): LintIssue[] {
   if (late) out.sort((p, q) => p.line - q.line); // stabil: Meldungen einer Zeile bleiben in ihrer Reihenfolge
   if (!ended) add("no-end", lines.length, "(no M2/M30)");
   if (on && !ended) add("end-tool-on", lines.length, "(tool still on)");
-  if (!everOn && (o.kind !== "mill" || cut)) add("tool-never-on", 1, "(no M3/M4)");
+  if (!everOn && o.kind !== "lathe" && (o.kind !== "mill" || cut)) add("tool-never-on", 1, "(no M3/M4)");
   return out;
 }
 

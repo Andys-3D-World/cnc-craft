@@ -30,6 +30,7 @@
  *   Handtaster:    an der Wechselposition – Platte dort hinlegen (auf eine Stelle, die nicht gefräst wird),
  *                  antasten, Platte weg, bestätigen. Gemessen wird relativ (gleiche Platte, gleiche Stelle).
  */
+import { isLathe } from "./machineMode";
 import { t, allBuiltinTexts, ascii } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, sendAndWait, jobResume, jobStop, setSwitchGuard } from "./machine";
 import { probeSettings as s, setProbeLog, step, settled, startGuard, stopGuard, freshStatus, touchAt, liftUp, abortProbe,
@@ -242,6 +243,8 @@ function onJobToolChange(p: { note?: string; tool?: number | null; m6?: boolean 
   // M0 ohne Werkzeugwechsel-Kommentar = gewöhnliche Pause wie bisher (Fortsetzen-Knopf)
   if (!m6 && !parseToolNote(note)) return;
   if (toolChangeBusy()) return;
+  // Drehbank: keine Fahrten von selbst (Z hoch, Sensor, Platte) – nur der Hinweis, weiter nach dem Klick
+  if (isLathe()) { tc.tool = toolInfo(note, p?.tool ?? null); tc.note = note; tc.delta = null; tc.zSet = null; tc.spindle = ""; manualStart = null; set(TcState.Manual); return; }
   tc.tool = toolInfo(note, p?.tool ?? null);
   tc.note = note;
   tc.delta = null; tc.zSet = null; tc.spindle = "";
@@ -290,7 +293,7 @@ async function manualLift() {
 
 /** Von Hand: doch mit der Tastplatte messen (Knopf im Dialog) */
 export function tcManualPlate() {
-  if (tc.state !== TcState.Manual || machine.protocol !== "grbl") return;
+  if (tc.state !== TcState.Manual || machine.protocol !== "grbl" || isLathe()) return;
   const st = manualStart;
   manualStart = null;
   run("plate", st);

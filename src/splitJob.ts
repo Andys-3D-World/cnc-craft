@@ -33,7 +33,7 @@ function radiusOf(v: { mode: string; toolId?: string; depth: number }): number {
 }
 
 /** Womit gerade geschnitten wird */
-export function splitKind(): SplitKind { return getMachineMode(); }
+export function splitKind(): SplitKind { const m = getMachineMode(); return m === "lathe" ? "mill" : m; }
 
 /** Einstellungen fürs Teilen – je nach Maschinen-Art (shapes und setup braucht nur der Laser: Schneid-Ebenen) */
 export function splitOptions(shapes: any[], setup: Pick<SplitSetup, "cutLayers"> | null): SplitOptions {

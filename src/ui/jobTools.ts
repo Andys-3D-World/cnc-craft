@@ -14,7 +14,7 @@ import { streamState } from "../machineStream";
 import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "../cam";
 import { state } from "../main";
 import { rotary } from "../rotary";
-import { isLaser, isPlasma } from "../machineMode";
+import { isLaser, isLathe, isPlasma } from "../machineMode";
 import { openSetupSheet } from "./setupSheetDialog";
 import { openToolPanel, rowCss } from "./toolPanel";
 import { esc } from "../setupSheet";
@@ -83,6 +83,7 @@ function currentLines(): { lines: string[]; label: string } | null {
 const r2 = (v: number) => (Math.round(v * 100) / 100).toFixed(2);
 
 export async function runFrame(log: (s: string) => void) {
+  if (isLathe()) { log(t("lathe.noMove")); return; }
   if (!machine.connected) { log(t("conn.connectFirst")); return; }
   if (!canCommand()) { log(t("m.why.job running")); return; }
   const job = currentLines();
@@ -94,7 +95,7 @@ export async function runFrame(log: (s: string) => void) {
   if (machine.protocol === "grbl") await sendAndWait("M5", 4000, true);
   // Drehachse an eigener A-Achse: die Querachse gehört nicht zum Teil → nur entlang der Drehachse fahren
   // (Achse entlang X: nur X; entlang Y: nur Y)
-  const aAxis = rotary.on && rotary.axis === "a" && !isPlasma();
+  const aAxis = rotary.on && rotary.axis === "a" && !isPlasma() && !isLathe();
   const alongY = rotary.along === "y";
   const pts = !aAxis ? corners : alongY ? [[0, b.y0], [0, b.y1], [0, b.y0]] : [[b.x0, 0], [b.x1, 0], [b.x0, 0]];
   for (const [px, py] of pts) {
@@ -108,6 +109,7 @@ export async function runFrame(log: (s: string) => void) {
 
 /** Auftrag dort starten, wo der Kopf steht: Bezugspunkt wählen, dann wird nur der Nullpunkt gesetzt (jobOrigin.ts) */
 export function openJobHereDialog(log: (s: string) => void, redraw: () => void) {
+  if (isLathe()) { log(t("lathe.noMove")); return; }
   if (!machine.connected) { log(t("conn.connectFirst")); return; }
   if (machine.protocol !== "grbl") { log(t("jobhere.grblOnly")); return; }
   if (rotary.on) { log(t("jobhere.noRotary")); return; }

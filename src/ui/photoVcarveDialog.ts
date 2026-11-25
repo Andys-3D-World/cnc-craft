@@ -2,6 +2,7 @@
  * DIALOG „Foto mit dem V-Stichel“ (Fräse): Bild → parallele V-Nuten, deren Breite die Helligkeit nachbildet.
  * Gerechnet wird in photoVcarve.ts. Hier: Werte, Vorschau, G-Code als Auftrag laden oder speichern – gestartet wird nichts.
  */
+import { isLathe } from "../machineMode";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { t, ascii, tMm } from "../i18n/i18n";
@@ -43,6 +44,7 @@ function photoGcode(plan: PhotoPlan, o: PhotoOpts, tool: MillingTool): { gcode: 
 }
 
 export async function openPhotoVcarve(name: string, bytes: Uint8Array, log: (s: string) => void) {
+  if (isLathe()) { log(t("deco.onlyMill")); return; }
   document.getElementById("pvc-overlay")?.remove();
   const tools = getTools().filter(x => (x.type === "vbit" || x.type === "chamfer") && x.angle > 0);
   if (!tools.length) { log(t("pvc.noTool")); return; }

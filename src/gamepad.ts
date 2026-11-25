@@ -13,6 +13,7 @@
  *
  * Rust liest auch ohne Fokus: Stopp und Pause gehen dann weiter, alles andere sperrt die Fokus-Regel.
  */
+import { isLathe } from "./machineMode";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "./i18n/i18n";
 import { zeroCommand } from "./wcs";
@@ -214,7 +215,7 @@ function run(cmd: GamepadCommand) {
       break;
     case "start": void confirmStart(); break;
     case "home": guard(send("$H")); break;
-    case "zeroXY": guard(send(zeroCommand("XY"))); break;
+    case "zeroXY": if (isLathe()) { log(t("lathe.noMove")); break; } guard(send(zeroCommand("XY"))); break;
     case "zeroZ": guard(send(zeroCommand("Z"))); break;
   }
 }

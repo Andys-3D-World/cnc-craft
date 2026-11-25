@@ -40,7 +40,7 @@ export interface Stock {
 export const stockOptions = { margin: 2, show: true, skipUsed: true };
 const KEY_OPTIONS = "cnc_craft_stock_options";
 const keyFor = (m: MachineMode, bed: number) => "cnc_craft_stock_" + m + (bed ? "_bed" + bed : "");
-const MODES: MachineMode[] = ["mill", "laser", "plasma"];
+const MODES: MachineMode[] = ["mill", "laser", "plasma", "lathe"];
 const stocks = new Map<string, Stock>();   // "mode:bed"
 let bedIdx = 0;                            // aktives Bett (setzt beds.ts)
 

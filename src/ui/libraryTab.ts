@@ -22,15 +22,16 @@ import { exportLibrary, importLibrary, LibKind, ALL_KINDS } from "../libraryBack
 import { initLaserLibPage, rebuildLaserLibPage } from "./laserLibPage";
 import { openSyncDialog, syncStatusText } from "./syncDialog";
 import { SYNC_CHANGED } from "../libSync";
+import { initLatheLibPage, rebuildLatheLibPage } from "./latheLibPage";
 import { initPlasmaLibPage, rebuildPlasmaLibPage } from "./plasmaLibPage";
 
 function esc(s: string): string {
   return s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
 }
 
-const KIND_OF: Record<MachineMode, LibKind> = { mill: "tools", laser: "laser", plasma: "plasma" };
-const MODE_OF: Record<LibKind, MachineMode> = { tools: "mill", laser: "laser", plasma: "plasma" };
-const ICON: Record<LibKind, string> = { tools: "🛠️", laser: "🔦", plasma: "🔥" };
+const KIND_OF: Record<MachineMode, LibKind> = { mill: "tools", laser: "laser", plasma: "plasma", lathe: "lathe" };
+const MODE_OF: Record<LibKind, MachineMode> = { tools: "mill", laser: "laser", plasma: "plasma", lathe: "lathe" };
+const ICON: Record<LibKind, string> = { tools: "🛠️", laser: "🔦", plasma: "🔥", lathe: "🔩" };
 
 let view: LibKind = "tools";
 let log: (s: string) => void = () => {};
@@ -126,6 +127,7 @@ export function initLibraryTab(logFn: (s: string) => void) {
   renderBar();
   initLaserLibPage();
   initPlasmaLibPage();
+  initLatheLibPage();
   showLibrary(KIND_OF[getMachineMode()]);
   // Maschinen-Modus gewechselt -> Ansicht springt mit
   window.addEventListener(MODE_CHANGED, () => showLibrary(KIND_OF[getMachineMode()]));
@@ -136,5 +138,6 @@ export function initLibraryTab(logFn: (s: string) => void) {
     syncNote();
     rebuildLaserLibPage();
     rebuildPlasmaLibPage();
+    rebuildLatheLibPage();
   });
 }

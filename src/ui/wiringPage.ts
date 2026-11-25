@@ -29,10 +29,10 @@ const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
   psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1", rotary: "#ffa94d",
-  spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", display: "#7dd3fc", io: "#2dd4bf"
+  spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", display: "#7dd3fc", io: "#2dd4bf", latheAxes: "#8fb4e8", lathe: "#c4a484", latheHand: "#d9b38c"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", rotary: "🔄", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", display: "🖥️", io: "🔘"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", rotary: "🔄", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", display: "🖥️", io: "🔘", latheAxes: "⚙️", lathe: "🔩", latheHand: "✋"
 };
 
 function esc(s: string): string {
@@ -124,7 +124,7 @@ function placeParts(b: Board, parts: Part[]): Placed[] {
     const vertical = side === "left" || side === "right";
     const sizes = list.map(p => {
       const np = Math.max(p.pins.length, outerPins(p).length);
-      return vertical ? { w: 150, h: Math.max(58, np * 16 + 26) } : { w: Math.max(118, np * 24 + 34), h: 62 };
+      return vertical ? { w: 150, h: Math.max(58, np * 16 + 26) } : { w: Math.max(118, np * (p.kind === "selsw" ? 42 : 24) + 34), h: 62 };
     });
     // nach Ziel sortiert, dann ohne Überlappung verteilen
     const idx = list.map((_, i) => i).sort((a, c) => vertical ? target(list[a]).y - target(list[c]).y : target(list[a]).x - target(list[c]).x);
@@ -197,7 +197,7 @@ function partGlyph(pl: Placed): string {
       return `<rect x="${n(cx - 16)}" y="${n(cy - 9)}" width="32" height="18" rx="2" fill="#1b1d21" stroke="#56606b"/><text x="${n(cx)}" y="${n(cy + 4)}" text-anchor="middle" class="wr-glyph" style="font-size:10px">→|</text>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
-      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡", flame: "🔥", buzzer: "🔔", pbtn: "🔘", lcd: "🖥️", router: "🌀"
+      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", srel: "🔁", iso: "⇌", yy: "⚡", bldc: "⚙", pot: "◔", rsw: "⇄", tacho: "123", nvr: "⏻", selsw: "⤨", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡", flame: "🔥", buzzer: "🔔", pbtn: "🔘", lcd: "🖥️", router: "🌀"
     }[p.kind as string] || "■"}</text>`;
   }
 }
@@ -446,7 +446,7 @@ function drawHookup(b: Board, hk: Hookup, box: Box): string {
       if (!z) continue;
       const ends = `p:${pl.part.id}.${w.from} ${endKey}`;
       const tip = `${partName(pl.part)} · ${w.from}  →  ${endName}`;
-      if (w.to.startsWith("@") && pl.part.outer) {
+      if (w.to.startsWith("@") && (pl.part.outer || pl.part.outerPins?.includes(w.from))) {
         // zwischen zwei Bauteilen außen herum (z. B. Plasmaschneider/Pumpe an den Relais-Kontakt)
         const side = pl.part.side, o = 46;
         const ox = side === "left" ? -o : side === "right" ? o : 0, oy = side === "top" ? -o : side === "bottom" ? o : 0;
@@ -572,7 +572,7 @@ export function initWiringPage() {
         <em>${esc(b.mcu)} · ${esc(b.volt)} · ${esc(t(b.fw))}</em>
       </label>`;
     const chips = [`<button class="wr-chip${comp === "overview" ? " active" : ""}" data-comp="overview">🗺️ ${esc(t("wr.overview"))}</button>`]
-      .concat(COMPS.filter(c => !OPTIONAL_COMPS.includes(c) || b.hookups[c]).map(c => {
+      .concat(COMPS.filter(c => (!OPTIONAL_COMPS.includes(c) && !b.only) || b.hookups[c]).map(c => {
         const h = b.hookups[c];
         const na = !h || !!h.unavailable;
         return `<button class="wr-chip${comp === c ? " active" : ""}${na ? " na" : ""}" data-comp="${c}" style="--cc:${COMP_COLOR[c]}">${COMP_ICON[c]} ${esc(t("wr.comp." + c))}</button>`;
@@ -618,7 +618,7 @@ export function initWiringPage() {
         side += `<details class="wr-details"><summary>${esc(t("wr.steps"))}</summary><ol class="wr-steps">${hk.steps.map(s => `<li>${tx(s)}</li>`).join("")}</ol></details>`;
       }
       if (hk.settings.length) side += `<h4>${esc(t("wr.settings"))}</h4><div class="wr-settings">${hk.settings.map(s => `<code>${esc(s)}</code>`).join("")}</div>`;
-      side += `<div class="wr-test">✅ ${esc(t(b.maker === "Ruida" ? "wr.test.ruida" : "wr.test"))}</div>`;
+      if (!b.only) side += `<div class="wr-test">✅ ${esc(t(b.maker === "Ruida" ? "wr.test.ruida" : "wr.test"))}</div>`;
     }
 
     root.innerHTML = `

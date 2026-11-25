@@ -169,7 +169,8 @@ export const RT = {
   rapid100: 0x95, rapid50: 0x96, rapid25: 0x97,
   feedPlus1: 0x93, feedMinus1: 0x94,
   spindle100: 0x99, spindlePlus10: 0x9a, spindleMinus10: 0x9b, spindlePlus1: 0x9c, spindleMinus1: 0x9d,
-  spindleStop: 0x9e
+  spindleStop: 0x9e,
+  floodToggle: 0xa0
 };
 
 /** Override-Grenzen von GRBL (unter 10 % geht nicht – "aus" ist M5 bzw. Spindel-Stopp) */

@@ -8,7 +8,7 @@
 import { t } from "../i18n/i18n";
 import { machine, sendAndWait } from "../machine";
 import { rotary } from "../rotary";
-import { isPlasma } from "../machineMode";
+import { isLathe, isPlasma } from "../machineMode";
 import { checkLimits, scanJobExtents, LimitOver } from "../softLimits";
 import { askChoice } from "./unsavedDialog";
 
@@ -35,7 +35,7 @@ function evaluate(lines: string[]) {
   const ext = scanJobExtents(lines, { wpos, wco, activeWcs: machine.wcs });
   // Referenziert? $22 aus: Zählerstand ohne Bezug. Nach Alarm/$X auch nicht. Sonst ($22 an, kein Alarm seit Verbinden): ja.
   const homed = ((num("$22") | 0) & 1) === 1 && machine.homeState !== "lost";
-  const skip = rotary.on && rotary.axis !== "a" && !isPlasma() ? [rotary.along === "y" ? 0 : 1] : [];
+  const skip = rotary.on && rotary.axis !== "a" && !isPlasma() && !isLathe() ? [rotary.along === "y" ? 0 : 1] : [];
   const res = checkLimits(ext, {
     travel: [num("$130"), num("$131"), num("$132")],
     homeDirMask: num("$23") | 0,

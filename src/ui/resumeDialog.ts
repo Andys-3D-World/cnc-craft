@@ -10,12 +10,13 @@
 import { t } from "../i18n/i18n";
 import { streamState, startStreaming } from "../machineStream";
 import { buildResume } from "../jobResume";
-import { getMachineMode } from "../machineMode";
+import { isLathe, getMachineMode } from "../machineMode";
 import { machine } from "../machine";
 
 const BACK = 20; // so viele Zeilen vor der zuletzt bestätigten Zeile beginnen
 
 export function openResumeDialog(log: (s: string) => void, startLine?: number) {
+  if (isLathe()) { log(t("lathe.noResume")); return; }
   const st = streamState;
   if (!st.totalLines) { log(t("stream.noGcode")); return; }
   if (st.isRunning) { log(t("stream.alreadyRunning")); return; }

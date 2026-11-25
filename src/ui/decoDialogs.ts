@@ -6,7 +6,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { t, ascii, tMm } from "../i18n/i18n";
 import { state } from "../main";
-import { isLaser, isPlasma } from "../machineMode";
+import { isMill, isPlasma } from "../machineMode";
 import { getTools, getTool, MillingTool, DEFAULT_PLUNGE, cutDiameter, stepDia, isBallTip } from "../toolLibrary";
 import { createCircle, createPolyline, isClosedShape, makeRectPoints, MM_TO_PIXEL, newId, shapeToPaths } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
@@ -101,7 +101,7 @@ function insert(shapes: any[], redraw: () => void) {
 export function openTexture(log: (s: string) => void, redraw: () => void) {
   const loops = selection().filter(s => s.closed).map(s => s.pts);
   if (!loops.length) { log(t("deco.needClosed")); return; }
-  const mill = !isLaser() && !isPlasma();
+  const mill = isMill();
   if (isPlasma()) { log(t("deco.notPlasma")); return; }
   const tools = getTools().filter(x => ["vbit", "ball", "endmill", "bullnose", "taper", "chamfer"].includes(x.type));
   if (mill && !tools.length) { log(t("face.noTool")); return; }
@@ -166,7 +166,7 @@ export function openTexture(log: (s: string) => void, redraw: () => void) {
 // ERHABENE SCHRIFT MIT GRAT
 // =====================================================================
 export function openRidge(log: (s: string) => void, redraw: () => void) {
-  if (isLaser() || isPlasma()) { log(t("deco.onlyMill")); return; }
+  if (!isMill()) { log(t("deco.onlyMill")); return; }
   const items = selection().filter(s => s.closed);
   if (!items.length) { log(t("deco.needClosed")); return; }
   const vs = getTools().filter(x => x.type === "vbit" && x.angle > 0), es = getTools().filter(x => x.type === "endmill" || x.type === "bullnose");
@@ -233,7 +233,7 @@ export function openRidge(log: (s: string) => void, redraw: () => void) {
 // PROFILLEISTE
 // =====================================================================
 export function openMoulding(log: (s: string) => void) {
-  if (isLaser() || isPlasma()) { log(t("deco.onlyMill")); return; }
+  if (!isMill()) { log(t("deco.onlyMill")); return; }
   const paths = selection().map(s => ({ pts: s.pts, closed: s.closed }));
   if (!paths.length) { log(t("deco.needLine")); return; }
   const tools = getTools().filter(x => ["ball", "taper", "endmill", "bullnose"].includes(x.type));

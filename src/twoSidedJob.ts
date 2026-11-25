@@ -8,7 +8,7 @@
 import { t, tMm, ascii } from "./i18n/i18n";
 import { bedSetup, twoSidedOn, viewSide, sideShapes } from "./editor/beds";
 import { bedSizeMm } from "./editor/editorState";
-import { isLaser, isPlasma } from "./machineMode";
+import { isMill } from "./machineMode";
 import { rotary } from "./rotary";
 import { expandOps } from "./ops";
 import { isKeepOut } from "./keepOut";
@@ -24,7 +24,7 @@ import { skinPlan, skinRole, skinSettings, type SkinSettings } from "./onionSkin
 
 /** Setup of the active bed when two-sided milling applies (router only, no rotary axis) */
 export function activeSetup(): TwoSidedSetup | null {
-  if (!twoSidedOn() || isLaser() || isPlasma() || rotary.on) return null;
+  if (!twoSidedOn() || !isMill() || rotary.on) return null;
   return bedSetup();
 }
 

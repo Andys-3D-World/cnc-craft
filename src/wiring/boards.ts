@@ -41,6 +41,9 @@
  *   - Ruida RDC6442G/S: Ruida "RDV6442G Control System manual V1.3" – same RDC644XG-A board and pins as the RDC6445G.
  *   - 6 Pack Integrated ESP32: FluidNC wiki page – same socket/driver pins as the original 6-Pack.
  *   - Jackpot3 (V1 Engineering, FluidNC): docs.v1e.com/electronics/jackpot3 (labelled photo) + V1E's JP3 config.yaml files.
+ *   - YY-600D-V1.2.8 (brushless lathe motor drive): seller's connection picture (labels AC IN, U V W, +5V 0V, NC F R COM,
+ *     +5V a b c 0V, +5V SV 0V). Other versions (e.g. V1.12) were not seen. No transformer or optocoupler is visible in the
+ *     picture, so every terminal is treated as mains potential. Not tested on a real board.
  *
  * Koordinaten: Board-Fläche w × h je Board (Zeichnung in ui/wiringPage.ts).
  *
@@ -60,10 +63,10 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "display" | "io";
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "display", "io"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "display" | "io" | "latheAxes" | "lathe" | "latheHand";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "display", "io", "latheAxes", "lathe", "latheHand"];
 /** "modbus" (Umrichter über RS485), "display" (Bildschirm) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
-export const OPTIONAL_COMPS: CompId[] = ["modbus", "display", "io"];
+export const OPTIONAL_COMPS: CompId[] = ["modbus", "display", "io", "latheAxes", "lathe", "latheHand"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
 /**
@@ -81,7 +84,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd" | "router";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd" | "router" | "srel" | "iso" | "yy" | "bldc" | "pot" | "rsw" | "tacho" | "nvr" | "selsw";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -145,6 +148,8 @@ export interface Board {
    *   slb   = Sienci SuperLongBoard: VCC on the limit terminal is 5 V (24 V only after a solder change), NO/NC switches, NPN
    */
   inputs: InputKind;
+  /** kein CNC-Board (z. B. Motorregler): nur die Ansichten zeigen, die es wirklich gibt */
+  only?: boolean;
   hookups: Partial<Record<CompId, Hookup>>;
 }
 export type InputKind = "avr5" | "esp33" | "pb496" | "pb588" | "ruida" | "opto5" | "jack" | "stm33" | "btt" | "bbx" | "bb4x" | "slb";
@@ -3018,8 +3023,145 @@ function hookupsFor(b: Board): Partial<Record<CompId, Hookup>> {
 }
 
 
-export const BOARDS: Board[] = [shield, shieldV4, dlc21, dlcMax, pibot, pibotUltra, ruida6445, ruida6442, sixPack, sixPackInt, jackpot, jackpot3, ramps, sktPro, rodent, bb4x, bbx32, slb];
-for (const b of BOARDS) b.hookups = hookupsFor(b);
+// =====================================================================
+// Lathe motor drive YY-600D-V1.2.8 (brushless, AC IN) – layout simplified after the seller's connection picture.
+// =====================================================================
+const yy600: Board = {
+  id: "yy-600d", name: "YY-600D-V1.2.8", maker: "YY-600D", mcu: "BLDC", fw: "wr.fw.yy", source: "wr.src.yy", volt: "110 / 220 V AC", w: 420, h: 520, inputs: "avr5", only: true,
+  pcb: { fill: "#1f6b45", edge: "#123f29" },
+  holes: [{ x: 24, y: 420, r: 8 }, { x: 396, y: 420, r: 8 }],
+  conns: [
+    { id: "ac", label: "AC IN", x: 26, y: 214, dir: "v", labelPos: "right", pitch: 26, style: "screw", body: "#5aa02c", pins: [{ k: "1", label: "AC" }, { k: "2", label: "AC" }] },
+    { id: "mot", label: "U V W", x: 290, y: 180, dir: "h", labelPos: "below", pitch: 30, style: "screw", body: "#5aa02c", pins: [{ k: "U", label: "U" }, { k: "V", label: "V" }, { k: "W", label: "W" }] },
+    { id: "j2", label: "J2", x: 60, y: 478, dir: "h", labelPos: "above", pitch: 22, body: "#e8e8e4", pins: [{ k: "5V", label: "+5V" }, { k: "0", label: "0V" }] },
+    { id: "j3", label: "J3", x: 138, y: 478, dir: "h", labelPos: "above", pitch: 22, body: "#e8e8e4", pins: [{ k: "NC", label: "NC" }, { k: "F", label: "F" }, { k: "R", label: "R" }, { k: "C", label: "COM" }] },
+    { id: "j1", label: "J1", x: 238, y: 478, dir: "h", labelPos: "above", pitch: 19, body: "#e8e8e4", pins: [{ k: "5V", label: "+5V" }, { k: "a", label: "a" }, { k: "b", label: "b" }, { k: "c", label: "c" }, { k: "0", label: "0V" }] },
+    { id: "sv", label: "SV", x: 342, y: 478, dir: "h", labelPos: "above", pitch: 22, body: "#e8e8e4", pins: [{ k: "5V", label: "+5V" }, { k: "SV", label: "SV" }, { k: "0", label: "0V" }] },
+  ],
+  deco: [
+    { kind: "chip", x: 90, y: 20, w: 120, h: 120, label: "" }, { kind: "chip", x: 240, y: 20, w: 120, h: 120, label: "" },
+    { kind: "chip", x: 210, y: 236, w: 170, h: 100, label: "IPM" }, { kind: "fuse", x: 130, y: 200, w: 18, h: 60, label: "" }, { kind: "chip", x: 250, y: 380, w: 90, h: 36, label: "" },
+  ],
+  hookups: {}
+};
+function yyHookups(): Partial<Record<CompId, Hookup>> {
+  return { latheHand: {
+    comp: "latheHand",
+    parts: [
+      { id: "nvr", kind: "nvr", name: "", side: "left", pins: ["1", "2"], outerPins: ["L", "N"], wires: [{ from: "1", to: "ac.1", color: "#8b5a2b" }, { from: "2", to: "ac.2", color: BLU }] },
+      { id: "rsw", kind: "rsw", name: "", side: "bottom", pins: ["COM"], outerPins: ["F", "R"], wires: [{ from: "COM", to: "j3.C", color: RED }, { from: "F", to: "@sel.H·F", color: YEL }, { from: "R", to: "@sel.H·R", color: WHT }] },
+      { id: "srel", kind: "srel", name: "", side: "bottom", pins: ["11"], outerPins: ["14"], wires: [{ from: "11", to: "j3.C", color: RED }, { from: "14", to: "@sel.CNC·F", color: YEL }] },
+      { id: "sel", kind: "selsw", name: "", side: "bottom", pins: ["F", "R", "SV"], outerPins: ["H·F", "H·R", "CNC·F", "H·SV", "CNC·SV"], wires: [{ from: "F", to: "j3.F", color: YEL }, { from: "R", to: "j3.R", color: WHT }, { from: "SV", to: "sv.SV", color: VIO }] },
+      { id: "pot", kind: "pot", name: "", side: "bottom", pins: ["+5V", "0V"], outerPins: ["S"], wires: [{ from: "+5V", to: "sv.5V", color: RED }, { from: "0V", to: "sv.0", color: BLACK }, { from: "S", to: "@sel.H·SV", color: VIO }] },
+      { id: "iso", kind: "iso", name: "", side: "bottom", pins: ["OUT−"], outerPins: ["OUT+"], wires: [{ from: "OUT−", to: "sv.0", color: BLACK }, { from: "OUT+", to: "@sel.CNC·SV", color: VIO }] },
+    ],
+    steps: [1, 2, 3, 4, 5, 6, 7].map(i => ({ k: "wr.s.lhd." + i })),
+    notes: [{ k: "wr.n.yy.hot" }, { k: "wr.n.lhd.sw" }, { k: "wr.n.yy.ver" }, { k: "wr.n.yy.test" }],
+    pro: [{ k: "wr.p.lhd" }],
+    settings: []
+  }, lathe: {
+    comp: "lathe",
+    parts: [
+      { id: "nvr", kind: "nvr", name: "", side: "left", pins: ["1", "2"], outerPins: ["L", "N"], wires: [{ from: "1", to: "ac.1", color: "#8b5a2b" }, { from: "2", to: "ac.2", color: BLU }] },
+      { id: "bldc", kind: "bldc", name: "", side: "right", pins: ["U", "V", "W"], outerPins: ["PE"], wires: [{ from: "U", to: "mot.U", color: ORG }, { from: "V", to: "mot.V", color: ORG }, { from: "W", to: "mot.W", color: ORG }] },
+      { id: "tacho", kind: "tacho", name: "", side: "bottom", pins: ["+5V", "0V"], wires: [{ from: "+5V", to: "j2.5V", color: RED }, { from: "0V", to: "j2.0", color: BLACK }] },
+      { id: "rsw", kind: "rsw", name: "", side: "bottom", pins: ["F", "R", "COM"], wires: [{ from: "F", to: "j3.F", color: YEL }, { from: "R", to: "j3.R", color: WHT }, { from: "COM", to: "j3.C", color: RED }] },
+      { id: "hall", kind: "bldc", name: "Hall", side: "bottom", pins: ["+5V", "a", "b", "c", "0V"], wires: [{ from: "+5V", to: "j1.5V", color: RED }, { from: "a", to: "j1.a", color: YEL }, { from: "b", to: "j1.b", color: GRN }, { from: "c", to: "j1.c", color: BLU }, { from: "0V", to: "j1.0", color: BLACK }] },
+      { id: "pot", kind: "pot", name: "", side: "bottom", pins: ["+5V", "SV", "0V"], wires: [{ from: "+5V", to: "sv.5V", color: RED }, { from: "SV", to: "sv.SV", color: VIO }, { from: "0V", to: "sv.0", color: BLACK }] },
+    ],
+    steps: [1, 2, 3, 4, 5, 6, 7].map(i => ({ k: "wr.s.yy." + i })),
+    notes: [{ k: "wr.n.yy.hot" }, { k: "wr.n.yy.ver" }, { k: "wr.n.yy.test" }],
+    pro: [{ k: "wr.p.yy" }],
+    settings: []
+  } };
+}
+
+/**
+ * Drehbank: Motorregler YY-600D an ein CNC-Board. Nur Boards, bei denen Ein/Aus und Drehzahl getrennte, belegte Ausgänge haben.
+ * Die Bedienklemmen des Reglers gelten als Netzpotential: dazwischen immer Koppelrelais und Trennwandler mit sicherer Trennung.
+ */
+interface LatheOut {
+  side: Part["side"];
+  sw: { a: string; b: string; how: "coil" | "contact" | "module"; gnd?: string; vcc?: string };  // Spule direkt, Kontakt auf dem Board oder Logik-Signal für ein Relaismodul
+  sig: string; gnd: string; pwm: boolean;   // Drehzahl: PWM oder 0–10 V
+  names: { sw: string; sig: string; gnd: string };
+  settings: string[]; notes?: string[]; extra?: Part[];
+  m8?: boolean;   // M3 und S sind hier derselbe Ausgang: Ein/Aus kommt vom Kühlmittel-Ausgang (M8/M9)
+}
+const FNC_PWM = (pwm: string, en: string) => ["PWM:", "pwm_hz: 5000", `output_pin: ${pwm}`, `enable_pin: ${en}`, "speed_map: 0=0% 2000=100%"];
+const FNC_10V = (out: string, en: string) => ["10V:", `output_pin: ${out}`, `enable_pin: ${en}`, "speed_map: 0=0% 2000=100%"];
+const GRBL_SP = ["$32=0", "$30", "$31=0"];
+const LATHE_OUT: Record<string, LatheOut> = {
+  "cnc-shield-v3": { side: "right", m8: true, sw: { a: "cool.S", b: "cool.G", how: "module", vcc: "v5.5V" }, sig: "lzp.S", gnd: "lzp.G", pwm: true, names: { sw: "CoolEn (A3)", sig: "Z+ S (D11)", gnd: "GND" }, settings: GRBL_SP },
+  "nano-shield-v4": { side: "top", m8: true, sw: { a: "ctl.A3", b: "ctlg.G1", how: "module", vcc: "v5.5V" }, sig: "lim.ZP", gnd: "limg.G7", pwm: true, names: { sw: "CoolEn (A3)", sig: "Z+ (D11)", gnd: "GND" }, settings: GRBL_SP },
+  "mks-dlc32-v21": { side: "right", m8: true, sw: { a: "i2c.SCL", b: "i2c.G", how: "module", vcc: "i2c.3V3" }, sig: "ttl.S", gnd: "ttl.G", pwm: true, names: { sw: "I2C SCL (IO4)", sig: "S-TTL-V S", gnd: "GND" }, settings: GRBL_SP, notes: ["wr.n.dlc.air"] },
+  "mks-dlc32-max": { side: "top", m8: true, sw: { a: "air.+", b: "air.-", how: "coil" }, sig: "ttl.S", gnd: "ttl.G", pwm: true, names: { sw: "+AIR−", sig: "Laser TTL", gnd: "GND" }, settings: [...GRBL_SP, "$44=1"], notes: ["wr.n.max.air"] },
+  "btt-skr-pro": { side: "bottom", sw: { a: "fan1.+", b: "fan1.-", how: "coil" }, sig: "exp1b.PA8", gnd: "exp1.G", pwm: true, names: { sw: "FAN1 + / −", sig: "EXP1 PA8", gnd: "GND" }, settings: GRBL_SP, notes: ["wr.n.skr.out"] },
+  "pibot-v496-pro": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, sig: "v10.V", gnd: "v10.G", pwm: false, names: { sw: "RELAY COM / NO (⑬)", sig: "10V", gnd: "GND" }, settings: FNC_10V("gpio.13", "gpio.26") },
+  "pibot-v588-ultra": { side: "top", sw: { a: "m4.V", b: "m4.4", how: "coil" }, sig: "v10.V", gnd: "v10.G", pwm: false, names: { sw: "MOS4 Vmot / io4−", sig: "10V", gnd: "GND" }, settings: FNC_10V("gpio.6", "gpio.4") },
+  "btt-rodent": { side: "top", sw: { a: "mos4.V", b: "mos4.S", how: "coil" }, sig: "pwm.V", gnd: "pwm.G", pwm: false, names: { sw: "V-MOS V+ / P-04", sig: "SP-PWM 0-10V", gnd: "GND" }, settings: FNC_10V("gpio.13", "gpio.4"), notes: ["wr.n.rod.pwm", "wr.n.rod.vmos"],
+    extra: [{ id: "psuv", kind: "psu", name: "12–24 V", side: "left", pins: ["+", "-"], wires: [{ from: "+", to: "vmos.+", color: RED }, { from: "-", to: "vmos.-", color: BLACK }] }] },
+  "openbuilds-bbx32": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, sig: "tool.V10", gnd: "tool.G", pwm: false, names: { sw: "RELAY COM / NO", sig: "TOOLHEAD 0-10V", gnd: "GND" }, settings: GRBL_SP },
+  "openbuilds-bb4x": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, sig: "tool.V10", gnd: "tool.G", pwm: false, names: { sw: "RELAY COM / NO", sig: "TOOLHEAD 0-10V", gnd: "GND" }, settings: GRBL_SP, notes: ["wr.n.bb4x.sp"] },
+  "6pack": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, sig: "o3.1", gnd: "o3.G", pwm: true, names: { sw: "#4 Relay COM / NO", sig: "#3 · 1 (IO26)", gnd: "G" }, settings: FNC_PWM("gpio.26", "gpio.14") },
+  "6pack-int": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, sig: "o3.1", gnd: "o3.G", pwm: true, names: { sw: "#4 Relay COM / NO", sig: "#3 · 1 (IO26)", gnd: "G" }, settings: FNC_PWM("gpio.26", "gpio.14") },
+  "jackpot": { side: "top", sw: { a: "mos.V1", b: "mos.2", how: "coil" }, sig: "out.27", gnd: "out.G", pwm: true, names: { sw: "MOSFET gpio.2", sig: "5V OUT gpio.27", gnd: "Gnd" }, settings: FNC_PWM("gpio.27", "gpio.2") },
+  "jackpot3": { side: "right", sw: { a: "o27h.+", b: "o27h.-", how: "coil" }, sig: "o2l.+", gnd: "o2l.-", pwm: true, names: { sw: "24 V 27 (+ / −)", sig: "5V 2 (+)", gnd: "5V 2 (−)" }, settings: FNC_PWM("gpio.2", "gpio.27"), notes: ["wr.n.jp3.out"] },
+  "mega-ramps": { side: "top", sw: { a: "srv4.S", b: "srv4.G", how: "module", vcc: "srv4.5V" }, sig: "srv2.S", gnd: "srv2.G", pwm: true, names: { sw: "Servo D4", sig: "Servo D6 S", gnd: "−" }, settings: [...GRBL_SP, "SPINDLE_PWM_ON_D6 (config.h)"] },
+  "sienci-slb": { side: "top", sw: { a: "sp.EN", b: "sp.G", how: "module" }, sig: "sp.PWM", gnd: "sp.G", pwm: true, names: { sw: "SPINDLE EN", sig: "SPINDLE PWM", gnd: "GND" }, settings: [...GRBL_SP, "$16", "$33=1000"] },
+};
+function latheHookup(b: Board): Hookup {
+  const o = LATHE_OUT[b.id];
+  if (!o) return { comp: "lathe", parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: "wr.u.lathe" };
+  const s = o.side, parts: Part[] = [...(o.extra ?? [])];
+  const rel: Part = { id: "srel", kind: "srel", name: "", side: s, pins: ["A1", "A2"], outerPins: ["11", "14"], wires: [] };
+  if (o.sw.how === "coil") rel.wires.push({ from: "A1", to: o.sw.a, color: RED }, { from: "A2", to: o.sw.b, color: BLACK });
+  else {
+    parts.push({ id: "psu", kind: "psu", name: "24 V", side: s, pins: ["+", "-"], wires: o.sw.how === "contact" ? [{ from: "+", to: o.sw.a, color: RED }] : [{ from: "+", to: "@relay.COM", color: RED }] });
+    if (o.sw.how === "contact") rel.wires.push({ from: "A1", to: o.sw.b, color: RED });
+    else {
+      parts.push({ id: "relay", kind: "relay", name: "5 V", side: s, pins: ["IN", "GND", "VCC"], wires: [{ from: "IN", to: o.sw.a, color: GRN }, { from: "GND", to: o.sw.b, color: BLACK }, ...(o.sw.vcc ? [{ from: "VCC", to: o.sw.vcc, color: RED }] : [{ from: "VCC", to: "@psu5.+", color: RED }])] });
+      if (!o.sw.vcc) parts.push({ id: "psu5", kind: "psu", name: "5 V", side: s, pins: ["+", "-"], wires: [{ from: "-", to: o.sw.b, color: BLACK }] });
+      rel.wires.push({ from: "A1", to: "@relay.NO", color: RED });
+    }
+    rel.wires.push({ from: "A2", to: "@psu.-", color: BLACK });
+  }
+  parts.push(rel,
+    { id: "iso", kind: "iso", name: "", side: s, pins: ["IN+", "IN−"], outerPins: ["OUT+", "OUT−"], wires: [{ from: "IN+", to: o.sig, color: VIO }, { from: "IN−", to: o.gnd, color: BLACK }] },
+    { id: "yy", kind: "yy", name: "", side: s, outer: true, pins: [], outerPins: ["COM", "F", "SV", "0V"], wires: [{ from: "COM", to: "@srel.11", color: ORG }, { from: "F", to: "@srel.14", color: ORG }, { from: "SV", to: "@iso.OUT+", color: ORG }, { from: "0V", to: "@iso.OUT−", color: ORG }] });
+  return {
+    comp: "lathe", parts,
+    steps: [{ k: "wr.s.lat.1" }, { k: "wr.s.lat.sw." + o.sw.how, p: { sw: o.names.sw } }, { k: "wr.s.lat.contact" }, { k: o.pwm ? "wr.s.lat.pwm" : "wr.s.lat.v10", p: { sig: o.names.sig, gnd: o.names.gnd } }, { k: "wr.s.lat.sv" }, ...(o.m8 ? [{ k: "wr.s.lat.m8" }] : []), { k: "wr.s.lat.stop" }, { k: "wr.s.lat.test" }, { k: "wr.s.lat.hand" }],
+    notes: [{ k: "wr.n.yy.hot" }, { k: "wr.n.yy.ver" }, { k: "wr.n.yy.test" }, ...(o.notes ?? []).map(k => ({ k }))],
+    pro: [{ k: "wr.p.lat" }],
+    settings: o.m8 ? [...o.settings, "M8 / M9"] : o.settings
+  };
+}
+
+/** Drehbank: X (Planschlitten) und Z (Bettschlitten) mit Endschaltern, Netzteil und Not-Aus – aus den Plänen des Boards zusammengestellt */
+function latheAxesHookup(b: Board, h: Partial<Record<CompId, Hookup>>): Hookup {
+  const pick = (hk: Hookup | undefined, kind: PartKind) => (hk?.parts ?? []).filter(p => p.kind === kind && (p.name === "X" || p.name === "Z"));
+  const power = h.estop?.parts.some(p => p.kind === "psu") ? h.estop.parts : h.psu?.parts ?? [];
+  const fnc = h.motors!.settings.some(x => /axes\//.test(x)), volt = b.volt;
+  const lim = h.limits?.steps[0];
+  return {
+    comp: "latheAxes",
+    parts: [...power, ...pick(h.motors, "motor"), ...pick(h.limits, "switch")],
+    steps: [{ k: "wr.s.psu.1" }, { k: "wr.s.lax.psu", p: { volt } }, { k: "wr.s.mot.1" }, { k: "wr.s.lax.mot" }, { k: "wr.s.mot.3" }, ...(lim ? [lim] : []), { k: "wr.s.lax.lim" }, { k: "wr.s.lim.2" },
+      { k: "wr.s.lax.dir" }, { k: "wr.s.lax.steps" }, { k: fnc ? "wr.s.lax.homeF" : "wr.s.lax.homeG" }, { k: "wr.s.lax.stop" }, { k: "wr.s.lax.app" }],
+    notes: [{ k: h.extdrv && !h.extdrv.unavailable ? "wr.n.lax.ext" : "wr.n.lax.noext" }, { k: "wr.n.lax.emc" }, ...h.motors!.notes, ...(h.limits?.notes ?? [])],
+    pro: [{ k: "wr.p.lax" }],
+    settings: fnc
+      ? [...h.motors!.settings.filter(x => !/^[yabc][ :]|axes\/[yabc]|^uart1|^i2so|^spi:/.test(x)), "axes/z", "steps_per_mm", "max_rate_mm_per_min", "acceleration_mm_per_sec2", ...(h.limits?.settings ?? []).filter(x => /^[xz]\/motor0|^z:|hard_limits/.test(x))]
+      : ["$100 / $102", "$110 / $112", "$120 / $122", "$3", "$130 / $132", "$5", "$21=1", "$22=0"]
+  };
+}
+
+export const BOARDS: Board[] = [shield, shieldV4, dlc21, dlcMax, pibot, pibotUltra, ruida6445, ruida6442, sixPack, sixPackInt, jackpot, jackpot3, ramps, sktPro, rodent, bb4x, bbx32, slb, yy600];
+for (const b of BOARDS) {
+  b.hookups = b.only ? yyHookups() : hookupsFor(b);
+  if (!b.only && b.maker !== "Ruida") { b.hookups.latheAxes = latheAxesHookup(b, b.hookups); b.hookups.lathe = latheHookup(b); }
+}
 
 export function getBoard(id: string): Board {
   return BOARDS.find(b => b.id === id) || BOARDS[0];

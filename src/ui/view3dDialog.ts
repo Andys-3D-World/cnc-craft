@@ -12,7 +12,7 @@ import { generateGcode, noGcodeMessage, lastSectionTools, lastThreads } from "..
 import { threadMeshes } from "../view3d/threadMesh";
 import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { rotary } from "../rotary";
-import { isLaser, isPlasma } from "../machineMode";
+import { isLaser, isLathe, isMill, isPlasma } from "../machineMode";
 
 const KEY = "cnc_craft_view3d";
 function state(): any { return (window as any).cncState; }
@@ -33,9 +33,9 @@ export function openView3D(want: "auto" | Mode = "auto") {
     if (deep > 0) o.thickness = deep;
   }
   // Die Vorschau auf dem Teil kennt nur runde Rohteile – bei anderen Formen abgewickelt zeigen (mit Hinweis)
-  const canCyl = rotary.on && !isPlasma() && rotary.shape === "round";
-  const flatNote = rotary.on && !isPlasma() && rotary.shape !== "round" ? " " + t("rot.previewFlat", { name: t("rot.shape." + rotary.shape) }) : "";
-  const mill = !isLaser() && !isPlasma();
+  const canCyl = rotary.on && !isPlasma() && !isLathe() && rotary.shape === "round";
+  const flatNote = rotary.on && !isPlasma() && !isLathe() && rotary.shape !== "round" ? " " + t("rot.previewFlat", { name: t("rot.shape." + rotary.shape) }) : "";
+  const mill = isMill();
   // Fräse mit Drehachse: Fräsergebnis auf dem runden Teil zuerst
   const modes: Mode[] = mill ? (canCyl ? ["cylCarve", "cylinder", "carve"] : ["carve", "parts"]) : canCyl ? ["parts", "cylinder"] : ["parts"];
   let mode: Mode = want === "auto" ? (canCyl ? modes.find(md => md !== "parts")! : modes[0])

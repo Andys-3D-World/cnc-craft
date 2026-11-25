@@ -27,11 +27,12 @@ import { exportToolLibrary, importToolLibrary, getTools, toolSettings } from "./
 import { isFusionLibrary, fusionToTools, unzipJson } from "./fusionTools";
 import { exportLaserLibrary, importLaserLibrary, getLayers } from "./laserLayers";
 import { exportPlasmaLibrary, importPlasmaLibrary, getCuts } from "./plasmaCuts";
+import { exportLatheLibrary, importLatheLibrary, latheTools } from "./lathe/latheJob";
 import { appInfo } from "./update/updater";
 import { exportMillProfiles, importMillProfiles } from "./millProfiles";
 
-export type LibKind = "tools" | "laser" | "plasma";
-export const ALL_KINDS: LibKind[] = ["tools", "laser", "plasma"];
+export type LibKind = "tools" | "laser" | "plasma" | "lathe";
+export const ALL_KINDS: LibKind[] = ["tools", "laser", "plasma", "lathe"];
 export const LIB_FORMAT = "cnc-craft-library";
 
 export interface LibFile {
@@ -42,6 +43,7 @@ export interface LibFile {
   tools?: { tools: any[]; settings?: any; active?: string | null; profiles?: any[] };
   laser?: { layers: any[]; settings?: any; active?: string | null };
   plasma?: { cuts: any[]; settings?: any; active?: string | null };
+  lathe?: { tools: any[] };
   /** aus einer Fusion-360-Bibliothek: so viele Einträge waren keine passenden Fräser (Halter, Taster …) */
   fusionSkipped?: number;
 }
@@ -51,7 +53,8 @@ export function libCounts(f: LibFile): Record<LibKind, number> {
   return {
     tools: Array.isArray(f.tools?.tools) ? f.tools!.tools.length : 0,
     laser: Array.isArray(f.laser?.layers) ? f.laser!.layers.length : 0,
-    plasma: Array.isArray(f.plasma?.cuts) ? f.plasma!.cuts.length : 0
+    plasma: Array.isArray(f.plasma?.cuts) ? f.plasma!.cuts.length : 0,
+    lathe: Array.isArray(f.lathe?.tools) ? f.lathe!.tools.length : 0
   };
 }
 
@@ -61,6 +64,7 @@ export function buildLibFile(kinds: LibKind[], appName = "CNC Craft"): LibFile {
   if (kinds.includes("tools")) f.tools = { ...exportToolLibrary(), profiles: exportMillProfiles() };
   if (kinds.includes("laser")) f.laser = exportLaserLibrary();
   if (kinds.includes("plasma")) f.plasma = exportPlasmaLibrary();
+  if (kinds.includes("lathe")) f.lathe = exportLatheLibrary();
   return f;
 }
 
@@ -76,6 +80,7 @@ export function parseLibFile(text: string): LibFile {
     const first = data.find(x => x && typeof x === "object") || {};
     if ("kerf" in first || "pierceDelay" in first) f.plasma = { cuts: data };
     else if ("power" in first || "interval" in first) f.laser = { layers: data };
+    else if ("kappa" in first && "vcPct" in first) f.lathe = { tools: data };
     else if ("diameter" in first || "feedrate" in first) f.tools = { tools: data };
   } else if (isFusionLibrary(data)) {
     const r = fusionToTools(data, toolSettings.material);
@@ -89,9 +94,10 @@ export function parseLibFile(text: string): LibFile {
     if (data.tools && Array.isArray(data.tools.tools)) f.tools = data.tools;
     if (data.laser && Array.isArray(data.laser.layers)) f.laser = data.laser;
     if (data.plasma && Array.isArray(data.plasma.cuts)) f.plasma = data.plasma;
+    if (data.lathe && Array.isArray(data.lathe.tools)) f.lathe = data.lathe;
   }
   const c = libCounts(f);
-  if (!c.tools && !c.laser && !c.plasma) throw new Error("lib-invalid");
+  if (!c.tools && !c.laser && !c.plasma && !c.lathe) throw new Error("lib-invalid");
   // IDs als Text, sonst verwirft sanitize die Einträge
   const fixIds = (list: any[], prefix: string) => list.forEach((x, i) => {
     if (x && typeof x === "object" && typeof x.id !== "string") x.id = x.id != null ? String(x.id) : `${prefix}${i + 1}`;
@@ -111,6 +117,7 @@ export function applyLibFile(f: LibFile, kinds: LibKind[], replace: boolean): Pa
   }
   if (kinds.includes("laser") && f.laser) r.laser = importLaserLibrary(f.laser, replace);
   if (kinds.includes("plasma") && f.plasma) r.plasma = importPlasmaLibrary(f.plasma, replace);
+  if (kinds.includes("lathe") && f.lathe) r.lathe = importLatheLibrary(f.lathe, replace);
   return r;
 }
 
@@ -196,7 +203,7 @@ export async function importLibrary(kinds: LibKind[], log: (s: string) => void) 
 function askImportMode(f: LibFile, kinds: LibKind[]): Promise<boolean | null> {
   return new Promise(resolve => {
     document.getElementById("lib-import-overlay")?.remove();
-    const now: Record<LibKind, number> = { tools: getTools().length, laser: getLayers().length, plasma: getCuts().length };
+    const now: Record<LibKind, number> = { tools: getTools().length, laser: getLayers().length, plasma: getCuts().length, lathe: latheTools.length };
     const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c] as string));
     const date = f.created ? new Date(f.created) : null;
     const ov = document.createElement("div");

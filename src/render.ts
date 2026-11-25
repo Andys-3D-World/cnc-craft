@@ -12,7 +12,7 @@ import { canvasColors, isLight } from "./theme";
 import { arcGeometry, shapeBounds } from "./shapeTransform";
 import { options } from "./editor/editorState";
 import { drawToolBands, drawToolBadges, drawLaserTabs } from "./toolView";
-import { isLaser, isPlasma } from "./machineMode";
+import { isLaser, isLathe, isPlasma } from "./machineMode";
 import { cutForShape } from "./plasmaCuts";
 import { drawPlasmaLeads } from "./plasmaCam";
 import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
@@ -137,6 +137,7 @@ export function drawEverything(
 
   const laser = isLaser();
   const plasma = isPlasma();
+  const lathe = isLathe(); // Drehen: die Form ist eine Kontur, keine Fräsbahn
 
   // 5b. Material-Platte: verbrauchte Fläche (schraffiert) + Plattenumriss
   drawStock(ctx, sx, sy, scale);
@@ -153,7 +154,7 @@ export function drawEverything(
       return c ? { diameter: Math.max(c.kerf, 0.3), color: c.color } : null;
     });
   }
-  else if (options.showTools) drawToolBands(ctx, shapes, sx, sy, scale);
+  else if (options.showTools && !lathe) drawToolBands(ctx, shapes, sx, sy, scale);
 
   // 6. Formen
   const selected = new Set(selectedShapeIds);
@@ -179,7 +180,7 @@ export function drawEverything(
       ctx.restore();
       continue;
     }
-    ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : laser ? (layerForShape(shape)?.color || "#ff4040") : modeColor(shape.millingMode);
+    ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : laser ? (layerForShape(shape)?.color || "#ff4040") : lathe ? (isLight() ? "#1a6fb5" : "#36b3ff") : modeColor(shape.millingMode);
     ctx.lineWidth = isSel ? 2.2 : 1.5;
     ctx.beginPath();
     tracePath(ctx, shape, sx, sy, scale);
@@ -195,7 +196,7 @@ export function drawEverything(
   }
 
   // 6b. Werkzeug-Marken T1, T2 … (nur wenn mehrere Werkzeuge benutzt werden)
-  if (options.showTools && !laser && !plasma) drawToolBadges(ctx, shapes, sx, sy);
+  if (options.showTools && !laser && !plasma && !lathe) drawToolBadges(ctx, shapes, sx, sy);
   // Plasma: Anfahrbahnen, Einstichpunkte, Schneidrichtung
   if (plasma) drawPlasmaLeads(ctx, shapes, sx, sy);
   // Laser: Haltestege (gelb) auf der Kontur

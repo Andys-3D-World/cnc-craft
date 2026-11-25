@@ -109,7 +109,7 @@ function load(mode: MachineMode = getMachineMode()): SavedMachine | null {
     if (!(+d.w > 0 && +d.h > 0)) return null;
     return {
       id: String(d.id || ""), name: String(d.name || ""),
-      kind: (["mill", "laser", "plasma"].includes(d.kind) ? d.kind : "mill") as MachineMode,
+      kind: (["mill", "laser", "plasma", "lathe"].includes(d.kind) ? d.kind : "mill") as MachineMode,
       w: +d.w, h: +d.h, z: +d.z > 0 ? +d.z : undefined,
       baud: +d.baud > 0 ? +d.baud : 115200,
       sMax: +d.sMax > 0 ? +d.sMax : 1000,
@@ -249,7 +249,7 @@ export function welcomeOnFirstStart() {
     if (document.querySelector(".dlg-overlay")) return;
     localStorage.setItem(FIRST_KEY, "1");
   } catch { return; }
-  if ((["laser", "mill", "plasma"] as MachineMode[]).some(k => load(k))) return;
+  if ((["laser", "mill", "plasma", "lathe"] as MachineMode[]).some(k => load(k))) return;
   openMachineWizard(true);
 }
 
@@ -270,7 +270,7 @@ export function openMachineWizard(welcome = false) {
     <div class="dlg-box mw-box" role="dialog">
       <h3>🧭 ${t(welcome ? "mw.welcomeTitle" : "mw.title")}</h3>
       <div class="mw-tabs" role="tablist">
-        ${(["laser", "mill", "plasma"] as MachineMode[]).map(k => `<button class="mw-tab" data-kind="${k}">${{ laser: "🔦", mill: "🛠️", plasma: "🔥" }[k]} ${t("mode." + k)}</button>`).join("")}
+        ${(["laser", "mill", "plasma", "lathe"] as const).map(k => `<button class="mw-tab" data-kind="${k}">${{ laser: "🔦", mill: "🛠️", plasma: "🔥", lathe: "🔩" }[k]} ${t("mode." + k)}</button>`).join("")}
       </div>
       <div class="dlg-hint">${t("mw.intro")}</div>
       <input type="search" id="mw-search" class="mw-search" placeholder="${esc(t("mw.search"))}">

@@ -25,7 +25,7 @@ function esc(s: string): string {
 
 export function stockSectionHtml(): string {
   return `
-    <div class="menu-section-unified">
+    <div class="menu-section-unified not-lathe">
       <h3 class="menu-trigger">${T("stock.title")}</h3>
       <div class="menu-body rp-box">
         <div id="stock-status" class="tool-info"></div>

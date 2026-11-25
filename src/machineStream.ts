@@ -10,6 +10,7 @@
  *   "cnc-job-progress" – Fortschritt (Simulation läuft live mit)
  *   "cnc-job-done"     – Job fertig/abgebrochen (Material-Platte wird markiert)
  */
+import { latheStartOk } from "./lathe/latheStart";
 import { probeRunning } from "./probe";
 import { aAxisRefused } from "./rotary";
 import { invoke } from "@tauri-apps/api/core";
@@ -17,7 +18,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { readTextFile } from "@tauri-apps/plugin-fs";
 import { t } from "./i18n/i18n";
 import { machine, MACHINE_EVENT, jobStart, jobPause, jobResume, jobStop, jobPatch } from "./machine";
-import { getMachineMode, MachineMode } from "./machineMode";
+import { isLathe, getMachineMode, MachineMode } from "./machineMode";
 import { stockBed } from "./stock";
 import { compensate, getHeightMap, heightMapEnabled, heightRange } from "./heightMap";
 import { buildResume, resumeMarks, ResumeMark } from "./jobResume";
@@ -279,6 +280,12 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
     }
   }
 
+  // Drehbank: kein Fortsetzen mitten im Programm, und vor jedem Start die Sicherheitsfrage
+  if (isLathe()) {
+    if (resumeFrom > 0) { appendToConsole(t("lathe.noResume")); return; }
+    if (machine.connected && (!await latheStartOk() || streamState.isRunning || !machine.connected || !isLathe())) return;
+  }
+
   // Koordinatensystem frisch lesen (Fortsetzen braucht es; M30/Reset können es umgestellt haben)
   if (machine.connected && machine.status.state !== "Alarm" && !await ensureWcsForJob()) return;
 
@@ -305,7 +312,7 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
     if (macroRunning()) { appendToConsole(t("macro.block.busy")); return; }
     // Laser-Modus an der Fräse: GRBL schaltet die Spindel bei jeder Eilfahrt (G0) ab und bei G1 ohne Hochlaufzeit
     // wieder an – der Fräser fährt dann stehend oder halb drehend ins Material
-    if (getMachineMode() === "mill" && machine.protocol === "grbl" && machine.settings.get("$32") === "1"
+    if ((getMachineMode() === "mill" || isLathe()) && machine.protocol === "grbl" && machine.settings.get("$32") === "1"
       && streamState.loadedLines.some(l => /\bM0?[34]\b/i.test(l))) { appendToConsole(t("stream.laserModeMill")); return; }
     const refused = aAxisRefused(streamState.loadedLines);
     if (refused) { appendToConsole(refused); return; }

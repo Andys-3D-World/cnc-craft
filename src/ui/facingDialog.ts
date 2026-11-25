@@ -5,6 +5,7 @@
  * „Als Auftrag laden“ – dann: Seite 1 fräsen, Platte wenden, Z neu nullen, denselben Auftrag noch einmal fräsen.
  * Die Bahn selbst entsteht in facing.ts.
  */
+import { isLathe } from "../machineMode";
 import { t, ascii, tMm } from "../i18n/i18n";
 import { getTools, MillingTool, DEFAULT_PLUNGE, cutDiameter } from "../toolLibrary";
 import { spindleCode } from "../spindleDir";
@@ -57,6 +58,7 @@ export function facingGcode(p: FacingParams, tool: MillingTool, rpm: number): st
  * @param onDone  nach „Als Auftrag laden“: Abtrag je Seite (z. B. um die Materialdicke anzupassen)
  */
 export function openFacingDialog(start: FacingStart, log: (s: string) => void, onDone?: (depth: number) => void) {
+  if (isLathe()) { log(t("deco.onlyMill")); return; }
   document.getElementById("face-overlay")?.remove();
   const tools = getTools();
   if (!tools.length) { log(t("face.noTool")); return; }

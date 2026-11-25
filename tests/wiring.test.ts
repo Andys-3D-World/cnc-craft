@@ -70,3 +70,50 @@ test("Platzhalter in den Texten sind in allen Sprachen gleich", () => {
     for (const l of LANGS) assert.equal(ph(dict[l][k] || ""), ph(dict.en[k]), `${l}: ${k}`);
   }
 });
+
+test("Drehbank-Motorregler: seine Klemmen hängen nie direkt an einem CNC-Board, immer an Koppelrelais und Trennwandler", () => {
+  let full = 0;
+  for (const b of BOARDS) {
+    const h = b.hookups.lathe;
+    if (!h || b.only || h.unavailable) continue;
+    full++;
+    const yy = h.parts.find(p => p.kind === "yy")!;
+    assert.deepEqual(yy.wires.map(w => w.to).sort(), ["@iso.OUT+", "@iso.OUT−", "@srel.11", "@srel.14"], b.id);
+    for (const p of h.parts) for (const w of p.wires) {
+      if (p.kind === "yy") continue;
+      assert.ok(!["11", "14", "OUT+", "OUT−"].includes(w.from) && !/^@(yy|srel\.1[14]|iso\.OUT)/.test(w.to), `${b.id}: ${p.id}.${w.from} → ${w.to}`);
+    }
+    assert.ok(h.notes[0].k === "wr.n.yy.hot" && h.steps.some(s => s.k === "wr.s.lat.stop"), b.id);
+  }
+  assert.equal(full, 16);
+  const only = BOARDS.filter(b => b.only);
+  assert.deepEqual(only.map(b => [b.id, Object.keys(b.hookups).sort()]), [["yy-600d", ["lathe", "latheHand"]]]);
+  assert.equal(only[0].hookups.lathe!.notes[0].k, "wr.n.yy.hot");
+});
+
+test("Drehbank-Achsen: jedes GRBL-Board hat X und Z mit Endschalter und Netzteil, nie Y", () => {
+  let n = 0;
+  for (const b of BOARDS) {
+    const h = b.hookups.latheAxes;
+    if (b.only || b.maker === "Ruida") { assert.ok(!h, b.id); continue; }
+    n++;
+    const names = (k: string) => h!.parts.filter(p => p.kind === k).map(p => p.name).sort();
+    assert.deepEqual(names("motor"), ["X", "Z"], b.id);
+    assert.deepEqual(names("switch"), ["X", "Z"], b.id);
+    assert.equal(names("psu").length, 1, b.id);
+    assert.equal(new Set(h!.parts.map(p => p.id)).size, h!.parts.length, b.id);
+    assert.ok(!h!.settings.some(x => /\$22=1|axes\/y|^y/.test(x)), b.id);
+  }
+  assert.equal(n, 16);
+});
+
+test("Hand/CNC: SV, F und R gehen nur über den Wahlschalter, Hand und CNC treffen sich nirgends", () => {
+  const h = BOARDS.find(b => b.id === "yy-600d")!.hookups.latheHand!;
+  const to = (pin: string) => h.parts.flatMap(p => p.wires.filter(w => w.to === pin).map(w => p.id + "." + w.from)).sort();
+  assert.deepEqual(to("sv.SV"), ["sel.SV"]);
+  assert.deepEqual(to("j3.F"), ["sel.F"]);
+  assert.deepEqual(to("j3.R"), ["sel.R"]);
+  for (const [pin, from] of [["H·SV", "pot.S"], ["H·F", "rsw.F"], ["H·R", "rsw.R"], ["CNC·F", "srel.14"], ["CNC·SV", "iso.OUT+"]]) assert.deepEqual(to("@sel." + pin), [from], pin);
+  assert.deepEqual(to("sv.5V"), ["pot.+5V"]);
+  assert.equal(h.notes[0].k, "wr.n.yy.hot");
+});

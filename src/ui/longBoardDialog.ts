@@ -6,7 +6,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { t, ascii, tMm } from "../i18n/i18n";
 import { state } from "../main";
-import { isLaser, isPlasma } from "../machineMode";
+import { isMill } from "../machineMode";
 import { rotary } from "../rotary";
 import { twoSidedOn } from "../editor/beds";
 import { bedSizeMm } from "../editor/editorState";
@@ -32,7 +32,7 @@ function wholeProgram(): string | null {
 }
 
 export function openLongBoard(log: (s: string) => void) {
-  if (isLaser() || isPlasma()) { log(t("deco.onlyMill")); return; }
+  if (!isMill()) { log(t("deco.onlyMill")); return; }
   if (rotary.on || twoSidedOn()) { log(t("long.notHere")); return; }
   const full = wholeProgram();
   if (!full) { log(lastGcodeWarnings[0] || t("gcw.noObjects")); return; }

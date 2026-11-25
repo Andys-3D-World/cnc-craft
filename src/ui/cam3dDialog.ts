@@ -8,6 +8,7 @@
  * Mit Drehachse (Reiter Fräsen → Drehachse an): „Rundum“ (4. Achse gleichzeitig) oder „von mehreren Seiten“ –
  * Bahnen dafür in rotary3d.ts, Vorschau rundum auf dem Zylinder.
  */
+import { isLathe } from "../machineMode";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { t } from "../i18n/i18n";
@@ -53,6 +54,7 @@ const COARSE_SHARE = 0.03;
  * @param relief  Relief aus Bild/Vektoren (ui/reliefDialog.ts): bleibt im Rechteck, nicht rundherum freifräsen
  */
 export function openCam3D(name: string, pos: Float32Array, log: (s: string) => void, relief?: ReliefPreset) {
+  if (isLathe()) { log(t("deco.onlyMill")); return; }
   document.getElementById("c3d-overlay")?.remove();
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
   for (let i = 0; i < pos.length; i += 3) for (let a = 0; a < 3; a++) {

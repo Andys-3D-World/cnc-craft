@@ -836,11 +836,15 @@ input:not([type]) {
 body:not(.mode-mill) .only-mill { display: none !important; }
 body:not(.mode-laser) .only-laser { display: none !important; }
 body:not(.mode-plasma) .only-plasma { display: none !important; }
-body.mode-laser .mill-plasma { display: none !important; }
+body.mode-laser .mill-plasma, body.mode-lathe .mill-plasma { display: none !important; }
+body:not(.mode-lathe) .only-lathe { display: none !important; }
+body.mode-lathe .not-lathe { display: none !important; }
+body:not(.mode-mill):not(.mode-lathe) .mill-lathe { display: none !important; }
+body.mode-lathe .lathe-ghost { visibility: hidden; }
 body.mode-plasma #cam-mode-pocket { display: none !important; }   /* Tasche gibt es beim Plasma nicht */
 
 .machine-switch { display: flex; gap: 4px; padding: 6px 8px 0; flex-shrink: 0; }
-.ms-btn { flex: 1; padding: 5px 6px; font-size: 0.78rem; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); cursor: pointer; }
+.ms-btn { flex: 1; min-width: 0; padding: 5px 2px; font-size: 0.74rem; display: flex; flex-direction: column; align-items: center; gap: 2px; line-height: 1.15; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: var(--bg-input); color: var(--text-muted); cursor: pointer; }
 .ms-btn:hover { color: var(--text-main); }
 .ms-btn.active { background: var(--accent-color); border-color: var(--accent-color); color: #fff; font-weight: 600; }
 
@@ -1403,7 +1407,8 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 /* Bibliothek umschalten (Fräse / Laser / Plasma) – unabhängig vom Maschinen-Modus */
 #tab-program[data-view="tools"] [data-lib]:not([data-lib="tools"]),
 #tab-program[data-view="laser"] [data-lib]:not([data-lib="laser"]),
-#tab-program[data-view="plasma"] [data-lib]:not([data-lib="plasma"]) { display: none !important; }
+#tab-program[data-view="plasma"] [data-lib]:not([data-lib="plasma"]),
+#tab-program[data-view="lathe"] [data-lib]:not([data-lib="lathe"]) { display: none !important; }
 .lib-switch { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 10px; }
 .lib-switch button { border: none; background: transparent; color: var(--text-muted); padding: 7px 16px; border-radius: 7px; font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
 .lib-switch button:hover { color: var(--text-main); }

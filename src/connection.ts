@@ -12,6 +12,7 @@
  *  - Manuelles Fahren ($J=…) und Konsole
  * Ohne Maschine läuft alles im Demo-Modus (Position wird nur angezeigt).
  */
+import { isLathe } from "./machineMode";
 import { state } from "./main";
 import { zeroCommand } from "./wcs";
 import { noteManualLine } from "./wcsSync";
@@ -559,9 +560,10 @@ export function initConnection(appendToConsole: (text: string) => void) {
   const noProbe = (fn: () => Promise<any>) => guard(async () => { if (probeRunning()) { appendToConsole(t("pr.running")); return; } return fn(); });
   $("m-home")?.addEventListener("click", noProbe(() => send("$H")));
   $("m-reset")?.addEventListener("click", guard(async () => { appendToConsole("> Ctrl-X (Reset)"); await realtime(RT.reset); }));
-  $("m-zero-xy")?.addEventListener("click", noProbe(() => send(zeroCommand("XY"))));
+  $("m-zero-xy")?.addEventListener("click", noProbe(async () => { if (isLathe()) { appendToConsole(t("lathe.noMove")); return; } await send(zeroCommand("XY")); }));
   $("m-zero-z")?.addEventListener("click", noProbe(() => send(zeroCommand("Z"))));
   $("m-goto-zero")?.addEventListener("click", noProbe(async () => {
+    if (isLathe()) { appendToConsole(t("lathe.noMove")); return; } // X0 ist dort die Drehmitte
     // erst Z hoch (falls Z unter 5 mm steht), dann XY auf 0
     if (machine.status.wpos[2] < 5) await send("G21 G90 G0 Z5");
     await send("G21 G90 G0 X0 Y0");

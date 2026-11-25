@@ -23,7 +23,7 @@ import { parsePdf } from "./pdfImport";
 import { openImageTraceDialog } from "./imageTrace";
 import { createImageShape } from "../raster/imageShape";
 import { openEngraveDialog } from "../raster/engraveDialog";
-import { isLaser, isPlasma } from "../machineMode";
+import { isLathe, getMachineMode, isLaser, isMill, setMachineMode } from "../machineMode";
 import { openReliefFromImage } from "../ui/reliefDialog";
 import { openPcb, PCB_EXTENSIONS } from "../ui/pcbDialog";
 import { surelyExcellon } from "../pcb/excellon";
@@ -38,8 +38,8 @@ import { assignPartGroups } from "../editor/parts";
 import { checkpoint } from "../editor/history";
 import { t } from "../i18n/i18n";
 import { toolsUsedBy, mergeProjectTools } from "../toolLibrary";
-import { getMachineMode, setMachineMode } from "../machineMode";
 import { getLayers, layersUsedBy, mergeProjectLayers } from "../laserLayers";
+import { latheSettings, setLatheSettings } from "../lathe/latheJob";
 import { cutsUsedBy, mergeProjectCuts } from "../plasmaCuts";
 import { allShapes, activeBed, bedsForSave, loadBeds } from "../editor/beds";
 import { graphForProject, loadProjectGraph } from "../nodes/graphStore";
@@ -132,7 +132,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     let res: ImportResult | null = null;
     if (IMPORT_EXTENSIONS.vector.includes(ext)) res = await parseVector(ext, bytes);
     // manche Platinen-Programme nennen ihre Bohrdatei .nc oder .tap
-    else if (IMPORT_EXTENSIONS.gcode.includes(ext) && surelyExcellon(decodeText(bytes.subarray(0, 4000))) && !isLaser() && !isPlasma()) { await openPcb(name, bytes, log, ctx.redraw); return; }
+    else if (IMPORT_EXTENSIONS.gcode.includes(ext) && surelyExcellon(decodeText(bytes.subarray(0, 4000))) && isMill()) { await openPcb(name, bytes, log, ctx.redraw); return; }
     else if (IMPORT_EXTENSIONS.gcode.includes(ext)) res = parseGcode(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.image.includes(ext)) {
       // Bild: gravieren (Bild-Form) oder nachzeichnen (Konturen)
@@ -145,7 +145,7 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     }
     else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
     else if (IMPORT_EXTENSIONS.pcb.includes(ext) || ext === "txt") {
-      if (isLaser() || isPlasma()) { log(t("pcb.onlyMill")); return; }
+      if (!isMill()) { log(t("pcb.onlyMill")); return; }
       await openPcb(name, bytes, log, ctx.redraw);
       return;
     }
@@ -229,7 +229,7 @@ function chooseImageUse(name: string): Promise<"engrave" | "trace" | "relief" | 
         <div class="dlg-hint imguse-file"></div>
         <button type="button" class="imguse-btn" data-how="engrave"><b>${t("img.engrave")}</b><span>${t("img.engraveD")}</span></button>
         <button type="button" class="imguse-btn" data-how="trace"><b>${t("img.trace")}</b><span>${t("img.traceD")}</span></button>
-        ${isLaser() || isPlasma() ? "" : `<button type="button" class="imguse-btn" data-how="relief"><b>${t("img.relief")}</b><span>${t("img.reliefD")}</span></button>
+        ${!isMill() ? "" : `<button type="button" class="imguse-btn" data-how="relief"><b>${t("img.relief")}</b><span>${t("img.reliefD")}</span></button>
         <button type="button" class="imguse-btn" data-how="vcarve"><b>${t("img.vcarve")}</b><span>${t("img.vcarveD")}</span></button>`}
         <div class="dlg-buttons"><button type="button" class="btn-secondary" data-how="">${t("dlg.cancel")}</button></div>
       </div>`;
@@ -385,7 +385,7 @@ export function projectData() {
   // Alle Betten: Formen hintereinander, `beds` sagt, wie viele zu welchem Bett gehören
   const beds = bedsForSave(), all = allShapes();
   return { format: "cnc-craft-project", version: 1, saved: new Date().toISOString(), bed: { w: bed.w, h: bed.h }, shapes: all, tools: toolsUsedBy(all),
-    machineMode: getMachineMode(), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed(),
+    machineMode: getMachineMode(), ...(isLathe() ? { lathe: latheSettings } : {}), laserLayers: layersUsedBy(all), plasmaCuts: cutsUsedBy(all), beds, activeBed: activeBed(),
     nodeGraph: graphForProject() };
 }
 
@@ -474,7 +474,8 @@ async function loadProjectText(text: string, name: string, fullPath?: string, re
   if (addedLayers) log(t("laser.importedFromProject", { n: addedLayers }));
   const addedCuts = mergeProjectCuts(data.plasmaCuts, data.shapes);
   if (addedCuts) log(t("plasma.importedFromProject", { n: addedCuts }));
-  if (["mill", "laser", "plasma"].includes(data.machineMode)) setMachineMode(data.machineMode);
+  if (["mill", "laser", "plasma", "lathe"].includes(data.machineMode)) setMachineMode(data.machineMode);
+  if (data.machineMode === "lathe" && data.lathe) { setLatheSettings(data.lathe); window.dispatchEvent(new Event("cnc-lathe-changed")); }
   loadBeds(data.shapes, data.beds, data.activeBed);
   loadProjectGraph(data.nodeGraph);
   if (data.bed) {

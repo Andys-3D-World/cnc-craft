@@ -6,7 +6,7 @@
  */
 import { t } from "../i18n/i18n";
 import { state } from "../main";
-import { isLaser, isPlasma } from "../machineMode";
+import { isMill } from "../machineMode";
 import { isClosedShape, shapeToPaths, MM_TO_PIXEL } from "../shapeTransform";
 import { loadImage, toGray } from "../importers/imageTrace";
 import { Viewer3D, Mesh } from "../view3d/viewer3d";
@@ -262,7 +262,7 @@ export async function openReliefFromImage(name: string, bytes: Uint8Array, log: 
 
 /** Ausgewählte geschlossene Formen als erhabenes Relief */
 export function openReliefFromSelection(log: (s: string) => void) {
-  if (isLaser() || isPlasma()) { log(t("rlf.onlyMill")); return; }
+  if (!isMill()) { log(t("rlf.onlyMill")); return; }
   const ids = new Set(state.selectedShapeIds);
   const loops: VPt[][] = [];
   let open = 0;

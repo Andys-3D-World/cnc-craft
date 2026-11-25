@@ -21,7 +21,7 @@
 import { measured, type MPoint } from "./simMeasure";
 import { t, T, tip, tMm } from "../i18n/i18n";
 import { motionLimits } from "./motionLimits";
-import { getMachineMode } from "../machineMode";
+import { MODE_CHANGED, getMachineMode, isLaser, isLathe, isPlasma } from "../machineMode";
 import { zonesFromShapes } from "../keepOutShapes";
 import { state as appState } from "../main";
 import { SimProgram, MOVE_CUT, MOVE_RAPID, parseGcodeProgram, positionAt, firstMoveOfLine, timeBeforeLine } from "./gcodeParser";
@@ -37,7 +37,6 @@ import { openResumeDialog } from "../ui/resumeDialog";
 import { wrapSimProgram } from "./rotarySim";
 import { rotary } from "../rotary";
 import { refRadius } from "../rotaryStock";
-import { isLaser, isPlasma, MODE_CHANGED } from "../machineMode";
 import { LiveCarve, toolSections, type WarnKind, type CarveKind } from "./simCarve";
 import { activeLayer, laserSettings } from "../laserLayers";
 import { activeCut } from "../plasmaCuts";
@@ -530,7 +529,7 @@ function finishSim(p: SimProgram, src: Source): SimProgram {
   // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
   const o = { along: rotary.along, reverse: rotary.reverse, stock: rotary };
   if (p.a0) return wrapSimProgram(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() && rotary.shape === "round" ? rotary.rollerDia / rotary.diameter : 1 });
-  if (src === "design" && rotary.on && !isPlasma()) return wrapSimProgram(p, R, "surface", o);
+  if (src === "design" && rotary.on && !isPlasma() && !isLathe()) return wrapSimProgram(p, R, "surface", o);
   return p;
 }
 
@@ -894,8 +893,9 @@ function autoThickness(p: SimProgram, dia: number): number {
 function rebuildCarve(sync = true) {
   if (!view) return;
   let c: LiveCarve | null = null;
+  const lathe = isLathe(); // Drehen: Materialabtrag zeigt das Dreh-Fenster, hier nur die Bahn
   const kind: CarveKind = isLaser() ? "laser" : isPlasma() ? "plasma" : "mill";
-  if (prog) {
+  if (prog && !lathe) {
     const st = getStock();
     let tools: (ToolGeom | null)[] = [], auto: number;
     if (kind === "mill") {

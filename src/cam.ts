@@ -16,9 +16,10 @@ import { cleanMillDir, orientLoop, circleCmd, arcNeedsReverse } from "./millDir"
 import { arcFit, fitArcs } from "./arcFit";
 import { leadOptions, leadAtPoint, planLead, planLeadAtStart, distToPath, LeadMove, LeadOpts, LeadPlan } from "./millLead";
 import { t, ascii, tMm } from "./i18n/i18n";
-import { isLaser, isPlasma } from "./machineMode";
+import { isLaser, isLathe, isMill, isPlasma } from "./machineMode";
 import { generatePlasmaGcode } from "./plasmaCam";
 import { generateLaserGcode } from "./laserCam";
+import { latheGcodeFromDesign } from "./lathe/latheJob";
 import { rotary, applyRotary, outsideBand, circumference, rotaryCheck, stockShapeWarnings } from "./rotary";
 import { minRadius } from "./rotaryStock";
 import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
@@ -156,6 +157,12 @@ let skinStock: Map<string, number> | null = null;
  * Ohne Zweiseitig ändert sich nichts: derselbe G-Code wie immer.
  */
 export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Side } = {}): string | null => {
+  // DREHBANK: ganz eigenes Programm (X/Z), nichts von den Fräs-Schritten unten gilt dort
+  if (isLathe()) {
+    const res = latheGcodeFromDesign(allShapes);
+    lastGcodeWarnings = res.warnings; lastGcodeNotes = res.notes; lastThreads = []; lastSectionTools = []; allSkipped = false;
+    return res.gcode;
+  }
   flatOnly = !!opts.flat;
   const two = twoSidedJob(allShapes, opts.side);
   if (two) allShapes = two.shapes;
@@ -172,13 +179,13 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   // Zweiseitig: das Programm der Vorderseite bohrt die Löcher für die Passstifte mit
   let g = generateGcodeInner(two && two.pins.length ? [...used, ...two.pins] : used);
   // Arc Fitting: nach Vorschub-Anpassung und Nachmess-Punkten, nur Fräse, nicht mit Drehachse (arcFit.ts)
-  if (g && arcFit.on && !isLaser() && !isPlasma() && !rotary.on) {
+  if (g && arcFit.on && isMill() && !rotary.on) {
     const r = fitArcs(g, arcFit.tol);
     g = r.gcode;
     if (r.arcs) lastGcodeNotes.push(t("arc.result", { before: r.before, after: r.after, arcs: r.arcs, pct: Math.round((1 - r.after / r.before) * 100) }));
   }
-  if (g && !isLaser() && !isPlasma()) g = applyZones(g, used);
-  if (g && rotary.on && !flatOnly && !isPlasma()) g = rotaryGcode(g, used);
+  if (g && isMill()) g = applyZones(g, used);
+  if (g && rotary.on && !flatOnly && !isPlasma() && !isLathe()) g = rotaryGcode(g, used);
   if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
   else if (g && !two) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
   if (g && two) { g = two.header + g; lastGcodeWarnings.push(...two.warnings); }

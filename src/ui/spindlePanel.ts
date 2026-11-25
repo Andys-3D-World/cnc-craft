@@ -15,6 +15,8 @@
  * Während ein Job pausiert ist, schaltet "aus/an" die Spindel mit dem Spindel-Stopp-
  * Override (0x9E) – GRBL fährt sie beim Fortsetzen von selbst wieder hoch.
  */
+import { latheSettings } from "../lathe/latheJob";
+import { isLathe } from "../machineMode";
 import { t, T, tip } from "../i18n/i18n";
 import { machine, MACHINE_EVENT, RT, OV_MIN, OV_MAX, send, realtime, setOverride, canCommand } from "../machine";
 import { currentMachine } from "./machineWizard";
@@ -33,12 +35,12 @@ export function spindlePanelHtml(): string {
     `<input type="range" id="${id}" class="ov-slider" min="${OV_MIN}" max="${OV_MAX}" step="1" value="100" list="ov-ticks">`;
   return `
     <div class="menu-section-unified not-ruida not-k40" id="spindle-section">
-      <h3 class="menu-trigger"><span class="only-mill">${T("sp.titleMill")}</span><span class="only-laser">${T("sp.titleLaser")}</span><span class="only-plasma">${T("sp.titlePlasma")}</span></h3>
+      <h3 class="menu-trigger"><span class="mill-lathe">${T("sp.titleMill")}</span><span class="only-laser">${T("sp.titleLaser")}</span><span class="only-plasma">${T("sp.titlePlasma")}</span></h3>
       <div class="menu-body rp-box">
         <datalist id="ov-ticks"><option value="50"></option><option value="100"></option><option value="150"></option></datalist>
 
         <!-- ===== Fräse: Spindel ===== -->
-        <div class="only-mill sp-block">
+        <div class="mill-lathe sp-block">
           <div class="sp-state-row"><span id="sp-state" class="sp-state sp-off">${T("sp.off")}</span><span id="sp-max" class="sp-max"></span></div>
           <div class="prop-row" ${tip("sp.rpmTip")}>${T("sp.rpm")}<input type="number" id="sp-rpm" min="0" step="100" class="prop-input"></div>
           <div class="rp-grid2 sp-dir">
@@ -83,7 +85,7 @@ export function spindlePanelHtml(): string {
           <button class="btn-secondary btn-icon" data-rt="feedPlus10">+</button></div>
         ${slider("ov-feed-slider")}
         <div class="not-plasma not-marlin">
-          <div class="m-ov-row"><span><span class="only-mill">${T("sp.ovSpindle")}</span><span class="only-laser">${T("sp.ovPower")}</span></span>
+          <div class="m-ov-row"><span><span class="mill-lathe">${T("sp.ovSpindle")}</span><span class="only-laser">${T("sp.ovPower")}</span></span>
             <button class="btn-secondary btn-icon" data-rt="spindleMinus10">−</button>
             <button class="btn-secondary m-ov-val" data-rt="spindle100" id="ov-spindle-val" ${tip("m.ovResetTip")}>100%</button>
             <button class="btn-secondary btn-icon" data-rt="spindlePlus10">+</button></div>
@@ -103,6 +105,10 @@ function put(k: string, v: string) { try { localStorage.setItem(k, v); } catch {
 
 /** Höchster S-Wert: $30 vom Board, sonst aus der gewählten Maschine, sonst 1000 */
 export function maxSpindle(): number {
+  const v = boardMaxSpindle();
+  return isLathe() ? Math.min(v, latheSettings.job.maxRpm) : v; // Drehbank: nie schneller als für das Futter eingestellt
+}
+function boardMaxSpindle(): number {
   const s30 = parseFloat(machine.settings.get("$30") || "");
   if (s30 > 0) return s30;
   const m = currentMachine();
@@ -185,12 +191,15 @@ export function initSpindlePanel(log: (s: string) => void) {
     if (a !== null && machine.protocol === "grbl") return /[SC]/.test(a);
     return !!spOn;
   };
+  /** Drehbank mit Ein/Aus des Motorreglers am Kühlmittel-Ausgang */
+  const floodOn = () => /F/.test(machine.status.acc || "");
+  const viaM8 = () => isLathe() && latheSettings.out.spindle === "m8";
   const pausedGrbl = () => machine.job.active && machine.job.paused && machine.protocol === "grbl";
 
   $("sp-on")?.addEventListener("click", async () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
     if (machine.job.active) {
-      if (pausedGrbl()) { if (!spindleRunning()) { log(t("sp.resumeInHold")); await realtime(RT.spindleStop); } }
+      if (pausedGrbl()) { if (!spindleRunning()) { log(t("sp.resumeInHold")); await realtime(RT.spindleStop); if (viaM8() && !floodOn()) await realtime(RT.floodToggle); } }
       else log(t("sp.jobRunning"));
       return;
     }
@@ -201,18 +210,18 @@ export function initSpindlePanel(log: (s: string) => void) {
     if (rpm > max) { log(t("sp.clamped", { rpm, max })); rpm = max; if (rpmIn) rpmIn.value = String(max); }
     spOn = dir();
     // Spindel falsch herum verkabelt? Dann M3/M4 vertauscht schicken (Einstellung „Drehrichtung umkehren“)
-    await queue([`${spindleCode(spOn)} S${rpm}`]);
+    await queue([`${spindleCode(spOn)} S${rpm}`, ...(viaM8() ? ["M8"] : [])]);
     updateState();
   });
   $("sp-off")?.addEventListener("click", async () => {
     if (!machine.connected) { log(t("conn.connectFirst")); return; }
     if (machine.job.active) {
-      if (pausedGrbl()) { if (spindleRunning()) { log(t("sp.stopInHold")); await realtime(RT.spindleStop); } }
+      if (pausedGrbl()) { if (spindleRunning()) { log(t("sp.stopInHold")); if (viaM8() && floodOn()) await realtime(RT.floodToggle); await realtime(RT.spindleStop); } }
       else log(t("sp.jobRunning"));
       return;
     }
     spOn = "";
-    await queue(["M5"]);
+    await queue(viaM8() ? ["M9", "M5"] : ["M5"]);
     updateState();
   });
 

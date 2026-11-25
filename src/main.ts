@@ -19,13 +19,15 @@ import { renderRightPanel } from "./ui/rightPanel";
 import { initToolLibrary } from "./toolLibrary";
 import { initToolPicker, refreshToolPicker } from "./ui/toolPicker";
 import { initMillProfilePicker, refreshMillProfilePicker } from "./ui/millProfilePicker";
-import { initMachineMode, isPlasma } from "./machineMode";
+import { initMachineMode, isLathe, isPlasma } from "./machineMode";
 import { rotary } from "./rotary";
 import { isPrism } from "./rotaryStock";
 import { initRotaryPanel } from "./ui/rotaryPanel";
 import { initLaserLayers } from "./laserLayers";
 import { initLaserPanel, refreshLaserPanel } from "./ui/laserPanel";
 import { initPlasmaCuts } from "./plasmaCuts";
+import { initLathePanel } from "./ui/lathePanel";
+import { openLatheDialog } from "./ui/latheDialog";
 import { initPlasmaPanel, refreshPlasmaPanel } from "./ui/plasmaPanel";
 import { initStock } from "./stock";
 import { initStockPanel } from "./ui/stockPanel";
@@ -311,7 +313,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     // „Zur Maschine“: Job aus der Zeichnung, dann in der Simulation ansehen. Gestartet wird nie von selbst
     function showBuiltJob() {
       // runde Drehachse: die Simulation zeigt die abgewickelte Fläche, der Job bleibt der echte
-      if (rotary.on && !isPlasma() && !isPrism(rotary)) document.getElementById("btn-simulate")?.click();
+      if (rotary.on && !isPlasma() && !isLathe() && !isPrism(rotary)) document.getElementById("btn-simulate")?.click();
       else openSimTab();
     }
     document.getElementById("btn-to-machine")?.addEventListener("click", async () => {
@@ -331,13 +333,14 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (headerStop) headerStop.style.display = streamState.isRunning ? "" : "none";
     }, 300);
     document.getElementById("btn-simulate")?.addEventListener("click", () => {
+      if (isLathe()) { openLatheDialog(appendToConsole, redraw); return; } // Drehen hat seine eigene Simulation
       // Eckig/Vieleck: die Simulation braucht den echten G-Code mit den Drehungen auf die Flächen
-      const prism = rotary.on && !isPlasma() && isPrism(rotary);
+      const prism = rotary.on && !isPlasma() && !isLathe() && isPrism(rotary);
       const gcode = generateGcode(state.shapes, { flat: !prism });
       if (!gcode) { appendToConsole(noGcodeMessage()); return; }
       lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
       lastGcodeNotes.forEach(n => appendToConsole(n));
-      if (rotary.on && !isPlasma()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
+      if (rotary.on && !isPlasma() && !isLathe()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
       setSimProgram(gcode.split("\n"), designLabel(), "design");
       openSimTab();
     });
@@ -361,6 +364,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLaserPanel(redraw);
     initRotaryPanel(redraw);           // Drehachse (Reiter Lasern) + 3D-Vorschau
     initPlasmaPanel(redraw, appendToConsole);
+    initLathePanel(appendToConsole, redraw);
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
     initTwoSidedPanel(redraw, appendToConsole);

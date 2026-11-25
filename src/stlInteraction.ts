@@ -19,7 +19,7 @@ import { parse3mf, parseObj, parseStep, MODEL_EXTENSIONS } from "./importers/mes
 import { t } from "./i18n/i18n";
 import { recognizeFeatures, FeatureResult } from "./meshFeatures";
 import { openCam3D } from "./ui/cam3dDialog";
-import { isLaser, isPlasma } from "./machineMode";
+import { isMill } from "./machineMode";
 import { fmtLen, fmtLenShort, unitName } from "./units";
 
 export function setupStlLoader(
@@ -147,7 +147,7 @@ function showStlDialog(
 
       <div class="stl-dlg-row" style="margin-top:14px;">
         <button id="stl-cancel" class="stl-btn-cancel">${t("dlg.cancel")}</button>
-        ${re || isLaser() || isPlasma() ? "" : `<button id="stl-cam3d" class="stl-btn-cancel" data-tip="${escapeHtml(t("c3d.openTip"))}">🏔 ${t("c3d.open")}</button>`}
+        ${re || !isMill() ? "" : `<button id="stl-cam3d" class="stl-btn-cancel" data-tip="${escapeHtml(t("c3d.openTip"))}">🏔 ${t("c3d.open")}</button>`}
         <button id="stl-insert" class="stl-btn-ok">✔ ${t(re ? "reimp.compare" : "stl.insert")}</button>
       </div>
     </div>

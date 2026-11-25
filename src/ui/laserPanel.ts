@@ -35,6 +35,7 @@ export function modeSwitchHtml(): string {
       <button class="ms-btn" data-mode="mill" ${tip("mode.millTip")}>🛠️ ${T("mode.mill")}</button>
       <button class="ms-btn" data-mode="laser" ${tip("mode.laserTip")}>🔦 ${T("mode.laser")}</button>
       <button class="ms-btn" data-mode="plasma" ${tip("mode.plasmaTip")}>🔥 ${T("mode.plasma")}</button>
+      <button class="ms-btn" data-mode="lathe" ${tip("mode.latheTip")}>🔩 ${T("mode.lathe")}</button>
     </div>`;
 }
 

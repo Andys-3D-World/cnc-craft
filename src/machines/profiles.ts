@@ -84,6 +84,7 @@ export const PROFILES: MachineProfile[] = [
   { id: "custom-laser", brand: "custom", modelKey: "mw.m.customLaser", kind: "laser", w: 400, h: 400, ...L, support: "ok", grbl: true, notes: ["mw.note.custom"] },
   { id: "custom-mill", brand: "custom", modelKey: "mw.m.customMill", kind: "mill", w: 300, h: 300, z: 50, ...M, support: "ok", grbl: true, notes: ["mw.note.custom"] },
   { id: "custom-plasma", brand: "custom", modelKey: "mw.m.customPlasma", kind: "plasma", w: 1250, h: 1250, z: 80, ...M, support: "ok", grbl: true, notes: ["mw.note.plasma", "mw.note.custom"] },
+  { id: "custom-lathe", brand: "custom", modelKey: "mw.m.customLathe", kind: "lathe", w: 300, h: 100, ...M, sMax: 3000, support: "ok", grbl: true, notes: ["mw.note.lathe", "mw.note.custom"] },
   { id: "mks-dlc32", brand: "custom", modelKey: "mw.m.dlc32", kind: "laser", w: 400, h: 400, ...L, support: "ok", grbl: true, notes: ["mw.note.dlc32", "mw.note.custom"] },
   // BTT Rodent (router board, FluidNC): settings live in config.yaml, so CNC Craft writes no $$ values (grbl: false).
   // Bed/Z like "own mill" (BTT's rodent.yaml only has 300 mm placeholders). Not tested on a real board -> "check".

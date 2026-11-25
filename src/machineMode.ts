@@ -1,5 +1,5 @@
 /**
- * MASCHINENART: Fräse, Laser oder Plasma
+ * MASCHINENART: Fräse, Laser, Plasma oder Drehbank
  *
  * Die Art bestimmt:
  *  - welche Abschnitte rechts sichtbar sind (Fräswerkzeuge / Laser-Ebenen / Plasma-Schnitte)
@@ -9,8 +9,8 @@
  * Gespeichert in localStorage und in der Projektdatei. Bei Änderung: Ereignis
  * "cnc-machine-mode-changed" und die CSS-Klasse "mode-mill" / "mode-laser" / "mode-plasma" am <body>.
  */
-export type MachineMode = "mill" | "laser" | "plasma";
-const MODES: MachineMode[] = ["mill", "laser", "plasma"];
+export type MachineMode = "mill" | "laser" | "plasma" | "lathe";
+const MODES: MachineMode[] = ["mill", "laser", "plasma", "lathe"];
 
 export const MODE_CHANGED = "cnc-machine-mode-changed";
 const KEY = "cnc_craft_machine_mode";
@@ -35,6 +35,15 @@ export function isLaser(): boolean {
 
 export function isPlasma(): boolean {
   return mode === "plasma";
+}
+
+export function isLathe(): boolean {
+  return mode === "lathe";
+}
+
+/** Nur Fräse: alles, was Fräsbahnen erzeugt oder Z als Tiefe versteht */
+export function isMill(): boolean {
+  return mode === "mill";
 }
 
 export function setMachineMode(m: MachineMode) {
