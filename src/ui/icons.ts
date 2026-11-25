@@ -110,6 +110,7 @@ const P: Record<string, string> = {
   selectAll: `<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2.5"/><rect x="8.5" y="8.5" width="7" height="7"/>`,
   group: `<rect x="3.5" y="3.5" width="17" height="17" rx="1" stroke-dasharray="3 2.5"/><rect x="7" y="7" width="5" height="5"/><circle cx="15" cy="15" r="2.7"/>`,
   keepOut: `<rect x="4" y="4" width="16" height="16" rx="1" stroke-dasharray="3 2"/><path d="M8 8l8 8M16 8l-8 8"/>`,
+  longBoard: `<path d="M2 9h20v6H2zM9 9v6M16 9v6"/><circle cx="5.500" cy="12" r="1" fill="currentColor"/><circle cx="12.500" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>`,
   texture: `<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M4 10l6-6M4 16L16 4M6 20L20 6M12 20l8-8M18 20l2-2"/>`,
   ridge: `<path d="M3 19h18"/><path d="M5 19l7-12 7 12"/><path d="M12 7v12"/>`,
   moulding: `<path d="M3 5h5c0 5 4 4 5 7s1 6 8 6"/><path d="M3 5v14h18"/>`,

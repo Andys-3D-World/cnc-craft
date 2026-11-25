@@ -25,6 +25,7 @@ import { openStencilDialog } from "./stencilTool";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { openHealDialog } from "../ui/healDialog";
+import { openLongBoard } from "../ui/longBoardDialog";
 import { openMoulding, openRidge, openTexture } from "../ui/decoDialogs";
 import { openReliefFromSelection } from "../ui/reliefDialog";
 import { openKeepOutDialog } from "../ui/keepOutDialog";
@@ -285,6 +286,7 @@ export const commands: Record<string, () => void> = {
   nodeGraph: () => openNodeEditor(log),
   tiles: () => openTileDialog(),
   seamSplit: () => openSplitPanel(),
+  longBoard: () => openLongBoard(log),
   duplicateDialog: () => openDuplicateDialog(),
   array: () => openArrayDialog(),
   copiesOnPath: () => openCopiesOnPathDialog(),
