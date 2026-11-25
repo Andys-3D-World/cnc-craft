@@ -230,6 +230,10 @@ function shapeMenu(): MenuEntry[] {
     ...(sel.some(canReimport) ? [{ label: t("cm.reimport"), ico: "reimport", run: () => { commands.reimport(); } }] : []),
     { label: t("cm.heal"), ico: "heal", run: cmd("heal") },
     ...(isLaser() || isPlasma() ? [] : [{ label: t("cm.relief"), ico: "relief", run: cmd("relief") }]),
+    ...(isPlasma() ? [] : [{ label: t("cm.deco"), ico: "texture", sub: [
+      { label: t("deco.texture"), ico: "texture", run: cmd("texture") },
+      ...(isLaser() ? [] : [{ label: t("deco.ridge"), ico: "ridge", run: cmd("ridge") }, { label: t("deco.moulding"), ico: "moulding", run: cmd("moulding") }])
+    ] }]),
     { label: t("cm.keepOut"), ico: "keepOut", run: cmd("keepOut") },
     { label: t("cm.front"), ico: "toFront", run: cmd("toFront") },
     { label: t("cm.back"), ico: "toBack", run: cmd("toBack") },

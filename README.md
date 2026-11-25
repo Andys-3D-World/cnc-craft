@@ -32,7 +32,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 - Tool library like in Estlcam (end mills, ball, V-bits, chamfer, drills, thread mills …), Fusion 360 tool import,
   material database with cutting data, tool wear compensation, tool coating
 - Outside / inside / on-line, pockets, adaptive clearing, finishing pass, ramp entry, holding tabs, onion skin, dogbones,
-  drilling, counterbores, chamfers, facing and spoilboard surfacing, V-carve & inlay, photo with a V-bit, flutes, trochoidal contours, rest machining, thread milling
+  drilling, counterbores, chamfers, facing and spoilboard surfacing, V-carve & inlay, photo with a V-bit, flutes, surface patterns, raised lettering, mouldings, trochoidal contours, rest machining, thread milling
   (internal/external), several operations per shape
 - Two-sided milling: front, turn the workpiece over on dowel pins, back (2.5D)
 - G-code files for GRBL, LinuxCNC, Mach3 and Mach4, in millimetres or inches

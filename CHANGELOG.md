@@ -8,6 +8,11 @@
 - **Recent projects:** a start page with the last 12 projects and a small picture, also under *File*. It can be switched off. The list is kept by the program itself: only project files that were chosen in a dialog get in, and opening one from the list gives access to that one file only.
 - **Calculator, machine rigidity:** for soft machines (for example a 3018 or MPCNC) it suggests less depth per pass and slightly less feed, for stiff ones more depth. *Normal* gives the same values as before.
 - **Router with speed dial:** for Makita RT0700, DeWalt DWP611 or an own table, the tool editor shows the dial position for the speed, and G-code and tool change name it. A speed the router can't reach gives a warning. Off by default.
+- **Decorative milling, three tools** (*Extras → Decorative milling*, or right-click):
+  - *Surface pattern* (router and laser): fills closed shapes with lines, grid, diamonds, waves, zigzag, bricks, honeycomb, scales, basket weave, rays, rings, dots or a hammered look. Keeps a distance from the edge, leaves holes free, and lines can fade in and out. The result is a group of normal shapes.
+  - *Raised lettering with a ridge* (router): a V-bit follows the outline and cuts sloped faces that meet in a ridge, the ground around the letters is cleared to the same depth, holes in letters too. Depth comes from the thickest part; what stays flat on top and a cone that is too short are reported.
+  - *Moulding* (router): mills a cross-section (slope, cove, round-over, ogee, steps, double round-over, half-round groove, bead) along a line or contour, roughing and finishing with the real shape of the cutter. The preview shows in red where the cutter can't reach. Loads a job or saves a file, never starts anything.
+  - Checked with tests, the G-code check and simulated material removal (the ridge within 0.06 mm of the calculated faces, mouldings apart from vertical walls within 0.1 mm). G-code generation itself was not changed. **Not tried on a real machine:** look at the simulation first and try it in scrap.
 
 Checked with tests, in the preview and with the G-code check; 70 generator programs and a really milled project (5 sheets) give the same G-code as before. **Not tried on a real machine,** and recent projects only with tests and a mock list, not in the packaged app yet.
 

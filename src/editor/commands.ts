@@ -25,6 +25,7 @@ import { openStencilDialog } from "./stencilTool";
 import { app, bedSizeMm, ToolName } from "./editorState";
 import { undo, redo, checkpoint } from "./history";
 import { openHealDialog } from "../ui/healDialog";
+import { openMoulding, openRidge, openTexture } from "../ui/decoDialogs";
 import { openReliefFromSelection } from "../ui/reliefDialog";
 import { openKeepOutDialog } from "../ui/keepOutDialog";
 import { combine, splitByLines, roundCorners, patternFill, weldAndScore, tileShapes, BoolOp, OpResult, PatternOptions, Tile } from "./shapeOps";
@@ -176,6 +177,9 @@ export const commands: Record<string, () => void> = {
   keepOut: () => openKeepOutDialog(log, () => { done(); checkpoint(); }),
   heal: () => openHealDialog(log, () => { done(); checkpoint(); }),
   relief: () => openReliefFromSelection(log),
+  texture: () => openTexture(log, redrawFn),
+  ridge: () => openRidge(log, redrawFn),
+  moulding: () => openMoulding(log),
 
   ungroup: () => {
     const sel = selectedShapes();
