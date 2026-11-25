@@ -13,10 +13,11 @@
  *   openToolDialog()  – Fenster (aus dem CAM-Bereich: ＋ / ✎), Feld-IDs "tl-…"
  *   renderToolPage()  – Reiter "Werkzeuge": Liste links, Editor rechts, Einstellungen, IDs "tp-…"
  */
+import { parseDial, RIGIDITIES, ROUTER_MODELS } from "../routerDial";
 import { t } from "../i18n/i18n";
 import {
   MillingTool, ToolType, Helix, TOOL_TYPES, CONE_TYPES, cutDiameter, materialName, TYPE_DEFAULTS, typeGeom, MATERIALS,
-  calcCutData, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
+  calcCutData, routerDial, toolSettings, setToolSettings, getTools, getTool, addTool, updateTool, removeTool,
   duplicateTool, swapTools, activeTool, setActiveTool, toolNumber, toolColor, toolTypeName, fmt,
   sanitize, DEFAULT_PLUNGE, DEFAULT_RAMP, TOOLS_CHANGED
 } from "../toolLibrary";
@@ -111,6 +112,7 @@ function editorHtml(p: string, src: MillingTool, isNew: boolean, h: EditorHandle
           </fieldset>
           <fieldset><legend>${esc(t("tl.cutting"))}</legend>
             ${num("tool.rpm", "rpm", src.rpm, "500", esc(t("unit.rpm")))}
+            <div class="te-calc-res te-dial" id="${p}dial"></div>
             ${num("tool.feed", "feed", src.feedrate, "50", "mm/min")}
             ${num("tool.plunge", "plunge", src.plungeFeed ?? DEFAULT_PLUNGE, "50", "mm/min")}
             ${num("tool.ramp", "ramp", src.rampAngle ?? 0, "0.5", "°", "", "tool.rampTip")}
@@ -196,6 +198,9 @@ function mountEditor(root: HTMLElement, p: string, tool: MillingTool | null, h: 
     q<HTMLElement>("end").innerHTML = toolEndSvg(g, h.compact ? 70 : 84);
     q<HTMLElement>("endlabel").textContent = t("tl.flutesN", { n: g.flutes });
     showLoad(g);
+    const dial = routerDial(g.rpm), de = q<HTMLElement>("dial");
+    de.style.display = dial ? "" : "none";
+    if (dial) de.textContent = t(dial.out ? "tl.dialOut." + dial.out : "tl.dialPos", { pos: dial.pos, rpm: dial.rpm });
     if (lastAuto !== null && (q("name").value === lastAuto || q("name").value === "")) {
       lastAuto = autoToolName(g);
       q("name").value = lastAuto;
@@ -397,6 +402,9 @@ export function renderToolPage(withEditor = true) {
             <label class="te-row" data-tip="${esc(t("tl.set.minRpmTip"))}"><span>${esc(t("tl.set.minRpm"))}</span><span class="dlg-num"><input id="tps-minrpm" type="number" min="0" step="1000"><em>${esc(t("unit.rpm"))}</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.maxFeedTip"))}"><span>${esc(t("tl.set.maxFeed"))}</span><span class="dlg-num"><input id="tps-maxfeed" type="number" min="10" step="100"><em>mm/min</em></span></label>
             <label class="te-row" data-tip="${esc(t("tl.set.spindleTip"))}"><span>${esc(t("tl.set.spindle"))}</span><span class="dlg-num"><input id="tps-spindle" type="number" min="0" step="50"><em>W</em></span></label>
+            <label class="te-row" data-tip="${esc(t("tl.set.rigidTip"))}"><span>${esc(t("tl.set.rigid"))}</span><select id="tps-rigid">${RIGIDITIES.map(r => `<option value="${r}">${esc(t("tl.rigid." + r))}</option>`).join("")}</select></label>
+            <label class="te-row" data-tip="${esc(t("tl.set.routerTip"))}"><span>${esc(t("tl.set.router"))}</span><select id="tps-router">${ROUTER_MODELS.map(r => `<option value="${r}">${esc(t("tl.router." + r))}</option>`).join("")}</select></label>
+            <label class="te-row" id="tps-dial-row" data-tip="${esc(t("tl.set.dialTip"))}"><span>${esc(t("tl.set.dial"))}</span><input id="tps-dial" type="text" maxlength="120" placeholder="10000, 12000, 17000 …"></label>
             <label class="te-row"><span>${esc(t("tl.set.material"))}</span><span class="tps-matrow"><select id="tps-mat"></select>
               <button id="tps-matdb" class="btn-secondary btn-icon" type="button" data-tip="${esc(t("matdb.btnTip"))}">📚</button></span></label>
             <button id="tps-all" class="btn-secondary" data-tip="${esc(t("tl.set.allTip"))}">🧮 ${esc(t("tl.set.all"))}</button>
@@ -457,6 +465,9 @@ export function renderToolPage(withEditor = true) {
     matSel.innerHTML = MATERIALS.map(m => `<option value="${esc(m.id)}">${esc(materialName(m.id))}</option>`).join("");
   }
   setv("tps-maxfeed", String(toolSettings.maxFeed)); setv("tps-spindle", String(toolSettings.spindleW)); setv("tps-mat", toolSettings.material);
+  setv("tps-rigid", toolSettings.rigid); setv("tps-router", toolSettings.router); setv("tps-dial", toolSettings.dial);
+  const dialRow = page.querySelector("#tps-dial-row") as HTMLElement | null;
+  if (dialRow) dialRow.style.display = toolSettings.router === "own" ? "" : "none";
   (page.querySelector("#tp-dup") as HTMLButtonElement).disabled = pageNew || !pageSel;
   (page.querySelector("#tp-up") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, -1);
   (page.querySelector("#tp-down") as HTMLButtonElement).disabled = pageNew || !moveNeighbor(tools, types, 1);
@@ -534,12 +545,16 @@ function bindPage(page: HTMLElement) {
   };
   page.querySelector("#tp-up")!.addEventListener("click", () => move(-1));
   page.querySelector("#tp-down")!.addEventListener("click", () => move(1));
-  const bind = (id: string, key: "maxRpm" | "minRpm" | "maxFeed" | "spindleW" | "material") => {
+  const bind = (id: string, key: "maxRpm" | "minRpm" | "maxFeed" | "spindleW" | "material" | "rigid" | "router" | "dial") => {
     const el = page.querySelector("#" + id) as HTMLInputElement;
-    el.addEventListener("change", () => setToolSettings({ [key]: key === "material" ? el.value : parseFloat(el.value) } as any));
+    el.addEventListener("change", () => setToolSettings({ [key]: ["material", "rigid", "router", "dial"].includes(key) ? el.value : parseFloat(el.value) } as any));
   };
   page.querySelector("#tps-matdb")?.addEventListener("click", () => openMaterialDb());
   bind("tps-maxrpm", "maxRpm"); bind("tps-minrpm", "minRpm"); bind("tps-maxfeed", "maxFeed"); bind("tps-spindle", "spindleW"); bind("tps-mat", "material");
+  bind("tps-rigid", "rigid"); bind("tps-router", "router"); bind("tps-dial", "dial");
+  // Wählrad-Anzeige im offenen Werkzeug gleich mitziehen
+  for (const id of ["tps-router", "tps-dial"]) page.querySelector("#" + id)!.addEventListener("change", () => page.querySelector('#tp-editor input[id$="rpm"]')?.dispatchEvent(new Event("input")));
+  page.querySelector("#tps-dial")!.addEventListener("change", e => { const i = e.target as HTMLInputElement; i.classList.toggle("dlg-invalid", !parseDial(i.value)); });
   // Alle Werkzeuge für das gewählte Material neu berechnen
   page.querySelector("#tps-all")!.addEventListener("click", () => {
     const mat = toolSettings.material;

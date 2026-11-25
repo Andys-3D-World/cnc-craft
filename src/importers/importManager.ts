@@ -27,6 +27,7 @@ import { isLaser, isPlasma } from "../machineMode";
 import { openReliefFromImage } from "../ui/reliefDialog";
 import { openPcb, PCB_EXTENSIONS } from "../ui/pcbDialog";
 import { surelyExcellon } from "../pcb/excellon";
+import { noteRecent } from "../recent";
 import { openPhotoVcarve } from "../ui/photoVcarveDialog";
 import { openStlFromBytes } from "../stlInteraction";
 import { traceText } from "../editor/textTool";
@@ -408,6 +409,7 @@ export async function saveProject(saveAs: boolean): Promise<boolean> {
     await writeFile(p, new TextEncoder().encode(JSON.stringify(projectData())));
     lastProjectPath = p;
     suggestedPath = null;
+    noteRecent(p);
     markClean();
     void clearRecovery();
     log(t("proj.saved", { p }));
@@ -450,6 +452,15 @@ export async function openProjectWithDialog() {
   }
 }
 
+/** Projekt aus „Zuletzt benutzt“ (recent.ts hat die Datei schon freigegeben) */
+export async function openProjectPath(p: string) {
+  try {
+    await loadProjectText(decodeText(await readFile(p)), p.split(/[\\/]/).pop() || "Projekt", p);
+  } catch (err) {
+    ctx.log(t("proj.openError", { e: String(err) }));
+  }
+}
+
 async function loadProjectText(text: string, name: string, fullPath?: string, recoveredFrom?: string | null) {
   const { log } = ctx;
   let data: any;
@@ -473,6 +484,7 @@ async function loadProjectText(text: string, name: string, fullPath?: string, re
     if (h) { h.value = String(data.bed.h); h.dispatchEvent(new Event("input")); }
   }
   lastProjectPath = fullPath || null;
+  if (fullPath) noteRecent(fullPath);
   suggestedPath = recoveredFrom || null;
   updateDimensionInputs(null);
   ctx.afterProjectLoad();

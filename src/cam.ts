@@ -1,6 +1,6 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
-import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter, toolSettings } from "./toolLibrary";
+import { activeTool, toolForShape, getTools, getTool, MillingTool, DEFAULT_PLUNGE, toolNumber, cutDiameter, routerDial, toolSettings } from "./toolLibrary";
 import { resolveCut, cleanCutData } from "./millProfiles";
 import { toolChangeGcode } from "./toolChange";
 import { berechne3PunktBogen } from "./arcEngine";
@@ -661,7 +661,8 @@ const generateGcodeInner = (shapes: any): string | null => {
     const cand: { pts: P[]; area: number }[] = [];
     for (const s of shapes) {
       // noIsland: Umriss eines Stücks aus „Großes Teil teilen“ (seamSplit.ts) – die Tasche reicht dort über das Stück hinaus
-      if (s === shape || s.noIsland) continue;
+      // Stufenbohrung: das Loch in der Mitte ist keine Insel
+      if (s === shape || s.noIsland || (shape.cbore && s === shape.opOf)) continue;
       const o = closedInfo(s);
       if (!o.pts) continue;
       // Punkt außerhalb des umgebenden Rechtecks -> kann nicht drin liegen
@@ -1012,16 +1013,20 @@ const generateGcodeInner = (shapes: any): string | null => {
   /** Werkzeug einsetzen (index = Nummer in der Liste oben, change = mit Werkzeugwechsel) und Spindel starten */
   const toolStart = (index: number, change: boolean) => {
     const toolName = curTool ? curTool.name : "Standard";
+    // Oberfräse mit Wählrad: Stufe dazuschreiben (nur wenn eingestellt, nicht in Dateien für andere Steuerungen)
+    const dial = postCtx.foreign ? null : routerDial(rpm), dialTxt = dial ? tMm("gc.dial", { pos: dial.pos, rpm: dial.rpm }) : "";
     if (change) {
       // ---- WERKZEUGWECHSEL ----
       gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\n`;
       gcode += `M5 ${c("gc.spindleOff")}\n`;
-      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c(postCtx.toolTable ? "gc.toolLoad" : "gc.toolChange", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
+      gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c(postCtx.toolTable ? "gc.toolLoad" : "gc.toolChange", { i: index + 1, name: dialTxt ? `${toolName} - ${dialTxt}` : toolName, d: toolDiameter.toFixed(1) }))}\n`;
     } else if (postCtx.toolTable) {
       // Datei für eine Steuerung mit Werkzeugtabelle: auch das erste Werkzeug mit Nummer (der Post-Prozessor setzt es an den Anfang)
       gcode += `${toolChangeGcode(curTool ? toolNumber(curTool) : 0, c("gc.toolLoad", { i: index + 1, name: toolName, d: toolDiameter.toFixed(1) }))}\n`;
     }
     gcode += `\n${c("gc.tool", { name: toolName, d: toolDiameter.toFixed(1) })}\n`;
+    if (dialTxt) gcode += `(${ascii(dialTxt)})\n`;
+    if (dial?.out) { const w = t("gcw.dial." + dial.out, { name: toolName, rpm, min: dial.rpm }); if (!lastGcodeWarnings.includes(w)) lastGcodeWarnings.push(w); }
     // M3 = rechts – bei „Drehrichtung umkehren“ M4 (Spindel falsch herum verkabelt)
     gcode += `${spindleCode("M3")} S${rpm} ${c("gc.spindleOn", { rpm })}\n`;
     if (change) gcode += `G4 P2 ${c("gc.spinUp")}\n`;
@@ -1130,6 +1135,11 @@ const generateGcodeInner = (shapes: any): string | null => {
     const pinMark = shape.pin ? `(--- ${ascii(tMm("two.gc.pin", { n: shape.pin }))} ---)` : "";
     // An-/Wegfahren nur an geschlossenen Konturen mit Seite (Kreis und geschlossener Linienzug)
     curLead = (mode === "outside" || mode === "inside") && (shape.type === "circle" || (shape.type === "polyline" && shape.closed)) ? leadOptions(shape) : null;
+    if (shape.cbore) {
+      const hole = shape.opOf?.type === "circle" ? 2 * Math.abs(shape.opOf.w) / MM_TO_PIXEL : 0;
+      if (mode === "cbore") { lastGcodeWarnings.push(t("gcw.cboreShape", { n: formCounter })); return; }
+      if (shape.cboreD <= hole + 0.01) { lastGcodeWarnings.push(t("gcw.cboreSmall", { n: formCounter, d: shape.cboreD, h: hole.toFixed(2) })); return; }
+    }
     if (mode === "chamfer") {
       gcode += `\n${c("gc.chamfer", { n: formCounter, w: Number(shape.chamferW) || 1 })}\n`;
       millChamfer(shape);

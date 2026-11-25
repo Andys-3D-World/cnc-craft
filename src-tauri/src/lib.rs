@@ -40,6 +40,7 @@ mod marlin;
 mod modbus;
 mod netscan;
 mod portscan;
+mod recent;
 mod camfetch;
 mod ruida;
 mod serial;
@@ -683,6 +684,66 @@ async fn recovery_clear(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Serialize)]
+struct RecentItem {
+    path: String,
+    name: String,
+    folder: String,
+    used: u64,
+    thumb: String,
+    exists: bool,
+}
+
+/// Zuletzt benutzte Projekte (recent.rs) für die Startseite
+#[tauri::command]
+async fn recent_list(app: AppHandle) -> Result<Vec<RecentItem>, String> {
+    Ok(recent::read(&store_dir(&app)?)
+        .into_iter()
+        .map(|r| {
+            let p = std::path::Path::new(&r.path);
+            RecentItem {
+                name: p.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+                folder: p.parent().map(|s| s.to_string_lossy().to_string()).unwrap_or_default(),
+                exists: p.is_file(),
+                used: r.used,
+                thumb: r.thumb,
+                path: r.path.clone(),
+            }
+        })
+        .collect())
+}
+
+/// Merken – nur, wenn die Oberfläche diese Datei gerade benutzen darf (im Dialog gewählt oder schon aus der Liste geöffnet)
+#[tauri::command]
+async fn recent_add(app: AppHandle, path: String, thumb: String) -> Result<(), String> {
+    use tauri_plugin_fs::FsExt;
+    if !app.fs_scope().is_allowed(&path) {
+        return Err("not allowed".into());
+    }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    recent::add(&store_dir(&app)?, &path, now, &thumb)
+}
+
+/// Wieder freigeben – nur ein Pfad aus der eigenen Liste und nur diese eine Datei
+#[tauri::command]
+async fn recent_open(app: AppHandle, path: String) -> Result<(), String> {
+    use tauri_plugin_fs::FsExt;
+    if !recent::contains(&store_dir(&app)?, &path) {
+        return Err("not in list".into());
+    }
+    // ein Verweis (Symlink) auf eine andere Dateiart wird nicht freigegeben
+    let real = std::fs::canonicalize(&path).map_err(|e| e.to_string())?;
+    if !real.is_file() || !recent::valid_path(&real.to_string_lossy()) {
+        return Err("not a project".into());
+    }
+    app.fs_scope().allow_file(&path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn recent_remove(app: AppHandle, path: Option<String>) -> Result<(), String> {
+    recent::remove(&store_dir(&app)?, path.as_deref())
+}
+
 /// Werkstatt-Sync (libsync.rs): eine Bibliothek mit dem gemeinsamen Ordner abgleichen
 #[tauri::command]
 async fn libsync_sync(folder: String, kind: String, local: String, device: String, device_name: String, now: u64) -> Result<libsync::SyncResult, String> {
@@ -981,6 +1042,10 @@ pub fn run() {
             recovery_write,
             recovery_read,
             recovery_clear,
+            recent_list,
+            recent_add,
+            recent_open,
+            recent_remove,
             libsync_sync,
             libsync_backup,
             net_scan,

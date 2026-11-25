@@ -54,6 +54,7 @@ import { nestShapes, NestOptions, NestAnchor, NestDir, NEST_ANCHORS, nestDirAllo
 import { activeBed, addBed, allBedsBounds, bedCount, bedName, bedShapes, moveToBed, switchBed } from "./beds";
 import { assignPartGroups } from "./parts";
 import { updateDimensionInputs } from "../uiInputs";
+import { openStartPage } from "../ui/startPage";
 import { importWithDialog, openProjectWithDialog, saveProject } from "../importers/importManager";
 import { t } from "../i18n/i18n";
 import { openFontTester } from "../ui/fontTester";
@@ -297,6 +298,7 @@ export const commands: Record<string, () => void> = {
   importFile: () => { importWithDialog(); },
   reimport: () => openReimport(log),
   openProject: () => { openProjectWithDialog(); },
+  recentProjects: () => { void openStartPage(false); },
   saveProject: () => { saveProject(false); },
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),

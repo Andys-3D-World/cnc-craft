@@ -18,6 +18,7 @@
  * Rückgängig (Strg+Z). „Übernehmen“ macht den Text zum Job. Läuft der Job schon, darf nur geändert werden,
  * was die Maschine noch nicht bekommen hat (Sicherheitsabstand, siehe liveEditFloor) – mit Rückfrage.
  */
+import { measured, type MPoint } from "./simMeasure";
 import { t, T, tip, tMm } from "../i18n/i18n";
 import { motionLimits } from "./motionLimits";
 import { getMachineMode } from "../machineMode";
@@ -132,6 +133,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
             <button class="sim-btn" data-view="front" ${tip("sim.viewFrontTip")}>${T("sim.viewFront")}</button>
             <button class="sim-btn" id="sim-fit" ${tip("sim.fitTip")}>⛶</button>
           </div>
+          <button class="sim-btn" id="sim-measure" aria-pressed="false" ${tip("sim.measureTip")}>📏 ${T("sim.measure")}</button>
           <label class="sim-check"><input type="checkbox" id="sim-rapids" checked> ${T("sim.showRapids")}</label>
           <div class="sim-seg" id="sim-mat-seg">
             <button class="sim-btn" id="sim-mat-on" ${tip("sim.materialTip")}>🪵 ${T("sim.material")}</button>
@@ -142,6 +144,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
         </div>
         <div class="sim-canvas-holder">
           <canvas id="sim-canvas"></canvas>
+          <div class="sim-measure" id="sim-measure-box" style="display:none"></div>
           <div class="sim-live" id="sim-live" style="display:none">● LIVE</div>
           <div class="sim-carve-busy" id="sim-carve-busy" style="display:none"></div>
           <div class="sim-legend sim-legend-mat" id="sim-legend-mat" style="display:none"></div>
@@ -248,6 +251,30 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     if (!live && move >= 0) { playing = false; seek(moveEnd(move)); }
     scrollCodeTo(line, true);
   };
+
+  // Messen: zwei Punkte anklicken
+  const showMeasure = (pts: MPoint[], hover: MPoint | null) => {
+    const box = $("sim-measure-box"), n = (v: number) => v.toFixed(2);
+    const at = (p: MPoint) => `X ${n(p.x)}  Y ${n(p.y)}  Z ${n(p.z)}`;
+    const lines: string[] = [];
+    if (pts.length === 2) {
+      const m = measured(pts[0], pts[1]);
+      lines.push(`${t("sim.mDist")} ${n(m.d3)} mm`, `ΔX ${n(m.dx)}  ΔY ${n(m.dy)}  ΔZ ${n(m.dz)}`, `${t("sim.mFlat")} ${n(m.xy)} mm · ${n(m.angle)}°`);
+    } else lines.push(t(pts.length ? "sim.mSecond" : prog?.rotary ? "sim.mRotary" : "sim.mFirst"));
+    if (hover) lines.push(at(hover));
+    const mat = view.material;
+    if (view.materialOn && mat && pts.some(p => p.kind === "surface")) lines.push(t("sim.mAcc", { c: mat.cell.toFixed(2) }));
+    box.textContent = lines.join("\n");
+  };
+  view.onMeasure = showMeasure;
+  const setMeasure = (on: boolean) => {
+    view.setMeasuring(on);
+    $("sim-measure").classList.toggle("active", on);
+    $("sim-measure").setAttribute("aria-pressed", String(on));
+    $("sim-measure-box").style.display = on ? "" : "none";
+    if (on) showMeasure([], null);
+  };
+  $("sim-measure").addEventListener("click", () => setMeasure(!view.measuring));
 
   // Canvas-Größe an den Platz anpassen
   const holder = canvas.parentElement!;
@@ -459,6 +486,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     if (target && (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA")) return;
     if (!prog) return;
     if (editing && editKey(e)) { e.preventDefault(); return; }
+    if (e.key === "Escape" && view.measuring) { setMeasure(false); e.preventDefault(); return; }
     if (e.key === " ") { togglePlay(); e.preventDefault(); }
     else if (e.key === "Home") { seek(0); e.preventDefault(); }
     else if (e.key === "End") { seek(prog.totalTime); e.preventDefault(); }

@@ -15,6 +15,7 @@ import { t, currentLanguage } from "./i18n/i18n";
 import { isDirty, changeCount, onDirtyChange, markClean, clearRecovery } from "./editor/projectDirty";
 import { guardUnsaved, projectName, recoveryText, restoreRecovered } from "./importers/importManager";
 import { askChoice } from "./ui/unsavedDialog";
+import { openStartPage } from "./ui/startPage";
 import { flushSettings } from "./settingsStore";
 
 const AUTOSAVE_MS = 90_000;
@@ -43,10 +44,10 @@ async function autosave() {
   }
 }
 
-async function offerRestore(log: (s: string) => void) {
+async function offerRestore(log: (s: string) => void): Promise<boolean> {
   let rec: { data: string; saved: number } | null = null;
-  try { rec = await invoke("recovery_read"); } catch { return; }
-  if (!rec) return;
+  try { rec = await invoke("recovery_read"); } catch { return false; }
+  if (!rec) return false;
   const when = new Date(rec.saved * 1000).toLocaleString(currentLanguage());
   const r = await askChoice(t("recover.title"), t("recover.text", { time: when }), [
     { key: "discard", label: t("recover.discard"), cancel: true },
@@ -55,9 +56,10 @@ async function offerRestore(log: (s: string) => void) {
   if (r === "restore") {
     await restoreRecovered(rec.data);
     log(t("recover.done"));
-  } else {
-    await clearRecovery();
+    return true;
   }
+  await clearRecovery();
+  return false;
 }
 
 export async function initProjectSafety(log: (s: string) => void) {
@@ -89,5 +91,5 @@ export async function initProjectSafety(log: (s: string) => void) {
   });
 
   window.setInterval(() => { void autosave(); }, AUTOSAVE_MS);
-  await offerRestore(log);
+  if (!await offerRestore(log)) void openStartPage(true);
 }

@@ -69,7 +69,7 @@ function cutsOf(front: any[], back: any[], s: TwoSidedSetup): Cut[] {
     const turn = (p: Pt): Pt => (side === "back" ? mirrorPoint(p, s) : p);
     for (const e of cutShapes(list)) {
       const mode = e.millingMode || "outside";
-      if (mode === "chamfer" || mode === "thread") continue;   // shallow edge work
+      if (mode === "chamfer" || mode === "thread" || mode === "cbore") continue;   // shallow edge work
       const path = shapeToPaths(e)[0];
       const b = shapeBounds(e);
       if (!path || path.pts.length < 2 || !b) continue;

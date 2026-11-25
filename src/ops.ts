@@ -11,12 +11,14 @@
  * Art „thread“ (Gewinde fräsen): nur an Kreisen mit dem Gewindefräser – innen bei Löchern, außen bei Bolzen
  * (gleiche Seite wie die Fase); Tiefe = Gewindelänge (siehe threadMill.ts).
  * Art „face“ (Planfräsen): das umgebende Rechteck der Form auf Tiefe planen (siehe facing.ts).
+ * Art „cbore“ (Stufenbohrung): flache Senkung für den Schraubenkopf um ein rundes Loch – wird zu einer runden Tasche
+ * mit eigenem Durchmesser in der Mitte des Kreises; das Loch selbst bleibt die erste Bearbeitung.
  */
 
 import { cleanMillDir, type MillDir } from "./millDir.ts";
 
-export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread" | "face";
-export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread", "face"];
+export type OpKind = "outside" | "inside" | "pocket" | "on-line" | "vcarve" | "drill" | "chamfer" | "thread" | "face" | "cbore";
+export const OP_KINDS: OpKind[] = ["outside", "inside", "pocket", "on-line", "vcarve", "drill", "chamfer", "thread", "face", "cbore"];
 
 export interface ShapeOp {
   kind: OpKind;
@@ -30,7 +32,19 @@ export interface ShapeOp {
   threadPitch?: number; // Gewinde: Steigung (0 = Werkzeug bzw. ISO-Regelgewinde)
   threadPasses?: number; // Gewinde: radiale Durchgänge
   threadSpring?: boolean; // Gewinde: Leerdurchgang
+  cboreD?: number;      // Stufenbohrung: Ø der Senkung in mm
 }
+
+const PX = 2; // Weltkoordinaten: 2 je mm (MM_TO_PIXEL)
+
+/**
+ * Senkungen für Zylinderkopfschrauben (DIN 912): Ø nach DIN 974-1 Reihe 1, Tiefe = Kopfhöhe + 0,4 mm Luft.
+ * Das Durchgangsloch (mittel, DIN EN 20273) steht zur Orientierung dabei.
+ */
+export const CBORE_SCREWS: { id: string; d: number; depth: number; hole: number }[] = [
+  { id: "M3", d: 6.5, depth: 3.4, hole: 3.4 }, { id: "M4", d: 8, depth: 4.4, hole: 4.5 }, { id: "M5", d: 10, depth: 5.4, hole: 5.5 },
+  { id: "M6", d: 11, depth: 6.4, hole: 6.6 }, { id: "M8", d: 15, depth: 8.4, hole: 9 }, { id: "M10", d: 18, depth: 10.4, hole: 11 }, { id: "M12", d: 20, depth: 12.4, hole: 13.5 }
+];
 
 const num = (v: any, d: number) => (Number.isFinite(Number(v)) ? Number(v) : d);
 
@@ -48,7 +62,8 @@ export function extraOps(s: any): ShapeOp[] {
       threadD: Math.max(0, Math.min(500, num(o.threadD, 0))), threadLeft: o.threadLeft === true,
       threadPitch: Math.max(0, Math.min(10, num(o.threadPitch, 0))),
       threadPasses: Math.max(1, Math.min(10, Math.round(num(o.threadPasses, 1)))), threadSpring: o.threadSpring === true
-    } : {})
+    } : {}),
+    ...(o.kind === "cbore" ? { cboreD: Math.max(0.5, Math.min(200, num(o.cboreD, 11))) } : {})
   }));
 }
 
@@ -83,7 +98,9 @@ export function expandOps(shapes: any[]): any[] {
         threadSpring: o.threadSpring,
         restToolId: undefined,
         parentChainId: undefined,
-        ops: undefined
+        ops: undefined,
+        // Stufenbohrung: runde Tasche um die Mitte des Kreises (an anderen Formen bleibt die Art „cbore“ → Hinweis in cam.ts)
+        ...(o.kind === "cbore" ? { cbore: true, cboreD: o.cboreD, ...(s.type === "circle" ? { millingMode: "pocket", w: (o.cboreD! / 2) * PX, h: (o.cboreD! / 2) * PX } : {}) } : {})
       });
     });
   }

@@ -31,7 +31,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
 **Fräse (CAM)**
 - Werkzeug-Bibliothek wie in Estlcam (Schaft-, Kugel-, V-, Fasenfräser, Bohrer, Gewindefräser …), Import von
   Fusion-360-Werkzeugen, Material-Datenbank mit Schnittdaten, Verschleiß-Ausgleich, Beschichtung
-- Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Zwiebelhaut, Dogbones, Bohren, Fasen,
+- Außen / Innen / Auf der Linie, Taschen, adaptives Räumen, Schlichtgang, Rampe, Haltestege, Zwiebelhaut, Dogbones, Bohren, Stufenbohrung, Fasen,
   Planfräsen und Opferplatte planen, V-Carve & Inlay, Foto mit V-Stichel, Flöten, trochoidale Konturen, Restmaterial, Gewindefräsen (innen/außen), mehrere
   Bearbeitungen pro Form
 - Zweiseitig fräsen: Vorderseite, Werkstück auf Passstiften wenden, Rückseite (2,5D)

@@ -10,7 +10,7 @@
  */
 import { t, T, tip } from "../i18n/i18n";
 import { getTools, getTool, toolForShape, toolLabel } from "../toolLibrary";
-import { OP_KINDS, OpKind, ShapeOp, extraOps } from "../ops";
+import { CBORE_SCREWS, OP_KINDS, OpKind, ShapeOp, extraOps } from "../ops";
 import { cleanMillDir, type MillDir } from "../millDir";
 import { fmtLenShort, unitName } from "../units";
 
@@ -81,7 +81,7 @@ export function initOpsPanel(redraw: () => void, log: (s: string) => void) {
     const td = parseFloat(q("ops-td")?.value || "");
     const tp = parseFloat(q("ops-tp")?.value || "");
     const tn = parseFloat(q("ops-tn")?.value || "");
-    const left = q("ops-left"), spring = q("ops-spring");
+    const left = q("ops-left"), spring = q("ops-spring"), cd = parseFloat(q("ops-cd")?.value || "");
     return {
       kind, toolId: tool || undefined,
       depth: Number.isFinite(depth) ? Math.min(0, depth) : prev?.depth ?? -1,
@@ -93,10 +93,27 @@ export function initOpsPanel(redraw: () => void, log: (s: string) => void) {
         threadPitch: Number.isFinite(tp) && tp >= 0 ? tp : prev?.threadPitch ?? 0,
         threadPasses: Number.isFinite(tn) && tn >= 1 ? Math.min(10, Math.round(tn)) : prev?.threadPasses ?? 1,
         threadSpring: spring ? spring.checked : prev?.threadSpring ?? false
-      } : {})
+      } : {}),
+      ...(kind === "cbore" ? { cboreD: Number.isFinite(cd) && cd > 0 ? cd : prev?.cboreD ?? CBORE_SCREWS[2].d } : {})
     };
   });
-  list.addEventListener("change", () => apply(readRows()));
+  list.addEventListener("change", e => {
+    const el = e.target as HTMLSelectElement, row = el.closest(".ops-row") as HTMLElement | null;
+    if (el.classList.contains("ops-screw")) {
+      // Schraube gewählt: Ø und Tiefe eintragen
+      const x = CBORE_SCREWS.find(c => c.id === el.value);
+      const ops = readRows(), i = Number(row?.dataset.i);
+      if (x && ops[i]) { ops[i].cboreD = x.d; ops[i].depth = -x.depth; apply(ops); }
+      return;
+    }
+    if (el.classList.contains("ops-kind") && el.value === "cbore") {
+      const ops = readRows(), i = Number(row?.dataset.i);
+      if (ops[i]) { ops[i].cboreD = CBORE_SCREWS[2].d; ops[i].depth = -CBORE_SCREWS[2].depth; }
+      apply(ops);
+      return;
+    }
+    apply(readRows());
+  });
   list.addEventListener("click", e => {
     const b = (e.target as HTMLElement).closest("[data-del]") as HTMLElement | null;
     if (!b) return;
@@ -169,6 +186,10 @@ export function refreshOps(force = false) {
            <div class="prop-row" ${tip("ops.threadPassesTip")}>${T("ops.threadPasses")}<input type="number" class="prop-input ops-tn" min="1" max="10" step="1" value="${o.threadPasses || 1}"></div>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadSpringTip")}>${T("ops.threadSpring")}<input type="checkbox" class="ops-spring" style="width:auto;"${o.threadSpring ? " checked" : ""}></label>
            <label class="prop-row" style="cursor:pointer;" ${tip("ops.threadLeftTip")}>${T("ops.threadLeft")}<input type="checkbox" class="ops-left" style="width:auto;"${o.threadLeft ? " checked" : ""}></label>`
+        : o.kind === "cbore"
+        ? `<div class="prop-row" ${tip("ops.screwTip")}>${T("ops.screw")}<select class="prop-input ops-screw" style="width:110px;"><option value="">–</option>${CBORE_SCREWS.map(c => `<option value="${c.id}"${c.d === o.cboreD && Math.abs(c.depth + o.depth) < 0.01 ? " selected" : ""}>${c.id}</option>`).join("")}</select></div>
+           <div class="prop-row" ${tip("ops.cboreDTip")}>${T("ops.cboreD")}<input type="number" data-unit="mm" class="prop-input ops-cd" min="0.5" step="0.5" value="${o.cboreD}"></div>
+           <div class="prop-row" ${tip("ops.cboreDepthTip")}>${T("rp.depth")}<input type="number" data-unit="mm" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`
         : `<div class="prop-row">${T("rp.depth")}<input type="number" data-unit="mm" class="prop-input ops-depth" step="0.5" value="${o.depth}"></div>`}
       ${DIR_KINDS.includes(o.kind) ? `<div class="prop-row" ${tip("rp.millDirTip")}>${T("rp.millDir")}<select class="prop-input ops-dir" style="width:110px;">
         ${MILL_DIRS.map(d => `<option value="${d}"${d === (o.millDir || "") ? " selected" : ""}>${esc(t("rp.millDir." + (d || "default")))}</option>`).join("")}</select></div>` : ""}

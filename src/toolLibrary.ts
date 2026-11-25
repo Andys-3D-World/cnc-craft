@@ -21,6 +21,7 @@ import { ToolType, Helix, ToolGeom } from "./toolGraphics";
 import { Coating, COATINGS } from "./toolCoating";
 import { syncFields, stamp, noteRemoved, noteOrder, sortByOrder } from "./syncStamp";
 import { fmtDia } from "./units";
+import { dialFor, dialTable, RIGIDITIES, rigidK, ROUTER_MODELS, type DialPos, type Rigidity, type RouterModel } from "./routerDial";
 
 export type { ToolType, Helix } from "./toolGraphics";
 export type ToolMat = "carbide" | "hss";
@@ -83,9 +84,12 @@ export interface ToolSettings {
   maxFeed: number;   // größter sinnvoller Vorschub der Maschine (mm/min)
   spindleW: number;  // Leistung der Spindel in Watt (0 = unbekannt) – nur für die Belastungs-Anzeige (cutLoad.ts)
   material: string;  // Material, das der Rechner vorschlägt
+  rigid: Rigidity;   // Steifigkeit der Maschine („normal“ = Rechner wie bisher)
+  router: RouterModel; // Oberfräse mit Wählrad („none“ = Spindel mit S-Wert)
+  dial: string;      // eigene Wählrad-Tabelle (nur router = "own")
 }
 const KEY_SETTINGS = "cnc_craft_tool_settings";
-export const toolSettings: ToolSettings = { minRpm: 0, maxRpm: 24000, maxFeed: 3000, spindleW: 0, material: "softwood" };
+export const toolSettings: ToolSettings = { minRpm: 0, maxRpm: 24000, maxFeed: 3000, spindleW: 0, material: "softwood", rigid: "normal", router: "none", dial: "" };
 
 /**
  * MATERIAL-DATENBANK für den Rechner (Hartmetall-Fräser, Hobby-/Portalfräsen):
@@ -204,12 +208,13 @@ export function calcCutData(tool: ToolGeom & { toolMat?: ToolMat }, materialId: 
   let limited = false;
   if (rpm > maxRpm) { rpm = maxRpm; limited = true; }
   if (st.minRpm > 0 && rpm < st.minRpm) { rpm = st.minRpm; limited = true; }
-  const fz = Math.min(m.fzMax, Math.max(0.005, m.fzK * dEff)) * (hss ? 0.8 : 1);
+  const rk = rigidK(st.rigid);
+  const fz = Math.max(0.004, Math.min(m.fzMax, Math.max(0.005, m.fzK * dEff)) * (hss ? 0.8 : 1) * rk.fz);
   const z = Math.max(1, Math.round(tool.flutes || 1));
   let feed = rpm * z * fz;
   const maxFeed = st.maxFeed > 0 ? st.maxFeed : 3000;
   if (feed > maxFeed) { feed = maxFeed; limited = true; }
-  let stepZ = m.ap * dEff * (conical ? 0.5 : 1);
+  let stepZ = m.ap * dEff * (conical ? 0.5 : 1) * rk.ap;
   if (tool.type === "drill") stepZ = Math.max(0.5, dEff * (m.ap >= 0.5 ? 1 : 0.5)); // Spanbrech-Tiefe
   // Anbohrer und Reibahle setzen nicht ab: eine Zustellung = ganze Schneide. Reiben langsam (halbe Drehzahl)
   if (tool.type === "spotdrill" || tool.type === "reamer") stepZ = Math.max(0.5, tool.fluteLen);
@@ -232,9 +237,18 @@ export function setToolSettings(s: Partial<ToolSettings>) {
   if (s.maxRpm !== undefined) toolSettings.maxRpm = num(s.maxRpm, toolSettings.maxRpm, 100, 100000);
   if (s.maxFeed !== undefined) toolSettings.maxFeed = num(s.maxFeed, toolSettings.maxFeed, 10, 100000);
   if (s.spindleW !== undefined) toolSettings.spindleW = num(s.spindleW, toolSettings.spindleW, 0, 30000);
+  if (s.rigid !== undefined && RIGIDITIES.includes(s.rigid)) toolSettings.rigid = s.rigid;
+  if (s.router !== undefined && ROUTER_MODELS.includes(s.router)) toolSettings.router = s.router;
+  if (s.dial !== undefined) toolSettings.dial = String(s.dial).slice(0, 120);
   if (s.material !== undefined && MATERIALS.some(m => m.id === s.material)) toolSettings.material = s.material;
   try { localStorage.setItem(KEY_SETTINGS, JSON.stringify(toolSettings)); } catch { /* egal */ }
   window.dispatchEvent(new CustomEvent(TOOLS_CHANGED));
+}
+
+/** Wählrad-Stufe für eine Drehzahl; null = keine Oberfräse eingestellt */
+export function routerDial(rpm: number): DialPos | null {
+  const tb = dialTable(toolSettings.router, toolSettings.dial);
+  return tb && rpm > 0 ? dialFor(rpm, tb) : null;
 }
 
 export const TOOLS_CHANGED = "cnc-tools-changed";

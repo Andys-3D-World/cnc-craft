@@ -2,6 +2,15 @@
 
 ## Next version (unreleased)
 
+**New**
+- **Counterbore:** a further operation for round holes that mills the flat recess for a screw head. Choose the screw (M3 to M12, socket head) or enter diameter and depth. Works on circles; other shapes and recesses that are not larger than the hole are left out with a warning.
+- **Measure in the simulation:** click two points and read distance, height and angle. With *Material* on the milled part, so depths and pockets can be checked (accuracy: one grid cell, shown), otherwise on the paths with snap to their ends. Not with a rotary axis.
+- **Recent projects:** a start page with the last 12 projects and a small picture, also under *File*. It can be switched off. The list is kept by the program itself: only project files that were chosen in a dialog get in, and opening one from the list gives access to that one file only.
+- **Calculator, machine rigidity:** for soft machines (for example a 3018 or MPCNC) it suggests less depth per pass and slightly less feed, for stiff ones more depth. *Normal* gives the same values as before.
+- **Router with speed dial:** for Makita RT0700, DeWalt DWP611 or an own table, the tool editor shows the dial position for the speed, and G-code and tool change name it. A speed the router can't reach gives a warning. Off by default.
+
+Checked with tests, in the preview and with the G-code check; 70 generator programs and a really milled project (5 sheets) give the same G-code as before. **Not tried on a real machine,** and recent projects only with tests and a mock list, not in the packaged app yet.
+
 ## 0.4.10 Beta
 
 **New**

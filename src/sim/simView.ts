@@ -16,6 +16,7 @@ import { sectionAt, cornerRadius, isPrism, type RotaryStock } from "../rotarySto
 import type { LiveCarve } from "./simCarve";
 import { MATERIALS, type Material } from "../materialView";
 import { MaterialRenderer } from "./simCarveGl";
+import { measured, rayAt, surfaceHit, type Camera, type MPoint } from "./simMeasure";
 
 export type ViewPreset = "top" | "iso" | "front";
 
@@ -68,6 +69,54 @@ export class SimView {
   /** wie lange das Zeichnen dauert (ms, geglättet) – danach richtet sich die Bildrate im Live-Betrieb */
   drawMs = 0;
   onChange: () => void = () => {};
+  /** Messen: Klicks setzen Punkte statt Bahnen zu wählen */
+  measuring = false;
+  measurePts: MPoint[] = [];
+  onMeasure: (pts: MPoint[], hover: MPoint | null) => void = () => {};
+  setMeasuring(on: boolean) { this.measuring = on; this.measurePts = []; this.canvas.style.cursor = on ? "crosshair" : ""; this.onMeasure([], null); this.invalidate(); }
+
+  private camera(): Camera {
+    return { yaw: this.yaw, pitch: this.pitch, scale: this.scale, ox: this.canvas.width / 2 + this.panX, oy: this.canvas.height / 2 + this.panY, cx: this.center.x, cy: this.center.y, cz: this.center.z };
+  }
+  /** Punkt unter der Maus: Material (Fräse), sonst die nächste Bahn; null = nichts (auch bei der Drehachse) */
+  pointAt(sx: number, sy: number): MPoint | null {
+    const p = this.prog;
+    if (!p || p.rotary) return null;
+    const m = this.material;
+    if (this.materialOn && m && !m.cyl) {
+      if (m.kind === "mill") return surfaceHit(sx, sy, this.camera(), m);
+      const q = rayAt(sx, sy, 0, this.camera());
+      return q ? { ...q, z: 0, kind: "flat" } : null;
+    }
+    const i = this.pick(sx, sy);
+    if (i < 0) return null;
+    const { PX, PY } = this.projection();
+    const ax = PX(p.x0[i], p.y0[i]), ay = PY(p.x0[i], p.y0[i], p.z0[i]), bx = PX(p.x1[i], p.y1[i]), by = PY(p.x1[i], p.y1[i], p.z1[i]);
+    // Fang am Anfang/Ende der Bewegung
+    if (Math.hypot(sx - ax, sy - ay) < 8) return { x: p.x0[i], y: p.y0[i], z: p.z0[i], kind: "end" };
+    if (Math.hypot(sx - bx, sy - by) < 8) return { x: p.x1[i], y: p.y1[i], z: p.z1[i], kind: "end" };
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy, u = l2 > 1e-9 ? Math.max(0, Math.min(1, ((sx - ax) * dx + (sy - ay) * dy) / l2)) : 0;
+    return { x: p.x0[i] + (p.x1[i] - p.x0[i]) * u, y: p.y0[i] + (p.y1[i] - p.y0[i]) * u, z: p.z0[i] + (p.z1[i] - p.z0[i]) * u, kind: "path" };
+  }
+  private drawMeasure() {
+    if (!this.measuring || !this.measurePts.length) return;
+    const ctx = this.ctx, { PX, PY } = this.projection(), S = (q: MPoint) => [PX(q.x, q.y), PY(q.x, q.y, q.z)] as const;
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 2; ctx.strokeStyle = "#ffd23c"; ctx.fillStyle = "#ffd23c";
+    const [a, b] = this.measurePts;
+    if (b) {
+      const [x0, y0] = S(a), [x1, y1] = S(b), label = `${measured(a, b).d3.toFixed(2)} mm`;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.font = "600 13px system-ui, sans-serif"; ctx.textAlign = "center";
+      const w = ctx.measureText(label).width + 12, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      ctx.fillStyle = "rgba(14,14,18,0.85)"; ctx.fillRect(mx - w / 2, my - 20, w, 20);
+      ctx.fillStyle = "#ffd23c"; ctx.fillText(label, mx, my - 6);
+    }
+    for (const q of this.measurePts) { const [x, y] = S(q); ctx.beginPath(); ctx.arc(x, y, 4, 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+
   /** Klick auf eine Bahn: Zeile (0-basiert) und Index der nächsten Bewegung, -1 = daneben */
   onPick: (line: number, move: number) => void = () => {};
 
@@ -104,6 +153,7 @@ export class SimView {
   setProgram(p: SimProgram | null) {
     this.prog = p;
     this.curIdx = -1;
+    this.measurePts = [];
     this.fit();
   }
 
@@ -279,6 +329,11 @@ export class SimView {
       drag = { x: e.clientX, y: e.clientY, mode, moved: 0 };
       e.preventDefault();
     });
+    c.addEventListener("mousemove", e => {
+      if (!this.measuring || drag) return;
+      const r = c.getBoundingClientRect();
+      this.onMeasure(this.measurePts, this.pointAt((e.clientX - r.left) * (c.width / Math.max(1, r.width)), (e.clientY - r.top) * (c.height / Math.max(1, r.height))));
+    });
     window.addEventListener("mousemove", e => {
       if (!drag) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -298,6 +353,12 @@ export class SimView {
         const r = c.getBoundingClientRect();
         const sx = (e.clientX - r.left) * (c.width / Math.max(1, r.width));
         const sy = (e.clientY - r.top) * (c.height / Math.max(1, r.height));
+        if (this.measuring) {
+          const q = this.pointAt(sx, sy);
+          if (q) { this.measurePts = this.measurePts.length >= 2 ? [q] : [...this.measurePts, q]; this.onMeasure(this.measurePts, q); this.invalidate(); }
+          drag = null;
+          return;
+        }
         const i = this.pick(sx, sy);
         this.onPick(i >= 0 && this.prog ? this.prog.line[i] : -1, i);
       }
@@ -337,7 +398,9 @@ export class SimView {
     this.matGpu.canvas.style.display = on ? "" : "none";
   }
 
-  draw() {
+  draw() { this.drawScene(); this.drawMeasure(); }
+
+  private drawScene() {
     const { canvas } = this;
     const W = canvas.width, H = canvas.height;
     const layered = this.materialOn;

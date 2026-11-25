@@ -54,6 +54,7 @@ const P: Record<string, string> = {
   nest: `<rect x="2.5" y="2.5" width="19" height="19" rx="1.5" stroke-dasharray="3 2.5"/><rect x="5.5" y="5.5" width="6" height="8" rx=".5"/><circle cx="16" cy="9" r="3"/><path d="M5.5 16.5h7l-2 2.5h-5zM14.5 15h4v4h-4z"/>`,
 
   // ---- Datei ----
+  recent: `<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>`,
   reimport: `<path d="M12 2v8M9 7l3 3 3-3"/><path d="M20 12.5a8 8 0 0 1-14.6 4.6M4 12.5a8 8 0 0 1 2.2-5.5"/><path d="M5 21v-4.2h4.2"/>`,
   import: `<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/>`,
   open: `<path d="M3 7.5V18a1 1 0 001 1h16a1 1 0 001-1V9a1 1 0 00-1-1h-8l-2-2.5H4a1 1 0 00-1 1z"/>`,

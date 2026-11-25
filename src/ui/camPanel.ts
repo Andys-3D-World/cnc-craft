@@ -64,7 +64,7 @@ export function renderCamPanel(container: HTMLElement) {
 export function renderEditorToolbar(container: HTMLElement) {
   container.innerHTML = `
     <div class="tb-group">
-      ${flyCmds("file", "open", [["importFile", "import", "tip.cmd.importFile"], ["reimport", "reimport", "tip.cmd.reimport"], ["openProject", "open", "tip.cmd.openProject"],
+      ${flyCmds("file", "open", [["importFile", "import", "tip.cmd.importFile"], ["reimport", "reimport", "tip.cmd.reimport"], ["openProject", "open", "tip.cmd.openProject"], ["recentProjects", "recent", "tip.cmd.recentProjects"],
         ["saveProject", "save", "tip.cmd.saveProject"], ["exportVector", "export", "tip.cmd.exportVector"]], "down", 18, {
         label: T("fly.fileLabel"),
         extra: `<div class="fly-sep"></div><button id="btn-clear-canvas" class="btn-cmd fly-item fly-danger" ${tip("tip.clearAll")}><span class="fly-chip">${icon("clear", 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`

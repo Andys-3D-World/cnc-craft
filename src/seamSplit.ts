@@ -490,7 +490,7 @@ function virtuals(s: any, fallback: number): Virt[] {
   const out: Virt[] = [{ src: s, op: -1, mode: s.millingMode || "outside", toolId: s.toolId, depth: typeof s.millingDepth === "number" && Number.isFinite(s.millingDepth) ? s.millingDepth : fallback, finishAllow: s.finishAllow, millDir: s.millDir }];
   extraOps(s).forEach((o, i) => out.push({
     src: s, op: i, mode: o.kind, toolId: o.toolId, depth: o.depth, finishAllow: o.finishAllow || undefined, millDir: o.millDir,
-    extra: { chamferW: o.chamferW, chamferSide: chamferSide(s), threadD: o.threadD, threadLeft: o.threadLeft, threadPitch: o.threadPitch, threadPasses: o.threadPasses, threadSpring: o.threadSpring },
+    extra: { chamferW: o.chamferW, chamferSide: chamferSide(s), threadD: o.threadD, threadLeft: o.threadLeft, threadPitch: o.threadPitch, threadPasses: o.threadPasses, threadSpring: o.threadSpring, ...(o.kind === "cbore" ? { cboreD: o.cboreD } : {}) },
   }));
   return out;
 }
@@ -661,10 +661,12 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
     if (!i.box) return false;
     const pointLike = i.virts.every(v => v.mode === "drill" || v.mode === "thread");
     let b = i.box, ring = i.ring!;
-    if (pointLike) {
+    // Stufenbohrung: auch die Senkung muss ganz im Stück liegen
+    const cb = Math.max(0, ...i.virts.map(v => (v.mode === "cbore" ? (v.extra?.cboreD ?? 0) / 2 : 0)));
+    if (pointLike || cb > 0) {
       // Bohrung/Gewinde: der Kreis des Lochs (mindestens der Bohrer) muss ganz im Stück liegen
       const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
-      const r = Math.max((b.maxX - b.minX) / 2, (b.maxY - b.minY) / 2, ...i.virts.map(v => o.radiusOf(v))) + 0.5;
+      const r = Math.max((b.maxX - b.minX) / 2, (b.maxY - b.minY) / 2, cb, ...(pointLike ? i.virts.map(v => o.radiusOf(v)) : [])) + (pointLike ? 0.5 : 0);
       b = { minX: cx - r, minY: cy - r, maxX: cx + r, maxY: cy + r };
       ring = Array.from({ length: 24 }, (_, k) => [cx + r * Math.cos(k * Math.PI / 12), cy + r * Math.sin(k * Math.PI / 12)] as [number, number]);
     }
@@ -755,7 +757,7 @@ export function splitDrawing(shapes: any[], setup: SplitSetup, o: SplitOptions):
   for (const i of crossing) {
     for (const v of i.virts) {
       if (isThrough(i, v)) continue; // steckt schon in den Umrissen
-      if (v.mode === "drill" || v.mode === "thread") {
+      if (v.mode === "drill" || v.mode === "thread" || v.mode === "cbore") {
         lostDrill++;
         if (!firstDrill) firstDrill = [(i.box!.minX + i.box!.maxX) / 2, (i.box!.minY + i.box!.maxY) / 2];
         continue;
