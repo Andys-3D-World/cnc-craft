@@ -1801,6 +1801,19 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .rp-console-new:empty { display: none; }
 .pr-live { font-size: 0.78rem; font-weight: 600; padding: 5px 8px; border-radius: 6px; background: rgba(128,128,128,0.1); color: var(--text-muted); }
 .pr-live-open { color: var(--color-success); background: rgba(52,209,123,0.1); }
+.xyp-kinds { display: flex; flex-wrap: wrap; gap: 4px; }
+.xyp-kinds .xyp-kind { flex: 1 1 auto; }
+.xyp-kinds .xyp-kind.active { border-color: var(--accent-color); color: var(--text-main); }
+.xyp-draw { margin: 2px 0; }
+.xyp-air { fill: rgba(128,128,128,0.08); stroke: rgba(128,128,128,0.35); }
+.xyp-mat { fill: rgba(200,160,100,0.35); stroke: rgba(200,160,100,0.8); }
+.xyp-spot { cursor: pointer; outline: none; }
+.xyp-spot circle { fill: var(--text-muted); }
+.xyp-spot .xyp-hit { fill: transparent; }
+.xyp-spot.on circle:not(.xyp-hit) { fill: var(--color-warning); }
+.xyp-spot:hover circle:not(.xyp-hit), .xyp-spot:focus-visible circle:not(.xyp-hit) { fill: var(--text-main); }
+.xyp-arrow { fill: none; stroke: var(--color-warning); stroke-width: 2; pointer-events: none; }
+.xyp-ok { fill: var(--color-success); font-size: 13px; text-anchor: middle; }
 .pr-live-on { color: var(--color-danger); background: rgba(255,107,107,0.14); }
 
 /* Schriftauswahl (editor/fontPicker.ts) – Text-Dialog, Namen-Generator */

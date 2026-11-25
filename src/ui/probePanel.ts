@@ -29,6 +29,7 @@ import { machine, MACHINE_EVENT, canCommand } from "../machine";
 import { getHeightMap, setHeightMap, setHeightMapEnabled, heightMapEnabled, heightRange, HEIGHTMAP_CHANGED, HeightMap } from "../heightMap";
 import { probeSettings, saveProbe, ProbeSettings, LIFT_MAX, setProbeLog, step, settled, guard, startGuard, stopGuard,
   freshStatus, touchAt, touch, liftUp, preLift, sendG90Quiet } from "../probe";
+import { initXyProbe, xyProbeHtml } from "./xyProbePanel";
 import { toolChangeSettingsHtml, initToolChangeSettings, toolChangeBusy } from "./toolChangeDialog";
 
 const MAP_FEED = 1000;     // Fahrt zwischen den Punkten (mm/min)
@@ -48,6 +49,8 @@ export function probePanelHtml(): string {
         <div class="pr-live" id="pr-live" ${tip("pr.liveTip")}></div>
         ${num("pr-plate", "pr.plate", "0.01", "0")}
         <button id="pr-plate-go" class="btn-secondary" ${tip("pr.plateGoTip")}>⊥ ${T("pr.plateGo")}</button>
+
+        ${xyProbeHtml()}
 
         <div class="pr-sub">${T("pr.sensorTitle")}</div>
         <div class="rp-grid2">
@@ -140,6 +143,9 @@ export function initProbePanel(log: (s: string) => void) {
     }
   };
 
+
+  // ---- X/Y antasten ----
+  const xyRefresh = initXyProbe({ ready, run, busy: () => busy || toolChangeBusy(), log });
 
   // ---- Tasterplatte ----
   $("pr-plate-go")?.addEventListener("click", () => {
@@ -278,6 +284,7 @@ export function initProbePanel(log: (s: string) => void) {
 
   // Knöpfe nur, wenn es geht
   function refresh() {
+    xyRefresh();
     const ok = machine.connected && machine.protocol === "grbl" && !busy && !toolChangeBusy() && !machine.job.active;
     ["pr-plate-go", "pr-sensor-go"].forEach(id => { const b = $<HTMLButtonElement>(id); if (b) b.disabled = !ok; });
     const go = $<HTMLButtonElement>("pr-map-go");

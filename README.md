@@ -40,7 +40,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   face stock on both sides
 - **Rotary axis for milling** (along X or Y): engrave, contours, pockets, V-carve and drilling on round parts;
   3D models all around (4th axis simultaneous) or from several sides (indexing)
-- Tool change with tool length measurement, re-measure during long jobs, probing, height map, drilling cycles
+- Tool change with tool length measurement, re-measure during long jobs, probing in Z and X/Y (corner, edge, centre), height map, drilling cycles
   G81–G89 on GRBL, slower feed in tight curves
 
 **Laser**

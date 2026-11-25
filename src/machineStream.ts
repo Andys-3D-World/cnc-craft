@@ -10,6 +10,7 @@
  *   "cnc-job-progress" – Fortschritt (Simulation läuft live mit)
  *   "cnc-job-done"     – Job fertig/abgebrochen (Material-Platte wird markiert)
  */
+import { probeRunning } from "./probe";
 import { aAxisRefused } from "./rotary";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -248,6 +249,7 @@ export function initStreamEvents(appendToConsole: (t: string) => void) {
 export async function startStreaming(_isConnected: () => boolean, appendToConsole: (t: string) => void, resumeFrom = -1) {
   logFn = appendToConsole;
   if (streamState.isRunning) { appendToConsole(t("stream.alreadyRunning")); return; }
+  if (probeRunning()) { appendToConsole(t("pr.running")); return; }
   if (streamState.loadedLines.length === 0) { appendToConsole(t("stream.noGcode")); return; }
 
   // Fertiger Job wird von vorne gestartet

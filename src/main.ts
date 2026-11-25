@@ -49,6 +49,8 @@ import { setupUiInputs } from "./uiInputs";
 import { initTabsEngine } from "./tabsEngine";
 import { buildJob, designLabel, okToBuild, okToStart, splitOk } from "./jobFlow";
 import { stopPlanFor, holdSettled } from "./stopPlan";
+import { abortProbe, probeRunning } from "./probe";
+import { tcAbort, toolChangeBusy } from "./toolChange";
 import { initHoldJog, holdJogStop } from "./holdJog";
 import { macroRunning, cancelMacro } from "./macroRun";
 import { machine, realtime, RT, jobStop } from "./machine";
@@ -247,6 +249,9 @@ window.addEventListener("DOMContentLoaded", async () => {
       // kein Job, aber die Maschine fährt (Nullpunkt, Referenzfahrt, Makro …): auch das muss der Knopf anhalten
       if (macroRunning()) { await cancelMacro(appendToConsole); return; } // bremst und setzt selbst zurück
       if (!machine.connected || machine.protocol !== "grbl") return;
+      // Antasten: den ganzen Ablauf beenden, nicht nur die eine Fahrt (sonst ginge es mit dem nächsten Schritt weiter)
+      if (toolChangeBusy()) tcAbort(t("tc.why.user"), false);
+      else if (probeRunning()) abortProbe(true);
       const plan = stopPlanFor(machine.status.state);
       if (plan === "none") return;
       appendToConsole(t("m.stopNoJob"));

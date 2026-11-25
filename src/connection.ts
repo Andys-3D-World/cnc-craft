@@ -18,6 +18,7 @@ import { noteManualLine } from "./wcsSync";
 import { liveMachinePos } from "./render";
 import { handleJogClick } from "./jogSimulator";
 import { clampJog } from "./jogLimit";
+import { abortProbe, probeRunning } from "./probe";
 import { holdPress, holdRelease, holdJogStop } from "./holdJog";
 import { normalizePrefs, setLevelFeed, holdSupported, dirFromCmd, JogPrefs, SpeedLevel } from "./holdJogLogic";
 import { bedSizeMm } from "./editor/editorState";
@@ -554,11 +555,13 @@ export function initConnection(appendToConsole: (text: string) => void) {
     try { await fn(); } catch (e) { appendToConsole(`${t("log.error")} ${t("m.why." + String(e)) !== "m.why." + String(e) ? t("m.why." + String(e)) : String(e)}`); }
   };
   $("m-unlock")?.addEventListener("click", guard(() => releaseMachine()));
-  $("m-home")?.addEventListener("click", guard(() => send("$H")));
+  // während eines Antast-Ablaufs keine Fahrten und kein Nullpunkt dazwischen
+  const noProbe = (fn: () => Promise<any>) => guard(async () => { if (probeRunning()) { appendToConsole(t("pr.running")); return; } return fn(); });
+  $("m-home")?.addEventListener("click", noProbe(() => send("$H")));
   $("m-reset")?.addEventListener("click", guard(async () => { appendToConsole("> Ctrl-X (Reset)"); await realtime(RT.reset); }));
-  $("m-zero-xy")?.addEventListener("click", guard(() => send(zeroCommand("XY"))));
-  $("m-zero-z")?.addEventListener("click", guard(() => send(zeroCommand("Z"))));
-  $("m-goto-zero")?.addEventListener("click", guard(async () => {
+  $("m-zero-xy")?.addEventListener("click", noProbe(() => send(zeroCommand("XY"))));
+  $("m-zero-z")?.addEventListener("click", noProbe(() => send(zeroCommand("Z"))));
+  $("m-goto-zero")?.addEventListener("click", noProbe(async () => {
     // erst Z hoch (falls Z unter 5 mm steht), dann XY auf 0
     if (machine.status.wpos[2] < 5) await send("G21 G90 G0 Z5");
     await send("G21 G90 G0 X0 Y0");
@@ -767,6 +770,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
         return;
       }
       if (!canCommand()) { appendToConsole(t("m.why.job running")); return; }
+      if (probeRunning()) { appendToConsole(t("pr.running")); return; }
       const st = machine.status.state;
       if (st === "Alarm") { appendToConsole(t("m.unlockFirst")); return; }
       if (st !== "Idle" && st !== "Jog") { appendToConsole(t("m.jogNotIdle", { s: st })); return; }
@@ -787,6 +791,7 @@ export function initConnection(appendToConsole: (text: string) => void) {
   // Mitte: Joggen sofort abbrechen
   $("jog-home")?.addEventListener("click", async () => {
     holdJogStop();
+    if (probeRunning()) abortProbe(true); // der ganze Antast-Ablauf, nicht nur diese Fahrt
     if (machine.connected) { await realtime(RT.jogCancel).catch(() => {}); appendToConsole(t("m.jogCancelled")); }
   });
 

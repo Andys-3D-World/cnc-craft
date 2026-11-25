@@ -40,7 +40,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Rohteil beidseitig planen
 - **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;
   3D-Modelle rundherum (4. Achse simultan) oder von mehreren Seiten (Indexieren)
-- Werkzeugwechsel mit Längenmessung, Nachmessen bei langen Jobs, Antasten, Höhenkarte, Bohrzyklen G81–G89 auf GRBL,
+- Werkzeugwechsel mit Längenmessung, Nachmessen bei langen Jobs, Antasten in Z und X/Y (Ecke, Kante, Mitte), Höhenkarte, Bohrzyklen G81–G89 auf GRBL,
   langsamer in engen Kurven
 
 **Laser**

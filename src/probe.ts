@@ -14,7 +14,8 @@
  * Abbruch von außen (abortProbe): Jog-Abbruch, danach schickt die Routine nichts mehr (step() gibt false zurück).
  */
 import { t } from "./i18n/i18n";
-import { machine, MACHINE_EVENT, sendAndWait, errorText, realtime, RT } from "./machine";
+import { machine, MACHINE_EVENT, sendAndWait, errorText, realtime, RT, addBeforeSwitch } from "./machine";
+import type { XYIO } from "./xyProbe";
 
 const KEY = "cnc_craft_probe";
 export const LIFT_MAX = 30;
@@ -78,9 +79,20 @@ let aborted = false;
 /** Laufende Antast-Fahrt sofort beenden (Jog-Abbruch); danach schickt die Routine keine Zeile mehr */
 export function abortProbe(sendCancel = true) {
   aborted = true;
-  if (sendCancel && machine.connected) realtime(RT.jogCancel).catch(() => undefined);
+  if (!sendCancel || !machine.connected) return;
+  realtime(RT.jogCancel).catch(() => undefined);
+  // eine Fahrt, die gerade unterwegs zum Board war, kommt erst NACH dem Abbruch an: fährt es dann noch, noch einmal abbrechen
+  let n = 0;
+  clearInterval(cancelTimer);
+  cancelTimer = window.setInterval(() => {
+    if (++n > 5 || !aborted) { clearInterval(cancelTimer); return; }
+    if (machine.connected && machine.status.state.startsWith("Jog")) realtime(RT.jogCancel).catch(() => undefined);
+  }, 200);
 }
+let cancelTimer = 0;
 export const probeAborted = () => aborted;
+// andere Maschine ausgewählt: die Fahrten gingen sonst dorthin
+addBeforeSwitch(async () => { if (guard.on) abortProbe(true); });
 
 /** Warten, bis die Maschine steht (Idle) und ein frischer Statusbericht da ist */
 export async function settled(timeoutMs = 60000): Promise<boolean> {
@@ -110,7 +122,7 @@ const liftMm = () => Math.min(LIFT_MAX, Math.max(0, s.lift));
 // ---- Wächter ----
 /** probing = gerade läuft die Suche nach unten (dann darf Z nicht steigen, Kontakt beendet die Fahrt selbst) */
 /** away = gerade weg vom Kontakt hochfahren (Taster darf da noch geschlossen sein) */
-export const guard = { on: false, probing: false, away: false, z0: 0, hits: 0, tripped: "" as "" | "noStop" | "wrongDir", timer: 0 };
+export const guard = { on: false, probing: false, away: false, /** X/Y antasten (xyProbe.ts): reagiert selbst auf jeden Kontakt */ own: false, z0: 0, hits: 0, tripped: "" as "" | "noStop" | "wrongDir", timer: 0 };
 const moving = () => ["Run", "Jog", "Home"].includes(machine.status.state);
 const trip = async (why: "noStop" | "wrongDir") => {
   if (guard.tripped) return;
@@ -126,7 +138,7 @@ const onReport = () => {
   if (guard.away && !contact) guard.away = false;
   // Kontakt, aber die Maschine fährt weiter – erst nach 2 Berichten eingreifen (beim Antasten hält GRBL selbst an,
   // ein einzelnes Störsignal soll keine Fahrt abbrechen)
-  if (contact && moving() && !guard.away && !guard.probing) { if (++guard.hits >= 2) trip("noStop"); }
+  if (contact && moving() && !guard.away && !guard.probing && !guard.own) { if (++guard.hits >= 2) trip("noStop"); }
   else guard.hits = 0;
   if (guard.probing && moving() && machine.status.mpos[2] > guard.z0 + 0.5) trip("wrongDir");
 };
@@ -138,7 +150,7 @@ export const startGuard = () => {
   // öfter nach dem Status fragen, solange der Ablauf läuft (schnellere Reaktion des Wächters)
   guard.timer = window.setInterval(() => { if (guard.on && machine.connected) realtime(RT.status).catch(() => undefined); }, 100);
 };
-export const stopGuard = () => { guard.on = false; guard.probing = false; clearInterval(guard.timer); };
+export const stopGuard = () => { guard.on = false; guard.probing = false; guard.own = false; clearInterval(guard.timer); };
 /** Läuft gerade ein Antast-Ablauf? (Gamepad: dann nicht dazwischenfahren) */
 export const probeRunning = () => guard.on;
 
@@ -261,6 +273,39 @@ export const preLift = async (): Promise<number | null> => {
   if (!await step(`G91 G0 Z${up.toFixed(3)}`)) return null;
   if (!await step("G90")) return null;
   return await settled() ? up : null;
+};
+
+/** Frischer Statusbericht oder false (drei Anfragen ohne Antwort = Verbindung weg) */
+async function gotStatus(): Promise<boolean> {
+  for (let k = 0; k < 3; k++) {
+    let got = false;
+    const on = (e: Event) => { if ((e as CustomEvent).detail?.type === "status") got = true; };
+    window.addEventListener(MACHINE_EVENT, on);
+    await freshStatus();
+    window.removeEventListener(MACHINE_EVENT, on);
+    if (got) return true;
+    if (aborted || !machine.connected) return false;
+  }
+  return false;
+}
+/** Anschluss an die Maschine für X/Y antasten (xyProbe.ts) */
+export const xyIO: XYIO = {
+  jog: async (dx, dy, feed) => {
+    const axes = [["X", dx], ["Y", dy]].filter(([, v]) => Math.abs(v as number) > 5e-4).map(([a, v]) => `${a}${(v as number).toFixed(3)}`).join(" ");
+    if (aborted) return false;
+    if (!axes) return true;
+    const a = await sendAndWait(`$J=G91 G21 ${axes} F${Math.round(feed)}`, 10000, true);
+    if (!a.ok && !aborted) log(t("pr.failed", { cmd: `$J ${axes}`, e: a.code && a.code > 0 ? errorText(a.code) : String(a.code ?? "") }));
+    return a.ok && !aborted;
+  },
+  status: async () => {
+    if (!machine.connected || !await gotStatus()) return null;
+    const s = machine.status;
+    return { x: s.mpos[0], y: s.mpos[1], contact: (s.pins || "").includes("P"), state: s.state };
+  },
+  cancel: () => realtime(RT.jogCancel),
+  aborted: () => aborted || !!guard.tripped,
+  now: () => performance.now(),
 };
 
 /** G90 ohne Konsolen-Zeile (nach jedem Ablauf: nie im relativen Modus stehen lassen) */
