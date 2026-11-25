@@ -36,6 +36,7 @@ Open-Source-Programm für **Laser, CNC-Fräse und Plasma** – Design, CAM und M
   Bearbeitungen pro Form
 - Zweiseitig fräsen: Vorderseite, Werkstück auf Passstiften wenden, Rückseite (2,5D)
 - G-Code-Dateien für GRBL, LinuxCNC, Mach3 und Mach4, in Millimeter oder Zoll
+- Platinen aus Gerber- und Bohrdateien: Isolationsbahnen, Löcher, Kontur
 - 3D-Fräsen aus 3D-Modellen und Reliefs aus Bildern oder Text (Schruppen und Schlichten), automatisch in Ausschnitte, Löcher und Taschen zerlegen,
   Rohteil beidseitig planen
 - **Drehachse beim Fräsen** (entlang X oder Y): Gravieren, Konturen, Taschen, V-Carve und Bohren auf runden Teilen;

@@ -25,6 +25,8 @@ import { createImageShape } from "../raster/imageShape";
 import { openEngraveDialog } from "../raster/engraveDialog";
 import { isLaser, isPlasma } from "../machineMode";
 import { openReliefFromImage } from "../ui/reliefDialog";
+import { openPcb, PCB_EXTENSIONS } from "../ui/pcbDialog";
+import { surelyExcellon } from "../pcb/excellon";
 import { openPhotoVcarve } from "../ui/photoVcarveDialog";
 import { openStlFromBytes } from "../stlInteraction";
 import { traceText } from "../editor/textTool";
@@ -50,6 +52,7 @@ export const IMPORT_EXTENSIONS = {
   model: ["stl", "3mf", "obj", "step", "stp"],
   image: ["png", "jpg", "jpeg", "bmp", "gif", "webp"],
   gcode: ["nc", "gcode", "gc", "tap", "ngc", "cnc"],
+  pcb: PCB_EXTENSIONS,
   project: ["cncc"]
 };
 /** „Zeichnung neu einlesen“ geht mit diesen Formaten (nicht mit nachgezeichneten Bildern und G-Code) */
@@ -93,6 +96,7 @@ export async function importWithDialog() {
       { name: t("imp.fImage"), extensions: IMPORT_EXTENSIONS.image },
       { name: t("imp.fModel"), extensions: IMPORT_EXTENSIONS.model },
       { name: t("rp.gcode"), extensions: IMPORT_EXTENSIONS.gcode },
+      { name: t("pcb.filter"), extensions: [...PCB_EXTENSIONS, "txt", ...PCB_EXTENSIONS.map(e => e.toUpperCase()), "TXT"] },
       { name: t("imp.fProject"), extensions: IMPORT_EXTENSIONS.project }
     ]
   });
@@ -126,6 +130,8 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
     }
     let res: ImportResult | null = null;
     if (IMPORT_EXTENSIONS.vector.includes(ext)) res = await parseVector(ext, bytes);
+    // manche Platinen-Programme nennen ihre Bohrdatei .nc oder .tap
+    else if (IMPORT_EXTENSIONS.gcode.includes(ext) && surelyExcellon(decodeText(bytes.subarray(0, 4000))) && !isLaser() && !isPlasma()) { await openPcb(name, bytes, log, ctx.redraw); return; }
     else if (IMPORT_EXTENSIONS.gcode.includes(ext)) res = parseGcode(decodeText(bytes));
     else if (IMPORT_EXTENSIONS.image.includes(ext)) {
       // Bild: gravieren (Bild-Form) oder nachzeichnen (Konturen)
@@ -137,6 +143,11 @@ export async function importBytes(name: string, bytes: Uint8Array, fullPath?: st
       res = await openImageTraceDialog(name, bytes);
     }
     else if (IMPORT_EXTENSIONS.model.includes(ext)) { await openStlFromBytes(name, bytes, ctx.state, ctx.redraw, log); return; }
+    else if (IMPORT_EXTENSIONS.pcb.includes(ext) || ext === "txt") {
+      if (isLaser() || isPlasma()) { log(t("pcb.onlyMill")); return; }
+      await openPcb(name, bytes, log, ctx.redraw);
+      return;
+    }
     else if (ext === "cncc") { await loadProjectText(decodeText(bytes), name, fullPath); return; }
     else if (ext === "dwg") throw new Error(t("imp.errDwg"));
     else if (ext === "eps") throw new Error(t("imp.errEps"));

@@ -36,6 +36,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   (internal/external), several operations per shape
 - Two-sided milling: front, turn the workpiece over on dowel pins, back (2.5D)
 - G-code files for GRBL, LinuxCNC, Mach3 and Mach4, in millimetres or inches
+- Circuit boards from Gerber and drill files: isolation paths, holes, outline
 - 3D milling from 3D models and reliefs from images or text (roughing and finishing), automatic split into cut-outs, holes and pockets,
   face stock on both sides
 - **Rotary axis for milling** (along X or Y): engrave, contours, pockets, V-carve and drilling on round parts;
