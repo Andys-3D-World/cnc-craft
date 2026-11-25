@@ -414,10 +414,10 @@ export function latheGcode(plan: LathePlan, job: LatheJob, o: LatheOut, c: Lathe
       out.push("M0 " + cm(c("tool", { n: run.tool.num, name: run.tool.name })));
       on = 0;
     }
-    out.push(cm(c("op." + run.op.kind, { n: run.tool.num, name: run.tool.name })));
     if (o.spindle === "hand") { if (on !== run.rpm) out.push("M0 " + cm(c("hand", { rpm: run.rpm }))); on = run.rpm; }
     // nach jeder Pause kann die Maschine von Hand verfahren worden sein: immer erst vor das Teil, dann nach außen
-    out.push(`G0 ${Z(safeZ)} ${cm(c("safe"))}`, `G0 ${X(safeR)}`);
+    // der Kommentar nennt Bearbeitung und Werkzeug (daran erkennt auch die Simulation, welcher Meißel dran ist)
+    out.push(`G0 ${Z(safeZ)} ${cm(c("op." + run.op.kind, { n: run.tool.num, name: run.tool.name }))}`, `G0 ${X(safeR)}`);
     let rpm = on, feed = -1, lz = safeZ, lr = safeR;
     run.moves.forEach((m, i) => {
       const want = run.rpms[i];

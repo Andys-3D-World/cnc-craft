@@ -9,6 +9,8 @@ import { state } from "../main";
 import { isLathe } from "../machineMode";
 import { loadGcodeFromText } from "../machineStream";
 import { gcodeFromPlan, issueTexts, latheSettings, latheTools, planFromDesign, saveLathe, setLatheSettings, setLatheTools } from "../lathe/latheJob";
+import { LatheView, latheScene } from "../lathe/latheView";
+import { planMoves } from "../lathe/latheSim";
 import { LATHE_MATERIALS, powerW, refDz, rpmFor, shapeOf, sweep, type LatheOp, type LathePlan, type LatheTool } from "../lathe/turn";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -43,13 +45,16 @@ export function openLatheDialog(log: (s: string) => void, onClose?: () => void) 
           ${sel("dir", "lathe.dir", s.out.dir, [["M3", t("lathe.dir.M3")], ["M4", t("lathe.dir.M4")]], "lathe.dirTip")}
           <div class="c3d-sec">${esc(t("lathe.machine"))}</div>
           ${sel("xMode", "lathe.xMode", s.out.xMode, [["radius", t("lathe.x.radius")], ["dia", t("lathe.x.dia")], ["g8", t("lathe.x.g8")], ["g7", t("lathe.x.g7")]], "lathe.xModeTip")}
+          ${sel("post", "lathe.post", s.post, [["front", t("lathe.post.front")], ["rear", t("lathe.post.rear")]], "lathe.postTip")}
           ${sel("xSign", "lathe.xSign", String(s.out.xSign), [["1", t("lathe.xSign.out")], ["-1", t("lathe.xSign.in")]], "lathe.xSignTip")}
           ${num("safeX", "lathe.safeX", j.safeX)}${num("safeZ", "lathe.safeZ", j.safeZ)}${num("clear", "lathe.clear", j.clear, "mm", "0.1")}
           <div class="c3d-sec">${esc(t("lathe.allow"))}</div>
           ${num("allowX", "lathe.allowX", j.allowX, "mm", "0.05")}${num("allowZ", "lathe.allowZ", j.allowZ, "mm", "0.05")}
         </div>
         <div style="min-width:0;">
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:0.78rem;"><span class="sim-seg"><button type="button" class="sim-btn" id="lt-2d">2D</button><button type="button" class="sim-btn" id="lt-3d">3D</button></span><label style="display:flex;gap:5px;align-items:center;cursor:pointer;" id="lt-cutrow"><input type="checkbox" id="lt-cut" style="width:auto;"> ${esc(t("sim.latheCut"))}</label></div>
           <canvas id="lt-cv" width="1100" height="430" style="width:100%;border-radius:6px;display:block;background:#16161c;"></canvas>
+          <canvas id="lt-gl" style="width:100%;aspect-ratio:1100/430;border-radius:6px;display:none;cursor:grab;"></canvas>
           <div style="display:flex;gap:8px;align-items:center;margin-top:6px;"><button id="lt-play" class="btn-secondary btn-compact" aria-label="${esc(t("lathe.play"))}">▶</button><input id="lt-pos" type="range" min="0" max="1" step="1" style="flex:1;min-width:0;"><small id="lt-state" style="width:210px;text-align:right;color:var(--text-muted);"></small></div>
           <div class="dlg-hint" id="lt-msg" style="white-space:pre-line;"></div>
           <div class="c3d-sec">${esc(t("lathe.ops"))}</div>
@@ -95,7 +100,23 @@ export function openLatheDialog(log: (s: string) => void, onClose?: () => void) 
     return c;
   };
 
+  // ---------------- 3D ----------------
+  const KEY3D = "cnc_craft_lathe_3d";
+  let v3: LatheView | null = null, on3d = false, scene: LathePlan | null = null;
+  try { on3d = localStorage.getItem(KEY3D) === "1"; } catch { /* egal */ }
+  const show3d = () => {
+    $<HTMLElement>("2d").classList.toggle("active", !on3d); $<HTMLElement>("3d").classList.toggle("active", on3d);
+    $<HTMLElement>("cv").style.display = on3d ? "none" : "block"; $<HTMLElement>("gl").style.display = on3d ? "block" : "none"; $<HTMLElement>("cutrow").style.display = on3d ? "flex" : "none";
+    if (on3d && !v3) { v3 = new LatheView($<HTMLCanvasElement>("gl")); if (!v3.ok) { on3d = false; log(t("sim.noGlMaterial")); show3d(); } }
+  };
+  const draw3d = () => {
+    if (!v3) return;
+    if (scene !== plan) { const keepView = scene !== null; scene = plan; v3.setScene(latheScene(s, planMoves(plan, s)), keepView); }
+    // gleiche Zählung wie der Regler: nach pos Fahrten
+    v3.setProgress(pos >= total() ? -1 : Math.max(0, pos - 1), pos >= total() ? 0 : pos ? 1 : 0);
+  };
   const draw = () => {
+    if (on3d) draw3d();
     const cv = $<HTMLCanvasElement>("cv"), ctx = cv.getContext("2d")!, R = j.stockD / 2, zL = -j.stickOut - 14, zR = j.faceAllow + j.safeZ + 4;
     ctx.clearRect(0, 0, cv.width, cv.height);
     const k = Math.min((cv.width - 30) / (zR - zL), (cv.height - 20) / (2 * (R + j.safeX + 4))), X = (z: number) => 15 + (z - zL) * k + Math.max(0, cv.width - 30 - (zR - zL) * k) / 2, Y = (r: number) => cv.height / 2 - r * k;
@@ -241,8 +262,12 @@ export function openLatheDialog(log: (s: string) => void, onClose?: () => void) 
     try { const p = await save({ title: t("rp.saveGcode"), defaultPath: "turning.gcode", filters: [{ name: t("stream.dlgFilter"), extensions: ["gcode", "nc", "ngc", "tap"] }] }); if (p) { await writeFile(p, new TextEncoder().encode(text)); log(t("gcw.saved", { p })); } }
     catch (e) { log(t("gcw.saveError", { e: String(e) })); }
   };
-  const close = () => { stop(); clearTimeout(timer); setLatheSettings(latheSettings); ov.remove(); window.dispatchEvent(new Event("cnc-lathe-changed")); onClose?.(); };
+  const close = () => { stop(); clearTimeout(timer); v3?.destroy(); setLatheSettings(latheSettings); ov.remove(); window.dispatchEvent(new Event("cnc-lathe-changed")); onClose?.(); };
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   $<HTMLButtonElement>("close").onclick = close;
+  for (const [id, on] of [["2d", false], ["3d", true]] as const) $<HTMLButtonElement>(id).onclick = () => { on3d = on; try { localStorage.setItem(KEY3D, on ? "1" : "0"); } catch { /* egal */ } show3d(); draw(); };
+  $("cut").addEventListener("change", () => { if (v3) { v3.cut = $("cut").checked; v3.update(true); } });
+  pick("post", v => { s.post = v === "rear" ? "rear" : "front"; });
+  show3d();
   drawOps(); drawTools(); refresh();
 }

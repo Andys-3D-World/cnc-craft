@@ -16,6 +16,8 @@ export interface Mesh {
   data?: Float32Array;
   index?: Uint32Array;
   offset?: [number, number, number]; // Verschiebung beim Zeichnen (z. B. Teile herausheben)
+  lines?: boolean;        // Linien statt Dreiecke (ohne Licht)
+  ghost?: boolean;        // zählt nicht für Bildausschnitt und Mitte
 }
 
 type M4 = Float32Array;
@@ -40,22 +42,24 @@ function persp(fov: number, asp: number, near: number, far: number): M4 {
 
 const VS = `
 attribute vec3 aPos; attribute vec3 aNrm; attribute vec2 aUv;
-uniform mat4 uMvp; uniform vec3 uOff;
+uniform mat4 uMvp; uniform vec3 uOff; uniform vec2 uRot;
 varying vec3 vN; varying vec2 vUv;
-void main() { vN = aNrm; vUv = aUv; gl_Position = uMvp * vec4(aPos + uOff, 1.0); }`;
+vec3 turn(vec3 p) { return vec3(p.x, p.y * uRot.x - p.z * uRot.y, p.y * uRot.y + p.z * uRot.x); }
+void main() { vN = turn(aNrm); vUv = aUv; gl_Position = uMvp * vec4(turn(aPos) + uOff, 1.0); }`;
 const FS = `
 precision mediump float;
 varying vec3 vN; varying vec2 vUv;
-uniform sampler2D uTex; uniform bool uUseTex; uniform vec3 uColor; uniform vec3 uLight;
+uniform sampler2D uTex; uniform bool uUseTex; uniform bool uFlat; uniform vec3 uColor; uniform vec3 uLight;
 void main() {
   vec3 base = uUseTex ? texture2D(uTex, vUv).rgb : uColor;
+  if (uFlat) { gl_FragColor = vec4(base, 1.0); return; }
   vec3 n = normalize(vN);
   float d = abs(dot(n, uLight));                 // beidseitig beleuchtet
   float rim = 0.12 * abs(dot(n, vec3(-0.4, 0.6, 0.2)));
   gl_FragColor = vec4(base * (0.42 + 0.62 * d + rim), 1.0);
 }`;
 
-interface GpuMesh { buf: WebGLBuffer; ibuf: WebGLBuffer | null; count: number; tex: WebGLTexture | null; color: [number, number, number]; off: [number, number, number] }
+interface GpuMesh { buf: WebGLBuffer; ibuf: WebGLBuffer | null; count: number; tex: WebGLTexture | null; color: [number, number, number]; off: [number, number, number]; rot: number; lines: boolean }
 
 export class Viewer3D {
   private gl: WebGLRenderingContext;
@@ -108,16 +112,17 @@ export class Viewer3D {
     for (const m of list) {
       const n = m.data ? m.data.length / 8 : m.pos.length / 3;
       if (!n) continue;
-      const o = m.offset || [0, 0, 0];
+      const o = m.offset || [0, 0, 0], bx = m.ghost ? null : 1;
       const data = m.data ?? new Float32Array(n * 8);
-      if (m.data) {
+      if (m.data && bx) {
         for (let i = 0; i < m.data.length; i += 8) {
           x0 = Math.min(x0, m.data[i] + o[0]); x1 = Math.max(x1, m.data[i] + o[0]);
           y0 = Math.min(y0, m.data[i + 1] + o[1]); y1 = Math.max(y1, m.data[i + 1] + o[1]);
           z0 = Math.min(z0, m.data[i + 2] + o[2]); z1 = Math.max(z1, m.data[i + 2] + o[2]);
         }
-      } else for (let i = 0; i < n; i++) {
+      } else if (!m.data) for (let i = 0; i < n; i++) {
         data.set([m.pos[i * 3], m.pos[i * 3 + 1], m.pos[i * 3 + 2], m.nrm[i * 3], m.nrm[i * 3 + 1], m.nrm[i * 3 + 2], m.uv?.[i * 2] ?? 0, m.uv?.[i * 2 + 1] ?? 0], i * 8);
+        if (!bx) continue;
         x0 = Math.min(x0, m.pos[i * 3] + o[0]); x1 = Math.max(x1, m.pos[i * 3] + o[0]);
         y0 = Math.min(y0, m.pos[i * 3 + 1] + o[1]); y1 = Math.max(y1, m.pos[i * 3 + 1] + o[1]);
         z0 = Math.min(z0, m.pos[i * 3 + 2] + o[2]); z1 = Math.max(z1, m.pos[i * 3 + 2] + o[2]);
@@ -145,7 +150,7 @@ export class Viewer3D {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibuf);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.index, gl.STATIC_DRAW);
       }
-      this.meshes.push({ buf, ibuf, count: m.index ? m.index.length : n, tex, color: m.color || [0.7, 0.7, 0.7], off: [o[0], o[1], o[2]] });
+      this.meshes.push({ buf, ibuf, count: m.index ? m.index.length : n, tex, color: m.color || [0.7, 0.7, 0.7], off: [o[0], o[1], o[2]], rot: 0, lines: !!m.lines });
     }
     if (!keepView && isFinite(x0)) {
       this.center = [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2];
@@ -153,6 +158,29 @@ export class Viewer3D {
       this.reset();
     }
   }
+
+  /** Netz an der Stelle i verschieben oder um die x-Achse drehen */
+  place(i: number, off: [number, number, number] | null, rot?: number) {
+    const m = this.meshes[i];
+    if (!m) return;
+    if (off) m.off = off;
+    if (rot !== undefined) m.rot = rot;
+    this.version++;
+  }
+  /** Netz an der Stelle i durch neue Eckpunkte ersetzen (Farbe und Lage bleiben) */
+  replace(i: number, data: Float32Array, index: Uint32Array) {
+    const m = this.meshes[i], gl = this.gl;
+    if (!m || !this.ok) return;
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.buf);
+    gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+    m.ibuf ??= gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ibuf);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, index, gl.DYNAMIC_DRAW);
+    m.count = index.length;
+    this.version++;
+  }
+  /** Bildausschnitt fest vorgeben */
+  frame(center: [number, number, number], radius: number) { this.center = center; this.radius = Math.max(10, radius); }
 
   reset() { this.yaw = -0.5; this.pitch = -1.0; this.dist = this.radius * 2.6; this.panX = 0; this.panY = 0; }
 
@@ -181,13 +209,16 @@ export class Viewer3D {
       if (aNrm >= 0) { gl.enableVertexAttribArray(aNrm); gl.vertexAttribPointer(aNrm, 3, gl.FLOAT, false, 32, 12); }
       if (aUv >= 0) { gl.enableVertexAttribArray(aUv); gl.vertexAttribPointer(aUv, 2, gl.FLOAT, false, 32, 24); }
       gl.uniform3f(gl.getUniformLocation(P, "uOff"), m.off[0], m.off[1], m.off[2]);
+      if (!m.count) continue;
+      gl.uniform2f(gl.getUniformLocation(P, "uRot"), Math.cos(m.rot), Math.sin(m.rot));
+      gl.uniform1i(gl.getUniformLocation(P, "uFlat"), m.lines ? 1 : 0);
       gl.uniform1i(gl.getUniformLocation(P, "uUseTex"), m.tex ? 1 : 0);
       gl.uniform3f(gl.getUniformLocation(P, "uColor"), m.color[0], m.color[1], m.color[2]);
       if (m.tex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, m.tex); gl.uniform1i(gl.getUniformLocation(P, "uTex"), 0); }
       if (m.ibuf) {
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.ibuf);
-        gl.drawElements(gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
-      } else gl.drawArrays(gl.TRIANGLES, 0, m.count);
+        gl.drawElements(m.lines ? gl.LINES : gl.TRIANGLES, m.count, gl.UNSIGNED_INT, 0);
+      } else gl.drawArrays(m.lines ? gl.LINES : gl.TRIANGLES, 0, m.count);
     }
   }
 

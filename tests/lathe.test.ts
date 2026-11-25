@@ -143,7 +143,7 @@ test("every rapid of the finished program stays out of the remaining stock (repl
   const gc = latheGcode(p, job, OUT, TXT).split("\n"), g = makeGrid(-70, 20, 0.02), S = new Float64Array(g.n).map((_, i) => (g.z0 + i * g.h <= 1 ? 15 : -1e9));
   let z = 100, r = 100, run = -1, n = 0;
   for (const l of gc) {
-    if (/^\(op\./.test(l)) run++;
+    if (/\(op\./.test(l)) run++;
     const m = /^G([01]) /.exec(l); if (!m || run < 0) continue;
     const tl = p.runs[run].tool, dz = refDz(tl), sh = shapeOf(tl), nz = /Z(-?[\d.]+)/.exec(l), nr = /X(-?[\d.]+)/.exec(l);
     const tz = nz ? +nz[1] : z, tr = nr ? +nr[1] : r;

@@ -14,13 +14,15 @@
  * nebeneinander, Höhe = senkrecht zur Fläche), die Enden als Scheiben.
  * Wie an der Maschine dreht sich das Teil: die Stelle, an der gerade gearbeitet wird, liegt oben, das Werkzeug
  * steht senkrecht darüber.
+ * Drumherum (abschaltbar, machineMesh.ts): Bett, Portal, Spannpratzen, Futter und Reitstock oder Rollen der Drehachse.
  * Gleiche Kamera wie simGl.ts (Drehung, Neigung, Maßstab), dazu ein Tiefenpuffer.
  */
 import { PLASMA_CUT, type LiveCarve, type ToolHolder } from "./simCarve";
 import { materialTile, isWoody, type Material } from "../materialView";
 import { profile } from "../view3d/carveSim";
 import { CHUNK, ChunkGrid } from "./carveChunks.ts";
-import { faces, perimeter } from "../rotaryStock";
+import { cornerRadius, faces, perimeter } from "../rotaryStock";
+import { bedMesh, carriageMesh, clampMesh, gantryMesh, rollers, rotaryChuck, rotaryFixed } from "./machineMesh";
 import type { ToolGeom } from "../toolGraphics";
 
 type GL = WebGL2RenderingContext;
@@ -205,7 +207,10 @@ export interface MaterialView {
   look: Material;
   /** Werkzeug zeigen (Spitze / Fokus bei x, y, z) – null = keins; on = Laser/Plasma an */
   tool: { x: number; y: number; z: number; kind: "mill" | "laser" | "plasma"; geom: ToolGeom | null; holder: ToolHolder; on: boolean } | null;
+  /** Maschine drumherum zeigen – null = nur Material und Werkzeug */
+  env?: MachineEnv | null;
 }
+export interface MachineEnv { bedW: number; bedH: number; zones: { pts: { x: number; y: number }[]; height: number }[]; rollerDia: number | null }
 
 const CUTTER: [number, number, number] = [0.86, 0.72, 0.4];
 const SHANK: [number, number, number] = [0.78, 0.8, 0.84];
@@ -290,6 +295,10 @@ export class MaterialRenderer {
   private meshBuf: WebGLBuffer | null = null;
   private meshKey: unknown = null;
   private meshCounts = { solid: 0, ghost: 0, beam: 0 };
+  private envVao: WebGLVertexArrayObject | null = null;
+  private envBuf: WebGLBuffer | null = null;
+  private envKey = "";
+  private envParts: Record<string, [number, number]> = {};
   private tex: WebGLTexture | null = null;
   private texFor: LiveCarve | null = null;
   private chunks: ChunkGrid | null = null;
@@ -432,6 +441,47 @@ export class MaterialRenderer {
     g.uniform1f(L.u_dscale, 1 / ext);
   }
 
+  /** Maschine drumherum: einmal bauen, danach nur verschieben */
+  private buildEnv(g: GL, c: LiveCarve, e: MachineEnv, head: number) {
+    const key = JSON.stringify([c.kind, c.T, c.x0, c.nx, c.cell, c.y0, c.ny, !!c.cyl, c.cyl?.R, c.cyl?.alongY, c.cyl?.stock, e, Math.round(head)]);
+    if (key === this.envKey && this.envBuf) return;
+    const parts: Record<string, Float32Array> = {};
+    if (c.cyl) {
+      const R = c.cyl.R, C = cornerRadius(c.cyl.stock), x0 = c.x0, x1 = c.x0 + c.nx * c.cell;
+      if (e.rollerDia) parts.fixed = rollers(x0, x1, R, e.rollerDia);
+      else { parts.chuck = rotaryChuck(x0, C); parts.fixed = rotaryFixed(x0, x1, C); }
+    } else {
+      parts.bed = bedMesh(c.kind, e.bedW, e.bedH, c.T);
+      parts.clamps = clampMesh(e.zones, c.T);
+      parts.gantry = gantryMesh(c.kind, e.bedW, c.T, head);
+      parts.carriage = carriageMesh(c.kind, head);
+    }
+    let n = 0;
+    for (const p of Object.values(parts)) n += p.length;
+    const all = new Float32Array(n);
+    this.envParts = {};
+    n = 0;
+    for (const [k, p] of Object.entries(parts)) { all.set(p, n); this.envParts[k] = [n / 10, p.length / 10]; n += p.length; }
+    this.envBuf ??= g.createBuffer();
+    this.envVao ??= g.createVertexArray();
+    g.bindVertexArray(this.envVao);
+    g.bindBuffer(g.ARRAY_BUFFER, this.envBuf);
+    g.bufferData(g.ARRAY_BUFFER, all, g.STATIC_DRAW);
+    for (const [name, size, off] of [["a_p", 3, 0], ["a_n", 3, 12], ["a_c", 4, 24]] as const) {
+      const l = g.getAttribLocation(this.meshProg!, name);
+      g.enableVertexAttribArray(l);
+      g.vertexAttribPointer(l, size, g.FLOAT, false, 40, off);
+    }
+    this.envKey = key;
+  }
+  private drawEnv(g: GL, name: string, at: [number, number, number], turn: [number, number, number] = [1, 0, 0]) {
+    const p = this.envParts[name];
+    if (!p || !p[1]) return;
+    g.uniform3f(this.mloc.u_at, ...at);
+    g.uniform3f(this.mloc.u_turn, ...turn);
+    g.drawArrays(g.TRIANGLES, p[0], p[1]);
+  }
+
   /** Material (und Fräser) zeichnen; Ergebnis-Canvas mit durchsichtigem Hintergrund oder null = WebGL geht nicht */
   render(c: LiveCarve, v: MaterialView): HTMLCanvasElement | null {
     const g = this.init();
@@ -513,6 +563,21 @@ export class MaterialRenderer {
         g.drawArraysInstanced(g.TRIANGLES, 0, 6, c.cyl ? c.ny : (s <= 2 ? c.nx : c.ny) - 1);
       }
 
+      // ---- Maschine drumherum (fester Teil) ----
+      const env = v.env ?? null, head = v.tool && v.tool.kind === "mill" ? v.tool.holder.stickout + v.tool.holder.holderH : c.kind === "plasma" ? 60 : 40;
+      if (env) {
+        this.buildEnv(g, c, env, head);
+        g.useProgram(this.meshProg);
+        g.bindVertexArray(this.envVao);
+        this.camera(g, this.mloc, v, c);
+        g.uniform2f(this.mloc.u_zmap, 0, 1);
+        if (c.cyl) {
+          const ax: [number, number, number] = [0, 0, -c.cyl.R], y = c.cyl.alongY ? 1 : 0;
+          this.drawEnv(g, "fixed", ax, [1, 0, y]);
+          this.drawEnv(g, "chuck", ax, [Math.cos(spin), Math.sin(spin), y]);
+        } else this.drawEnv(g, "bed", [0, 0, 0]);
+      }
+
       // ---- Fräser ----
       if (tool) {
         const tk = tool.kind;
@@ -562,6 +627,20 @@ export class MaterialRenderer {
         g.depthMask(true);
         g.disable(g.BLEND);
       }
+      // halb durchsichtig: Spannpratzen, Portal und Schlitten (zuletzt, ohne Tiefenpuffer zu ändern)
+      if (env && !c.cyl) {
+        g.useProgram(this.meshProg);
+        g.bindVertexArray(this.envVao);
+        this.camera(g, this.mloc, v, c);
+        g.uniform2f(this.mloc.u_zmap, 0, 1);
+        g.enable(g.BLEND);
+        g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA);
+        g.depthMask(false);
+        this.drawEnv(g, "clamps", [0, 0, 0]);
+        if (tool) { const lift = Math.max(0, tool.z); this.drawEnv(g, "carriage", [tool.x, tool.y, lift]); this.drawEnv(g, "gantry", [0, tool.y, 0]); }
+        g.depthMask(true);
+        g.disable(g.BLEND);
+      }
       g.bindVertexArray(null);
       const err = g.getError();
       if (err !== g.NO_ERROR) { console.warn("material view: GL error", err); return null; }
@@ -580,7 +659,9 @@ export class MaterialRenderer {
       if (this.lookTex) g.deleteTexture(this.lookTex);
       if (this.meshBuf) g.deleteBuffer(this.meshBuf);
       if (this.meshVao) g.deleteVertexArray(this.meshVao);
+      if (this.envBuf) g.deleteBuffer(this.envBuf);
+      if (this.envVao) g.deleteVertexArray(this.envVao);
     }
-    this.tex = null; this.texFor = null; this.lookTex = null; this.lookId = ""; this.meshBuf = null; this.meshVao = null; this.meshKey = null;
+    this.tex = null; this.texFor = null; this.lookTex = null; this.lookId = ""; this.meshBuf = null; this.meshVao = null; this.meshKey = null; this.envBuf = null; this.envVao = null; this.envKey = "";
   }
 }

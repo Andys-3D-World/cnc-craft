@@ -7,7 +7,7 @@ import { MM_TO_PIXEL, shapeToPaths } from "../shapeTransform";
 import { DEFAULT_LATHE_TOOLS, latheGcode, planLathe, type LatheJob, type LatheOp, type LatheOut, type LathePlan, type LatheTool, type Pt } from "./turn";
 
 const KEY = "cnc_craft_lathe", KEY_TOOLS = "cnc_craft_lathe_tools";
-export interface LatheSettings { job: LatheJob; out: LatheOut; material: string; watt: number; axis: "bottom" | "middle" | "zero"; profile: string[] }
+export interface LatheSettings { job: LatheJob; out: LatheOut; material: string; watt: number; post: "front" | "rear"; axis: "bottom" | "middle" | "zero"; profile: string[] }
 
 const DEF_OPS = (): LatheOp[] => [
   { kind: "face", on: true, tool: "l1" }, { kind: "rough", on: true, tool: "l1" }, { kind: "finish", on: true, tool: "l2" },
@@ -15,7 +15,7 @@ const DEF_OPS = (): LatheOp[] => [
 ];
 const DEFAULTS = (): LatheSettings => ({
   job: { stockD: 30, faceAllow: 1, stickOut: 60, margin: 3, allowX: 0.2, allowZ: 0.05, vc: 90, maxRpm: 1500, safeX: 3, safeZ: 5, clear: 0.5, tailOn: false, tailD: 12, tailZ: 0, ops: DEF_OPS() },
-  out: { xMode: "radius", xSign: 1, spindle: "auto", dir: "M3" }, material: "steel", watt: 850, axis: "bottom", profile: [],
+  out: { xMode: "radius", xSign: 1, spindle: "auto", dir: "M3" }, material: "steel", watt: 850, post: "front", axis: "bottom", profile: [],
 });
 const LIM: Record<string, [number, number]> = {
   stockD: [1, 1000], faceAllow: [0, 20], stickOut: [1, 3000], margin: [0.5, 50], allowX: [0, 3], allowZ: [0, 3], vc: [1, 1000], maxRpm: [10, 10000],
@@ -32,6 +32,7 @@ export function cleanLathe(raw: any): LatheSettings {
   if (o.spindle === "hand" || o.spindle === "m8") d.out.spindle = o.spindle;
   if (o.dir === "M4") d.out.dir = "M4";
   if (typeof raw?.material === "string" && /^[a-z]{1,20}$/.test(raw.material)) d.material = raw.material;
+  if (raw?.post === "rear") d.post = "rear";
   d.watt = num(raw?.watt, [10, 50000], d.watt);
   if (["bottom", "middle", "zero"].includes(raw?.axis)) d.axis = raw.axis;
   if (Array.isArray(raw?.profile)) d.profile = raw.profile.filter((x: any) => typeof x === "string" && x.length < 80).slice(0, 2000);

@@ -3040,7 +3040,7 @@ const yy600: Board = {
   ],
   deco: [
     { kind: "chip", x: 90, y: 20, w: 120, h: 120, label: "" }, { kind: "chip", x: 240, y: 20, w: 120, h: 120, label: "" },
-    { kind: "chip", x: 210, y: 236, w: 170, h: 100, label: "IPM" }, { kind: "fuse", x: 130, y: 200, w: 18, h: 60, label: "" }, { kind: "chip", x: 250, y: 380, w: 90, h: 36, label: "" },
+    { kind: "chip", x: 210, y: 236, w: 170, h: 100, label: "IPM" }, { kind: "fuse", x: 120, y: 212, w: 60, h: 28, label: "" }, { kind: "chip", x: 250, y: 380, w: 90, h: 36, label: "" },
   ],
   hookups: {}
 };

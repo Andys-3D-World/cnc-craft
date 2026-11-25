@@ -64,6 +64,9 @@ export class SimView {
   showMaterial = false;
   /** Aussehen des Rohteils (materialView.ts) */
   materialLook: Material = MATERIALS[0];
+  /** Maschine drumherum (Bett, Portal, Pratzen, Futter der Drehachse) zeigen; Rollen-Drehachse: Durchmesser der Rollen */
+  showMachine = true;
+  rollerDia: number | null = null;
   /** Material zeichnen geht nicht (kein WebGL2) – dann wieder Bahnen */
   materialFailed = false;
   /** wie lange das Zeichnen dauert (ms, geglättet) – danach richtet sich die Bildrate im Live-Betrieb */
@@ -597,6 +600,7 @@ export class SimView {
     const img = this.matGpu.render(m, {
       W, H, originX: W / 2 + this.panX, originY: H / 2 + this.panY, center: this.center,
       yaw: this.yaw, pitch: this.pitch, scale: this.scale, look: this.materialLook,
+      env: this.showMachine ? { bedW: this.bedW, bedH: this.bedH, zones: this.zones, rollerDia: this.rollerDia } : null,
       tool: this.curIdx >= 0 ? {
         ...this.tool, kind: m.kind, geom: m.toolOf(at), holder: m.holderOf(at),
         on: this.curIdx < m.program.n && m.program.type[this.curIdx] === MOVE_CUT

@@ -18,6 +18,9 @@
  * Rückgängig (Strg+Z). „Übernehmen“ macht den Text zum Job. Läuft der Job schon, darf nur geändert werden,
  * was die Maschine noch nicht bekommen hat (Sicherheitsabstand, siehe liveEditFloor) – mit Rückfrage.
  */
+import { LatheView, latheScene, xFactor } from "../lathe/latheView";
+import { movesFromProgram } from "../lathe/latheSim";
+import { latheSettings, latheTools } from "../lathe/latheJob";
 import { measured, type MPoint } from "./simMeasure";
 import { t, T, tip, tMm } from "../i18n/i18n";
 import { motionLimits } from "./motionLimits";
@@ -108,6 +111,7 @@ let rerendering = false;
 // Material
 const KEY_MATERIAL = "cnc_craft_sim_material";
 let showMaterial = true;
+const KEY_MACHINE = "cnc_craft_sim_machine";
 try { showMaterial = localStorage.getItem(KEY_MATERIAL) !== "0"; } catch { /* egal */ }
 let thickOverride = 0;      // Materialdicke von Hand (0 = tiefster Schnitt)
 let carveShown = -1;        // zuletzt angezeigter Stand der Warnungen
@@ -138,11 +142,14 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
             <button class="sim-btn" id="sim-mat-on" ${tip("sim.materialTip")}>🪵 ${T("sim.material")}</button>
             <button class="sim-btn" id="sim-mat-off" ${tip("sim.pathsOnlyTip")}>〰 ${T("sim.pathsOnly")}</button>
           </div>
+          <label class="sim-check" id="sim-machine-row" style="display:none" ${tip("sim.machineTip")}><input type="checkbox" id="sim-machine"> ${T("sim.machine")}</label>
+          <label class="sim-check" id="sim-lathe-row" style="display:none" ${tip("sim.latheCutTip")}><input type="checkbox" id="sim-lathe-cut"> ${T("sim.latheCut")}</label>
           <label class="sim-check" id="sim-thick-row" ${tip("sim.thickTip")}>${T("sim.thick")}
             <input type="number" id="sim-thick" class="sim-thick" min="0.2" max="160" step="0.5"> mm</label>
         </div>
         <div class="sim-canvas-holder">
           <canvas id="sim-canvas"></canvas>
+          <canvas id="sim-lathe" style="display:none;position:absolute;inset:0;width:100%;height:100%;cursor:grab;"></canvas>
           <div class="sim-measure" id="sim-measure-box" style="display:none"></div>
           <div class="sim-live" id="sim-live" style="display:none">● LIVE</div>
           <div class="sim-carve-busy" id="sim-carve-busy" style="display:none"></div>
@@ -195,7 +202,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
             <button id="sim-job-pause" class="btn-secondary">⏸ ${T("rp.pause")}</button>
             <button id="sim-job-stop" class="btn-secondary sim-stop" ${tip("rp.stopTip")}>⏹ ${T("rp.stop")}</button>
           </div>
-          <button id="sim-job-resume" class="btn-secondary" ${tip("res.simTip")}>⏭ ${T("res.simBtn")}</button>
+          <button id="sim-job-resume" class="btn-secondary not-lathe" ${tip("res.simTip")}>⏭ ${T("res.simBtn")}</button>
           <div class="sim-job-state" id="sim-job-state"></div>
         </div>
         <div class="sim-box sim-code-box">
@@ -291,9 +298,11 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
 
   // ---- Bedienelemente ----
   container.querySelectorAll<HTMLButtonElement>("[data-view]").forEach(b =>
-    b.addEventListener("click", () => view.setView(b.dataset.view as ViewPreset)));
-  $("sim-fit").addEventListener("click", () => view.fit());
-  $<HTMLInputElement>("sim-rapids").addEventListener("change", e => { view.showRapids = (e.target as HTMLInputElement).checked; view.invalidate(); });
+    b.addEventListener("click", () => { view.setView(b.dataset.view as ViewPreset); latheView?.preset(b.dataset.view as ViewPreset); }));
+  $("sim-fit").addEventListener("click", () => { view.fit(); latheView?.preset("iso"); });
+  $<HTMLInputElement>("sim-lathe-cut").addEventListener("change", e => { if (latheView) { latheView.cut = (e.target as HTMLInputElement).checked; latheView.update(true); } });
+  for (const ev of ["cnc-lathe-changed", "cnc-lathe-tools"]) window.addEventListener(ev, () => { if (isLathe()) rebuildCarve(); });
+  $<HTMLInputElement>("sim-rapids").addEventListener("change", e => { view.showRapids = (e.target as HTMLInputElement).checked; view.invalidate(); if (latheView) { latheView.showPaths = view.showRapids; latheView.update(true); } });
   const setMaterial = (on: boolean) => {
     showMaterial = on;
     try { localStorage.setItem(KEY_MATERIAL, on ? "1" : "0"); } catch { /* egal */ }
@@ -309,6 +318,10 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
     thickOverride = v > 0 ? Math.min(160, v) : 0;
     rebuildCarve();
   });
+  const machineBox = $<HTMLInputElement>("sim-machine");
+  try { view.showMachine = localStorage.getItem(KEY_MACHINE) !== "0"; } catch { /* egal */ }
+  machineBox.checked = view.showMachine;
+  machineBox.addEventListener("change", () => { view.showMachine = machineBox.checked; try { localStorage.setItem(KEY_MACHINE, machineBox.checked ? "1" : "0"); } catch { /* egal */ } view.invalidate(); });
   view.showMaterial = showMaterial;
   view.onChange = () => updateCarveUI(true);
   // Warnung angeklickt -> Zeile zeigen, Simulation dorthin
@@ -643,6 +656,7 @@ function nextTick() {
 
 function tick(now: number) {
   updateCarveUI();
+  latheView?.turn(now, latheOn && (playing || (live && machine.status.state === "Run")));
   if (playing && prog) {
     const dt = Math.min(0.1, (now - lastFrame) / 1000);
     const at = positionAt(prog, simTime).i;
@@ -676,9 +690,10 @@ function liveFrameGap(): number {
 
 function applyTime(scrollList: boolean, fromTick = false) {
   if (!prog) return;
-  if (!started) { view.setProgress(-1, 0, 0, 0, 0); updateUI(); return; }
+  if (!started) { view.setProgress(-1, 0, 0, 0, 0); syncLathe(-1, 0); updateUI(); return; }
   const p = positionAt(prog, simTime);
   view.setProgress(p.i, p.frac, p.x, p.y, p.z);
+  syncLathe(p.i, p.frac);
   updateUI();
   // Liste nur neu bauen, wenn sich die Zeile ändert (Abspielen/Live laufen mit voller Bildrate)
   const line = p.i >= 0 ? prog.line[p.i] : 0;
@@ -806,7 +821,8 @@ function updateInfo() {
     row(t("sim.moves"), String(prog.n)) +
     `<div class="sim-muted">${t("sim.estNote")}</div>`;
   const bed = bedSizeMm();
-  if (prog.n && !rot && (b.minX < -0.01 || b.minY < -0.01 || b.maxX > bed.w + 0.01 || b.maxY > bed.h + 0.01)) {
+  // Drehen: X ist der Radius und Z läuft ins Minus – das Bett der Zeichnung sagt dazu nichts
+  if (prog.n && !rot && !isLathe() && (b.minX < -0.01 || b.minY < -0.01 || b.maxX > bed.w + 0.01 || b.maxY > bed.h + 0.01)) {
     el.innerHTML += `<div class="sim-warn">⚠ ${t("sim.outOfBed")}</div>`;
   }
 }
@@ -889,11 +905,42 @@ function autoThickness(p: SimProgram, dia: number): number {
   return Math.max(1, Math.round(t * 100) / 100);
 }
 
+/** Drehbank: Drehteil mit Futter und Meißel in 3D (lathe/latheView.ts) statt der Bahnen */
+let latheView: LatheView | null = null;
+let latheOn = false;
+/** so viele Fahrten rechnet die Drehansicht höchstens (danach nur Bahnen) */
+const LATHE_MAX = 20000;
+function rebuildLathe() {
+  const cv = $<HTMLCanvasElement>("sim-lathe");
+  latheOn = false;
+  if (isLathe() && prog && prog.n && prog.n <= LATHE_MAX) {
+    latheView ??= new LatheView(cv);
+    if (latheView.ok) {
+      const same = latheProg === prog;
+      latheProg = prog;
+      latheView.setScene(latheScene(latheSettings, movesFromProgram(prog, xFactor(latheSettings), latheTools, MOVE_RAPID)), same);
+      latheOn = true;
+      const p = started ? positionAt(prog, simTime) : null;
+      latheView.setProgress(p ? p.i : -1, p ? p.frac : 0);
+    }
+  } else if (latheView) { latheView.setScene(null); latheProg = null; }
+  showLathe();
+}
+let latheProg: SimProgram | null = null;
+function showLathe() {
+  const on = latheOn && showMaterial;
+  $("sim-lathe").style.display = on ? "block" : "none";
+  $("sim-lathe-row").style.display = on ? "" : "none";
+  $("sim-measure").style.display = on ? "none" : "";
+}
+function syncLathe(i: number, frac: number) { if (latheOn && showMaterial) latheView?.setProgress(i < 0 && live ? 0 : i, frac); }
+
 /** Materialabtrag für das aktuelle Programm neu aufsetzen (Fräse, Laser, Plasma – auch um die Drehachse) */
 function rebuildCarve(sync = true) {
   if (!view) return;
   let c: LiveCarve | null = null;
-  const lathe = isLathe(); // Drehen: Materialabtrag zeigt das Dreh-Fenster, hier nur die Bahn
+  const lathe = isLathe(); // Drehen hat seine eigene 3D-Ansicht
+  rebuildLathe();
   const kind: CarveKind = isLaser() ? "laser" : isPlasma() ? "plasma" : "mill";
   if (prog && !lathe) {
     const st = getStock();
@@ -919,6 +966,7 @@ function rebuildCarve(sync = true) {
     if (!thickOverride) inp.value = "";
   }
   view.material = c;
+  view.rollerDia = prog?.rotary && isLaser() && rotary.kind === "roller" ? rotary.rollerDia : null;
   view.materialFailed = false;
   setLook();
   carveShown = -1;
@@ -945,9 +993,32 @@ function updateCarveUI(force = false) {
   const c = view.material;
   const can = !!c && !view.materialFailed;
   const on = can && view.showMaterial;
+  if (latheOn) {
+    if (!force) return;
+    $("sim-mat-seg").style.display = "flex";
+    $("sim-machine-row").style.display = "none";
+    $("sim-thick-row").style.display = "none";
+    $("sim-mat-on").classList.toggle("active", showMaterial);
+    $("sim-mat-off").classList.toggle("active", !showMaterial);
+    $("sim-legend-paths").style.display = showMaterial ? "none" : "flex";
+    $("sim-legend-mat").style.display = showMaterial ? "flex" : "none";
+    $("sim-legend-mat").textContent = "🔩 " + t("sim.latheStock", { d: latheSettings.job.stockD, l: latheSettings.job.stickOut });
+    $("sim-carve-busy").style.display = "none";
+    showLathe();
+    if (showMaterial) { const p = started && prog ? positionAt(prog, simTime) : null; syncLathe(p ? p.i : -1, p ? p.frac : 0); }
+    const warn = showMaterial ? latheView!.replay!.warnings : [];
+    $("sim-warn-box").style.display = warn.length ? "flex" : "none";
+    if (warn.length) {
+      $("sim-warn-n").textContent = String(warn.length);
+      $("sim-warn-list").innerHTML = warn.map(l => `<div class="sim-warn-row" data-wline="${l}"><b>${t("sim.warnLine", { n: l + 1 })}</b> ${t("sim.warn.rapid")}</div>`).join("");
+    }
+    carveShown = -1;
+    return;
+  }
   if (force) {
     $("sim-mat-seg").style.display = can ? "flex" : "none";
     $("sim-thick-row").style.display = on && !(c!.cyl && c!.kind === "mill") ? "flex" : "none";
+    $("sim-machine-row").style.display = on ? "" : "none";
     $("sim-mat-on").classList.toggle("active", on);
     $("sim-mat-off").classList.toggle("active", can && !on);
     $("sim-legend-paths").style.display = on ? "none" : "flex";
