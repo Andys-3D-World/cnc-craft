@@ -22,7 +22,9 @@ import { generateLaserGcode } from "./laserCam";
 import { latheGcodeFromDesign } from "./lathe/latheJob";
 import { rotary, applyRotary, outsideBand, circumference, rotaryCheck, stockShapeWarnings } from "./rotary";
 import { minRadius } from "./rotaryStock";
-import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea } from "./stock";
+import { stockWarnings, stockOptions, hasUsedArea, shapeOnUsedArea, ownStock } from "./stock";
+import { countOutside, deepestZ } from "./stockFit";
+import { groupBounds } from "./shapeTransform";
 import { adaptFeed, feedAdapt } from "./feedAdapt";
 import { threadPath, ThreadInfo } from "./threadMill";
 import { facingPath } from "./facing";
@@ -188,9 +190,27 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   if (g && rotary.on && !flatOnly && !isPlasma() && !isLathe()) g = rotaryGcode(g, used);
   if (skipped.size && !allSkipped) lastGcodeWarnings.push(t("stock.skipped", { n: skipped.size }));
   else if (g && !two) lastGcodeWarnings.push(...stockWarnings(shapes, n => t("stock.gcodeWarn", { n })));
+  if (g && !two) lastGcodeWarnings.push(...fitWarnings(g, used));
   if (g && two) { g = two.header + g; lastGcodeWarnings.push(...two.warnings); }
   return g;
 };
+
+/** Passt der Auftrag ins eingetragene Rohteil? Nur Hinweise – ohne eingetragene Maße passiert hier nichts */
+function fitWarnings(g: string, used: any[]): string[] {
+  const s = ownStock();
+  if (!s || (rotary.on && !isPlasma())) return [];
+  const out: string[] = [], mm = (v: number) => +v.toFixed(2);
+  const boxes = used.map((sh: any) => groupBounds([sh])).filter((b): b is NonNullable<typeof b> => !!b)
+    .map(b => ({ x0: b.minX / MM_TO_PIXEL, y0: b.minY / MM_TO_PIXEL, x1: b.maxX / MM_TO_PIXEL, y1: b.maxY / MM_TO_PIXEL }));
+  const n = countOutside(boxes, s);
+  if (n) out.push(t("stock.outside", { n, w: mm(s.w), h: mm(s.h) }));
+  if (isMill() && s.thick > 0) {
+    const deep = -deepestZ(g);
+    // bis 1 mm in die Opferplatte ist beim Durchfräsen üblich
+    if (deep > s.thick + 1) out.push(t("stock.tooDeep", { z: mm(deep), t: mm(s.thick), d: mm(deep - s.thick) }));
+  }
+  return out;
+}
 
 /** Sperrzonen (keepOut.ts): Eilfahrten anheben, Schnitte hinein melden. Mit Drehachse gibt es keine feste Fläche → nur Hinweis */
 function applyZones(g: string, used: any[]): string {

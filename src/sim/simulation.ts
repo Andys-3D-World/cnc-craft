@@ -952,13 +952,15 @@ function rebuildCarve(sync = true) {
       // was die andere Seite von unten schon weggenommen hat, ist hier nicht zu sehen
       const two = prog.rotary ? null : activeSetup();
       if (two) auto = two.thickness;
+      // Rohteil-Dicke eingetragen: genau die zeigen
+      else if (!prog.rotary && st.thick > 0) auto = st.thick;
       // Zwiebelhaut: das Programm nennt die Materialdicke, von der aus die Haut zählt – sonst sähe der tiefste Gang
       // wie die Unterseite aus und die Haut wäre nicht zu sehen
       else if (!prog.rotary) { const sk = skinInfo(prog.lines); if (sk) auto = Math.max(auto, sk.stock); }
-    } else if (kind === "laser") auto = activeLayer?.thickness || 3;
-    else auto = activeCut?.thickness || 2;
+    } else if (kind === "laser") auto = st.thick || activeLayer?.thickness || 3;
+    else auto = st.thick || activeCut?.thickness || 2;
     c = LiveCarve.create(prog, {
-      kind, tools, thickness: thickOverride || auto, stock: { w: st.w, h: st.h },
+      kind, tools, thickness: thickOverride || auto, stock: { x: st.x, y: st.y, w: st.w, h: st.h },
       sMax: laserSettings.sMax, kerf: activeCut?.kerf || 1.5
     });
     const inp = $<HTMLInputElement>("sim-thick");

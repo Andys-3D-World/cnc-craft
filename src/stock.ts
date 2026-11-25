@@ -28,6 +28,9 @@ export interface StockJob { date: string; label: string; percent: number }
 
 export interface Stock {
   w: number; h: number;        // Plattengröße in mm
+  x: number; y: number;        // linke untere Ecke in der Zeichnung (mm, normal 0/0)
+  thick: number;               // Materialdicke in mm (0 = nicht eingetragen)
+  own: boolean;                // Maße vom Nutzer eingetragen (nur dann wird geprüft, ob alles ins Rohteil passt)
   cell: number;                // Rastergröße in mm
   cols: number; rows: number;
   used: Uint8Array;            // 1 = verbraucht (Zeile 0 = unten, y = 0)
@@ -67,6 +70,7 @@ export function removeStockBed(i: number, countBefore: number) {
   stocks.clear();
 }
 let versionCounter = 1;
+const MAX_POS = 20000, MAX_THICK = 1000;
 
 // ---------------------------------------------------------------------
 // Anlegen / Laden / Speichern
@@ -79,7 +83,7 @@ function cellFor(w: number, h: number) {
 function blank(w: number, h: number): Stock {
   const cell = cellFor(w, h);
   const cols = Math.max(1, Math.ceil(w / cell)), rows = Math.max(1, Math.ceil(h / cell));
-  return { w, h, cell, cols, rows, used: new Uint8Array(cols * rows), jobs: [], undo: null, version: versionCounter++ };
+  return { w, h, x: 0, y: 0, thick: 0, own: false, cell, cols, rows, used: new Uint8Array(cols * rows), jobs: [], undo: null, version: versionCounter++ };
 }
 
 function encode(a: Uint8Array): string {
@@ -141,6 +145,10 @@ export function getStock(mode: MachineMode = getMachineMode(), bed = bedIdx): St
         b.used = decode(String(d.used || ""), b.cols * b.rows);
         b.jobs = Array.isArray(d.jobs) ? d.jobs.slice(-50) : [];
         b.undo = typeof d.undo === "string" ? d.undo : null;
+        if (Math.abs(+d.x) <= MAX_POS) b.x = +d.x;
+        if (Math.abs(+d.y) <= MAX_POS) b.y = +d.y;
+        if (+d.thick > 0 && +d.thick <= MAX_THICK) b.thick = +d.thick;
+        b.own = d.own === true;
         s = b;
       }
     }
@@ -155,7 +163,7 @@ function save(mode: MachineMode = getMachineMode(), bed = bedIdx) {
   s.version = versionCounter++;
   try {
     localStorage.setItem(keyFor(mode, bed), JSON.stringify({
-      w: s.w, h: s.h, cell: s.cell, used: encode(s.used), jobs: s.jobs, undo: s.undo
+      w: s.w, h: s.h, x: s.x, y: s.y, thick: s.thick, own: s.own, cell: s.cell, used: encode(s.used), jobs: s.jobs, undo: s.undo
     }));
   } catch { /* zu groß / gesperrt – gilt trotzdem bis zum Neustart */ }
   window.dispatchEvent(new CustomEvent(STOCK_CHANGED));
@@ -174,30 +182,56 @@ export function hasUsedArea(mode: MachineMode = getMachineMode(), bed = bedIdx):
   return false;
 }
 
-/** Neue Platte: alles frei (optional mit neuer Größe) */
+/** Neue Platte: alles frei (optional mit neuer Größe). Lage und Dicke bleiben. */
 export function newPlate(w?: number, h?: number) {
   const mode = getMachineMode();
   const old = getStock(mode);
   const size = w && h ? { w, h } : { w: old.w, h: old.h };
   const s = blank(size.w, size.h);
+  s.x = old.x; s.y = old.y; s.thick = old.thick; s.own = old.own;
   stocks.set(mode + ":" + bedIdx, s);
   save(mode);
 }
 
-/** Stand der Platte zum Ablegen als Reststück (remnants.ts) */
-export function plateSnapshot(): { w: number; h: number; cell: number; used: string; percent: number } {
+/** Rohteil-Maße vom Nutzer: Lage und Dicke (die verbrauchte Fläche liegt auf der Platte und wandert mit) */
+export function setStockPose(p: { x?: number; y?: number; thick?: number }) {
   const s = getStock();
-  return { w: s.w, h: s.h, cell: s.cell, used: encode(s.used), percent: usedPercent(s) };
+  if (p.x !== undefined && Math.abs(p.x) <= MAX_POS) s.x = p.x;
+  if (p.y !== undefined && Math.abs(p.y) <= MAX_POS) s.y = p.y;
+  if (p.thick !== undefined && p.thick >= 0 && p.thick <= MAX_THICK) s.thick = p.thick;
+  s.own = true;
+  save();
+}
+
+/** Platte mit eigener Größe: alles frei, Lage und Dicke bleiben */
+export function newOwnPlate(w: number, h: number) {
+  getStock().own = true;
+  newPlate(w, h);
+}
+
+/** Zurück zur Platte in der Größe des Arbeitsraums (wie ohne Eintrag) */
+export function resetPlate() {
+  const mode = getMachineMode(), b = bedMm();
+  stocks.set(mode + ":" + bedIdx, blank(b.w, b.h));
+  save(mode);
+}
+
+/** Stand der Platte zum Ablegen als Reststück (remnants.ts) */
+export function plateSnapshot(): { w: number; h: number; thick: number; cell: number; used: string; percent: number } {
+  const s = getStock();
+  return { w: s.w, h: s.h, thick: s.thick, cell: s.cell, used: encode(s.used), percent: usedPercent(s) };
 }
 
 /**
  * Abgelegtes Reststück wieder als Platte der aktuellen Maschinenart und des aktiven Betts auflegen.
  * false = die Daten passen nicht (anderes Raster als diese Größe hier bekäme) – dann bleibt alles, wie es ist.
  */
-export function loadPlateSnapshot(d: { w: number; h: number; cell: number; used: string }, label: string): boolean {
+export function loadPlateSnapshot(d: { w: number; h: number; thick?: number; cell: number; used: string }, label: string): boolean {
   const mode = getMachineMode();
+  const old = getStock(mode);
   const s = blank(d.w, d.h);
   if (s.cell !== d.cell) return false;
+  s.x = old.x; s.y = old.y; s.thick = d.thick || 0; s.own = old.own;
   s.used = decode(d.used, s.cols * s.rows);
   s.jobs = [{ date: new Date().toISOString(), label, percent: usedPercent(s) }];
   stocks.set(mode + ":" + bedIdx, s);
@@ -214,7 +248,8 @@ export function applyPlateFromCamera(w: number, h: number, isUsed: (x: number, y
   const mode = getMachineMode();
   const old = getStock(mode);
   const s = blank(w, h);
-  if (old.w === w && old.h === h && old.cell === s.cell) { s.undo = encode(old.used); s.jobs = old.jobs.slice(); }
+  s.thick = old.thick; // die Kamera sieht keine Dicke; das Raster ist hier immer der ganze Arbeitsraum ab 0/0
+  if (old.w === w && old.h === h && old.cell === s.cell && !old.x && !old.y) { s.undo = encode(old.used); s.jobs = old.jobs.slice(); }
   for (let r = 0; r < s.rows; r++) for (let c = 0; c < s.cols; c++) {
     if (isUsed((c + 0.5) * s.cell, (r + 0.5) * s.cell)) s.used[r * s.cols + c] = 1;
   }
@@ -228,6 +263,7 @@ export function applyPlateFromCamera(w: number, h: number, isUsed: (x: number, y
 
 /** Ist diese Stelle (mm) frei – auf der Platte und nicht verbraucht? (für das Verschachteln) */
 export function stockFreeAt(x: number, y: number, s: Stock = getStock()): boolean {
+  x -= s.x; y -= s.y;
   if (x < 0 || y < 0 || x >= s.w || y >= s.h) return false;
   const c = Math.floor(x / s.cell), r = Math.floor(y / s.cell);
   return !s.used[r * s.cols + c];
@@ -282,7 +318,7 @@ export function markFromGcode(lines: string[], label: string, width: number, upT
     if (prog.type[i] !== MOVE_CUT) continue;
     // Fräse: nur was unter der Oberfläche (Z < 0) passiert, ist ein Schnitt
     if (mode === "mill" && Math.min(prog.z0[i], prog.z1[i]) >= -0.001) continue;
-    stampSegment(s, cut, prog.x0[i], prog.y0[i], prog.x1[i], prog.y1[i], disk);
+    stampSegment(s, cut, prog.x0[i] - s.x, prog.y0[i] - s.y, prog.x1[i] - s.x, prog.y1[i] - s.y, disk);
   }
 
   s.undo = encode(s.used);
@@ -380,7 +416,7 @@ function shapeSig(shape: any): string {
 const BIG = 1 << 20;
 function footprint(shape: any, s: Stock): Footprint {
   const R = 2 * shapeToolRadius(shape) + stockOptions.margin;
-  const sig = shapeSig(shape) + "|" + s.cell + "|" + R + "|" + getMachineMode();
+  const sig = shapeSig(shape) + "|" + s.cell + "|" + s.x + "|" + s.y + "|" + R + "|" + getMachineMode();
   const c = fpCache.get(shape);
   if (c && c.sig === sig) return c.fp;
 
@@ -389,7 +425,7 @@ function footprint(shape: any, s: Stock): Footprint {
   const add = (cc: number, rr: number) => set.add((rr + BIG / 2) * BIG + (cc + BIG / 2));
   const disk = diskOffsets(Math.max(0, Math.ceil(R / cell)));
   for (const path of shapeToPaths(shape)) {
-    const pts: Pt[] = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL, y: p.y / MM_TO_PIXEL }));
+    const pts: Pt[] = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL - s.x, y: p.y / MM_TO_PIXEL - s.y }));
     if (pts.length < 2) continue;
     // Rand
     const segs = path.closed ? pts.length : pts.length - 1;
@@ -459,6 +495,12 @@ export function stockWarnings(shapes: any[], msg: (n: number) => string): string
   if (!hasUsedArea()) return [];
   const bad = shapes.filter(sh => shapeOnUsedArea(sh)).length;
   return bad ? [msg(bad)] : [];
+}
+
+/** Eingetragenes Rohteil (Maße vom Nutzer), sonst null – dann gibt es nichts zu prüfen */
+export function ownStock(): Stock | null {
+  const s = getStock();
+  return s.own ? s : null;
 }
 
 /**
@@ -551,19 +593,21 @@ function usedImage(s: Stock): HTMLCanvasElement {
 export function drawStock(ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number, scale: number) {
   const s = getStock();
   const bed = bedMm();
-  const x0 = sx(0), y1 = sy(s.h * MM_TO_PIXEL);
+  const x0 = sx(s.x * MM_TO_PIXEL), y1 = sy((s.y + s.h) * MM_TO_PIXEL);
   const w = s.w * MM_TO_PIXEL * scale, h = s.h * MM_TO_PIXEL * scale;
   if (stockOptions.show && hasUsedArea()) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     // Das Raster ist evtl. etwas größer als die Platte (ganze Zellen) -> oben an der Rasterkante ausrichten
-    const yTop = sy(s.rows * s.cell * MM_TO_PIXEL);
+    const yTop = sy((s.y + s.rows * s.cell) * MM_TO_PIXEL);
     ctx.drawImage(usedImage(s), 0, 0, s.cols, s.rows, x0, yTop, s.cols * s.cell * MM_TO_PIXEL * scale, s.rows * s.cell * MM_TO_PIXEL * scale);
     ctx.restore();
   }
   // Plattenumriss, wenn die Platte kleiner/größer als der Arbeitsraum ist
-  if (Math.abs(s.w - bed.w) > 0.01 || Math.abs(s.h - bed.h) > 0.01) {
+  if (s.x || s.y || Math.abs(s.w - bed.w) > 0.01 || Math.abs(s.h - bed.h) > 0.01) {
     ctx.save();
+    // eingetragenes Rohteil: Fläche leicht tönen, damit man sieht, wo Material liegt
+    if (s.own) { ctx.fillStyle = "rgba(255,176,32,0.07)"; ctx.fillRect(x0, y1, w, h); }
     ctx.strokeStyle = "#ffb020";
     ctx.setLineDash([8, 5]);
     ctx.lineWidth = 1.5;

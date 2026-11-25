@@ -20,6 +20,7 @@ import { rotarySectionHtml } from "./rotaryPanel";
 import { plasmaCutsHtml, plasmaSettingsHtml } from "./plasmaPanel";
 import { lathePanelHtml, latheZeroHtml } from "./lathePanel";
 import { stockSectionHtml } from "./stockPanel";
+import { placesSectionHtml } from "./placesPanel";
 import { twoSidedSectionHtml } from "./twoSidedPanel";
 import { machineLineHtml } from "./machineWizard";
 import { spindlePanelHtml } from "./spindlePanel";
@@ -206,6 +207,7 @@ export function renderRightPanel(container: HTMLElement) {
 
         ${toolSummaryHtml()}
         ${stockSectionHtml()}
+        ${placesSectionHtml()}
         ${twoSidedSectionHtml()}
         ${laserSettingsHtml()}
         ${rotarySectionHtml()}

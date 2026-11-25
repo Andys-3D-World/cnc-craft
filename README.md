@@ -27,6 +27,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
   are read in background threads; re-import a changed drawing and keep all settings of its shapes
 - Split a large part into pieces with joints (puzzle knobs, fingers or butt joint) – router, laser and plasma
 - Mill long boards in sections and move them along on locating pins (router)
+- Material with its own dimensions and fixed clamping places (vise, stop): zero with one click, nothing moves
 - Lathe (first stage, not tried on a real lathe yet): facing, roughing, finishing, grooves, drilling, parting off
 - 3D view of the finished parts, node graph for reusable workflows
 

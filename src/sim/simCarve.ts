@@ -97,8 +97,8 @@ export interface LiveCarveOptions {
   beam?: number;
   /** Plasma: Schnittspalt (mm) */
   kerf?: number;
-  /** Rohteil-Platte (Rohteil-Verwaltung, stock.ts), Ecke bei 0/0 – null = nur um die Bahnen */
-  stock?: { w: number; h: number } | null;
+  /** Rohteil-Platte (Rohteil-Verwaltung, stock.ts), Ecke bei x/y (ohne Angabe 0/0) – null = nur um die Bahnen */
+  stock?: { x?: number; y?: number; w: number; h: number } | null;
 }
 
 export class LiveCarve {
@@ -175,10 +175,11 @@ export class LiveCarve {
     // Rohteil-Platte: kleine Platte ganz zeigen, große nur um die Bahnen (Ränder der Platte bleiben echte Kanten)
     const s = g.cyl ? null : o.stock;
     if (s && s.w > 0 && s.h > 0) {
+      const sx = s.x ?? 0, sy = s.y ?? 0, sx1 = sx + s.w, sy1 = sy + s.h;
       if (s.w * s.h <= 4 * (a.x1 - a.x0) * (a.y1 - a.y0)) {
-        a = { x0: Math.min(0, x0), y0: Math.min(0, y0), x1: Math.max(s.w, x1), y1: Math.max(s.h, y1) };
+        a = { x0: Math.min(sx, x0), y0: Math.min(sy, y0), x1: Math.max(sx1, x1), y1: Math.max(sy1, y1) };
       } else {
-        const c = { x0: Math.max(a.x0, Math.min(0, x0)), y0: Math.max(a.y0, Math.min(0, y0)), x1: Math.min(a.x1, Math.max(s.w, x1)), y1: Math.min(a.y1, Math.max(s.h, y1)) };
+        const c = { x0: Math.max(a.x0, Math.min(sx, x0)), y0: Math.max(a.y0, Math.min(sy, y0)), x1: Math.min(a.x1, Math.max(sx1, x1)), y1: Math.min(a.y1, Math.max(sy1, y1)) };
         if (c.x1 > c.x0 && c.y1 > c.y0) a = c;
       }
     }

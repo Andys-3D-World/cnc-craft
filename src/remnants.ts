@@ -13,6 +13,7 @@ export interface Remnant {
   w: number; h: number; cell: number;   // sheet size and grid size in mm
   used: string;    // used cells, run-length coded as in stock.ts (free, used, free …)
   percent: number; // used area in %
+  thick?: number;  // sheet thickness in mm, if entered
   date: string;    // ISO date of saving
 }
 
@@ -33,7 +34,8 @@ export function cleanRemnant(raw: any): Remnant | null {
   if (Math.ceil(w / cell) * Math.ceil(h / cell) > MAX_CELLS) return null;
   if (typeof raw.used !== "string" || !/^\d+(,\d+)*$/.test(raw.used)) return null;
   const percent = fin(raw.percent);
-  return { name, mode: raw.mode, w, h, cell, used: raw.used, percent: percent >= 0 && percent <= 100 ? percent : 0,
+  const thick = fin(raw.thick);
+  return { name, mode: raw.mode, w, h, ...(thick > 0 && thick <= 1000 ? { thick } : {}), cell, used: raw.used, percent: percent >= 0 && percent <= 100 ? percent : 0,
     date: typeof raw.date === "string" && !isNaN(Date.parse(raw.date)) ? raw.date : "" };
 }
 

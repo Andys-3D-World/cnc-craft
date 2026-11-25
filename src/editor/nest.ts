@@ -368,7 +368,7 @@ export function nestShapes(opts: NestOptions, only?: any[], sets?: any[][]): Nes
   // Material-Platte: verbrauchte Fläche (Jobs, Kamera-Erkennung) und alles außerhalb der Platte meiden
   const stock = getStock();
   const bedMm = bedSizeMm();
-  if (hasUsedArea() || stock.w < bedMm.w - 0.01 || stock.h < bedMm.h - 0.01) {
+  if (hasUsedArea() || stock.x || stock.y || stock.w < bedMm.w - 0.01 || stock.h < bedMm.h - 0.01) {
     let used: Uint8Array = new Uint8Array(grid.cols * grid.rows);
     for (let r = 0; r < grid.rows; r++) for (let c = 0; c < grid.cols; c++) {
       const vx = (c + 0.5) * cell, vy = (r + 0.5) * cell;

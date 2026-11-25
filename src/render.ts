@@ -16,6 +16,7 @@ import { isLaser, isLathe, isPlasma } from "./machineMode";
 import { cutForShape } from "./plasmaCuts";
 import { drawPlasmaLeads } from "./plasmaCam";
 import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
+import { drawPlace } from "./placesView";
 import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
 import { drawCameraUnderlay } from "./camera/cameraOverlay";
 import { drawImageShape } from "./raster/imageShape";
@@ -141,6 +142,7 @@ export function drawEverything(
 
   // 5b. Material-Platte: verbrauchte Fläche (schraffiert) + Plattenumriss
   drawStock(ctx, sx, sy, scale);
+  drawPlace(ctx, sx, sy);
   const checkUsed = hasUsedArea();
 
   // 5c. Bilder (Bildgravur) unter allen Konturen

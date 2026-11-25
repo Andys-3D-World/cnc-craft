@@ -31,6 +31,7 @@ import { openLatheDialog } from "./ui/latheDialog";
 import { initPlasmaPanel, refreshPlasmaPanel } from "./ui/plasmaPanel";
 import { initStock } from "./stock";
 import { initStockPanel } from "./ui/stockPanel";
+import { initPlacesPanel } from "./ui/placesPanel";
 import { applySavedMachine, initMachineWizard, welcomeOnFirstStart } from "./ui/machineWizard";
 import { initJobTools } from "./ui/jobTools";
 import { initSpindlePanel } from "./ui/spindlePanel";
@@ -367,6 +368,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLathePanel(appendToConsole, redraw);
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
+    initPlacesPanel(redraw, appendToConsole); // feste Spannplätze: Nullpunkt aus gemerkter Stelle
     initTwoSidedPanel(redraw, appendToConsole);
     initSplitPanel(redraw, appendToConsole); // Großes Teil teilen: Fugen auf der Zeichenfläche ziehen
     initMachineWizard(redraw, appendToConsole);

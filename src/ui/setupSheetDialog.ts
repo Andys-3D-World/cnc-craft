@@ -203,7 +203,7 @@ export function openSetupSheet(log: (s: string) => void) {
     date: new Date().toLocaleString(currentLanguage()),
     tools: toolRows(drawing),
     toolsNote: t("sheet.toolsFromFile"),
-    stock: two && twoSetup ? t("sheet.stockVal", { x: twoSetup.stock.w, y: twoSetup.stock.h, z: twoSetup.thickness.toFixed(2) }) : t("sheet.stockVal", { x: st.w, y: st.h, z: deep.toFixed(2) }),
+    stock: two && twoSetup ? t("sheet.stockVal", { x: twoSetup.stock.w, y: twoSetup.stock.h, z: twoSetup.thickness.toFixed(2) }) : t("sheet.stockVal", { x: st.w, y: st.h, z: (st.thick || deep).toFixed(2) }),
     partSize: info.partSize,
     time: info.time,
     timeBasis: t("sim.timeBasis." + (motion.source || "default")),

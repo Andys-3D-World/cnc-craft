@@ -10,11 +10,13 @@
 import { t, T, tip, ph } from "../i18n/i18n";
 import {
   getStock, hasUsedArea, usedPercent, newPlate, undoLastMark, markFromGcode, cutWidthFor,
-  findFreeSpot, stockOptions, saveStockOptions, drawStockPreview, STOCK_CHANGED, plateSnapshot, loadPlateSnapshot
+  setStockPose, newOwnPlate, resetPlate, findFreeSpot, stockOptions, saveStockOptions, drawStockPreview, STOCK_CHANGED, plateSnapshot, loadPlateSnapshot
 } from "../stock";
 import { cleanRemnants, dropRemnant, freeArea, putRemnant, MAX_NAME, type Remnant } from "../remnants";
 import { getMachineMode, MODE_CHANGED, MachineMode } from "../machineMode";
-import { translateShape } from "../shapeTransform";
+import { translateShape, groupBounds, MM_TO_PIXEL } from "../shapeTransform";
+import { updateDimensionInputs } from "../uiInputs";
+import { checkpoint } from "../editor/history";
 import { generateGcode, noGcodeMessage } from "../cam";
 import { icon } from "./icons";
 
@@ -33,6 +35,14 @@ export function stockSectionHtml(): string {
         <label class="prop-row" style="cursor:pointer;" ${tip("stock.skipUsedTip")}><span>${T("stock.skipUsed")}</span><input type="checkbox" id="stock-skip-used" style="width:auto;"></label>
         <div class="prop-row">${T("stock.w")}<input type="number" id="stock-w" min="1" step="10" class="prop-input"></div>
         <div class="prop-row">${T("stock.h")}<input type="number" id="stock-h" min="1" step="10" class="prop-input"></div>
+        <div class="prop-row" ${tip("stock.thickTip")}>${T("stock.thick")}<input type="number" id="stock-thick" min="0" max="1000" step="0.5" class="prop-input"></div>
+        <div class="prop-row" ${tip("stock.posTip")}>${T("stock.x")}<input type="number" id="stock-x" step="1" class="prop-input"></div>
+        <div class="prop-row" ${tip("stock.posTip")}>${T("stock.y")}<input type="number" id="stock-y" step="1" class="prop-input"></div>
+        <div class="rp-grid2">
+          <button id="stock-fit" class="btn-secondary btn-compact" ${tip("stock.fitTip")}>${T("stock.fit")}</button>
+          <button id="stock-reset" class="btn-secondary btn-compact" ${tip("stock.resetTip")}>${T("stock.reset")}</button>
+        </div>
+        <button id="stock-through" class="btn-secondary btn-compact only-mill" ${tip("stock.throughTip")}>${T("stock.through")}</button>
         <div class="prop-row" ${tip("stock.marginTip")}>${T("stock.margin")}<input type="number" id="stock-margin" min="0" step="0.5" class="prop-input"></div>
         <button id="stock-mark" class="btn-secondary btn-compact" ${tip("stock.markTip")}>✔ ${T("stock.mark")}</button>
         <div class="rp-grid2">
@@ -73,6 +83,10 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     }
     if ($("stock-w") && document.activeElement !== $("stock-w")) $("stock-w")!.value = String(s.w);
     if ($("stock-h") && document.activeElement !== $("stock-h")) $("stock-h")!.value = String(s.h);
+    for (const [id, v] of [["stock-thick", s.thick || ""], ["stock-x", s.x], ["stock-y", s.y]] as const)
+      if ($(id) && document.activeElement !== $(id)) $(id)!.value = String(v);
+    const through = $("stock-through") as HTMLButtonElement | null;
+    if (through) through.disabled = !(s.thick > 0);
     if ($("stock-margin")) $("stock-margin")!.value = String(stockOptions.margin);
     if ($("stock-show")) $("stock-show")!.checked = stockOptions.show;
     if ($("stock-skip-used")) $("stock-skip-used")!.checked = stockOptions.skipUsed;
@@ -130,9 +144,40 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
     const s = getStock();
     if (!(w > 0 && h > 0) || (w === s.w && h === s.h)) { refresh(); return; }
     if (hasUsedArea() && !window.confirm(t("stock.confirmResize"))) { refresh(); return; }
-    newPlate(w, h);
+    newOwnPlate(w, h);
     log(t("stock.resized", { w, h }));
   };
+  // ---- Dicke und Lage (die verbrauchte Fläche bleibt) ----
+  const pose = (id: string, key: "x" | "y" | "thick") => $(id)?.addEventListener("change", () => {
+    const raw = $(id)!.value.trim(), v = raw === "" ? 0 : parseFloat(raw);
+    if (Number.isFinite(v)) setStockPose({ [key]: key === "thick" ? Math.max(0, v) : v });
+    refresh();
+  });
+  pose("stock-thick", "thick"); pose("stock-x", "x"); pose("stock-y", "y");
+  document.getElementById("stock-fit")?.addEventListener("click", () => {
+    const b = groupBounds((state().shapes as any[]).filter(sh => !sh.keepOut));
+    if (!b) { log(t("gcw.noObjects")); return; }
+    if (hasUsedArea() && !window.confirm(t("stock.confirmResize"))) return;
+    const mm = (v: number) => Math.round((v / MM_TO_PIXEL) * 100) / 100, x = mm(b.minX), y = mm(b.minY), w = mm(b.maxX) - x, h = mm(b.maxY) - y;
+    if (!(w > 0 && h > 0)) return;
+    newOwnPlate(Math.round(w * 100) / 100, Math.round(h * 100) / 100);
+    setStockPose({ x, y });
+    log(t("stock.resized", { w: getStock().w, h: getStock().h }));
+  });
+  document.getElementById("stock-reset")?.addEventListener("click", () => {
+    if (hasUsedArea() && !window.confirm(t("stock.confirmNew"))) return;
+    resetPlate();
+    log(t("stock.resized", { w: getStock().w, h: getStock().h }));
+  });
+  document.getElementById("stock-through")?.addEventListener("click", () => {
+    const st = state(), s = getStock();
+    const sel = st.shapes.filter((sh: any) => st.selectedShapeIds.includes(sh.id) && !sh.keepOut && sh.type !== "image");
+    if (!sel.length) { log(t("stock.throughSelect")); return; }
+    if (!(s.thick > 0)) return;
+    sel.forEach((sh: any) => { sh.millingDepth = -s.thick; });
+    updateDimensionInputs(null); checkpoint(); redraw();
+    log(t("stock.throughDone", { n: sel.length, t: s.thick }));
+  });
   $("stock-w")?.addEventListener("change", resize);
   $("stock-h")?.addEventListener("change", resize);
   $("stock-margin")?.addEventListener("change", () => {

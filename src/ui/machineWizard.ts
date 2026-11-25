@@ -441,7 +441,7 @@ export async function applyMachine(m: SavedMachine, writeToMachine = false) {
   }
   // Platte an die neue Größe anpassen, wenn darauf noch nichts markiert ist
   const st = getStock(m.kind);
-  if (!hasUsedArea(m.kind) && (st.w !== m.w || st.h !== m.h)) newPlate(m.w, m.h);
+  if (!hasUsedArea(m.kind) && !st.own && (st.w !== m.w || st.h !== m.h)) newPlate(m.w, m.h);
   refreshMachineLine();
   syncRuidaOptions();
   log(t("mw.applied", { name: m.name, w: m.w, h: m.h }));
