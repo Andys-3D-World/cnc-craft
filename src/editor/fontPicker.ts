@@ -8,7 +8,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import { t } from "../i18n/i18n";
-import { BUNDLED, addCustomFont, customFontNames, previewFamily, systemFonts } from "./fonts";
+import { BUNDLED, addFontFiles, customFontNames, fontFavs, loadUserFont, previewFamily, systemFonts, userFontList } from "./fonts";
 
 export interface FontPicker {
   get(): string;
@@ -69,6 +69,7 @@ export function createFontPicker(host: HTMLElement, initial: string, onChange: (
     n.className = "fp-iname";
     n.textContent = family;
     n.style.fontFamily = previewFamily(family, source);
+    if (source === "custom") { const uf = userFontList().find(x => x.name === family); if (uf) loadUserFont(uf).then(() => { n.style.fontFamily = previewFamily(family, source); }).catch(() => undefined); }
     el.appendChild(n);
     if (tag) {
       const tg = document.createElement("span");
@@ -86,6 +87,8 @@ export function createFontPicker(host: HTMLElement, initial: string, onChange: (
     const match = (f: string) => !q || f.toLowerCase().includes(q);
     list.textContent = "";
     let count = 0;
+    const favs = fontFavs(), fav = [...favs].filter(f => match(f) && (BUNDLED.some(b => b.family === f) || customFontNames().includes(f) || (sysNames ?? []).includes(f)));
+    if (fav.length) { heading("★ " + t("ft.favs")); for (const f of fav) { item(f, sourceOf(f)); count++; } }
     const bundled = BUNDLED.filter(b => match(b.family) || match(t("text.cat." + b.cat)));
     if (bundled.length) {
       heading(t("text.fontBundled"));
@@ -153,15 +156,16 @@ export function createFontPicker(host: HTMLElement, initial: string, onChange: (
   host.querySelector(".fp-refresh")!.addEventListener("click", () => loadSystem(true));
   host.querySelector(".fp-file")!.addEventListener("click", async () => {
     const sel = await open({
-      multiple: false, directory: false, title: t("text.fontLoadFile"),
-      filters: [{ name: t("text.fontFileFilter"), extensions: ["ttf", "otf", "woff", "woff2"] }]
+      multiple: true, directory: false, title: t("text.fontLoadFile"),
+      filters: [{ name: t("text.fontFileFilter"), extensions: ["ttf", "otf", "woff", "woff2", "zip"] }]
     });
     if (!sel) return;
-    const path = typeof sel === "object" && sel !== null ? (sel as any).path : sel;
     try {
-      const bytes = await readFile(path);
-      const name = await addCustomFont(path, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer);
-      pick(name);
+      const files: { name: string; data: Uint8Array }[] = [];
+      for (const path of Array.isArray(sel) ? sel : [sel]) files.push({ name: String(path), data: await readFile(String(path)) });
+      const r = await addFontFiles(files);
+      if (!r.names.length) throw new Error("no-font");
+      pick(r.names[0]);
     } catch (e) {
       hint.textContent = t("text.fontLoadError", { e: String(e) });
     }

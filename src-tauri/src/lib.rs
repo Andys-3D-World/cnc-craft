@@ -30,6 +30,7 @@ mod cycles;
 mod elfimg;
 mod flash;
 mod fonts;
+mod user_fonts;
 mod fwzip;
 mod gamepad;
 mod grbl;
@@ -619,6 +620,45 @@ async fn system_font_data(path: String, index: u32) -> Result<tauri::ipc::Respon
     Ok(tauri::ipc::Response::new(bytes))
 }
 
+/// Eigene Schriften (user_fonts.rs): auflisten, speichern (Bytes roh, Name im Kopf), lesen, löschen
+#[tauri::command]
+async fn user_fonts(app: AppHandle) -> Result<Vec<user_fonts::UserFont>, String> {
+    let dir = store_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || user_fonts::list(&dir)).await.map_err(|e| e.to_string())
+}
+#[tauri::command]
+async fn user_font_add(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<user_fonts::UserFont, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else { return Err("no-font".into()) };
+    let head = |k: &str| request.headers().get(k).and_then(|v| v.to_str().ok()).map(percent_decode).unwrap_or_default();
+    let (name, alias, data, dir) = (head("font-name"), head("font-alias"), data.clone(), store_dir(&app)?);
+    tauri::async_runtime::spawn_blocking(move || user_fonts::add(&dir, &name, &alias, &data)).await.map_err(|e| e.to_string())?
+}
+#[tauri::command]
+async fn user_font_data(app: AppHandle, id: String) -> Result<tauri::ipc::Response, String> {
+    let dir = store_dir(&app)?;
+    let bytes = tauri::async_runtime::spawn_blocking(move || user_fonts::read(&dir, &id)).await.map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+#[tauri::command]
+async fn user_font_remove(app: AppHandle, id: String) -> Result<(), String> {
+    let dir = store_dir(&app)?;
+    tauri::async_runtime::spawn_blocking(move || user_fonts::remove(&dir, &id)).await.map_err(|e| e.to_string())?
+}
+/// %XX in Kopfzeilen (encodeURIComponent der Oberfläche)
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 3 <= b.len() {
+            if let Some(v) = std::str::from_utf8(&b[i + 1..i + 3]).ok().and_then(|h| u8::from_str_radix(h, 16).ok()) { out.push(v); i += 3; continue; }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 /// Befehl über die Weboberfläche eines ESP32-Boards schicken (für WLAN-Passwörter mit ! ? ~ oder Umlauten)
 #[tauri::command]
 async fn esp_web_command(host: String, command: String) -> Result<String, String> {
@@ -1052,6 +1092,10 @@ pub fn run() {
             camera_snapshot,
             system_fonts,
             system_font_data,
+            user_fonts,
+            user_font_add,
+            user_font_data,
+            user_font_remove,
             esp_web_command,
             cam3d_load,
             cam3d_compute,

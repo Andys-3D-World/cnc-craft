@@ -12,7 +12,7 @@ in one app, so you no longer switch between three programs. Runs on macOS, Windo
 ## Features
 
 **Design & import**
-- Drawing tools with Bézier curves and node editing, text with 26+ fonts, single-line fonts and all system fonts,
+- Drawing tools with Bézier curves and node editing, text with 110+ included fonts, single-line fonts and all system fonts,
   dimensions and constraints, booleans (weld, score), patterns, duplicate / “fill the bed”, linked copies
   that follow their original, nesting (also into offcuts)
 - Shape library, QR codes, barcodes, serial numbers and variable text, several beds per project (like build plates in a slicer)
@@ -217,7 +217,7 @@ Copyright © 2026 Andys 3D World.
 Bundled parts of other projects (all open source) are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md):
 the GRBL firmware (`src-tauri/firmware/`, GPLv3) and the STEP import with
 [occt-import-js](https://github.com/kovacsv/occt-import-js) and [Open CASCADE Technology](https://www.opencascade.com)
-(`public/occt/`, LGPL 2.1), plus 26 free fonts for the text tool (`public/fonts/`, SIL Open Font License 1.1 or
+(`public/occt/`, LGPL 2.1), plus 112 free fonts for the text tool (`public/fonts/`, SIL Open Font License 1.1 or
 Apache 2.0, licence texts next to the files). The text tool can also use every font installed on your computer.
 
 Product and company names mentioned (e.g. LightBurn, Estlcam, OpenBuilds, MKS, BIGTREETECH, Sienci Labs,

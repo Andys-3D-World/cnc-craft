@@ -2100,7 +2100,25 @@ svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
 .ft-tile:hover { border-color: var(--accent-color); }
 .ft-sample { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
 .ft-outline { color: transparent; -webkit-text-stroke: 1px var(--text-main); }
-.ft-tile small { color: var(--text-muted); font-size: 0.68rem; }
+.ft-tile { position: relative; align-items: flex-start; cursor: pointer; }
+.ft-tile small { color: var(--text-muted); font-size: 0.68rem; display: flex; flex-wrap: wrap; gap: 2px 8px; }
+.ft-tile small b { color: var(--text-main); font-weight: 600; }
+.ft-ok { color: #34d17b; }
+.ft-no { color: var(--lt-amber, #ffb454); }
+.ft-star, .ft-del { position: absolute; top: 5px; right: 6px; border: none; background: none; color: var(--text-muted); cursor: pointer; font-size: 0.95rem; padding: 2px 4px; }
+.ft-star.on { color: #ffc043; }
+.ft-del { right: 32px; }
+.ft-main { flex: 1 1 0 !important; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 12px; }
+.ft-side { overflow: hidden auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; font-size: 0.78rem; }
+.ft-filter { display: flex; flex-direction: column; gap: 3px; }
+.ft-fbtn { display: flex; justify-content: space-between; gap: 8px; padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-input); color: var(--text-main); font: inherit; cursor: pointer; text-align: left; }
+.ft-fbtn small { color: var(--text-muted); }
+.ft-fbtn.on { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+.ft-fbtn.on small { color: #fff; }
+.ft-check { display: flex; gap: 6px; align-items: center; cursor: pointer; }
+.ft-check input { width: auto; }
+.ft-side .dlg-num input { width: 52px; }
+@media (max-width: 760px) { .ft-main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); } .ft-side { max-height: 150px; } }
 
 /* Zweiseitig fräsen: Vorderseite | Rückseite neben den Bett-Reitern */
 .bed-sides { display: inline-flex; gap: 0; margin-left: 10px; }
