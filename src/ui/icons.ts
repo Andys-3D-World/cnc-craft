@@ -128,6 +128,7 @@ const P: Record<string, string> = {
   seamSplit: `<path d="M3 5h8v5a2 2 0 100 4v5H3z"/><path d="M13 5h8v14h-8v-5a2 2 0 110-4z"/>`,
   tiles: `<rect x="3" y="4" width="8" height="7" rx="1"/><rect x="13" y="4" width="8" height="7" rx="1"/><rect x="3" y="13" width="8" height="7" rx="1"/><rect x="13" y="13" width="8" height="7" rx="1" stroke-dasharray="2 1.6"/>`,
   imageMask: `<rect x="3.5" y="4.5" width="17" height="15" rx="1.5" stroke-dasharray="2.5 2" opacity=".55"/><path d="M12 7.5l1.6 3.2 3.5.5-2.5 2.5.6 3.5L12 15.6l-3.2 1.6.6-3.5-2.5-2.5 3.5-.5z"/>`,
+  extrude3d: `<path d="M5 15l7 4 7-4"/><path d="M5 15V9l7-4 7 4v6" opacity=".55"/><path d="M12 19v-6M12 13l7-4M12 13L5 9" opacity=".55"/><path d="M12 3v6M9.5 5.5L12 3l2.5 2.5"/>`,
   constrain: `<path d="M4 20h16M7 20V5"/><path d="M7 16h4v4"/><path d="M12 6l7 7M15 4l5 5" opacity=".7"/>`,
   corner: `<path d="M5 20V5h15" opacity=".3" stroke-dasharray="2 2"/><path d="M5 20v-6a9 9 0 019-9h6"/><circle cx="8.6" cy="8.6" r="1.4"/>`,
   extend: `<path d="M3 12h10"/><path d="M13 12h6" stroke-dasharray="1.6 2.4" opacity=".7"/><path d="M21 4v16"/><path d="M15 9l3 3-3 3"/>`,

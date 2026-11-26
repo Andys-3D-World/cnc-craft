@@ -107,6 +107,7 @@ export function renderEditorToolbar(container: HTMLElement) {
     <div class="tb-group">
       ${cmd("zoomFit", "zoomFit", "tip.cmd.zoomFit")}
       <button id="btn-design3d" type="button" class="btn-cmd btn-d3 not-lathe" ${tip("d3.tip")}>3D</button>
+      ${cmd("extrude", "extrude3d", "tip.cmd.extrude")}
       ${placeButtonHtml()}
     </div>
     <div class="tb-group tb-options">

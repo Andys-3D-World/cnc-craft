@@ -18,7 +18,7 @@ export interface XY { x: number; y: number }
 
 export type CmdName =
   | "line" | "rect" | "circle" | "ellipse" | "polygon" | "star" | "slot" | "ring" | "arc" | "arcCenter" | "text" | "measure"
-  | "move" | "copy" | "rotate" | "erase" | "undo" | "redo" | "offset" | "corner" | "chamfer" | "extend" | "trim" | "mirror" | "zoom" | "select" | "help";
+  | "move" | "copy" | "rotate" | "erase" | "undo" | "redo" | "offset" | "corner" | "chamfer" | "extend" | "extrude" | "body" | "trim" | "mirror" | "zoom" | "select" | "help";
 
 const ALIASES: Record<string, CmdName> = {
   l: "line", line: "line", pl: "line", pline: "line",
@@ -38,6 +38,7 @@ const ALIASES: Record<string, CmdName> = {
   o: "offset", offset: "offset",
   f: "corner", fillet: "corner", cha: "chamfer", chamfer: "chamfer",
   ex: "extend", extend: "extend",
+  ext: "extrude", extrude: "extrude", body: "body", bodies: "body",
   tr: "trim", trim: "trim",
   mi: "mirror", mirror: "mirror",
   z: "zoom", zoom: "zoom",

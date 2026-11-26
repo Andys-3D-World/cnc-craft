@@ -28,7 +28,8 @@ const DRAW: Partial<Record<CmdName, ToolName>> = {
 };
 /** Befehle, die einfach einen vorhandenen Knopf-Befehl auslösen */
 const SIMPLE: Partial<Record<CmdName, string>> = {
-  erase: "delete", undo: "undo", redo: "redo", offset: "offset", mirror: "mirrorH", zoom: "zoomFit"
+  erase: "delete", undo: "undo", redo: "redo", offset: "offset", mirror: "mirrorH", zoom: "zoomFit",
+  extrude: "extrude", body: "body3d"
 };
 
 type Mode =

@@ -8,10 +8,10 @@
  *  - Erhebung: steht um die Höhe über dem Grundkörper vor (ohne Grundkörper: frei stehend ab 0)
  * Koordinaten in mm: x rechts, y nach hinten, z nach oben (wie der 3D-Betrachter).
  */
-import polygonClipping, { MultiPolygon, Polygon, Ring } from "polygon-clipping";
+import polygonClipping, { type MultiPolygon, type Polygon, type Ring } from "polygon-clipping";
 import earcut from "earcut";
-import { Mesh } from "./viewer3d";
-import { MM_TO_PIXEL, shapeToPaths } from "../shapeTransform";
+import type { Mesh } from "./viewer3d";
+import { MM_TO_PIXEL, shapeToPaths } from "../shapeTransform.ts";
 
 export type SolidKind = "body" | "recess" | "raise";
 export interface SolidPart { kind: SolidKind; value: number; shapes: any[] }

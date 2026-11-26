@@ -37,6 +37,7 @@ import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor, pick } from "./tools";
 import { offsetOpenPath, sideOf } from "./offsetOpen";
+import { openBodyDialog } from "../ui/bodyDialog";
 import { initCmdLine, toggleCmdLine, openCmdLine } from "./cmdLine";
 import {
   MM_TO_PIXEL, Bounds, groupBounds, translateShape, scaleShape, rotateShape, cloneShape, newId,
@@ -311,6 +312,8 @@ export const commands: Record<string, () => void> = {
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),
   cmdLine: () => toggleCmdLine(),
+  body3d: () => openBodyDialog(log, false, redrawFn),
+  extrude: () => openBodyDialog(log, true, redrawFn),
   exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-fly="file"] [data-fly-btn]')),
 
   toolSelect: () => setTool("select"),
@@ -353,6 +356,12 @@ export function makeCopies(source: any[], offsetPx: number, linked = false): any
       return m;
     });
     if (!c.gcons.length) delete c.gcons;
+  }
+  // 3D-Schritte (bodyDialog.ts): Profil auf die neuen Kennungen, nur wenn alle Profil-Formen mitkopiert wurden
+  for (const c of out) if (c.feat3d) {
+    c.feat3d = c.feat3d.filter((f: any) => f.profile.every((id: string) => idMap.has(id)))
+      .map((f: any) => ({ ...f, id: "f-" + newId(), profile: f.profile.map((id: string) => idMap.get(id)) }));
+    if (!c.feat3d.length) delete c.feat3d;
   }
   if (linked) markLinked(source, out);
   else for (const c of out) delete c.linkFrame; // a plain copy of an original is no original itself
