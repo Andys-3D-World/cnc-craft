@@ -4,7 +4,7 @@
  * „Zur Maschine“ macht aus der Zeichnung den Job und zeigt ihn in der Simulation. Gestartet wird nie von selbst:
  * Start bleibt immer ein eigener Klick. Vor dem Start wird geprüft, ob der Job noch zur Zeichnung passt.
  */
-import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "./cam";
+import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage, lastSectionTools } from "./cam";
 import { loadGcodeFromText, streamState } from "./machineStream";
 import { t } from "./i18n/i18n";
 import { askChoice } from "./ui/unsavedDialog";
@@ -85,7 +85,7 @@ export function buildJob(shapes: any, log: Log): boolean {
   building = true;
   const ok = loadGcodeFromText(gcode, designLabel(), log);
   building = false;
-  if (ok) { builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = fingerprint(shapes); builtSide = side; }
+  if (ok) { streamState.firstTool = lastSectionTools[0]?.id || ""; builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = fingerprint(shapes); builtSide = side; }
   lastLog = log;
   if (ok && two && side) log(t(side === "front" ? "two.builtFront" : "two.builtBack", { turn: t(two.flip === "lr" ? "two.turnLr" : "two.turnFb") }));
   return ok;

@@ -29,10 +29,10 @@ const PIN = 13;
 
 const COMP_COLOR: Record<CompId, string> = {
   psu: "#e5484d", motors: "#3e7bfa", extdrv: "#7c8cff", limits: "#f5c518", probe: "#f08c00", laser: "#ff5db1", rotary: "#ffa94d",
-  spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", display: "#7dd3fc", io: "#2dd4bf", latheAxes: "#8fb4e8", lathe: "#c4a484", latheHand: "#d9b38c"
+  spindle: "#9b5de5", modbus: "#b388ff", plasma: "#00b4d8", air: "#30a46c", estop: "#ff3b3b", door: "#a3a3a3", display: "#7dd3fc", io: "#2dd4bf", latheAxes: "#8fb4e8", lathe: "#c4a484", latheHand: "#d9b38c", atc: "#4cc38a", atcDiy: "#86d8ae"
 };
 const COMP_ICON: Record<CompId, string> = {
-  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", rotary: "🔄", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", display: "🖥️", io: "🔘", latheAxes: "⚙️", lathe: "🔩", latheHand: "✋"
+  psu: "🔌", motors: "⚙️", extdrv: "🎛️", limits: "🛑", probe: "📍", laser: "🔦", rotary: "🔄", spindle: "🌀", modbus: "🔗", plasma: "⚡", air: "💨", estop: "🚨", door: "🚪", display: "🖥️", io: "🔘", latheAxes: "⚙️", lathe: "🔩", latheHand: "✋", atc: "🔧", atcDiy: "🛠️"
 };
 
 function esc(s: string): string {
@@ -197,7 +197,7 @@ function partGlyph(pl: Placed): string {
       return `<rect x="${n(cx - 16)}" y="${n(cy - 9)}" width="32" height="18" rx="2" fill="#1b1d21" stroke="#56606b"/><text x="${n(cx)}" y="${n(cy + 4)}" text-anchor="middle" class="wr-glyph" style="font-size:10px">→|</text>`;
     case "psu": return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">⎓</text>`;
     default: return `<text x="${n(cx)}" y="${n(cy + 6)}" text-anchor="middle" class="wr-glyph">${{
-      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", srel: "🔁", iso: "⇌", yy: "⚡", bldc: "⚙", pot: "◔", rsw: "⇄", tacho: "123", nvr: "⏻", selsw: "⤨", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡", flame: "🔥", buzzer: "🔔", pbtn: "🔘", lcd: "🖥️", router: "🌀"
+      probe: "📍", wls: "🎯", laser: "🔦", relay: "🔁", vfd: "〰", inv: "〰", plasma: "⚡", thc: "↕", pump: "💨", door: "🚪", extdrv: "▤", lpsu: "⚡", srel: "🔁", iso: "⇌", yy: "⚡", bldc: "⚙", pot: "◔", rsw: "⇄", tacho: "123", nvr: "⏻", selsw: "⤨", valve: "⋈", psw: "bar", vfr: "⎓", clamp: "⊐⊏", runc: "⎍", flow: "💧", foot: "🦶", button: "🔘", lamp: "💡", flame: "🔥", buzzer: "🔔", pbtn: "🔘", lcd: "🖥️", router: "🌀"
     }[p.kind as string] || "■"}</text>`;
   }
 }

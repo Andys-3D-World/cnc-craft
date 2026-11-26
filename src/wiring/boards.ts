@@ -44,6 +44,13 @@
  *   - YY-600D-V1.2.8 (brushless lathe motor drive): seller's connection picture (labels AC IN, U V W, +5V 0V, NC F R COM,
  *     +5V a b c 0V, +5V SV 0V). Other versions (e.g. V1.12) were not seen. No transformer or optocoupler is visible in the
  *     picture, so every terminal is treated as mains potential. Not tested on a real board.
+ *   - Tool changer (atc, atcDiy), free outputs for M64/M65: FluidNC "user_outputs" (source Machine/UserOutputs.cpp: 8 digital
+ *     outputs, switched off at start and by all_off) and grblHAL board maps "mks_dlc32_max_1_0_map.h" (AUXOUTPUT2 = IO1 air
+ *     pump, free when flood coolant is not built in), "btt_skr_pro_v1_1_map.h" (AUXOUTPUT4 = PD14 HEAT1, free without mist).
+ *     Checked and left out: BlackBoxX32_map.h (all outputs used), longboard32_map.h (outputs exist, connectors not drawn
+ *     here), mks_dlc32_2_0_map.h (only on the display connector). Drawbar: Tormach "Power Drawbar" (springs clamp, air only
+ *     releases, back to clamped without air or power, do not press before the spindle has stopped), DWC 4848 ATC reference
+ *     (24 V, tool clamp and tool present sensors). Valve type and pressure are the maker's. Not tested on a real machine.
  *
  * Koordinaten: Board-Fläche w × h je Board (Zeichnung in ui/wiringPage.ts).
  *
@@ -63,10 +70,10 @@
  * Stecker: x/y = erster Pin, dir = Reihe (h) oder Spalte (v), Pins im Abstand von 13.
  */
 
-export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "display" | "io" | "latheAxes" | "lathe" | "latheHand";
-export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "display", "io", "latheAxes", "lathe", "latheHand"];
+export type CompId = "psu" | "motors" | "extdrv" | "limits" | "probe" | "laser" | "rotary" | "spindle" | "modbus" | "plasma" | "air" | "estop" | "door" | "display" | "io" | "latheAxes" | "lathe" | "latheHand" | "atc" | "atcDiy";
+export const COMPS: CompId[] = ["psu", "motors", "extdrv", "limits", "probe", "laser", "rotary", "spindle", "modbus", "plasma", "air", "estop", "door", "display", "io", "latheAxes", "lathe", "latheHand", "atc", "atcDiy"];
 /** "modbus" (Umrichter über RS485), "display" (Bildschirm) und "io" (weitere Ein-/Ausgänge) gibt es nur bei Boards, die es eintragen – sonst erscheint der Knopf nicht */
-export const OPTIONAL_COMPS: CompId[] = ["modbus", "display", "io", "latheAxes", "lathe", "latheHand"];
+export const OPTIONAL_COMPS: CompId[] = ["modbus", "display", "io", "latheAxes", "lathe", "latheHand", "atc", "atcDiy"];
 
 export interface BPin { k: string; label: string; mcu?: string; fn?: string }
 /**
@@ -84,7 +91,7 @@ export interface BConn {
 }
 
 /** Bauteil, das gezeichnet und verdrahtet wird */
-export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd" | "router" | "srel" | "iso" | "yy" | "bldc" | "pot" | "rsw" | "tacho" | "nvr" | "selsw";
+export type PartKind = "psu" | "motor" | "switch" | "probe" | "wls" | "laser" | "relay" | "vfd" | "plasma" | "thc" | "pump" | "estop" | "door" | "extdrv" | "lpsu" | "flow" | "foot" | "button" | "lamp" | "inv" | "prox" | "opto" | "flame" | "buzzer" | "pbtn" | "rotary" | "lcd" | "router" | "srel" | "iso" | "yy" | "bldc" | "pot" | "rsw" | "tacho" | "nvr" | "selsw" | "valve" | "psw" | "vfr" | "clamp" | "runc";
 export interface Wire { from: string; to: string; color: string }   // to = "conn.pin" oder "@teil.pin"
 /** outer: Pins auf der vom Board abgewandten Seite (für Verbindungen zu anderen Bauteilen, z. B. Relais-Kontakt) */
 export interface Part {
@@ -3138,6 +3145,60 @@ function latheHookup(b: Board): Hookup {
   };
 }
 
+/**
+ * Werkzeugwechsler: Ventil der Spannzange an einem freien Ausgang (M64/M65). Nur Boards mit belegtem freien Ausgang.
+ * Das Ventil hat immer einen eigenen 24-V-Kreis: Druckschalter, Umrichter-Kontakt „Frequenz null“ und Koppelrelais in Reihe.
+ * Ohne Strom oder Luft spannen die Federn. Nie über Kühlung oder Spindel-Ausgang.
+ */
+interface AtcOut { side: Part["side"]; sw: LatheOut["sw"]; name: string; settings: string[]; hal?: "wr.s.atc.max" | "wr.s.atc.skr"; notes?: string[]; extra?: Part[] }
+const FNC_OUT = (pin: string) => ["user_outputs:", `digital0_pin: ${pin}`, "M64 P0 / M65 P0"];
+const ATC_OUT: Record<string, AtcOut> = {
+  "mks-dlc32-max": { side: "top", sw: { a: "air.+", b: "air.-", how: "coil" }, name: "+AIR− (IO1)", hal: "wr.s.atc.max", settings: ["$PINS", "M64 P… / M65 P…"], notes: ["wr.n.atc.max"] },
+  "btt-skr-pro": { side: "bottom", sw: { a: "heat1.+", b: "heat1.-", how: "coil" }, name: "HEAT1 (PD14)", hal: "wr.s.atc.skr", settings: ["$PINS", "M64 P… / M65 P…"], notes: ["wr.n.skr.out"] },
+  "pibot-v496-pro": { side: "top", sw: { a: "relay.COM", b: "relay.NO", how: "contact" }, name: "RELAY COM / NO (⑬)", settings: FNC_OUT("gpio.26"), notes: ["wr.n.atc.pb"] },
+  "pibot-v588-ultra": { side: "left", sw: { a: "extra.10", b: "extra.G", how: "module", vcc: "rs485.5V" }, name: "EXTRA IO 10", settings: FNC_OUT("gpio.10"), notes: ["wr.n.pu.io"] },
+  "btt-rodent": { side: "top", sw: { a: "mos2.V", b: "mos2.S", how: "coil" }, name: "V-MOS V+ / P-02", settings: FNC_OUT("gpio.2"), notes: ["wr.n.rod.vmos"],
+    extra: [{ id: "psuv", kind: "psu", name: "12–24 V", side: "left", pins: ["+", "-"], wires: [{ from: "+", to: "vmos.+", color: RED }, { from: "-", to: "vmos.-", color: BLACK }] }] },
+  "6pack": { side: "top", sw: { a: "o3.3", b: "o3.G", how: "module" }, name: "#3 · 3 (IO16)", settings: FNC_OUT("gpio.16") },
+  "6pack-int": { side: "top", sw: { a: "o3.3", b: "o3.G", how: "module" }, name: "#3 · 3 (IO16)", settings: FNC_OUT("gpio.16") },
+  "jackpot": { side: "top", sw: { a: "mos.V2", b: "mos.16", how: "coil" }, name: "MOSFET gpio.16", settings: FNC_OUT("gpio.16"), notes: ["wr.n.jp.mos"] },
+  "jackpot3": { side: "right", sw: { a: "o27h.+", b: "o27h.-", how: "coil" }, name: "24 V 27 (+ / −)", settings: FNC_OUT("gpio.27"), notes: ["wr.n.jp3.out"] },
+};
+/** Warum es den Plan auf den anderen Boards nicht gibt */
+const ATC_NO: Record<string, string> = { "openbuilds-bbx32": "wr.u.atc.bbx", "sienci-slb": "wr.u.atc.slb", "mks-dlc32-v21": "wr.u.atc.dlc" };
+function atcHookup(b: Board, diy: boolean): Hookup {
+  const comp: CompId = diy ? "atcDiy" : "atc", o = ATC_OUT[b.id];
+  if (!o) return { comp, parts: [], steps: [], notes: [], pro: [], settings: [], unavailable: ATC_NO[b.id] ?? "wr.u.atc" };
+  const s = o.side, parts: Part[] = [...(o.extra ?? [])];
+  const rel: Part = { id: "srel", kind: "srel", name: "", side: s, pins: ["A1", "A2"], outerPins: ["11", "14"], wires: [] };
+  const psu: Part = { id: "psu", kind: "psu", name: "24 V", side: s, pins: ["+", "-"], wires: [] };
+  if (o.sw.how === "coil") rel.wires.push({ from: "A1", to: o.sw.a, color: RED }, { from: "A2", to: o.sw.b, color: BLACK });
+  else if (o.sw.how === "contact") { psu.wires.push({ from: "+", to: o.sw.a, color: RED }); rel.wires.push({ from: "A1", to: o.sw.b, color: RED }, { from: "A2", to: "@psu.-", color: BLACK }); }
+  else {
+    parts.push({ id: "relay", kind: "relay", name: "5 V", side: s, pins: ["IN", "GND", "VCC"], wires: [{ from: "IN", to: o.sw.a, color: GRN }, { from: "GND", to: o.sw.b, color: BLACK }, o.sw.vcc ? { from: "VCC", to: o.sw.vcc, color: RED } : { from: "VCC", to: "@psu5.+", color: RED }] });
+    if (!o.sw.vcc) parts.push({ id: "psu5", kind: "psu", name: "5 V", side: s, pins: ["+", "-"], wires: [{ from: "-", to: o.sw.b, color: BLACK }] });
+    psu.wires.push({ from: "+", to: "@relay.COM", color: RED });
+    rel.wires.push({ from: "A1", to: "@relay.NO", color: RED }, { from: "A2", to: "@psu.-", color: BLACK });
+  }
+  parts.push(psu, rel,
+    // Ventilkreis: 24 V → Druckschalter → „Frequenz null“ → Koppelrelais → Ventil → 0 V
+    { id: "psw", kind: "psw", name: "", side: s, outer: true, pins: [], outerPins: ["1", "2"], wires: [{ from: "1", to: "@psu.+", color: RED }, { from: "2", to: "@vfr.C", color: RED }] },
+    { id: "vfr", kind: "vfr", name: "", side: s, outer: true, pins: [], outerPins: ["C", "NO", "RUN"], wires: [{ from: "NO", to: "@srel.11", color: RED }] },
+    { id: "valve", kind: "valve", name: "24 V", side: s, outer: true, pins: [], outerPins: ["+", "-"], wires: [{ from: "+", to: "@srel.14", color: RED }, { from: "-", to: "@psu.-", color: BLACK }] },
+    // Startkreis der Spindel: nur wenn gespannt (Kontakt in Reihe)
+    { id: "clamp", kind: "clamp", name: "", side: s, outer: true, pins: [], outerPins: ["1", "2"], wires: [{ from: "1", to: "@vfr.RUN", color: YEL }, { from: "2", to: "@runc.14", color: YEL }] },
+    { id: "runc", kind: "runc", name: "", side: s, outer: true, pins: [], outerPins: ["14"], wires: [] });
+  const k = diy ? "wr.s.atd." : "wr.s.atc.";
+  return {
+    comp, parts,
+    steps: [{ k: "wr.s.atc.1" }, { k: k + "kind" }, { k: "wr.s.lat.sw." + o.sw.how, p: { sw: o.name } }, { k: "wr.s.atc.chain" }, { k: "wr.s.atc.zero" }, { k: k + "clamp" }, { k: k + "valve" },
+      { k: o.hal ?? "wr.s.atc.fnc" }, { k: "wr.s.atc.app" }, { k: "wr.s.atc.test" }],
+    notes: [{ k: "wr.n.atc.hot" }, { k: "wr.n.atc.boot" }, { k: "wr.n.atc.test" }, ...(o.notes ?? []).map(x => ({ k: x }))],
+    pro: [{ k: "wr.p.atc.1" }, { k: "wr.p.atc.2" }],
+    settings: o.settings
+  };
+}
+
 /** Drehbank: X (Planschlitten) und Z (Bettschlitten) mit Endschaltern, Netzteil und Not-Aus – aus den Plänen des Boards zusammengestellt */
 function latheAxesHookup(b: Board, h: Partial<Record<CompId, Hookup>>): Hookup {
   const pick = (hk: Hookup | undefined, kind: PartKind) => (hk?.parts ?? []).filter(p => p.kind === kind && (p.name === "X" || p.name === "Z"));
@@ -3160,7 +3221,7 @@ function latheAxesHookup(b: Board, h: Partial<Record<CompId, Hookup>>): Hookup {
 export const BOARDS: Board[] = [shield, shieldV4, dlc21, dlcMax, pibot, pibotUltra, ruida6445, ruida6442, sixPack, sixPackInt, jackpot, jackpot3, ramps, sktPro, rodent, bb4x, bbx32, slb, yy600];
 for (const b of BOARDS) {
   b.hookups = b.only ? yyHookups() : hookupsFor(b);
-  if (!b.only && b.maker !== "Ruida") { b.hookups.latheAxes = latheAxesHookup(b, b.hookups); b.hookups.lathe = latheHookup(b); }
+  if (!b.only && b.maker !== "Ruida") { b.hookups.latheAxes = latheAxesHookup(b, b.hookups); b.hookups.lathe = latheHookup(b); b.hookups.atc = atcHookup(b, false); b.hookups.atcDiy = atcHookup(b, true); }
 }
 
 export function getBoard(id: string): Board {

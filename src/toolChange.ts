@@ -38,6 +38,9 @@ import { probeSettings as s, setProbeLog, step, settled, startGuard, stopGuard, 
 import { getTools } from "./toolLibrary";
 import { fmtLenShort, unitName } from "./units";
 import { postCtx } from "./post/postContext";
+import { reportsInches } from "./units";
+import { getSteps, lookSteps, needsSteps, putSteps, rackBlocked, runsOn, slotForTool, slotOf, type RackBlock, type Slot, type Step } from "./magazine";
+import { magazine, rackOn, saveMagazine, setInSpindle, slotNumber } from "./magazineStore";
 
 export enum TcState {
   Idle = "idle",
@@ -50,6 +53,8 @@ export enum TcState {
   Probing = "probing",             // misst das neue Werkzeug
   Failed = "failed",               // Messung ging nicht – Z NICHT verändert; nochmal / von Hand / abbrechen
   WaitRemovePlate = "waitRemove",  // Platte + Klemme entfernen
+  Atc = "atc",                     // Magazin: legt ab / holt (magazine.ts)
+  AtcStep = "atcStep",             // Magazin: wartet auf das Ja zum nächsten Schritt
   Returning = "returning",         // zurück zur Position vor dem Wechsel
   WaitResume = "waitResume",       // fertig – Nutzer bestätigt das Weitermachen
   Aborted = "aborted"              // abgebrochen, Job geht nicht weiter
@@ -59,7 +64,8 @@ export enum TcState {
 export function toolChangeGcode(num: number, comment: string): string {
   // file for a controller with a tool table (post/postContext.ts): always with the number – a tool without one stops the export
   if (postCtx.toolTable) return `M6 T${num} ${comment}`;
-  return s.tcM6 && num > 0 ? `M6 T${num} ${comment}` : `M0 ${comment}`;
+  // automatisches Magazin: immer mit Nummer, sonst weiß es nicht, welches Werkzeug (nur eigene Programme, nicht Dateien für andere)
+  return (s.tcM6 || (rackOn() && !postCtx.foreign)) && num > 0 ? `M6 T${num} ${comment}` : `M0 ${comment}`;
 }
 
 export interface TcTool { num: number | null; name: string; d: number | null }
@@ -74,7 +80,8 @@ export const tc = {
   spindle: "",             // wird beim Weitermachen wieder eingeschaltet (z. B. "M3 S12000"), "" = nichts
   ref: null as number | null,     // Referenz: Maschinen-Z beim Sensor-Kontakt des aktuellen Werkzeugs
   refBusy: false,
-  kind: "change" as "change" | "drift",   // Werkzeugwechsel oder Nachmessen (Wärmegang)
+  kind: "change" as "change" | "drift" | "fetch",   // Werkzeugwechsel, Nachmessen (Wärmegang) oder Holen/Ablegen ohne Job
+  stepText: "",                          // Magazin: der nächste Schritt in Worten
   driftRef: null as number | null,       // Nachmessen mit Handtaster: Maschinen-Z beim ersten Kontakt
   driftAt: 0                             // Zeitpunkt der letzten Messung (ms)
 };
@@ -250,6 +257,15 @@ function onJobToolChange(p: { note?: string; tool?: number | null; m6?: boolean 
   tc.delta = null; tc.zSet = null; tc.spindle = "";
   manualStart = null;
   noTopLogged = false;
+  // automatisches Magazin: nur wenn alles stimmt, sonst wie bisher von Hand (mit dem Grund im Protokoll)
+  if (rackOn() && m6) {
+    const tl = p?.tool ? getTools()[p.tool - 1] : undefined, slot = tl ? slotForTool(magazine(), tl.id) : null;
+    if (slot && slot.n === magazine().inSpindle) { log(t("mag.log.same", { n: slot.n })); jobResume().catch(e => log(`${t("log.error")} ${e}`)); return; }
+    const b = atcBlocked();
+    if (slot && !b.why) { run("sensor", null, slot); return; }
+    log(t("mag.log.byHand", { why: b.why ? t("mag.why." + b.why, { n: b.n }) : t("mag.noSlotFor", { tool: toolLabel() }) }));
+    setInSpindle(-1); // von Hand gewechselt: danach sagt der Nutzer, was drin ist
+  } else if (rackOn()) setInSpindle(-1);
   const auto = machine.protocol === "grbl" && (s.tcMode === 1 || s.tcMode === 2);
   if (!auto) {
     if (machine.protocol === "grbl" && s.tcLift !== 2) manualLift();
@@ -340,8 +356,9 @@ async function returnTo(start: TcStart) {
   if (/\bG20\b/.test(gc)) must(await step("G20"), "G20");
 }
 
-async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
+async function run(mode: "sensor" | "plate", from: TcStart | null = null, slot: Slot | null = null) {
   cancelled = false;
+  let onward = false;
   set(TcState.Parking);
   startGuard();
   try {
@@ -368,8 +385,9 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
         must(z !== null, t("tc.err.ref"));
         tc.ref = z;
       }
-      await swapPos();
-      let a = await waitUser(TcState.WaitSwap);
+      if (slot) { onward = runsOn(magazine(), slot); await atcSwap(slot); set(TcState.Probing); }
+      else await swapPos();
+      let a: Answer = slot ? "go" : await waitUser(TcState.WaitSwap);
       for (;;) {
         if (a === "cancel") throw new Cancel();
         if (a === "skip") { tc.ref = null; tc.driftRef = null; break; } // Nutzer hat selbst genullt – alte Referenz passt nicht mehr
@@ -385,6 +403,7 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
           log(t("tc.log.delta", { d: delta.toFixed(3) }));
           break;
         }
+        onward = false; // etwas war nicht in Ordnung: vor dem Weitermachen fragen
         a = await waitUser(TcState.Failed, t("tc.err.measure"));
       }
     } else {
@@ -412,10 +431,12 @@ async function run(mode: "sensor" | "plate", from: TcStart | null = null) {
     }
 
     set(TcState.Returning);
+    if (slot) must(await upTo(magazine().zClear), "up"); // nicht auf Sensor-Höhe quer über die Werkzeugreihe
     await returnTo(start);
     stopGuard();
 
-    if ((await waitUser(TcState.WaitResume)) !== "go") throw new Cancel();
+    if (!onward && (await waitUser(TcState.WaitResume)) !== "go") throw new Cancel();
+    if (cancelled || guard.tripped) throw new Cancel();
     if (tc.spindle) {
       log(t("tc.log.spindle", { s: tc.spindle }));
       must(await step(tc.spindle) && await step("G4 P2"), "spindle");
@@ -535,6 +556,7 @@ export function tcAbort(reason: string, stopJob: boolean, sendCancel = true) {
   if (tc.state === TcState.Aborted) return;
   cancelled = true;
   manualStart = null;
+  if (tc.state === TcState.Atc || tc.state === TcState.AtcStep) log(t("mag.log.check"));
   abortProbe(sendCancel);
   stopGuard();
   const p = pending; pending = null; p?.("cancel");
@@ -567,9 +589,158 @@ export async function measureReference(): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------
+// Magazin (magazine.ts): ablegen und holen
+// ---------------------------------------------------------------------
+
+/** Warum die Reihe gerade nicht fahren darf ("" = darf) */
+export function atcBlocked(): { why: RackBlock; n: number } {
+  const n = (k: string) => parseFloat(machine.settings.get(k) ?? "");
+  return rackBlocked(magazine(), {
+    grbl: machine.connected && machine.protocol === "grbl", firmware: machine.firmware,
+    homed: ((n("$22") | 0) & 1) === 1 && machine.homeState !== "lost" && machine.homeState !== "pending",
+    inches: reportsInches(machine.settings.get("$13")), sensor: s.tcMode === 1 && s.sensorSet === 1
+  });
+}
+
+/** Z nach oben auf diese Maschinen-Höhe – nie nach unten */
+async function upTo(z: number): Promise<boolean> {
+  await freshStatus();
+  if (machine.status.mpos[2] >= z - 0.01) return true;
+  return await step(`$J=G53 G21 Z${f3(z)} F${Math.round(magazine().feedZ)}`) && await settled();
+}
+
+function stepText(x: Step): string {
+  if (x.k === "up") return t("mag.step.up", { z: f3(x.z) });
+  if (x.k === "xy") return t(x.at ? "mag.step.slide" : "mag.step.xy", { x: f3(x.x), y: f3(x.y) });
+  if (x.k === "z") return t("mag.step.z", { z: f3(x.z), f: x.feed });
+  return t("mag.step." + x.what, { cmd: x.cmd });
+}
+
+const near = (a: number, b: number) => Math.abs(a - b) < 0.1;
+/** Warten mit Abbruch */
+async function pause(seconds: number) {
+  const end = performance.now() + seconds * 1000;
+  while (performance.now() < end) { if (cancelled || guard.tripped) throw new Cancel(); await sleep(50); }
+}
+
+async function atcRun(steps: Step[], ask: boolean) {
+  for (const x of steps) {
+    if (ask) {
+      tc.stepText = stepText(x);
+      if ((await waitUser(TcState.AtcStep)) !== "go") throw new Cancel();
+    }
+    if (cancelled || guard.tripped) throw new Cancel();
+    set(TcState.Atc);
+    log(`[${t("mag.title")}] ${stepText(x)}`);
+    if (x.k === "up") { must(await upTo(x.z), "up"); continue; }
+    if (x.k === "out") { must(await step(x.cmd), x.cmd); await pause(x.wait); continue; }
+    await freshStatus(); await freshStatus();
+    const p = machine.status.mpos;
+    if (x.k === "xy") {
+      // quer nur auf der freien Höhe – oder als Einfahrt genau von der vorgesehenen Stelle aus
+      if (x.at) must(near(p[0], x.at.x) && near(p[1], x.at.y) && near(p[2], x.at.z), t("mag.err.place"));
+      else must(p[2] >= magazine().zClear - 0.1, t("mag.err.place"));
+      must(await step(`$J=G53 G21 X${f3(x.x)} Y${f3(x.y)} F${Math.round(x.feed)}`) && await settled(120000), "xy");
+    } else {
+      must(near(p[0], x.at.x) && near(p[1], x.at.y), t("mag.err.place"));
+      must(await step(`$J=G53 G21 Z${f3(x.z)} F${Math.round(x.feed)}`) && await settled(), "z");
+    }
+  }
+}
+
+/** Werkzeug in der Spindel ablegen (falls eins drin ist) und das neue holen. Spindel ist schon aus */
+async function atcSwap(want: Slot | null) {
+  const m = magazine();
+  await pause(Math.max(0, m.spinS));
+  await freshStatus();
+  must(!(machine.status.spindle > 0), t("mag.err.spindle"));
+  const old = m.inSpindle > 0 ? slotOf(m, m.inSpindle) : null;
+  must(m.inSpindle === 0 || !!old, t("mag.why.spindle"));
+  if (old) {
+    setInSpindle(-1);
+    await atcRun(putSteps(m, old), needsSteps(m, old, "put"));
+    setInSpindle(0);
+    mark(old.n, "okPut");
+  }
+  if (want) {
+    setInSpindle(-1);
+    await atcRun(getSteps(m, want), needsSteps(m, want, "get"));
+    setInSpindle(want.n);
+    mark(want.n, "okGet");
+  }
+}
+/** Ein Vorgang ist ganz durchgelaufen (beim ersten Mal Schritt für Schritt bestätigt) */
+function mark(n: number, what: "okGet" | "okPut") {
+  const m = magazine();
+  saveMagazine({ ...m, slots: m.slots.map(x => x.n === n ? { ...x, [what]: true } : x) });
+}
+
+export type AtcJob = "look" | "get" | "put";
+/** Ohne Job: Platz anfahren, Werkzeug holen oder ablegen. Danach startet nichts von selbst. true = fertig */
+export async function atcManual(what: AtcJob, n: number): Promise<boolean> {
+  if (!rackOn()) return false;
+  if (toolChangeBusy() || machine.job.active || guard.on) { log(t("sp.jobRunning")); return false; }
+  if (!machine.settings.has("$22")) await sendAndWait("$$", 5000, true).catch(() => undefined);
+  const b = atcBlocked(), slot = slotOf(magazine(), n);
+  // zum Anfahren muss niemand wissen, was in der Spindel steckt
+  if (b.why && !(what === "look" && (b.why === "spindle" || b.why === "sensor" || b.why === "outputs"))) { log(t("mag.why." + b.why, { n: b.n })); return false; }
+  if (machine.status.state !== "Idle") { log(t("m.jogNotIdle", { s: machine.status.state })); return false; }
+  if (what !== "put" && !slot?.set) return false;
+  if (what === "get" && magazine().inSpindle === n) { log(t("mag.log.same", { n })); return false; }
+  if (what === "put" && magazine().inSpindle <= 0) { log(t("mag.log.empty")); return false; }
+  tc.kind = "fetch"; tc.note = ""; tc.delta = null; tc.zSet = null; tc.spindle = ""; cancelled = false; noTopLogged = false;
+  const tl = slot ? getTools().find(x => x.id === slot.toolId) : undefined;
+  tc.tool = { num: null, name: t("mag.slotN", { n }) + (tl && what !== "put" ? " · " + tl.name : ""), d: what !== "put" ? tl?.diameter ?? null : null };
+  set(TcState.Parking);
+  startGuard();
+  let done = false;
+  try {
+    const gc = (await readStart()).gc;
+    must(await step("M5"), "M5");
+    must(await goSafe(), "safe");
+    if (what === "look") await atcRun(lookSteps(magazine(), slot!), true);
+    else if (what === "put") { await atcSwap(null); tc.ref = null; tc.driftRef = null; }
+    else {
+      const had = magazine().inSpindle > 0;
+      // Z-Nullpunkt gehört zum Werkzeug, das noch drin ist: erst messen, dann den Unterschied übernehmen
+      if (had && tc.ref === null) { set(TcState.MeasureRef); const z0 = await measureAtSensor(); must(z0 !== null, t("tc.err.ref")); tc.ref = z0; }
+      const ref = had ? tc.ref : null;
+      await atcSwap(slot);
+      set(TcState.Probing);
+      tc.ref = null; tc.driftRef = null;
+      const z = await measureAtSensor();
+      must(z !== null, t("tc.err.measure"));
+      if (ref !== null) {
+        const delta = z! - ref;
+        await freshStatus(); await freshStatus();
+        must(await step("G21") && await step(`G10 L20 P0 Z${f3(machine.status.wpos[2] - delta)}`), "G10");
+        tc.delta = delta;
+        log(t("tc.log.delta", { d: delta.toFixed(3) }));
+      } else log(t("mag.log.setZ"));
+      tc.ref = z;
+      must(await upTo(magazine().zClear), "up");
+    }
+    if (/\bG91\b/.test(gc)) must(await step("G91"), "G91");
+    if (/\bG20\b/.test(gc)) must(await step("G20"), "G20");
+    done = true;
+    set(TcState.Idle);
+    log(t("mag.log.done"));
+  } catch (e) {
+    if (!(e instanceof Cancel) && !cancelled) tcAbort(t("tc.err.step", { e: (e as Error).message || String(e) }), false);
+    else if (guard.tripped && (tc.state as TcState) !== TcState.Aborted) tcAbort(t("tc.why.guard"), false);
+    else if (!cancelled) tcAbort(t("tc.why.user"), false);
+  } finally {
+    stopGuard();
+    pending = null;
+  }
+  return done;
+}
+
 export function toolLabel(): string {
   const w = tc.tool;
-  return (w.num ? `T${w.num} · ` : "") + (w.name || "?") + (w.d !== null ? ` · Ø ${fmtLenShort(w.d, 3)} ${unitName()}` : "");
+  const at = w.num ? slotNumber(getTools()[w.num - 1]?.id) : null;
+  return (at !== null ? t("mag.slotN", { n: at }) + " · " : "") + (w.num ? `T${w.num} · ` : "") + (w.name || "?") + (w.d !== null ? ` · Ø ${fmtLenShort(w.d, 3)} ${unitName()}` : "");
 }
 
 export function initToolChange(logFn: (s: string) => void) {

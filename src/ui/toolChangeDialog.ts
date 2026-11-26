@@ -8,6 +8,7 @@
 import { t, T, tip } from "../i18n/i18n";
 import { machine, MACHINE_EVENT } from "../machine";
 import { probeSettings as s, saveProbe, ProbeSettings } from "../probe";
+import { openMagazine } from "./magazineDialog";
 import { tc, TcState, onToolChange, tcAnswer, tcAbort, tcClose, tcManualPlate, tcManualResume, tcWaiting,
   measureReference, toolLabel, toolChangeBusy, initToolChange } from "../toolChange";
 
@@ -45,6 +46,7 @@ export function toolChangeSettingsHtml(): string {
             <button id="tc-ref-go" class="btn-secondary btn-compact" ${tip("tc.refGoTip")}>📏 ${T("tc.refGo")}</button>
           </div>
         </div>
+        <button id="tc-mag" class="btn-secondary btn-compact only-mill" ${tip("mag.tip")}>🔧 ${T("mag.openDlg")}</button>
         <label class="prop-row" style="cursor:pointer;" ${tip("tc.m6Tip")}>${T("tc.m6")}<input type="checkbox" id="tc-m6" style="width:auto;"></label>
         <label class="prop-row" style="cursor:pointer;" ${tip("dr.onTip")}>${T("dr.on")}<input type="checkbox" id="dr-on" style="width:auto;"></label>
         <div id="dr-box">
@@ -112,6 +114,7 @@ export function initToolChangeSettings(log: (s: string) => void) {
     saveProbe(); show();
     log(t("tc.hereDone", { x: s.tcX, y: s.tcY }));
   });
+  $("tc-mag")?.addEventListener("click", () => openMagazine(log));
   $("tc-ref-go")?.addEventListener("click", () => { measureReference(); });
   // Sensor-Platz/Platte stehen weiter oben im Abschnitt – Hinweis aktuell halten
   ["pr-sx", "pr-sy", "pr-plate", "pr-fast", "pr-slow"].forEach(id => $(id)?.addEventListener("change", show));
@@ -129,7 +132,7 @@ export function initToolChangeSettings(log: (s: string) => void) {
 // Ablauf-Fenster
 // ---------------------------------------------------------------------
 
-const BUSY = [TcState.Parking, TcState.MeasureRef, TcState.Travel, TcState.Probing, TcState.Returning];
+const BUSY = [TcState.Atc, TcState.Parking, TcState.MeasureRef, TcState.Travel, TcState.Probing, TcState.Returning];
 
 function render() {
   let box = document.getElementById("tc-float");
@@ -160,13 +163,14 @@ function render() {
     case TcState.Failed: buttons = btn("tc-b-go", "↻ " + t("tc.b.retry"), "btn-primary") + btn("tc-b-skip", t(k("tc.b.skip"))) + stop; break;
     case TcState.WaitRemovePlate: buttons = btn("tc-b-go", "✓ " + t("tc.b.removed"), "btn-primary") + stop; break;
     case TcState.WaitResume: buttons = btn("tc-b-go", "▶ " + t("tc.b.resume"), "btn-primary") + stop; break;
+    case TcState.AtcStep: buttons = btn("tc-b-go", "▶ " + t("mag.b.step"), "btn-primary") + stop; break;
     case TcState.Aborted: buttons = btn("tc-b-close", t("tc.b.close")); break;
     default: buttons = stop;
   }
   const extra = st === TcState.WaitResume
     ? (tc.delta !== null ? `<div class="tc-result">${esc(t(k("tc.resDelta"), params))}</div>` : tc.zSet !== null ? `<div class="tc-result">${esc(t("tc.resPlate", params))}</div>` : "")
       + (tc.spindle ? `<div class="dlg-hint">${esc(t("tc.resSpindle", params))}</div>` : "")
-    : "";
+    : st === TcState.AtcStep ? `<div class="tc-result">${esc(tc.stepText)}</div><div class="dlg-hint">${esc(t("mag.stepHint"))}</div>` : "";
   box.innerHTML = `
     <h3>${drift ? "🌡" : "🔧"} ${esc(t(k("tc.dlgTitle")))}</h3>
     <div class="tc-tool">${esc(drift ? t("dr.sub", { m: s.drMin }) : toolLabel())}</div>
@@ -178,7 +182,7 @@ function render() {
   const on = (id: string, fn: () => void) => document.getElementById(id)?.addEventListener("click", fn);
   on("tc-b-go", () => { if (tcWaiting()) tcAnswer("go"); });
   on("tc-b-skip", () => { if (tcWaiting() && window.confirm(t(k("tc.skipConfirm")))) tcAnswer("skip"); });
-  on("tc-b-stop", () => { if (window.confirm(t("tc.stopConfirm"))) tcAbort(t("tc.why.user"), true); });
+  on("tc-b-stop", () => { if (tc.kind === "fetch" || window.confirm(t("tc.stopConfirm"))) tcAbort(t("tc.why.user"), true); });
   on("tc-b-close", () => tcClose());
   on("tc-b-plate", () => tcManualPlate());
   on("tc-b-mresume", () => { if (window.confirm(t("tc.manualConfirm"))) tcManualResume(); });

@@ -15,6 +15,7 @@ import { getStock } from "../stock";
 import { parseGcodeProgram, MOVE_CUT } from "../sim/gcodeParser";
 import { motionLimits } from "../sim/motionLimits";
 import { getTool, toolForShape, toolNumber } from "../toolLibrary";
+import { slotNumber } from "../magazineStore";
 import { extraOps } from "../ops";
 import { layersUsedBy } from "../laserLayers";
 import { cutForShape } from "../plasmaCuts";
@@ -60,7 +61,8 @@ function toolRows(fromDrawing: boolean, list: any[] = state.shapes, extra: any[]
   const add = (tl: any) => {
     if (!tl || seen.has(tl.id)) return;
     seen.add(tl.id);
-    rows.push({ no: `T${toolNumber(tl)}`, name: tl.name, dia: `${tl.diameter} mm`, type: t("tl.type." + tl.type), len: tl.length ? `${tl.length} mm` : "–" });
+    const at = slotNumber(tl.id);
+    rows.push({ no: `T${toolNumber(tl)}` + (at !== null ? ` · ${t("mag.slotN", { n: at })}` : ""), name: tl.name, dia: `${tl.diameter} mm`, type: t("tl.type." + tl.type), len: tl.length ? `${tl.length} mm` : "–" });
   };
   for (const s of shapes) {
     add(toolForShape(s));

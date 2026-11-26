@@ -26,6 +26,7 @@ import { ensureWcsForJob } from "./wcsSync";
 import { macroRunning } from "./macroRun";
 import { toolChangeBusy, tcAbort } from "./toolChange";
 import { limitsAllowStart } from "./ui/limitGuard";
+import { magazineAllowsStart } from "./ui/magazineStart";
 import { checkFileLines } from "./fileCheck";
 import { jobLines } from "./jobLines";
 import type { LintIssue } from "./gcodeLint";
@@ -44,6 +45,7 @@ export const streamState = {
   onMachine: false,         // läuft gerade an der echten Maschine?
   sentOrigin: null as number[] | null, // je gesendeter Zeile die Original-Zeile (Höhenkarte, Fortsetzen; sonst 1:1)
   compensated: false,       // mit Höhenkarte gesendet? (dann keine Live-Bearbeitung: neue Zeilen wären nicht angepasst)
+  firstTool: "",              // Kennung des ersten Werkzeugs (nur Jobs aus der Zeichnung, für das Werkzeugmagazin)
   fromFile: false,            // aus einer Datei (auch danach bearbeitet): fremder G-Code
   fileIssues: [] as LintIssue[], // was an der Datei auffällt (fileCheck.ts) – nur Hinweis, gestartet wird weiter von Hand
   marks: [] as ResumeMark[],  // Formen/Ebenen im Job (zum Fortsetzen)
@@ -95,6 +97,7 @@ export function loadGcodeFromText(content: string, label: string, appendToConsol
   streamState.abortLine = -1;
   streamState.label = label;
   streamState.bed = stockBed();
+  streamState.firstTool = "";
   streamState.fromFile = fromFile;
   streamState.fileIssues = fromFile ? checkFileLines(streamState.loadedLines, { kind: getMachineMode(), sMax: laserSettings.sMax }) : [];
   appendToConsole(t("stream.loaded", { n: streamState.totalLines }));
@@ -336,6 +339,8 @@ export async function startStreaming(_isConnected: () => boolean, appendToConsol
       }
     }
     // Maschinengrenzen: geprüft wird genau das, was gleich gesendet wird
+    // Werkzeugmagazin: Plätze und Werkzeug in der Spindel (fährt höchstens nach einer Frage und startet nie den Job)
+    if (!await magazineAllowsStart(send, streamState.firstTool, resumeFrom > 0, appendToConsole)) return;
     if (!await limitsAllowStart(send, appendToConsole)) return;
     if (streamState.isRunning || !machine.connected || machine.status.state === "Alarm") return; // während der Frage geändert
     try {

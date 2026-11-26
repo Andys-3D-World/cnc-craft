@@ -117,3 +117,33 @@ test("Hand/CNC: SV, F und R gehen nur über den Wahlschalter, Hand und CNC treff
   assert.deepEqual(to("sv.5V"), ["pot.+5V"]);
   assert.equal(h.notes[0].k, "wr.n.yy.hot");
 });
+
+test("Werkzeugwechsler: Ventil nur im eigenen 24-V-Kreis, nie am Board; jeder Öffner-Weg geht durch Druckschalter, Frequenz null und Koppelrelais", () => {
+  let full = 0;
+  for (const b of BOARDS) for (const id of ["atc", "atcDiy"] as const) {
+    const h = b.hookups[id];
+    if (b.only || b.maker === "Ruida") { assert.ok(!h, b.id); continue; }
+    assert.ok(h, b.id);
+    if (h.unavailable) { assert.equal(h.parts.length, 0); continue; }
+    full++;
+    const of = (k: string) => h.parts.filter(p => p.kind === k);
+    const w = (k: string) => of(k)[0].wires.map(x => x.from + ">" + x.to).sort();
+    for (const k of ["valve", "psw", "vfr", "clamp", "runc", "srel"]) assert.equal(of(k).length, 1, `${b.id} ${k}`);
+    assert.deepEqual(w("valve"), ["+>@srel.14", "->@psu.-"], b.id);
+    assert.deepEqual(w("psw"), ["1>@psu.+", "2>@vfr.C"], b.id);
+    assert.deepEqual(w("vfr"), ["NO>@srel.11"], b.id);
+    assert.deepEqual(w("clamp"), ["1>@vfr.RUN", "2>@runc.14"], b.id);
+    // Ventilkreis berührt das Board nirgends; Spulenseite und Kontaktseite des Koppelrelais bleiben getrennt
+    for (const p of h.parts) for (const x of p.wires) {
+      if (["valve", "psw", "vfr", "clamp", "runc"].includes(p.kind)) assert.ok(x.to.startsWith("@"), `${b.id} ${p.id}`);
+      if (p.kind !== "valve" && p.kind !== "vfr") assert.ok(!/^@srel\.1[14]$/.test(x.to), `${b.id} ${p.id}`);
+    }
+    assert.ok(of("srel")[0].wires.every(x => x.from === "A1" || x.from === "A2"), b.id);
+    // derselbe Pin wie Kühlung/Spindel darf es nur sein, wenn der Plan das ausdrücklich sagt (grblHAL ohne diese Funktion)
+    const out = h.settings.find(x => /digital0_pin/.test(x))?.split(": ")[1];
+    if (out) for (const other of ["air", "spindle"] as const) assert.ok(!b.hookups[other]?.settings.some(x => /pin/.test(x) && !/mist_pin/.test(x) && x.endsWith(out)), `${b.id} ${other} ${out}`);
+    else assert.ok(h.steps.some(x => x.k === "wr.s.atc.max" || x.k === "wr.s.atc.skr"), b.id);
+    assert.equal(h.notes[0].k, "wr.n.atc.hot");
+  }
+  assert.equal(full, 18);
+});

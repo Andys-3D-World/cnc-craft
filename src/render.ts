@@ -17,6 +17,7 @@ import { cutForShape } from "./plasmaCuts";
 import { drawPlasmaLeads } from "./plasmaCam";
 import { drawStock, shapeOnUsedArea, hasUsedArea } from "./stock";
 import { drawPlace } from "./placesView";
+import { drawRack } from "./rackView";
 import { layerForShape, layerHasFill, LaserLayer } from "./laserLayers";
 import { drawCameraUnderlay } from "./camera/cameraOverlay";
 import { drawImageShape } from "./raster/imageShape";
@@ -51,7 +52,8 @@ export function drawEverything(
   selectedShapeIds: string[],
   offsetX: number,
   offsetY: number,
-  scale: number
+  scale: number,
+  bare = false // nur die Zeichnung, durchsichtig (Entwurf in 3D): ohne Grund, Bett, Raster und Lineal
 ) {
   const bedWInput = document.getElementById("bed-w") as HTMLInputElement;
   const bedHInput = document.getElementById("bed-h") as HTMLInputElement;
@@ -64,6 +66,7 @@ export function drawEverything(
 
   // 1. Hintergrund
   const tc = canvasColors();
+  if (!bare) {
   ctx.fillStyle = tc.bg;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -135,6 +138,7 @@ export function drawEverything(
     ctx.fillText(String(+(mm / unitMm).toFixed(inch ? 2 : 1)), bx0 - 4, y + 3);
   }
   ctx.textAlign = "left";
+  }
 
   const laser = isLaser();
   const plasma = isPlasma();
@@ -143,6 +147,7 @@ export function drawEverything(
   // 5b. Material-Platte: verbrauchte Fläche (schraffiert) + Plattenumriss
   drawStock(ctx, sx, sy, scale);
   drawPlace(ctx, sx, sy);
+  drawRack(ctx, sx, sy);
   const checkUsed = hasUsedArea();
 
   // 5c. Bilder (Bildgravur) unter allen Konturen

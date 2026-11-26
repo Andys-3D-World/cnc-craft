@@ -32,6 +32,8 @@ import { initPlasmaPanel, refreshPlasmaPanel } from "./ui/plasmaPanel";
 import { initStock } from "./stock";
 import { initStockPanel } from "./ui/stockPanel";
 import { initPlacesPanel } from "./ui/placesPanel";
+import { initDrawingZero } from "./drawingZero";
+import { design3dOn, initDesign3d, paintDesign3d } from "./editor/design3d";
 import { applySavedMachine, initMachineWizard, welcomeOnFirstStart } from "./ui/machineWizard";
 import { initJobTools } from "./ui/jobTools";
 import { initSpindlePanel } from "./ui/spindlePanel";
@@ -195,12 +197,15 @@ window.addEventListener("DOMContentLoaded", async () => {
       if (dirty && ctx && canvas) {
         dirty = false;
         solveConstraints(); // Maße: abhängige Formen folgen ihrer Bezugsform
+        if (design3dOn()) paintDesign3d(ctx, canvas); // Entwurf in 3D: dieselbe Zeichnung, schräg betrachtet
+        else {
         drawEverything(ctx, canvas, state.shapes, state.selectedShapeIds, state.offsetX, state.offsetY, state.scale);
         drawOtherBeds(ctx);   // weitere Betten blass daneben (wie im Slicer)
         drawTwoSided(ctx);    // Zweiseitig fräsen: Rohteil, Wendelinie, Stifte, andere Seite blass
         drawSplit(ctx);       // Großes Teil teilen: Fugen und Stück-Namen
         drawReimport(ctx);    // Zeichnung neu einlesen: was sich ändern würde
         drawOverlay(ctx, canvas);
+        }
         refreshToolPicker(); // Werkzeug-Auswahl an die aktuelle Auswahl anpassen
         refreshMillProfilePicker();
         refreshOps();        // Bearbeitungen der Auswahl
@@ -225,6 +230,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     if (canvas && ctx) {
       initMouseEngine(canvas, state, redraw);
       initCommands(canvas, redraw, appendToConsole);
+      initDesign3d(canvas, redraw, appendToConsole);
     }
     initHistory();
     initBeds(redraw, appendToConsole, () => zoomFit());
@@ -369,6 +375,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     initLibSync(appendToConsole);      // Werkstatt-Sync: Bibliotheken über einen gemeinsamen Ordner abgleichen
     initStockPanel(redraw, appendToConsole);
     initPlacesPanel(redraw, appendToConsole); // feste Spannplätze: Nullpunkt aus gemerkter Stelle
+    initDrawingZero();
     initTwoSidedPanel(redraw, appendToConsole);
     initSplitPanel(redraw, appendToConsole); // Großes Teil teilen: Fugen auf der Zeichenfläche ziehen
     initMachineWizard(redraw, appendToConsole);

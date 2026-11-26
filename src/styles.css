@@ -2130,3 +2130,26 @@ svg.gen-stage, canvas.gen-stage { width: 100%; height: auto !important; }
 #post-box { padding: 6px 8px; }
 #post-note { line-height: 1.35; display: flex; flex-direction: column; gap: 4px; }
 #post-note.warn { color: var(--lt-amber, #ffb547); }
+
+/* Entwurf in 3D (editor/design3d.ts) */
+.btn-d3 { font-weight: 700; font-size: 0.78rem; }
+.btn-d3.active { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+.design3d { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 22px); display: block; }
+.design3d-ui { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% - 22px); pointer-events: none; overflow: hidden; }
+.design3d-bar { position: absolute; right: 10px; top: 10px; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 6px; max-width: calc(100% - 20px); pointer-events: auto; background: color-mix(in srgb, var(--bg-panel, #1b1b22) 82%, transparent); padding: 5px 8px; border-radius: var(--radius-md); font-size: 0.76rem; }
+.design3d-bar .btn-compact { width: auto; }
+.design3d-info:empty { display: none; }
+.design3d-hint { position: absolute; left: 10px; bottom: 8px; font-size: 0.7rem; color: var(--text-muted); max-width: calc(100% - 20px); }
+.design3d-depth { position: absolute; transform: translate(-50%, 6px); pointer-events: auto; cursor: ns-resize; touch-action: none; border: 1px solid #34d17b; background: rgba(16, 40, 28, 0.92); color: #d7ffe8; border-radius: 12px; padding: 3px 9px; font-size: 0.74rem; font-variant-numeric: tabular-nums; }
+
+/* Werkzeugmagazin (ui/magazineDialog.ts) */
+/* Die Platzliste darf im Flex-Fenster nicht schrumpfen (sonst eigener Rollbalken mit nur 2 Zeilen); das ganze Fenster rollt */
+.mag-dlg > * { flex-shrink: 0; }
+.mag-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.mag-table th { text-align: left; font-weight: 600; color: var(--text-muted); padding: 3px 5px; }
+.mag-table td { padding: 2px 5px; }
+.mag-table input[type="number"] { width: 78px; }
+.mag-table select { max-width: 250px; }
+.mag-table .btn-compact { width: auto; }
+.mag-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 8px 22px; }
+.mag-cols > div { display: flex; flex-direction: column; gap: 7px; }

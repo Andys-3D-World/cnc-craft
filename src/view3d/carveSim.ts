@@ -72,7 +72,7 @@ export function exactKernel(tool: ToolGeom | null, c: number): Kernel {
  * @param tools      Fräser je Abschnitt (Abschnitt = zwischen zwei Werkzeugwechseln); fehlt einer: 3-mm-Schaftfräser
  * @param onProgress 0…1; gibt false zurück = abbrechen
  */
-export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgress: (f: number) => boolean): Promise<CarveResult | null> {
+export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgress: (f: number) => boolean, maxCells = MAX_CELLS): Promise<CarveResult | null> {
   const prog = parseGcodeProgram(lines);
   // Abschnitt (Werkzeug) je Zeile
   const sect = new Int32Array(lines.length + 1);
@@ -98,7 +98,7 @@ export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgr
   x0 -= margin; y0 -= margin; x1 += margin; y1 += margin;
   // Kleine Teile: nicht feiner als nötig (feiner = viel länger rechnen, sieht man aber nicht). Feine Fräser dürfen feiner.
   const rMin = Math.min(...(tools.length ? tools : [null]).map(radius));
-  const c = Math.max(Math.min(0.06, Math.max(0.03, rMin / 4)), Math.sqrt(((x1 - x0) * (y1 - y0)) / MAX_CELLS));
+  const c = Math.max(Math.min(0.06, Math.max(0.03, rMin / 4)), Math.sqrt(((x1 - x0) * (y1 - y0)) / maxCells));
   const nx = Math.max(2, Math.ceil((x1 - x0) / c)), ny = Math.max(2, Math.ceil((y1 - y0) / c));
   const h = new Float32Array(nx * ny); // 0 = Oberkante
   const kernels = new Map<ToolGeom | null, Kernel>();

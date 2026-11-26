@@ -23,7 +23,8 @@ import { drawLinkMarks } from "./linked";
 const PREVIEW = "rgba(0, 255, 204, 0.95)";
 const SELECT = "#34d17b";
 
-export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+/** bar = false: ohne Statuszeile (Entwurf in 3D malt sie getrennt) */
+export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, bar = true) {
   ctx.save();
   const tool = currentTool();
   // ---- Drehachse: Band für den abgewickelten Umfang ----
@@ -100,7 +101,7 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
     ctx.fillText(live.label, x, y);
   }
 
-  drawStatusBar(ctx, canvas, tool);
+  if (bar) drawStatusBar(ctx, canvas, tool);
   ctx.restore();
 }
 
@@ -321,7 +322,7 @@ function drawSnapMarker(ctx: CanvasRenderingContext2D, x: number, y: number, kin
   ctx.stroke();
 }
 
-function drawStatusBar(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, tool: string) {
+export function drawStatusBar(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, tool: string) {
   const h = 22;
   const y = canvas.height - h;
   ctx.fillStyle = "rgba(23, 23, 28, 0.92)";

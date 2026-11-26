@@ -6,10 +6,21 @@ import { initTools, onMouseDown, onMouseMove, onMouseUp, onDoubleClick, updateCu
 import { toWorld } from "./editor/editorState";
 import { openCanvasMenu } from "./ui/contextMenu";
 
+/** Entwurf in 3D (editor/design3d.ts): rechnet die Maus auf die Zeichen-Ebene um; sein Bild liegt über der Zeichenfläche */
+let plane: ((e: MouseEvent) => { x: number; y: number }) | null = null;
+let planeEl: HTMLElement | null = null;
+let down: ((e: MouseEvent) => void) | null = null;
+export function setPlaneMouse(fn: typeof plane, el: HTMLElement | null) {
+  if (planeEl && down) planeEl.removeEventListener("mousedown", down);
+  plane = fn; planeEl = el;
+  if (el && down) el.addEventListener("mousedown", down);
+}
+
 export function initMouseEngine(canvas: HTMLCanvasElement, state: any, redraw: () => void) {
   initTools(canvas, redraw);
 
   const pos = (e: MouseEvent) => {
+    if (plane) return plane(e);
     const r = canvas.getBoundingClientRect();
     // Falls das Canvas per CSS skaliert ist: auf Canvas-Pixel umrechnen
     return {
@@ -32,14 +43,15 @@ export function initMouseEngine(canvas: HTMLCanvasElement, state: any, redraw: (
 
   let pressed = false; // wurde die Maustaste IM Canvas gedrückt?
 
-  canvas.addEventListener("mousedown", (e: MouseEvent) => {
+  down = (e: MouseEvent) => {
     pressed = true;
     // Eingabefeld verlassen, damit Tastenkürzel wieder funktionieren
     const active = document.activeElement as HTMLElement | null;
     if (active && active !== document.body) active.blur();
     const p = pos(e);
     onMouseDown(e, p.x, p.y);
-  });
+  };
+  canvas.addEventListener("mousedown", down);
 
   // Bewegen und Loslassen auch außerhalb des Canvas verfolgen (z.B. beim Ziehen über den Rand)
   window.addEventListener("mousemove", (e: MouseEvent) => {
