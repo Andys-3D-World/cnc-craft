@@ -182,3 +182,78 @@ test("Nur Ausschnitte (wie bisher): Tasche in der Tasche und Ring-Tasche stimmen
 test("Ohne Körper: nichts zu fräsen", () => {
   assert.equal(millPlan([cut(rect(0, 0, 10, 10), 0, 5)]).ops.length, 0);
 });
+
+// ---- Kanten: Fase und Rundung ----
+import { edgeInset, expandEdges, offsetRegion, regionArea } from "../src/editor/body3d.ts";
+
+test("Fläche verschieben: kleiner und größer, Löcher gegenläufig", () => {
+  near(regionArea(offsetRegion(rect(0, 0, 100, 50), -5)), 90 * 40, 1e-6);
+  const frame: MultiPolygon = [[[[0, 0], [100, 0], [100, 50], [0, 50], [0, 0]], [[40, 15], [40, 35], [60, 35], [60, 15], [40, 15]]]];
+  // das Loch wächst mit runden Ecken (Radius 2), wie ein Fräser es macht
+  near(regionArea(offsetRegion(frame, -2)), 96 * 46 - (20 * 20 + 4 * 20 * 2 + Math.PI * 4), 0.15);
+});
+
+test("Kantenverlauf: Fase linear, Rundung als Viertelkreis", () => {
+  near(edgeInset({ kind: "chamfer", size: 3 }, 1), 1);
+  near(edgeInset({ kind: "round", size: 3 }, 3), 3);
+  near(edgeInset({ kind: "round", size: 3 }, 0), 0);
+  near(edgeInset({ kind: "round", size: 3 }, 1.5), 3 - Math.sqrt(9 - 2.25));
+});
+
+test("Platte mit Fase 2 oben: Rauminhalt fast genau (feine Stufen)", () => {
+  const plain = 100 * 50 * 10;
+  // Fase entfernt ein Dreiecksprisma 2×2/2 entlang des Umfangs (Ecken: Pyramiden-Korrektur)
+  const exact = plain - 0.5 * 4 * 2 * (100 + 50) + (4 / 3) * 4 * 2;
+  const v = volume([{ ...join(rect(0, 0, 100, 50), 0, 10), edge: { kind: "chamfer", size: 2 } }]);
+  assert.ok(Math.abs(v - exact) / exact < 0.003, `${v} vs ${exact}`);
+});
+
+test("Rundung: Oberkante kleiner, Höhe bleibt", () => {
+  const f = [{ ...join(rect(0, 0, 100, 50), 0, 10), edge: { kind: "round" as const, size: 3 } }];
+  near(topOf(f), 10);
+  const s = slabs(f);
+  assert.ok(regionArea(s[s.length - 1].region) < 100 * 50 - 10);
+  assert.ok(expandEdges(f).length > 3);
+});
+
+test("Fräsen: Fase oben an der Platte (außen) und am Rand einer Tasche und eines Durchbruchs (innen)", () => {
+  const f = [
+    { ...join(rect(0, 0, 100, 50), 0, 10), edge: { kind: "chamfer" as const, size: 1 } },
+    { ...cut(rect(10, 10, 30, 30), 5, 10), edge: { kind: "chamfer" as const, size: 0.5 } },
+    { ...cut(rect(60, 10, 80, 30), -1, 11), edge: { kind: "chamfer" as const, size: 0.5 } }
+  ];
+  const p = millPlan(f);
+  const ch = p.ops.filter(o => o.mode === "chamfer");
+  assert.deepEqual(ch.map(o => `${o.side}:${o.width}`).sort(), ["-1:0.5", "-1:0.5", "1:1"]);
+  // die Taschen-Tiefe bleibt 5 (die Fase ändert die Fräsformen sonst nicht)
+  assert.deepEqual(p.ops.filter(o => o.mode === "pocket").map(o => o.depth), [5]);
+});
+
+test("Fräsen: Rundungen und tiefe Fasen werden nur gemeldet", () => {
+  const p = millPlan([
+    { ...join(rect(0, 0, 100, 50), 0, 10), edge: { kind: "round" as const, size: 2 } },
+    { ...join(rect(40, 15, 60, 35), 10, 20), edge: { kind: "chamfer" as const, size: 1 } },
+    { ...join(rect(0, 0, 100, 50), 0, 10), edge: { kind: "chamfer" as const, size: 1 } }
+  ]);
+  assert.equal(p.rounds, 1);
+  assert.equal(p.edgeLow, 1);
+});
+
+test("Fase am Rand eines Durchbruchs, der über den Körper hinausreicht: sitzt an der Oberkante", () => {
+  const plate = join(rect(0, 0, 100, 50), 0, 10);
+  const hole = { ...cut(rect(40, 15, 60, 35), -1, 11), edge: { kind: "chamfer" as const, size: 1 } };
+  const without = volume([plate, cut(rect(40, 15, 60, 35), -1, 11)]);
+  assert.ok(volume([plate, hole]) < without - 10, "Fase nimmt Material weg");
+  near(topOf([plate, hole]), 10);
+});
+
+test("Fase an einem Loch in der Platte neben einem höheren Zapfen: liegt auf der Platte, wird nicht bei Z 0 gefräst", () => {
+  const plate = join(rect(0, 0, 100, 50), 0, 10), boss = join(rect(60, 10, 90, 40), 10, 16);
+  const hole = { ...cut(rect(10, 10, 20, 20), -1, 20), edge: { kind: "chamfer" as const, size: 1 } };
+  const p = millPlan([plate, boss, hole]);
+  assert.equal(p.ops.filter(o => o.mode === "chamfer").length, 0);
+  assert.equal(p.edgeLow, 1);
+  // im Körper sitzt die Fase auf Höhe der Platte (10): dort fehlt Material gegenüber ohne Fase
+  const without = volume([plate, boss, cut(rect(10, 10, 20, 20), -1, 20)]);
+  assert.ok(volume([plate, boss, hole]) < without - 5);
+});

@@ -180,3 +180,33 @@ test("Festhalten widerspricht dem Ziehen nicht, aber zwei Festhalte-Punkte und e
   const r = solve(sh, [{ k: "fix", p: { id: "a", i: 0 }, at: P(0, 0) }, { k: "fix", p: { id: "a", i: 1 }, at: P(100, 0) }, { k: "len", a: { id: "a", i: 0, j: 1 }, v: 50 }]);
   assert.equal(r.ok, false);
 });
+
+// ---- Bögen: [Start, Ende, Punkt auf dem Bogen] ----
+import { circumcircle } from "../src/editor/sketchSolve.ts";
+
+test("Umkreis durch drei Punkte", () => {
+  const k = circumcircle(P(10, 0), P(-10, 0), P(0, 10))!;
+  near(k.c.x, 0); near(k.c.y, 0); near(k.r, 10);
+  assert.equal(circumcircle(P(0, 0), P(1, 1), P(2, 2)), null);
+});
+
+test("Bogen: Radius setzen, Endpunkt an eine Linie hängen", () => {
+  const sh: Shapes = new Map([["arc", [P(10, 0), P(-10, 0), P(0, 10)]], ["l", [P(10.5, 0.3), P(30, 0)]]]);
+  const cons: GCon[] = [
+    { k: "rad", c: { id: "arc", arc: true }, v: 15 },
+    { k: "coin", p: { id: "arc", i: 0 }, q: { id: "l", i: 0 } }
+  ];
+  const r = solve(sh, cons);
+  assert.ok(r.ok); all(r, cons);
+  const v = r.shapes.get("arc")!;
+  near(circumcircle(v[0], v[1], v[2])!.r, 15, 1e-6);
+});
+
+test("Linie tangential an einen Bogen", () => {
+  const sh: Shapes = new Map([["arc", [P(10, 0), P(-10, 0), P(0, 10)]], ["l", [P(-30, 13), P(30, 13)]]]);
+  const cons: GCon[] = [{ k: "tanL", a: { id: "l", i: 0, j: 1 }, c: { id: "arc", arc: true } }];
+  const r = solve(sh, cons, id => (id === "l" ? 1000 : 1));
+  assert.ok(r.ok); all(r, cons);
+  const v = r.shapes.get("arc")!, k = circumcircle(v[0], v[1], v[2])!, l = r.shapes.get("l")!;
+  near(Math.abs(l[0].y - k.c.y), k.r, 1e-6);
+});

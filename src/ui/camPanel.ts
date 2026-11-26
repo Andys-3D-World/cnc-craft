@@ -95,11 +95,12 @@ export function renderEditorToolbar(container: HTMLElement) {
       ${flyGroups("edit", "offset", [
         ["outline", [["offset", "offset", "tip.cmd.offset"], ["fillet", "fillet", "tip.cmd.fillet"], ["heal", "heal", "tip.cmd.heal"], ["thickness", "thickness", "tip.cmd.thickness"], ["dogbone", "dogbone", "tip.cmd.dogbone"], ["centerFix", "centerFix", "tip.cmd.centerFix"]]],
         ["parts", [["array", "array", "tip.cmd.array"], ["copiesOnPath", "copiesOnPath", "tip.cmd.copiesOnPath"], ["patternFill", "patternFill", "tip.cmd.patternFill"], ["tiles", "tiles", "tip.cmd.tiles"], ["seamSplit", "seamSplit", "tip.cmd.seamSplit"], ["longBoard", "longBoard", "tip.cmd.longBoard"], ["splitParts", "splitParts", "tip.cmd.splitParts"], ["relief", "relief", "tip.cmd.relief"], ["keepOut", "keepOut", "tip.cmd.keepOut"]]],
-        ["paths", [["textOnPath", "textOnPath", "tip.cmd.textOnPath"], ["simplify", "simplify", "tip.cmd.simplify"], ["perforate", "perforate", "tip.cmd.perforate"], ["stencilBridge", "stencilBridge", "tip.cmd.stencilBridge"], ["dedupe", "dedupe", "tip.cmd.dedupe"], ["cutStart", "cutStart", "tip.cmd.cutStart"], ["reverseDir", "reverseDir", "tip.cmd.reverseDir"]]]
+        ["paths", [["joinLines", "joinLines", "tip.cmd.joinLines"], ["explode", "explode", "tip.cmd.explode"], ["textOnPath", "textOnPath", "tip.cmd.textOnPath"], ["simplify", "simplify", "tip.cmd.simplify"], ["perforate", "perforate", "tip.cmd.perforate"], ["stencilBridge", "stencilBridge", "tip.cmd.stencilBridge"], ["dedupe", "dedupe", "tip.cmd.dedupe"], ["cutStart", "cutStart", "tip.cmd.cutStart"], ["reverseDir", "reverseDir", "tip.cmd.reverseDir"]]]
       ], 18, "down")}
       ${flyCmds("image", "imageMask", [["imageMask", "imageMask", "tip.cmd.imageMask"], ["imageSplit", "imageSplit", "tip.cmd.imageSplit"], ["toImage", "toImage", "tip.cmd.toImage"]])}
       ${flyCmds("transform", "rotateLeft", [["rotateLeft", "rotateLeft", "tip.cmd.rotateLeft"], ["rotateRight", "rotateRight", "tip.cmd.rotateRight"],
-        ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"], ["shear", "shear", "tip.cmd.shear"]])}
+        ["mirrorH", "mirrorH", "tip.cmd.mirrorH"], ["mirrorV", "mirrorV", "tip.cmd.mirrorV"], ["shear", "shear", "tip.cmd.shear"],
+        ["scaleRef", "scaleRef", "tip.cmd.scaleRef"], ["stretch", "stretch", "tip.cmd.stretch"]])}
       ${flyCmds("align", "alignCenterH", [["alignLeft", "alignLeft", "tip.cmd.alignLeft"], ["alignCenterH", "alignCenterH", "tip.cmd.alignCenterH"],
         ["alignRight", "alignRight", "tip.cmd.alignRight"], ["alignTop", "alignTop", "tip.cmd.alignTop"], ["alignCenterV", "alignCenterV", "tip.cmd.alignCenterV"],
         ["alignBottom", "alignBottom", "tip.cmd.alignBottom"], ["distributeH", "distributeH", "tip.cmd.distributeH"], ["distributeV", "distributeV", "tip.cmd.distributeV"]])}
@@ -120,6 +121,8 @@ export function renderEditorToolbar(container: HTMLElement) {
         <input type="checkbox" id="opt-show-tools">${icon("endmill", 16)}</label>
       <label class="tb-opt" ${tip("tip.snapObjects")}>
         <input type="checkbox" id="opt-snap-objects">${icon("magnet", 16)}</label>
+      <label class="tb-opt" ${tip("tip.ortho")}>
+        <input type="checkbox" id="opt-ortho"><span class="tb-lbl">90°</span></label>
       <label class="tb-opt" ${tip("tip.snapGrid")}>
         <input type="checkbox" id="opt-snap-grid">${icon("grid", 16)}
         <input type="number" id="opt-grid-step" data-unit="mm" min="0.1" step="0.5" class="tb-num"></label>

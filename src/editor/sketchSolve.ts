@@ -11,6 +11,7 @@
  *   onLine    Punkt liegt auf der (verlängerten) Strecke
  *   ang       Winkel von Strecke a nach b (Grad, gegen den Uhrzeigersinn; 180° weiter gilt auch)
  * Kreise: in der Punktliste stehen [Mitte, {x: Radius, y: 0}] – Punkt 0 ist also die Mitte (geht auch bei coin/fix …)
+ * Bögen (CirRef mit arc): [Start, Ende, Punkt auf dem Bogen] – Mitte und Radius ergeben sich aus den drei Punkten
  *   rad       Radius genau v
  *   conc      gleiche Mitte
  *   tanL      Strecke berührt den Kreis (Abstand Mitte–Gerade = Radius)
@@ -26,8 +27,17 @@ export interface P { x: number; y: number }
 /** Strecke: Punkte i und j der Form id */
 export interface SegRef { id: string; i: number; j: number }
 export interface PtRef { id: string; i: number }
-/** Kreis: id einer Kreis-Form (Punktliste [Mitte, {x: r, y: 0}]) */
-export interface CirRef { id: string }
+/** Kreis: id einer Kreis-Form (Punktliste [Mitte, {x: r, y: 0}]) oder eines Bogens (arc: [Start, Ende, Mitte des Bogens]) */
+export interface CirRef { id: string; arc?: boolean }
+
+/** Umkreis durch drei Punkte (null = auf einer Geraden) */
+export function circumcircle(a: P, b: P, c: P): { c: P; r: number } | null {
+  const d = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+  if (Math.abs(d) < 1e-12) return null;
+  const a2 = a.x * a.x + a.y * a.y, b2 = b.x * b.x + b.y * b.y, c2 = c.x * c.x + c.y * c.y;
+  const x = (a2 * (b.y - c.y) + b2 * (c.y - a.y) + c2 * (a.y - b.y)) / d, y = (a2 * (c.x - b.x) + b2 * (a.x - c.x) + c2 * (b.x - a.x)) / d;
+  return { c: { x, y }, r: Math.hypot(a.x - x, a.y - y) };
+}
 export type GCon =
   | { k: "h" | "v"; a: SegRef }
   | { k: "par" | "perp" | "eq"; a: SegRef; b: SegRef }
@@ -47,7 +57,7 @@ export type Shapes = Map<string, P[]>;
 /** Alle Punkte, die eine Bedingung braucht */
 export function refsOf(c: GCon): PtRef[] {
   const seg = (s: SegRef): PtRef[] => [{ id: s.id, i: s.i }, { id: s.id, i: s.j }];
-  const cir = (r: CirRef): PtRef[] => [{ id: r.id, i: 0 }, { id: r.id, i: 1 }];
+  const cir = (r: CirRef): PtRef[] => r.arc ? [{ id: r.id, i: 0 }, { id: r.id, i: 1 }, { id: r.id, i: 2 }] : [{ id: r.id, i: 0 }, { id: r.id, i: 1 }];
   switch (c.k) {
     case "h": case "v": case "len": return seg(c.a);
     case "par": case "perp": case "eq": case "ang": return [...seg(c.a), ...seg(c.b)];
@@ -67,6 +77,11 @@ export function idsOf(c: GCon): string[] { return [...new Set(refsOf(c).map(r =>
 /** Fehler einer Bedingung (0 = erfüllt). get(id, i) liefert den Punkt */
 export function residual(c: GCon, get: (id: string, i: number) => P): number[] {
   const seg = (s: SegRef) => { const a = get(s.id, s.i), b = get(s.id, s.j); return { x: b.x - a.x, y: b.y - a.y }; };
+  /** Mitte und Radius eines Kreises oder Bogens (Bogen auf einer Geraden: sehr groß, damit der Rechner weg davon findet) */
+  const circ = (r: CirRef): { c: P; r: number } => {
+    if (!r.arc) return { c: get(r.id, 0), r: get(r.id, 1).x };
+    return circumcircle(get(r.id, 0), get(r.id, 1), get(r.id, 2)) ?? { c: get(r.id, 2), r: 1e9 };
+  };
   switch (c.k) {
     case "h": return [seg(c.a).y];
     case "v": return [seg(c.a).x];
@@ -86,18 +101,18 @@ export function residual(c: GCon, get: (id: string, i: number) => P): number[] {
       const d = seg(c.a), e = seg(c.b), l = Math.hypot(d.x, d.y) * Math.hypot(e.x, e.y) || 1, t = (c.v * Math.PI) / 180;
       return [((d.x * e.y - d.y * e.x) * Math.cos(t) - (d.x * e.x + d.y * e.y) * Math.sin(t)) / l];
     }
-    case "rad": return [get(c.c.id, 1).x - c.v];
-    case "eqR": return [get(c.c.id, 1).x - get(c.d.id, 1).x];
-    case "conc": { const p = get(c.c.id, 0), q = get(c.d.id, 0); return [p.x - q.x, p.y - q.y]; }
+    case "rad": return [circ(c.c).r - c.v];
+    case "eqR": return [circ(c.c).r - circ(c.d).r];
+    case "conc": { const p = circ(c.c).c, q = circ(c.d).c; return [p.x - q.x, p.y - q.y]; }
     case "tanL": {
-      const a = get(c.a.id, c.a.i), d = seg(c.a), l = Math.hypot(d.x, d.y) || 1, m = get(c.c.id, 0);
-      return [Math.abs(d.x * (m.y - a.y) - d.y * (m.x - a.x)) / l - get(c.c.id, 1).x];
+      const a = get(c.a.id, c.a.i), d = seg(c.a), l = Math.hypot(d.x, d.y) || 1, k = circ(c.c);
+      return [Math.abs(d.x * (k.c.y - a.y) - d.y * (k.c.x - a.x)) / l - k.r];
     }
     case "tanC": {
-      const p = get(c.c.id, 0), q = get(c.d.id, 0), r1 = get(c.c.id, 1).x, r2 = get(c.d.id, 1).x;
-      return [Math.hypot(p.x - q.x, p.y - q.y) - (c.inner ? Math.abs(r1 - r2) : r1 + r2)];
+      const k1 = circ(c.c), k2 = circ(c.d);
+      return [Math.hypot(k1.c.x - k2.c.x, k1.c.y - k2.c.y) - (c.inner ? Math.abs(k1.r - k2.r) : k1.r + k2.r)];
     }
-    case "onCirc": { const p = get(c.p.id, c.p.i), m = get(c.c.id, 0); return [Math.hypot(p.x - m.x, p.y - m.y) - get(c.c.id, 1).x]; }
+    case "onCirc": { const p = get(c.p.id, c.p.i), k = circ(c.c); return [Math.hypot(p.x - k.c.x, p.y - k.c.y) - k.r]; }
   }
 }
 

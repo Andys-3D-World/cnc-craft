@@ -14,12 +14,14 @@
  */
 import { t } from "../i18n/i18n";
 import { isInch, fmtLenU } from "../units";
-import { MM_TO_PIXEL, Pt, createCircle, rotateShape, translateShape } from "../shapeTransform";
+import { MM_TO_PIXEL, Pt, convertToPolyline, createCircle, makeRectPoints, rotateShape, scaleShape, shapeBounds, translateShape, updatePolylineBounds } from "../shapeTransform";
+import { inBox, refFactor, stretchPoints, type Box } from "./joinExplode";
+import { syncPoints } from "./bezier";
 import { app, options, saveOptions, ToolName } from "./editorState";
 import { addShapes, cancelCurrent, currentTool, drawingBase, finishLine, live, pick, placePoint, setTool } from "./tools";
 import { selectedShapes } from "./selection";
 import { aliasesOf, CmdName, parseCommand, parseConKind, parsePoint } from "./cmdParse";
-import { typedAngle, typedLen } from "./typedValues";
+import { calc, typedAngle, typedLen } from "./typedValues";
 import { commands, makeCopies } from "./commands";
 
 const DRAW: Partial<Record<CmdName, ToolName>> = {
@@ -29,7 +31,7 @@ const DRAW: Partial<Record<CmdName, ToolName>> = {
 /** Befehle, die einfach einen vorhandenen Knopf-Befehl auslösen */
 const SIMPLE: Partial<Record<CmdName, string>> = {
   erase: "delete", undo: "undo", redo: "redo", offset: "offset", mirror: "mirrorH", zoom: "zoomFit",
-  extrude: "extrude", body: "body3d"
+  extrude: "extrude", body: "body3d", join: "joinLines", explode: "explode", ortho: "ortho"
 };
 
 type Mode =
@@ -38,7 +40,9 @@ type Mode =
   | { k: "circle"; c?: Pt }
   | { k: "corner" }                                 // Werkzeug „Ecke“: getippte Zahl = neuer Radius
   | { k: "move" | "copy"; base?: Pt }
-  | { k: "rotate"; base?: Pt };
+  | { k: "rotate"; base?: Pt }
+  | { k: "stretch"; c1?: Pt; c2?: Pt; base?: Pt }    // Strecken: Rechteck (zwei Ecken), Basispunkt, Zielpunkt
+  | { k: "scale"; base?: Pt; step: "factor" | "ref1" | "ref2" | "new"; refA?: Pt; refLen?: number };
 
 let mode: Mode = { k: "none" };
 let bar: HTMLDivElement | null = null;
@@ -68,6 +72,14 @@ export function initCmdLine(redrawFn: () => void) {
 }
 
 export function toggleCmdLine() { if (bar) closeCmdLine(); else openCmdLine(); }
+
+/** Befehl von einem Knopf aus starten (Befehlszeile öffnet sich und fragt nach den Punkten) */
+export function runCommand(cmd: CmdName) {
+  openCmdLine();
+  startCommand(cmd);
+  refresh();
+  redraw();
+}
 
 export function openCmdLine() {
   if (bar) { input?.focus(); return; }
@@ -142,6 +154,10 @@ function prompt(): string {
     case "corner": return t(options.cornerChamfer ? "cl.chamferLen" : "cl.cornerR", { r: fmtLenU(options.cornerSize) });
     case "move": case "copy": return t(mode.base ? "cl.target" : "cl.base");
     case "rotate": return t(mode.base ? "cl.angle" : "cl.pivot");
+    case "stretch": return t(!mode.c1 ? "cl.stretch1" : !mode.c2 ? "cl.stretch2" : mode.base ? "cl.target" : "cl.base");
+    case "scale":
+      if (!mode.base) return t("cl.base");
+      return t(mode.step === "factor" ? "cl.scaleFactor" : mode.step === "ref1" ? "cl.refLen" : mode.step === "ref2" ? "cl.refLen2" : "cl.newLen");
     case "draw": {
       const tool = currentTool(), n = live.points.length, started = !!drawingBase();
       if (tool === "line") return t(n ? "cl.nextLine" : "cl.start");
@@ -171,7 +187,7 @@ function refresh() {
 }
 
 function endCommand() {
-  if (mode.k !== "none" && mode.k !== "draw") { pick.hook = null; pick.from = null; }
+  if (mode.k !== "none" && mode.k !== "draw") { pick.hook = null; pick.from = null; pick.move = null; pick.lines = null; }
   mode = { k: "none" };
 }
 
@@ -308,14 +324,36 @@ function startCommand(cmd: CmdName) {
       cancelCurrent();
       mode = { k: cmd };
       break;
+    case "scale":
+      if (!selectedShapes().length) { say(t("cl.selectFirst")); lastCmd = null; return; }
+      cancelCurrent();
+      mode = { k: "scale", step: "factor" };
+      break;
+    case "stretch":
+      cancelCurrent();
+      mode = { k: "stretch" };
+      break;
   }
   pick.from = null;
   pick.hook = p => { modePoint(p); refresh(); redraw(); };
   say("");
 }
 
-/** Getippter Wert in Ecke/Kreis/Verschieben/Kopieren/Drehen */
+/** Getippter Wert in Ecke/Kreis/Verschieben/Kopieren/Drehen/Skalieren */
 function modeValue(v: string): "ok" | "bad" {
+  if (mode.k === "scale" && mode.base) {
+    if (mode.step === "factor") {
+      if (/^r(ef(erence)?)?$/i.test(v)) { mode.step = "ref1"; return "ok"; }
+      const f = calc(v);
+      if (!(f > 0)) return "bad";
+      doScale(mode.base, f);
+      return "ok";
+    }
+    const len = typedLen(v, isInch());
+    if (mode.step === "ref1" && len > 0) { mode.refLen = len * MM_TO_PIXEL; mode.step = "new"; return "ok"; }
+    if (mode.step === "new" && len > 0 && mode.refLen) { const f = refFactor(mode.refLen, len * MM_TO_PIXEL); if (f) { doScale(mode.base, f); return "ok"; } }
+    if (mode.step === "ref1" || mode.step === "new") return "bad";
+  }
   if (mode.k === "corner") {
     const r = typedLen(v, isInch());
     if (!(r > 0)) return "bad";
@@ -358,6 +396,28 @@ function modePoint(p: Pt) {
       if (!mode.base) { mode.base = p; pick.from = p; return; }
       doRotate(mode.base, (Math.atan2(p.y - mode.base.y, p.x - mode.base.x) * 180) / Math.PI);
       return;
+    case "stretch": {
+      const m = mode;
+      if (!m.c1) {
+        m.c1 = p;
+        // Rechteck als Vorschau, bis die zweite Ecke gesetzt ist
+        pick.move = q => { const a = m.c1!; pick.lines = [[a, { x: q.x, y: a.y }, q, { x: a.x, y: q.y }, a]]; };
+        return;
+      }
+      if (!m.c2) { m.c2 = p; pick.move = null; return; }
+      if (!m.base) { m.base = p; pick.from = p; return; }
+      doStretch({ x0: m.c1.x, y0: m.c1.y, x1: m.c2.x, y1: m.c2.y }, p.x - m.base.x, p.y - m.base.y);
+      return;
+    }
+    case "scale": {
+      const m = mode;
+      if (!m.base) { m.base = p; pick.from = p; return; }
+      if (m.step === "ref1") { m.refA = p; m.step = "ref2"; pick.from = p; return; }
+      if (m.step === "ref2" && m.refA) { m.refLen = Math.hypot(p.x - m.refA.x, p.y - m.refA.y); m.step = "new"; pick.from = m.base; return; }
+      if (m.step === "new" && m.refLen) { const f = refFactor(m.refLen, Math.hypot(p.x - m.base.x, p.y - m.base.y)); if (f) doScale(m.base, f); return; }
+      say(t("cl.scaleFactor"));
+      return;
+    }
     default:
       placePoint(p);
   }
@@ -384,6 +444,49 @@ function doMove(copy: boolean, dx: number, dy: number) {
   }
   sel.forEach(s => translateShape(s, dx, dy));
   say(t("cl.moved", { x: fmtLenU(dx / MM_TO_PIXEL), y: fmtLenU(dy / MM_TO_PIXEL) }));
+  endCommand();
+}
+
+function doScale(c: Pt, f: number) {
+  const sel = selectedShapes();
+  if (!sel.length) { say(t("cl.selectFirst")); endCommand(); return; }
+  sel.forEach(s => scaleShape(s, c.x, c.y, f, f));
+  say(t("cl.scaled", { f: +f.toFixed(6) }));
+  endCommand();
+}
+
+/** Strecken: alle Punkte im Rechteck wandern um (dx, dy); Kreise, Texte, Bilder nur ganz, wenn ihre Mitte drin liegt */
+function doStretch(box: Box, dx: number, dy: number) {
+  let n = 0;
+  for (const s of app().shapes as any[]) {
+    if (s.type === "rect") { const c = makeRectPoints(s.x, s.y, s.x + s.w, s.y + s.h); if (c.some(p => inBox(p, box))) convertToPolyline(s); else continue; }
+    if (s.type === "polyline" && s.bez?.length) {
+      // Kurven: Knoten (mit ihren Griffen) verschieben, dann neu glätten
+      let hit = false;
+      for (const k of s.bez) if (inBox(k, box)) { hit = true; k.x += dx; k.y += dy; if (k.hi) k.hi = { x: k.hi.x + dx, y: k.hi.y + dy }; if (k.ho) k.ho = { x: k.ho.x + dx, y: k.ho.y + dy }; }
+      if (hit) { syncPoints(s); delete s.tabPts; n++; }
+      continue;
+    }
+    if (s.type === "polyline") {
+      const r = stretchPoints(s.points, box, dx, dy);
+      if (r) { s.points = r; delete s.tabPts; updatePolylineBounds(s); n++; }
+      continue;
+    }
+    if (s.type === "line" || s.type === "arc") {
+      const a = { x: s.x, y: s.y }, b = { x: s.x + s.w, y: s.y + s.h }, inA = inBox(a, box), inB = inBox(b, box);
+      const inM = s.type === "arc" && inBox({ x: s.midX, y: s.midY }, box);
+      if (!inA && !inB && !inM) continue;
+      if (inA) { s.x += dx; s.y += dy; s.w -= dx; s.h -= dy; }
+      if (inB) { s.w += dx; s.h += dy; }
+      if (inM) { s.midX += dx; s.midY += dy; }
+      n++;
+      continue;
+    }
+    const b = shapeBounds(s);
+    if (b && inBox({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }, box)) { translateShape(s, dx, dy); n++; }
+  }
+  app().shapes = [...app().shapes];
+  say(t("cl.stretched", { n }));
   endCommand();
 }
 

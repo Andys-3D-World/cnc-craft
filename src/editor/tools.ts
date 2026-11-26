@@ -41,9 +41,10 @@ import { unitName } from "../units";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 import { toolLog, trimClick, trimMouseMove } from "./trimTool";
 import { cornerClick, cornerHover, cornerMove, extendClick, extendMove } from "./cornerTool";
-import { conAfterMove, conAfterNodeMove, conAt, conClick, conDeleteSelected, conEdit, conMove, conPrompt, conReset, conTool, valueInput } from "./constrainTool";
+import { conAfterMove, conAfterNodeMove, conAt, conClick, conDeleteSelected, conEdit, conMove, conPrompt, conReset, conSnapshot, conTool, valueInput } from "./constrainTool";
 import { centerArc, CenterArc, ringInner, slotPoints, starPoints } from "./drawShapes";
 import { fieldsFor, lockPoint } from "./typedValues";
+import { orthoPoint } from "./joinExplode";
 import { closeTypedBox, openTypedBox, typedLock, typedOpen } from "./typedBox";
 
 type Mode =
@@ -367,7 +368,7 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
   if (tool === "node" && nodeEdit.grab) {
     // Bedingungen: nach dem Ziehen eines Knotens nachrechnen (gezogener Punkt bleibt bei der Maus)
     const g = nodeEdit.grab, target = nodeTarget();
-    const prev = g.kind === "node" && target?.points ? (target.points as Pt[]).map(p => ({ ...p })) : null;
+    const prev = g.kind === "node" && target?.points ? conSnapshot(target) : null;
     nodeMove(live.raw, live.alt);
     if (prev && target && g.kind === "node") conAfterNodeMove(target.id, g.i, prev);
     redrawFn();
@@ -440,6 +441,12 @@ function updateSnap() {
   live.snap = s.kind === "none" ? null : s;
   live.world = { x: s.x, y: s.y };
 
+  // Ortho (F8): vom letzten Punkt aus nur waagerecht/senkrecht – ein Objektfang geht vor (wie in CAD-Programmen)
+  if (options.ortho && snapFrom && (!live.snap || live.snap.kind === "grid")) {
+    live.world = orthoPoint(snapFrom, live.world);
+    live.snap = null;
+  }
+
   // getippte Maße (typedBox.ts) gelten statt der Maus
   const from = drawFrom();
   if (typedOpen() && from) {
@@ -490,7 +497,7 @@ function commitTyped() {
 function doMove() {
   let dx = live.raw.x - live.downWorld.x;
   let dy = live.raw.y - live.downWorld.y;
-  if (live.shift) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+  if (live.shift || options.ortho) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
 
   // Greifpunkt einrasten lassen (an anderen Formen bzw. am Raster)
   const grab = live.grabPoint;

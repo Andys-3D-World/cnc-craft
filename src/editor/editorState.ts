@@ -26,6 +26,7 @@ export const options = {
   cornerSize: 3,       // Werkzeug „Ecke“: Radius bzw. Fasenlänge in mm
   cornerChamfer: false, // Werkzeug „Ecke“: Fase statt Rundung
   conKind: "h",        // Werkzeug „Bedingung“: Art (h, v, par, perp, eq, len, coin)
+  ortho: false,        // Ortho (F8): vom letzten Punkt aus nur waagerecht oder senkrecht
   showTools: true      // Fräserbreite + Werkzeug-Marken auf der Zeichenfläche zeigen
 };
 

@@ -23,8 +23,9 @@
  * bzw. wieder herstellen.
  */
 import { app, options, screenDist, toScreen } from "./editorState";
-import { MM_TO_PIXEL, Pt, convertToPolyline, makeRectPoints, updatePolylineBounds } from "../shapeTransform";
-import { CirRef, GCon, PtRef, SegRef, Shapes, idsOf, satisfied, solve } from "./sketchSolve";
+import { MM_TO_PIXEL, Pt, arcGeometry, convertToPolyline, makeRectPoints, updatePolylineBounds } from "../shapeTransform";
+import { CirRef, GCon, PtRef, SegRef, Shapes, circumcircle, idsOf, satisfied, solve } from "./sketchSolve";
+import { syncPoints } from "./bezier";
 import { toolLog } from "./trimTool";
 import { t } from "../i18n/i18n";
 import { fmtLenShort, fmtLenU, isInch } from "../units";
@@ -63,13 +64,40 @@ function usableLine(s: any): boolean {
   return !s.bez?.some((n: any) => (n.hi && (n.hi.x !== n.x || n.hi.y !== n.y)) || (n.ho && (n.ho.x !== n.x || n.ho.y !== n.y)));
 }
 const isCircle = (s: any) => s?.type === "circle" && !s.textData;
+const isArc = (s: any) => s?.type === "arc" && !s.textData;
+/** Freie Kurve: Polylinie mit Kurven-Knoten (Bedingungen nur an den Knoten) */
+const isCurve = (s: any) => s?.type === "polyline" && !s.textData && Array.isArray(s.bez) && s.bez.length >= 2 && !usableLine(s);
+/** Kennung der Form in ns: Polylinie = Punktzahl, -1 Kreis, -2 Bogen, -(100000 + Knoten) Kurve */
+const nsOf = (s: any) => (isCircle(s) ? -1 : isArc(s) ? -2 : isCurve(s) ? -(100000 + s.bez.length) : s.points.length);
 
-/** Punktliste für den Rechenkern: Polylinie = ihre Punkte, Kreis = [Mitte, {x: Radius}] */
+/** Punktliste für den Rechenkern: Polylinie = ihre Punkte, Kreis = [Mitte, {x: Radius}], Bogen = [Start, Ende, Mitte des Bogens], Kurve = Knoten */
 function vec(s: any): Pt[] {
-  return isCircle(s) ? [{ x: s.x, y: s.y }, { x: Math.abs(s.w), y: 0 }] : s.points;
+  if (isCircle(s)) return [{ x: s.x, y: s.y }, { x: Math.abs(s.w), y: 0 }];
+  if (isArc(s)) return [{ x: s.x, y: s.y }, { x: s.x + s.w, y: s.y + s.h }, { x: s.midX, y: s.midY }];
+  if (isCurve(s)) return s.bez.map((n: any) => ({ x: n.x, y: n.y }));
+  return s.points;
+}
+/** Kopie der Punktliste (zum Zurücksetzen, wenn das Nachrechnen nicht geht) */
+export const conSnapshot = (s: any): Pt[] => vec(s).map(p => ({ ...p }));
+/** Kreis oder Bogen einer Form: Mitte und Radius */
+function circleOf(s: any): { c: Pt; r: number } | null {
+  if (isCircle(s)) return { c: { x: s.x, y: s.y }, r: Math.abs(s.w) };
+  if (isArc(s)) { const v = vec(s); return circumcircle(v[0], v[1], v[2]); }
+  return null;
 }
 function writeBack(s: any, pts: Pt[]) {
   if (isCircle(s)) { s.x = pts[0].x; s.y = pts[0].y; s.w = Math.abs(pts[1].x); s.h = Math.abs(pts[1].x); return; }
+  if (isArc(s)) { s.x = pts[0].x; s.y = pts[0].y; s.w = pts[1].x - pts[0].x; s.h = pts[1].y - pts[0].y; s.midX = pts[2].x; s.midY = pts[2].y; return; }
+  if (isCurve(s)) {
+    // Knoten verschieben, ihre Griffe gleich mit, dann die Kurve neu glätten
+    s.bez = s.bez.map((n: any, i: number) => {
+      const dx = pts[i].x - n.x, dy = pts[i].y - n.y;
+      return { ...n, x: pts[i].x, y: pts[i].y, hi: n.hi && { x: n.hi.x + dx, y: n.hi.y + dy }, ho: n.ho && { x: n.ho.x + dx, y: n.ho.y + dy } };
+    });
+    syncPoints(s);
+    delete s.tabPts;
+    return;
+  }
   s.points = pts;
   if (s.bez && s.bez.length === pts.length) s.bez = pts.map((p, i) => ({ ...s.bez[i], x: p.x, y: p.y })); // gerade Knoten 1:1
   else delete s.bez;
@@ -90,7 +118,8 @@ function alive(c: Stored, owner: string, map: Map<string, any>): boolean {
   if (!ids.includes(owner)) return false;
   const shapeOk = ids.every(id => {
     const s = map.get(id);
-    return c.ns[id] === -1 ? isCircle(s) : s?.type === "polyline" && s.points?.length === c.ns[id];
+    const n = c.ns[id];
+    return n === -1 ? isCircle(s) : n === -2 ? isArc(s) : n <= -100000 ? isCurve(s) && s.bez.length === -n - 100000 : s?.type === "polyline" && !isCurve(s) && s.points?.length === n;
   });
   return shapeOk && idsOf(c).every(id => ids.includes(id));
 }
@@ -163,6 +192,21 @@ function findAt(world: Pt, types: PickType[]): Found | null {
       if (types.includes("cir")) take({ pick: { t: "cir", ref: { id: s.id } }, d: Math.abs(dc - r), s, c: { x: s.x, y: s.y }, r }, segTol, 0);
       continue;
     }
+    if (isArc(s)) {
+      // Bogen: Endpunkte sind Punkte, der Bogen selbst zählt wie ein Kreis
+      const v = vec(s), g = arcGeometry(s);
+      if (types.includes("pt")) [0, 1].forEach(i => take({ pick: { t: "pt", ref: { id: s.id, i } }, d: Math.hypot(world.x - v[i].x, world.y - v[i].y), s, p: v[i] }, ptTol, ptTol));
+      if (types.includes("cir") && g) {
+        const dc = Math.hypot(world.x - g.cx, world.y - g.cy);
+        take({ pick: { t: "cir", ref: { id: s.id, arc: true } }, d: Math.abs(dc - g.r), s, c: { x: g.cx, y: g.cy }, r: g.r }, segTol, 0);
+      }
+      continue;
+    }
+    if (isCurve(s)) {
+      // freie Kurve: nur ihre Knoten
+      if (types.includes("pt")) s.bez.forEach((n: any, i: number) => take({ pick: { t: "pt", ref: { id: s.id, i } }, d: Math.hypot(world.x - n.x, world.y - n.y), s, p: { x: n.x, y: n.y } }, ptTol, ptTol));
+      continue;
+    }
     if (!usableLine(s)) continue;
     const pts: Pt[] = s.type === "rect" ? makeRectPoints(s.x, s.y, s.x + s.w, s.y + s.h) : s.points; // Reihenfolge wie convertToPolyline
     const closed = s.type === "rect" || !!s.closed, n = pts.length;
@@ -202,7 +246,7 @@ export function conClick(world: Pt, ask: (initial: string, done: (text: string |
   if (k === "len") {
     const p = picks[0];
     if (p.t === "cir") {
-      const d = (Math.abs(map.get(p.ref.id).w) * 2) / MM_TO_PIXEL;
+      const d = ((circleOf(map.get(p.ref.id))?.r ?? 0) * 2) / MM_TO_PIXEL;
       ask(numText(d), txt => { const mm = txt === null ? NaN : typedLen(txt.replace(/^[øØ⌀]\s*/, ""), isInch()); if (mm > 0) addCon({ k: "rad", c: p.ref, v: (mm / 2) * MM_TO_PIXEL }, [first]); });
     } else if (p.t === "seg") {
       const pts = map.get(p.ref.id).points;
@@ -250,9 +294,10 @@ function build(k: ConKind, p: Pick[], map: Map<string, any>): GCon | string {
       if (a.t === "seg" && b.t === "seg") return "con.tanNeedsCircle";
       if (a.t === "cir" && b.t === "cir") {
         if (a.ref.id === b.ref.id) return "con.sameShape";
-        const c1 = map.get(a.ref.id), c2 = map.get(b.ref.id);
-        const d = Math.hypot(c1.x - c2.x, c1.y - c2.y);
-        return { k: "tanC", c: a.ref as CirRef, d: b.ref as CirRef, inner: d < Math.max(Math.abs(c1.w), Math.abs(c2.w)) };
+        const k1 = circleOf(map.get(a.ref.id)), k2 = circleOf(map.get(b.ref.id));
+        if (!k1 || !k2) return "con.pickCircle";
+        const d = Math.hypot(k1.c.x - k2.c.x, k1.c.y - k2.c.y);
+        return { k: "tanC", c: a.ref as CirRef, d: b.ref as CirRef, inner: d < Math.max(k1.r, k2.r) };
       }
       const seg = (a.t === "seg" ? a : b).ref as SegRef, cir = (a.t === "cir" ? a : b).ref as CirRef;
       return { k: "tanL", a: seg, c: cir };
@@ -268,7 +313,7 @@ export function addCon(c: GCon, heavyIds: string[]): boolean {
   const map = byId();
   const ids = idsOf(c);
   const ns: Record<string, number> = {};
-  for (const id of ids) { const s = map.get(id); ns[id] = isCircle(s) ? -1 : s.points.length; }
+  for (const id of ids) ns[id] = nsOf(map.get(id));
   const stored: Stored = { ...c, ns } as Stored;
   const heavy = ids.length > 1 ? new Set(heavyIds) : new Set<string>();
   if (!solveAndApply(ids, [stored], id => (heavy.has(id) ? 20 : 1))) { toolLog(t("con.conflict")); return false; }
@@ -336,7 +381,11 @@ function glyphText(c: GCon): string {
 /** Wo die Zeichen einer Bedingung stehen (Welt) und in welche Richtung sie von der Linie weg rücken */
 function spots(c: GCon, shapes: Shapes): { p: Pt; nx: number; ny: number }[] {
   const seg = (s: SegRef) => { const pts = shapes.get(s.id)!, a = pts[s.i], b = pts[s.j]; return { p: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, nx: -(b.y - a.y), ny: b.x - a.x }; };
-  const cir = (r: CirRef) => { const v = shapes.get(r.id)!; return { p: { x: v[0].x, y: v[0].y + v[1].x }, nx: 0, ny: 1 }; };
+  const cir = (r: CirRef) => {
+    const v = shapes.get(r.id)!;
+    if (r.arc) return { p: v[2], nx: 0, ny: 1 }; // Bogen: Zeichen am Punkt auf dem Bogen
+    return { p: { x: v[0].x, y: v[0].y + v[1].x }, nx: 0, ny: 1 };
+  };
   const pt = (r: PtRef) => ({ p: shapes.get(r.id)![r.i], nx: 1, ny: 1 });
   switch (c.k) {
     case "h": case "v": case "len": return [seg(c.a)];
@@ -395,7 +444,7 @@ export function drawConstraints(ctx: CanvasRenderingContext2D, tool: string) {
   for (const pk of conTool.picks) {
     const s = map.get(pk.ref.id);
     if (!s) continue;
-    if (pk.t === "cir") draw({ c: { x: s.x, y: s.y }, r: Math.abs(s.w) }, "#ffe14d");
+    if (pk.t === "cir") { const k = circleOf(s); if (k) draw({ c: k.c, r: k.r }, "#ffe14d"); }
     else if (pk.t === "pt") draw({ p: vec(s)[pk.ref.i] }, "#ffe14d");
     else draw({ a: s.points[pk.ref.i], b: s.points[pk.ref.j] }, "#ffe14d");
   }

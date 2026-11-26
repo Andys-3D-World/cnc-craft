@@ -18,6 +18,7 @@ import { Viewer3D } from "../view3d/viewer3d";
 import { regionOf, shellBounds, shellMeshes, stlBinary, type Shell } from "../view3d/solid";
 import { bodyShells, millPlan, topOf, volume, zRange, type EvalFeat, type Feature, type FeatOp } from "../editor/body3d";
 import { isMill } from "../machineMode";
+import { getTools, CONE_TYPES } from "../toolLibrary";
 import { getStock } from "../stock";
 import { checkpoint } from "../editor/history";
 
@@ -34,7 +35,8 @@ export function allFeatures(): Entry[] {
 function evalFeat(f: Feature, byId: Map<string, any>): EvalFeat & { missing: number } {
   const shapes = f.profile.map(id => byId.get(id)).filter(s => s && isClosedShape(s));
   const [z0, z1] = zRange(f);
-  return { op: f.op, z0, z1, region: shapes.length ? regionOf(shapes) : [], missing: f.profile.length - shapes.length };
+  const edge = f.edge && f.edge.size > 0 ? f.edge : undefined;
+  return { op: f.op, z0, z1, region: shapes.length ? regionOf(shapes) : [], missing: f.profile.length - shapes.length, edge };
 }
 
 export function bodyNow(): Shell[] {
@@ -113,12 +115,29 @@ export function openBodyDialog(log: (s: string) => void, addSelection: boolean, 
           <span class="dlg-num">${t("body.from")} <input class="b-z0" type="number" step="0.5" style="width:70px;"><em style="width:auto;">mm</em></span>
           <span class="dlg-num">${t("body.h")} <input class="b-h" type="number" step="0.5" style="width:70px;"><em style="width:auto;">mm</em></span>
         </span>
+        <span style="display:flex;gap:10px;flex-basis:100%;align-items:center;" title="${t("body.edgeTip")}">
+          <span class="dlg-num">${t("body.edge")} <select class="b-edge" style="width:auto;"><option value="">${t("body.edge.none")}</option><option value="chamfer">${t("body.edge.chamfer")}</option><option value="round">${t("body.edge.round")}</option></select></span>
+          <span class="dlg-num b-esize-wrap"><input class="b-esize" type="number" min="0.1" step="0.5" style="width:60px;"><em style="width:auto;">mm</em></span>
+        </span>
         <span class="dlg-hint" style="flex-basis:100%;margin:0;">${t("body.profile", { n: f.profile.length - ev.missing })}${ev.missing ? " · ⚠ " + t("body.missing", { n: ev.missing }) : ""}${!ev.region.length ? " · ⚠ " + t("body.noArea") : ""}</span>`;
       const q = <E extends HTMLElement>(c: string) => row.querySelector("." + c) as E;
       q<HTMLInputElement>("b-on").checked = !f.off;
       q<HTMLSelectElement>("b-op").value = f.op;
       q<HTMLInputElement>("b-z0").value = num(f.z0);
       q<HTMLInputElement>("b-h").value = num(f.h);
+      q<HTMLSelectElement>("b-edge").value = f.edge?.kind || "";
+      q<HTMLInputElement>("b-esize").value = num(f.edge?.size || 1);
+      q<HTMLElement>("b-esize-wrap").style.visibility = f.edge ? "visible" : "hidden";
+      const setEdge = () => {
+        const kind = q<HTMLSelectElement>("b-edge").value as "" | "chamfer" | "round";
+        const size = parseFloat(q<HTMLInputElement>("b-esize").value.replace(",", "."));
+        if (!kind) delete f.edge;
+        else f.edge = { kind, size: Number.isFinite(size) && size > 0 ? size : 1 };
+        q<HTMLElement>("b-esize-wrap").style.visibility = f.edge ? "visible" : "hidden";
+        rebuild();
+      };
+      q<HTMLSelectElement>("b-edge").onchange = setEdge;
+      q<HTMLInputElement>("b-esize").addEventListener("input", setEdge);
       q<HTMLInputElement>("b-on").onchange = () => { f.off = !q<HTMLInputElement>("b-on").checked || undefined; if (!f.off) delete f.off; rebuild(); };
       q<HTMLSelectElement>("b-op").onchange = () => { f.op = q<HTMLSelectElement>("b-op").value as FeatOp; rebuild(); };
       const numIn = (c: string, key: "z0" | "h") => q<HTMLInputElement>(c).addEventListener("input", () => {
@@ -199,8 +218,12 @@ function makeMillShapes(log: (s: string) => void): boolean {
   const plan = millPlan(entries.map(e => evalFeat(e.f, byId)));
   if (!plan.ops.length) { log(t("body.millNone")); return false; }
   const gid = "grp-3d-" + newId();
+  // Fasen: V-Fräser aus der Bibliothek (der erste passende), sonst Hinweis
+  const vbit = getTools().find(tl => CONE_TYPES.includes(tl.type) && tl.angle > 0 && tl.angle < 180 && tl.type !== "drill" && tl.type !== "spotdrill");
   const made = plan.ops.map(o => createPolyline(o.ring.map(([x, y]) => ({ x: x * MM_TO_PIXEL, y: y * MM_TO_PIXEL })), true, o.mode,
-    { groupId: gid, millingDepth: -+o.depth.toFixed(4), from3d: true }));
+    o.mode === "chamfer"
+      ? { groupId: gid, millingDepth: -+(o.width || 1).toFixed(4), from3d: true, chamferW: o.width, chamferSide: o.side, ...(vbit ? { toolId: vbit.id } : {}) }
+      : { groupId: gid, millingDepth: -+o.depth.toFixed(4), from3d: true }));
   // Inseln gelten nur für ihre eigene Tasche (cam.ts → islandFor)
   const byKey = new Map<string, string>();
   plan.ops.forEach((o, i) => { if (o.key) byKey.set(o.key, made[i].id); });
@@ -214,5 +237,9 @@ function makeMillShapes(log: (s: string) => void): boolean {
   if (thick > 0 && Math.abs(thick - plan.height) > 0.01) log(t("body.millThick", { h: +plan.height.toFixed(2), t: thick }));
   if (plan.inner) log(t("body.millInner", { n: plan.inner }));
   if (plan.raised) log(t("body.millRaisedOk", { n: plan.raised }));
+  const chamfers = plan.ops.filter(o => o.mode === "chamfer").length;
+  if (chamfers) log(t(vbit ? "body.millChamfer" : "body.millChamferNoTool", { n: chamfers, tool: vbit?.name || "" }));
+  if (plan.rounds) log(t("body.millRounds", { n: plan.rounds }));
+  if (plan.edgeLow) log(t("body.millEdgeLow", { n: plan.edgeLow }));
   return true;
 }

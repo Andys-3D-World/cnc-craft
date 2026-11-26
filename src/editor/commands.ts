@@ -37,11 +37,14 @@ import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor, pick } from "./tools";
 import { offsetOpenPath, sideOf } from "./offsetOpen";
+import { explodePath, joinOpen } from "./joinExplode";
+import { runCommand } from "./cmdLine";
+import { options, saveOptions } from "./editorState";
 import { openBodyDialog } from "../ui/bodyDialog";
 import { initCmdLine, toggleCmdLine, openCmdLine } from "./cmdLine";
 import {
   MM_TO_PIXEL, Bounds, groupBounds, translateShape, scaleShape, rotateShape, cloneShape, newId,
-  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath, convertToPolyline, type Pt
+  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath, convertToPolyline, updatePolylineBounds, type Pt
 } from "../shapeTransform";
 import { openExportMenu, initCanvasMenu } from "../ui/contextMenu";
 import { offsetPolygon } from "../polyOffset";
@@ -312,6 +315,11 @@ export const commands: Record<string, () => void> = {
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),
   cmdLine: () => toggleCmdLine(),
+  joinLines: () => joinLines(),
+  explode: () => explodeShapes(),
+  stretch: () => runCommand("stretch"),
+  scaleRef: () => runCommand("scale"),
+  ortho: () => toggleOrtho(),
   body3d: () => openBodyDialog(log, false, redrawFn),
   extrude: () => openBodyDialog(log, true, redrawFn),
   exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-fly="file"] [data-fly-btn]')),
@@ -477,6 +485,85 @@ export function zoomFit() {
 // =====================================================================
 // VERSATZ-DIALOG (Offset): neue Kontur im Abstand um die Auswahl
 // =====================================================================
+
+/** Ortho ein/aus (F8, Befehl ORTHO, Haken in der Leiste) */
+export function toggleOrtho() {
+  options.ortho = !options.ortho;
+  saveOptions();
+  const box = document.getElementById("opt-ortho") as HTMLInputElement | null;
+  if (box) box.checked = options.ortho;
+  log(t(options.ortho ? "ortho.on" : "ortho.off"));
+  redrawFn();
+}
+
+/** Formen-Eigenschaften (Werkzeug, Tiefe, Ebene …) behalten, Geometrie neu als Polylinie */
+function asPolyline(like: any, pts: Pt[], closed: boolean): any {
+  const c = cloneShape(like);
+  c.id = newId();
+  c.type = "polyline";
+  c.points = pts.map(p => ({ ...p }));
+  c.closed = closed;
+  for (const k of ["midX", "midY", "bez", "tabPts", "gcons", "feat3d", "textData", "radius"]) delete c[k];
+  if (c.tabMode === "manual") c.tabMode = "auto";
+  if (!closed && (c.millingMode === "outside" || c.millingMode === "inside" || c.millingMode === "pocket")) c.millingMode = "on-line";
+  updatePolylineBounds(c);
+  return c;
+}
+
+/** Verbinden (Join): offene Linien der Auswahl, deren Enden sich treffen, werden ein Linienzug */
+function joinLines() {
+  const st = app();
+  const sel = selectedShapes().filter(isOpenLine);
+  if (sel.length < 2) { log(t("join.select")); return; }
+  const chains = joinOpen(sel.map(s => ({ ref: s, pts: shapeToPaths(s)[0]?.pts || [] })), 0.05 * MM_TO_PIXEL);
+  const made: any[] = [];
+  let shapes = [...st.shapes], joined = 0;
+  for (const ch of chains) {
+    if (ch.from.length < 2) continue;
+    const first = ch.from[0];
+    const n = asPolyline(first, ch.pts, ch.closed);
+    if (ch.closed && first.millingMode === "on-line") n.millingMode = "on-line";
+    const gone = new Set(ch.from.map((s: any) => s.id));
+    const at = shapes.indexOf(first);
+    shapes = shapes.filter((s: any) => !gone.has(s.id));
+    shapes.splice(Math.min(at, shapes.length), 0, n);
+    made.push(n);
+    joined += ch.from.length;
+  }
+  if (!made.length) { log(t("join.none")); return; }
+  st.shapes = shapes;
+  st.selectedShapeIds = made.map(s => s.id);
+  log(t("join.done", { n: joined, m: made.length, c: made.filter(s => s.closed).length }));
+  done();
+}
+
+/** Auflösen (Explode): Linienzüge der Auswahl in einzelne Strecken; Gruppen werden aufgelöst */
+function explodeShapes() {
+  const st = app();
+  const sel = selectedShapes();
+  if (!sel.length) { log(t("explode.select")); return; }
+  let shapes = [...st.shapes], pieces = 0, ungrouped = 0, skipped = 0;
+  const made: any[] = [];
+  for (const s of sel) {
+    if (s.groupId) { delete s.groupId; ungrouped++; }
+    if (s.type !== "polyline" && s.type !== "rect") continue;
+    if (s.textData || (s.points?.length || 0) > 2000) { skipped++; continue; }
+    const p = shapeToPaths(s)[0];
+    if (!p || p.pts.length < 3) continue;
+    const segs = explodePath(p.pts, p.closed);
+    if (segs.length < 2) continue;
+    const parts = segs.map(([a, b]) => asPolyline(s, [a, b], false));
+    const at = shapes.indexOf(s);
+    shapes.splice(at, 1, ...parts);
+    made.push(...parts);
+    pieces += parts.length;
+  }
+  if (!pieces && !ungrouped) { log(t(skipped ? "explode.tooMany" : "explode.none")); return; }
+  st.shapes = shapes;
+  if (made.length) st.selectedShapeIds = made.map(s => s.id);
+  log(t("explode.done", { n: pieces, g: ungrouped }));
+  done();
+}
 
 /** Offene Linien für den Versatz: offene Polylinien, Linien, Bögen */
 const isOpenLine = (s: any) => !s.textData && ((s.type === "polyline" && !s.closed && s.points?.length >= 2) || s.type === "line" || s.type === "arc");
@@ -1295,6 +1382,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     else if (!ctrl && e.key.startsWith("Arrow")) nudge(e);
     else if (!ctrl && !e.altKey && key === "f") zoomFit();
     else if (!ctrl && !e.altKey && e.key === "Enter") openCmdLine(); // Enter ohne laufende Zeichnung: Befehlszeile
+    else if (e.key === "F8") toggleOrtho();
     else if (!ctrl && !e.altKey && TOOL_KEYS[key]) setTool(TOOL_KEYS[key]);
     else handled = false;
 

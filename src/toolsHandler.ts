@@ -10,7 +10,7 @@ export function setupToolsHandler(_state: any) {
   });
 
   loadOptions();
-  const bindCheck = (id: string, key: "snapObjects" | "snapGrid" | "showTools" | "cornerChamfer") => {
+  const bindCheck = (id: string, key: "snapObjects" | "snapGrid" | "showTools" | "cornerChamfer" | "ortho") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.checked = options[key];
@@ -42,6 +42,7 @@ export function setupToolsHandler(_state: any) {
   bindNum("opt-ring-wall", "ringWall", 0.01);
   bindNum("opt-corner-size", "cornerSize", 0.01);
   bindCheck("opt-corner-chamfer", "cornerChamfer");
+  bindCheck("opt-ortho", "ortho");
   const conSel = document.getElementById("opt-con-kind") as HTMLSelectElement | null;
   if (conSel) {
     conSel.value = options.conKind;
