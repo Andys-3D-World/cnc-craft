@@ -35,10 +35,12 @@ import { cutForShape } from "../plasmaCuts";
 import { centerOn } from "./dims";
 import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
-import { setTool, onToolKey, live, updateCursor } from "./tools";
+import { setTool, onToolKey, live, updateCursor, pick } from "./tools";
+import { offsetOpenPath, sideOf } from "./offsetOpen";
+import { initCmdLine, toggleCmdLine, openCmdLine } from "./cmdLine";
 import {
   MM_TO_PIXEL, Bounds, groupBounds, translateShape, scaleShape, rotateShape, cloneShape, newId,
-  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath, convertToPolyline
+  shapeToPaths, isClosedShape, createPolyline, pathArea, pointInPath, convertToPolyline, type Pt
 } from "../shapeTransform";
 import { openExportMenu, initCanvasMenu } from "../ui/contextMenu";
 import { offsetPolygon } from "../polyOffset";
@@ -308,6 +310,7 @@ export const commands: Record<string, () => void> = {
   saveProject: () => { saveProject(false); },
   saveProjectAs: () => { saveProject(true); },
   zoomFit: () => zoomFit(),
+  cmdLine: () => toggleCmdLine(),
   exportVector: () => openExportMenu(document.querySelector<HTMLElement>('[data-fly="file"] [data-fly-btn]')),
 
   toolSelect: () => setTool("select"),
@@ -339,6 +342,18 @@ export function makeCopies(source: any[], offsetPx: number, linked = false): any
     translateShape(c, offsetPx, -offsetPx);
     return c;
   });
+  // Bedingungen (constrainTool.ts) auf die neuen Kennungen umschreiben; was auf nicht mitkopierte Formen zeigt, fällt weg
+  const idMap = new Map(source.map((s, i) => [s.id, out[i].id]));
+  for (const c of out) if (c.gcons) {
+    const re = (id: string) => idMap.get(id);
+    c.gcons = c.gcons.filter((g: any) => Object.keys(g.ns || {}).every(id => idMap.has(id))).map((g: any) => {
+      const m = JSON.parse(JSON.stringify(g));
+      for (const k of ["a", "b", "c", "d", "p", "q"]) if (m[k]?.id) m[k].id = re(m[k].id);
+      m.ns = Object.fromEntries(Object.entries(m.ns).map(([id, n]) => [re(id), n]));
+      return m;
+    });
+    if (!c.gcons.length) delete c.gcons;
+  }
   if (linked) markLinked(source, out);
   else for (const c of out) delete c.linkFrame; // a plain copy of an original is no original itself
   return out;
@@ -451,9 +466,13 @@ export function zoomFit() {
 // VERSATZ-DIALOG (Offset): neue Kontur im Abstand um die Auswahl
 // =====================================================================
 
+/** Offene Linien für den Versatz: offene Polylinien, Linien, Bögen */
+const isOpenLine = (s: any) => !s.textData && ((s.type === "polyline" && !s.closed && s.points?.length >= 2) || s.type === "line" || s.type === "arc");
+
 function openOffsetDialog() {
   const sel = selectedShapes().filter(isClosedShape);
-  if (!sel.length) { log(t("offset.selectFirst")); return; }
+  const open = selectedShapes().filter(isOpenLine);
+  if (!sel.length && !open.length) { log(t("offset.selectFirst")); return; }
 
   document.getElementById("offset-dialog-overlay")?.remove();
   const ov = document.createElement("div");
@@ -464,11 +483,16 @@ function openOffsetDialog() {
       <h3 style="margin:0;font-size:1rem;">⧉ ${t("offset.title")}</h3>
       <label style="display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;">${t("offset.distance")}
         <input id="off-dist" type="number" value="2" min="0.01" step="0.5" style="width:90px;"></label>
-      <label style="display:flex;justify-content:space-between;align-items:center;font-size:0.85rem;">${t("offset.direction")}
+      <label style="display:${sel.length ? "flex" : "none"};justify-content:space-between;align-items:center;font-size:0.85rem;">${t("offset.direction")}
         <select id="off-dir" style="width:120px;">
           <option value="out">${t("offset.out")}</option>
           <option value="in">${t("offset.in")}</option>
           <option value="both">${t("offset.both")}</option>
+        </select></label>
+      <label style="display:${open.length ? "flex" : "none"};justify-content:space-between;align-items:center;font-size:0.85rem;">${t("offset.openLines")}
+        <select id="off-side" style="width:140px;">
+          <option value="pick">${t("offset.sidePick")}</option>
+          <option value="both">${t("offset.sideBoth")}</option>
         </select></label>
       <label style="display:flex;gap:6px;align-items:center;font-size:0.85rem;"><input id="off-del" type="checkbox"> ${t("offset.deleteOriginal")}</label>
       <div style="display:flex;gap:8px;">
@@ -485,11 +509,54 @@ function openOffsetDialog() {
     const dist = parseFloat((ov.querySelector("#off-dist") as HTMLInputElement).value) || 0;
     const dir = (ov.querySelector("#off-dir") as HTMLSelectElement).value;
     const del = (ov.querySelector("#off-del") as HTMLInputElement).checked;
+    const side = (ov.querySelector("#off-side") as HTMLSelectElement).value;
     close();
     if (dist <= 0) return;
-    makeOffsets(sel, dist * MM_TO_PIXEL, dir, del);
+    if (sel.length) makeOffsets(sel, dist * MM_TO_PIXEL, dir, del);
+    if (open.length) {
+      if (side === "both") makeOpenOffsets(open, dist * MM_TO_PIXEL, null, del, !!sel.length);
+      else pickOffsetSide(open, dist * MM_TO_PIXEL, del, !!sel.length);
+    }
   };
   setTimeout(() => (ov.querySelector("#off-dist") as HTMLInputElement).select(), 0);
+}
+
+/**
+ * Versatz offener Linien (offsetOpen.ts). at = Punkt für die Seite (geklickt), null = beide Seiten.
+ * keepSel: die eben erzeugten geschlossenen Versätze bleiben mit ausgewählt
+ */
+function makeOpenOffsets(open: any[], d: number, at: Pt | null, deleteOriginal: boolean, keepSel = false) {
+  const st = app();
+  const gid = "offs-" + newId();
+  const created: any[] = [];
+  for (const s of open) {
+    const pts = shapeToPaths(s)[0]?.pts;
+    if (!pts || pts.length < 2) continue;
+    const sides = at ? [sideOf(pts, at)] : [1, -1];
+    for (const k of sides) for (const line of offsetOpenPath(pts, d * k, 0.01 * MM_TO_PIXEL)) {
+      created.push(createPolyline(line, false, "on-line", { groupId: gid }));
+    }
+  }
+  if (deleteOriginal) {
+    const ids = new Set(open.map(s => s.id));
+    st.shapes = st.shapes.filter((s: any) => !ids.has(s.id));
+  }
+  st.shapes = [...st.shapes, ...created];
+  st.selectedShapeIds = [...(keepSel ? st.selectedShapeIds : []), ...created.map(c => c.id)];
+  log(created.length ? t("offset.created", { n: created.length }) : t("offset.openNone"));
+  done();
+}
+
+/** Offene Linien: Seite mit der Maus wählen – Vorschau gelb gestrichelt, Klick erzeugt, Esc bricht ab */
+function pickOffsetSide(open: any[], d: number, deleteOriginal: boolean, keepSel: boolean) {
+  const paths = open.map(s => shapeToPaths(s)[0]?.pts).filter((p): p is Pt[] => !!p && p.length >= 2);
+  const clear = () => { pick.hook = null; pick.move = null; pick.cancel = null; pick.lines = null; };
+  log(t("offset.pickSide"));
+  pick.from = null;
+  pick.move = p => { pick.lines = paths.flatMap(pts => offsetOpenPath(pts, d * sideOf(pts, p), 0.02 * MM_TO_PIXEL)); };
+  pick.hook = p => { clear(); makeOpenOffsets(open, d, p, deleteOriginal, keepSel); checkpoint(); };
+  pick.cancel = clear;
+  redrawFn();
 }
 
 /**
@@ -1158,6 +1225,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
   initEditTools(canvas, redraw, appendToConsole);
   initTextOnPath(redraw, appendToConsole);
   setTrimLog(appendToConsole);
+  initCmdLine(redraw);
 
   // „Stege setzen“ im Panel (Fräs-Parameter) schaltet das Werkzeug ein
   document.getElementById("btn-tab-tool")?.addEventListener("click", () => setTool("tab"));
@@ -1214,6 +1282,7 @@ export function initCommands(canvas: HTMLCanvasElement, redraw: () => void, appe
     else if (!ctrl && (e.key === "Delete" || e.key === "Backspace")) commands.delete();
     else if (!ctrl && e.key.startsWith("Arrow")) nudge(e);
     else if (!ctrl && !e.altKey && key === "f") zoomFit();
+    else if (!ctrl && !e.altKey && e.key === "Enter") openCmdLine(); // Enter ohne laufende Zeichnung: Befehlszeile
     else if (!ctrl && !e.altKey && TOOL_KEYS[key]) setTool(TOOL_KEYS[key]);
     else handled = false;
 

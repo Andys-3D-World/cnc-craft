@@ -1665,6 +1665,25 @@ body.panel-resizing-v, body.panel-resizing-v * { cursor: row-resize !important; 
 .tb-sel { font-size: 0.74rem; padding: 2px 4px; max-width: 140px; }
 .dim-edit { position: fixed; z-index: 6000; width: 90px; padding: 2px 6px; font-size: 0.8rem; border: 1px solid #34d17b; border-radius: 4px; background: var(--bg-panel); color: var(--text-main); }
 
+/* Befehlszeile (editor/cmdLine.ts) */
+.cmd-line { position: fixed; z-index: 5900; display: flex; flex-direction: column; gap: 2px; padding: 4px 6px; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); font-size: 0.8rem; color: var(--text-main); }
+.cmd-line-msg { color: var(--text-muted, #9aa); white-space: pre-wrap; max-height: 9em; overflow: auto; }
+.cmd-line-msg:empty { display: none; }
+.cmd-line-row { display: flex; align-items: center; gap: 6px; }
+.cmd-line-prompt { color: #34d17b; white-space: nowrap; font-weight: 600; }
+.cmd-line input { flex: 1; min-width: 80px; padding: 2px 6px; font: inherit; font-family: monospace; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; }
+.cmd-line input:focus { outline: none; border-color: #34d17b; }
+.cmd-line-x { background: none; border: none; color: var(--text-muted, #9aa); cursor: pointer; font-size: 1rem; padding: 0 4px; }
+
+/* Getippte Maße beim Zeichnen (editor/typedBox.ts) */
+.typed-box { position: fixed; z-index: 6000; display: flex; flex-direction: column; gap: 3px; padding: 5px 7px; background: var(--bg-panel); border: 1px solid #34d17b; border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,0.35); font-size: 0.78rem; color: var(--text-main); pointer-events: auto; }
+.typed-box label { display: grid; grid-template-columns: 4.6em 70px 1.8em; align-items: center; gap: 5px; }
+.typed-box span { color: var(--text-muted, #9aa); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.typed-box input { width: 70px; padding: 1px 5px; font: inherit; font-family: monospace; background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; }
+.typed-box input:focus { outline: none; border-color: #34d17b; }
+.typed-box input.bad { border-color: #e5484d; }
+.typed-box i { font-style: normal; opacity: 0.7; }
+
 /* Formen-Bibliothek */
 .sl-cats { display: flex; gap: 6px; flex-wrap: wrap; }
 .sl-cat { background: var(--bg-input); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.82rem; }

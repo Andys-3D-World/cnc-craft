@@ -34,8 +34,8 @@ export function renderCamPanel(container: HTMLElement) {
       ["polygon", "polygon", "tip.tool.polygon"], ["star", "star", "tip.tool.star"], ["slot", "slot", "tip.tool.slot"], ["ring", "ring", "tip.tool.ring"],
       ["arc", "arc", "tip.tool.arc"], ["arcCenter", "arcCenter", "tip.tool.arcCenter"]])}
     ${tool("text", "text", "tip.tool.text")}
-    ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"], ["trim", "trim", "tip.tool.trim"]])}
-    ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"], ["lineDim", "lineDim", "tip.tool.lineDim"]])}
+    ${flyTools("curves", [["pen", "pen", "tip.tool.pen"], ["node", "node", "tip.tool.node"], ["trim", "trim", "tip.tool.trim"], ["extend", "extend", "tip.tool.extend"], ["corner", "corner", "tip.tool.corner"]])}
+    ${flyTools("measure", [["measure", "measure", "tip.tool.measure"], ["dim", "dim", "tip.tool.dim"], ["lineDim", "lineDim", "tip.tool.lineDim"], ["constrain", "constrain", "tip.tool.constrain"]])}
     <div class="strip-sep"></div>
     ${flyGroups("generators", "boxgen", [
       ["boxes", [["boxgen", "boxgen", "tip.cmd.boxgen"], ["shapeBox", "shapeBox", "tip.cmd.shapeBox"], ["foldBox", "foldBox", "tip.cmd.foldBox"], ["birdhouse", "birdhouse", "tip.cmd.birdhouse"],
@@ -71,6 +71,7 @@ export function renderEditorToolbar(container: HTMLElement) {
         extra: `<div class="fly-sep"></div><button id="btn-clear-canvas" class="btn-cmd fly-item fly-danger" ${tip("tip.clearAll")}><span class="fly-chip">${icon("clear", 18)}</span><span class="fly-lbl"></span><kbd class="fly-kbd"></kbd></button>`
       })}
       <button id="btn-cmd-search" class="btn-cmd" ${tip("tip.cmdSearch")}>${icon("search")}</button>
+      ${cmd("cmdLine", "console", "tip.cmd.cmdLine")}
     </div>
     <div class="tb-group">
       ${cmd("undo", "undo", "tip.cmd.undo")}
@@ -129,6 +130,14 @@ export function renderEditorToolbar(container: HTMLElement) {
         <span class="tb-lbl">%</span><input type="number" id="opt-star-inner" min="5" max="95" step="5" class="tb-num"></label>
       <label class="tb-opt tb-opt-tool" data-for="ring" ${tip("tip.ringWall")}>
         ${icon("ring", 16)}<input type="number" id="opt-ring-wall" data-unit="mm" min="0.01" step="0.5" class="tb-num"></label>
+      <label class="tb-opt tb-opt-tool" data-for="corner" ${tip("tip.cornerSize")}>
+        ${icon("corner", 16)}<span class="tb-lbl">R</span><input type="number" id="opt-corner-size" data-unit="mm" min="0.01" step="0.5" class="tb-num"></label>
+      <label class="tb-opt tb-opt-tool" data-for="corner" ${tip("tip.cornerChamfer")}>
+        <input type="checkbox" id="opt-corner-chamfer"><span class="tb-lbl">${T("corner.chamferShort")}</span></label>
+      <label class="tb-opt tb-opt-tool" data-for="constrain" ${tip("tip.conKind")}>
+        ${icon("constrain", 16)}<select id="opt-con-kind" class="tb-sel">
+          ${["h", "v", "par", "perp", "eq", "len", "ang", "coin", "on", "fix", "tan", "conc"].map(k => `<option value="${k}">${T("con.k." + k)}</option>`).join("")}
+        </select></label>
       <label class="tb-opt tb-opt-tool" data-for="polygon" ${tip("tip.polySides")}>
         ${icon("polygon", 16)}<input type="number" id="opt-poly-sides" min="3" max="100" step="1" class="tb-num"></label>
     </div>

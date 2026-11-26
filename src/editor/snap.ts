@@ -1,11 +1,14 @@
 /**
- * FANG (EINRASTEN): Die Maus springt auf Endpunkte, Mittelpunkte, Kreismitten
- * oder auf das Raster. Funktioniert wie der Objektfang in LightBurn/CAD-Programmen.
+ * FANG (EINRASTEN): Die Maus springt auf Endpunkte, Mittelpunkte, Kreismitten, Viertelpunkte, Schnittpunkte,
+ * Lot- und Tangentenpunkte (die beiden nur beim Zeichnen vom letzten Punkt aus) oder auf das Raster.
+ * Die Rechnung für Schnitt-, Lot-, Tangenten- und Viertelpunkte steht in snapGeom.ts.
+ * Bei gleichem Abstand gewinnt, was zuerst geprüft wird: Punkt, Mitte, Kreismitte, Viertelpunkt, Schnittpunkt, Lot, Tangente.
  */
 import { app, options, screenDist } from "./editorState";
 import { MM_TO_PIXEL, Pt, shapeBounds, arcGeometry } from "../shapeTransform";
+import { allIntersections, perpFeet, primsNear, quadrants, tangentPts } from "./snapGeom";
 
-export type SnapKind = "none" | "point" | "mid" | "center" | "grid";
+export type SnapKind = "none" | "point" | "mid" | "center" | "quad" | "int" | "perp" | "tan" | "grid";
 
 export interface SnapResult { x: number; y: number; kind: SnapKind; }
 
@@ -16,8 +19,9 @@ const MAX_POINTS_PER_SHAPE = 4000;
  * @param wx, wy      Mausposition in Welt-Pixeln
  * @param exclude     Formen, die ignoriert werden (z.B. die gerade verschobenen)
  * @param extra       zusätzliche Fangpunkte (z.B. bereits gesetzte Punkte der aktuellen Linie)
+ * @param from        letzter gesetzter Punkt beim Zeichnen: dann auch Lot- und Tangentenpunkte
  */
-export function snapPoint(wx: number, wy: number, exclude?: Set<string>, extra: Pt[] = []): SnapResult {
+export function snapPoint(wx: number, wy: number, exclude?: Set<string>, extra: Pt[] = [], from?: Pt): SnapResult {
   const radius = screenDist(SNAP_PX);
   let best: SnapResult = { x: wx, y: wy, kind: "none" };
   let bestD = radius;
@@ -53,14 +57,23 @@ export function snapPoint(wx: number, wy: number, exclude?: Set<string>, extra: 
       } else if (s.type === "circle") {
         const r = Math.abs(s.w);
         consider(s.x, s.y, "center");
-        consider(s.x + r, s.y, "point"); consider(s.x - r, s.y, "point");
-        consider(s.x, s.y + r, "point"); consider(s.x, s.y - r, "point");
+        consider(s.x + r, s.y, "quad"); consider(s.x - r, s.y, "quad");
+        consider(s.x, s.y + r, "quad"); consider(s.x, s.y - r, "quad");
       } else if (s.type === "arc") {
         consider(s.x, s.y, "point");
         consider(s.x + s.w, s.y + s.h, "point");
         const g = arcGeometry(s);
         if (g) consider(g.cx, g.cy, "center");
       }
+    }
+
+    // Viertelpunkte von Bögen, Schnittpunkte, Lot und Tangente: nur Bausteine nahe der Maus
+    const prims = primsNear(app().shapes, { x: wx, y: wy }, radius, exclude, MAX_POINTS_PER_SHAPE);
+    for (const p of prims) if (p.k === "circ" && p.sweep !== undefined) for (const q of quadrants(p)) consider(q.x, q.y, "quad");
+    for (const q of allIntersections(prims)) consider(q.x, q.y, "int");
+    if (from) {
+      for (const q of perpFeet(prims, from)) consider(q.x, q.y, "perp");
+      for (const q of tangentPts(prims, from)) consider(q.x, q.y, "tan");
     }
   }
 

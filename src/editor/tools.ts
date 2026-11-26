@@ -34,12 +34,16 @@ import { openTextDialog, editTextGroup } from "./textTool";
 import { openQrDialog } from "./qrTool";
 import { openEngraveDialog } from "../raster/engraveDialog";
 import { addLineDim, addSize, dimAt, dimSel, dimClick, dimCancel, dimTool, deleteDim, editDimValue, lastLineDimCrossed, lineDimPick } from "./dims";
-import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen } from "./bezier";
+import { nodeEdit, nodeDown, nodeMove, nodeUp, nodeDblClick, nodeDelete, ensureBez, penDown, penMove, penUp, penFinish, penCancel, pen, nodeTarget } from "./bezier";
 import { t } from "../i18n/i18n";
 import { unitName } from "../units";
 import { outline, outlineFraction, autoFractions, cumulative } from "../tabs";
 import { toolLog, trimClick, trimMouseMove } from "./trimTool";
+import { cornerClick, cornerHover, cornerMove, extendClick, extendMove } from "./cornerTool";
+import { conAfterMove, conAfterNodeMove, conAt, conClick, conDeleteSelected, conEdit, conMove, conPrompt, conReset, conTool, valueInput } from "./constrainTool";
 import { centerArc, CenterArc, ringInner, slotPoints, starPoints } from "./drawShapes";
+import { fieldsFor, lockPoint } from "./typedValues";
+import { closeTypedBox, openTypedBox, typedLock, typedOpen } from "./typedBox";
 
 type Mode =
   | "idle" | "panning" | "pressSelect" | "moving" | "scaling" | "rotating" | "boxselect"
@@ -72,6 +76,7 @@ export const live = {
   // Zeichnen
   points: [] as Pt[],            // Linie: gesetzte Punkte / Bogen: Start & Ende
   dragStart: null as Pt | null,  // Rechteck/Ellipse/Polygon/Messen
+  clickDraw: false,              // Rechteck & Co. mit Klick, Klick statt Ziehen (zweiter Klick setzt)
   measure: null as { a: Pt; b: Pt } | null,
 
   hover: null as any,
@@ -79,13 +84,27 @@ export const live = {
   menuOk: false                  // Rechtsklick ohne laufende Zeichnung: Menü zeigen
 };
 
+/**
+ * Punkt abholen (Befehlszeile: Verschieben, Kopieren, Drehen, Kreis): solange hook gesetzt ist, liefert ein Linksklick
+ * den gefangenen Punkt an hook statt an das Werkzeug. from: Bezugspunkt (Gummiband in der Vorschau, Lot/Tangente)
+ */
+export const pick = {
+  hook: null as null | ((p: Pt) => void),
+  from: null as Pt | null,
+  move: null as null | ((p: Pt) => void),  // Maus bewegt (z. B. Vorschau beim Versatz)
+  lines: null as null | Pt[][],             // Vorschau-Linien (gelb gestrichelt)
+  cancel: null as null | (() => void)       // Esc / anderes Werkzeug
+};
+let pickClick = false;
+
 let redrawFn: () => void = () => {};
 let canvasEl: HTMLCanvasElement | null = null;
 let panStart = { x: 0, y: 0 };
 
 /** Hinweis in der Statuszeile für jedes Werkzeug (übersetzt) */
 export function toolHint(name: ToolName): string {
-  return t(`hint.${name}`);
+  if (name === "constrain") return `${conPrompt()} · ${t("hint.constrain")}`;
+  return fieldsFor(name) ? `${t(`hint.${name}`)} · ${t("hint.typed")}` : t(`hint.${name}`);
 }
 
 export function initTools(canvas: HTMLCanvasElement, redraw: () => void) {
@@ -99,6 +118,8 @@ export function currentTool(): ToolName {
 
 export function setTool(name: ToolName) {
   cancelCurrent();
+  cornerHover.corner = null; cornerHover.piece = null; cornerHover.ext = null;
+  conReset(); conTool.sel = null;
   app().currentTool = name;
   // Punkte bearbeiten: eine einzeln ausgewählte Form gleich übernehmen
   if (name === "node") {
@@ -122,9 +143,12 @@ export function cancelCurrent() {
   live.mode = "idle";
   live.points = [];
   live.dragStart = null;
+  live.clickDraw = false;
   live.measure = null;
   live.originals.clear();
   live.label = "";
+  closeTypedBox();
+  if (pick.cancel) pick.cancel();
   penCancel();
   nodeEdit.grab = null;
   dimCancel();
@@ -145,7 +169,7 @@ function finishChange() {
   redrawFn();
 }
 
-function addShapes(shapes: any[]) {
+export function addShapes(shapes: any[]) {
   const st = app();
   st.shapes = [...st.shapes, ...shapes];
   st.selectedShapeIds = shapes.map(s => s.id);
@@ -185,13 +209,19 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
   if (e.button !== 0) return;
 
   updateSnap();
+  if (pick.hook) { const h = pick.hook; pickClick = true; h({ ...live.world }); redrawFn(); return; }
   live.measure = tool === "measure" ? null : live.measure;
 
   // Maßzahl angeklickt (Auswahl- oder Bemaßungs-Werkzeug): Maß auswählen (Entf löscht, Doppelklick ändert)
   if (tool === "select" || tool === "dim" || tool === "lineDim") {
     const d = dimAt(sx, sy);
     dimSel.cur = d;
-    if (d) { redrawFn(); return; }
+    if (d) { conTool.sel = null; redrawFn(); return; }
+  }
+  // Zeichen einer Bedingung angeklickt: auswählen (Entf löscht, Doppelklick ändert)
+  if (tool === "select" || tool === "constrain") {
+    conTool.sel = conAt(sx, sy);
+    if (conTool.sel) { redrawFn(); return; }
   }
 
   switch (tool) {
@@ -224,7 +254,7 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
     case "slot":
     case "ring":
     case "measure":
-      live.dragStart = { ...live.world };
+      if (!(live.clickDraw && live.dragStart)) live.dragStart = { ...live.world };
       live.mode = "dragDraw";
       break;
     case "tab":
@@ -232,6 +262,15 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
       break;
     case "trim":
       if (trimClick(live.raw)) finishChange();
+      break;
+    case "corner":
+      if (cornerClick(live.raw)) finishChange();
+      break;
+    case "extend":
+      if (extendClick(live.raw)) finishChange();
+      break;
+    case "constrain":
+      if (conClick(live.raw, openValue)) finishChange();
       break;
     case "lineDim":
       lineDimClick(live.raw);
@@ -322,9 +361,21 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
     redrawFn();
     return;
   }
-  if (tool === "node" && nodeEdit.grab) { nodeMove(live.raw, live.alt); redrawFn(); return; }
+  if (pick.move) { updateSnap(); pick.move({ ...live.world }); redrawFn(); return; }
+  if (tool === "node" && nodeEdit.grab) {
+    // Bedingungen: nach dem Ziehen eines Knotens nachrechnen (gezogener Punkt bleibt bei der Maus)
+    const g = nodeEdit.grab, target = nodeTarget();
+    const prev = g.kind === "node" && target?.points ? (target.points as Pt[]).map(p => ({ ...p })) : null;
+    nodeMove(live.raw, live.alt);
+    if (prev && target && g.kind === "node") conAfterNodeMove(target.id, g.i, prev);
+    redrawFn();
+    return;
+  }
   if (tool === "pen") { updateSnap(); penMove(pen.dragging ? live.raw : live.world); redrawFn(); return; }
   if (tool === "trim") { trimMouseMove(live.raw); redrawFn(); return; }
+  if (tool === "corner") { cornerMove(live.raw); redrawFn(); return; }
+  if (tool === "extend") { extendMove(live.raw); redrawFn(); return; }
+  if (tool === "constrain") { conMove(live.raw); redrawFn(); return; }
   if (tool === "lineDim") {
     const hit = hitTest(live.raw.x, live.raw.y), pick = hit ? lineDimPick(hit, live.raw) : null;
     lineDimHover.pick = pick && "seg" in pick ? pick : null;
@@ -355,7 +406,7 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
       break;
   }
 
-  if (tool !== "select" && tool !== "pan") updateSnap();
+  if ((tool !== "select" && tool !== "pan") || pick.hook) updateSnap();
   else live.snap = null;
 
   if (live.mode === "idle" && tool === "select") {
@@ -372,7 +423,11 @@ export function onMouseMove(e: MouseEvent, sx: number, sy: number) {
 function updateSnap() {
   const tool = currentTool();
   const extra = tool === "line" ? live.points : [];
-  let s = snapPoint(live.raw.x, live.raw.y, undefined, extra);
+  // Lot und Tangente gibt es nur, wenn von einem gesetzten Punkt aus gezeichnet bzw. gemessen wird
+  const snapFrom = pick.hook ? pick.from ?? undefined
+    : tool === "line" && live.points.length ? live.points[live.points.length - 1]
+    : tool === "measure" && live.mode === "dragDraw" && live.dragStart ? live.dragStart : undefined;
+  let s = snapPoint(live.raw.x, live.raw.y, undefined, extra, snapFrom);
 
   // Shift beim Linien- und Bogenzeichnen: Winkel auf 15° einrasten
   if (live.shift && tool === "line" && live.points.length > 0) {
@@ -382,6 +437,52 @@ function updateSnap() {
   }
   live.snap = s.kind === "none" ? null : s;
   live.world = { x: s.x, y: s.y };
+
+  // getippte Maße (typedBox.ts) gelten statt der Maus
+  const from = drawFrom();
+  if (typedOpen() && from) {
+    const lock = typedLock();
+    if (lock.a !== undefined || lock.b !== undefined) {
+      live.world = lockPoint(tool, from, live.world, lock, live.ctrl || live.alt);
+      live.snap = null;
+    }
+  }
+}
+
+/** Bezugspunkt der laufenden Zeichnung (letzter Linienpunkt bzw. Startpunkt), null = es wird nichts gezeichnet */
+function drawFrom(): Pt | null {
+  const tool = currentTool();
+  if (!fieldsFor(tool)) return null;
+  if (tool === "line") return live.points.length ? live.points[live.points.length - 1] : null;
+  return live.mode === "dragDraw" && live.dragStart ? live.dragStart : null;
+}
+
+/** Zahl getippt während des Zeichnens: Felder an der Maus öffnen */
+function startTyping(e: KeyboardEvent): boolean {
+  if (e.ctrlKey || e.metaKey || e.altKey || typedOpen() || !drawFrom()) return false;
+  const tab = e.key === "Tab";
+  if (!tab && !/^[0-9.,+\-(]$/.test(e.key)) return false;
+  const tool = currentTool();
+  return openTypedBox(tool, tab ? "" : e.key, {
+    change: () => { updateSnap(); updateLabel(); redrawFn(); },
+    commit: () => commitTyped(),
+    empty: () => { if (tool === "line" && live.points.length >= 2) finishLine(false); redrawFn(); }
+  }, tab && !e.shiftKey ? 1 : 0); // Tab = gleich ins zweite Feld (Winkel/Höhe)
+}
+
+/** Enter in den Feldern: Punkt bzw. Form mit den getippten Werten setzen */
+function commitTyped() {
+  const tool = currentTool();
+  updateSnap();
+  if (tool === "line") handleLineClick();
+  else if (live.mode === "dragDraw" && live.dragStart) {
+    live.clickDraw = false; // auch eine winzige getippte Form ist gewollt
+    finishDragDraw(tool);
+  }
+  closeTypedBox();
+  updateSnap();
+  updateLabel();
+  redrawFn();
 }
 
 function doMove() {
@@ -587,6 +688,7 @@ export function onMouseUp(e: MouseEvent, sx: number, sy: number) {
 
   if (live.mode === "panning") { live.mode = "idle"; updateCursor(); return; }
   if (e.button !== 0) return;
+  if (pickClick) { pickClick = false; redrawFn(); return; } // der Klick ging an die Befehlszeile
   if (tool === "node") { nodeUp(); finishChange(); return; }
   if (tool === "pen") { penUp(); redrawFn(); return; }
 
@@ -603,6 +705,7 @@ export function onMouseUp(e: MouseEvent, sx: number, sy: number) {
     case "moving":
     case "scaling":
     case "rotating":
+      if (live.mode === "moving") conAfterMove(selectedShapes().map(s => s.id)); // verbundene Formen folgen
       live.mode = "idle";
       live.originals.clear();
       live.label = "";
@@ -638,6 +741,8 @@ export function onMouseUp(e: MouseEvent, sx: number, sy: number) {
   } else if (live.mode === "dragDraw" && live.dragStart) {
     finishDragDraw(tool);
   }
+  // Klick mit getippten Werten: Werte verbraucht. Rechteck & Co. warten ggf. noch auf den zweiten Klick
+  if (typedOpen() && !(live.mode === "dragDraw" && live.dragStart)) closeTypedBox();
   redrawFn();
 }
 
@@ -664,6 +769,14 @@ export function finishLine(close: boolean) {
   live.points = [];
   live.label = "";
   redrawFn();
+}
+
+/** Wert-Eingabe für das Werkzeug „Bedingung“ an der Maus – erst nach dem Loslassen, sonst nimmt die Maus den Fokus */
+let lastClient = { x: 0, y: 0 };
+if (typeof window !== "undefined") window.addEventListener("mousemove", e => { lastClient = { x: e.clientX, y: e.clientY }; }, true);
+function openValue(initial: string, done: (text: string | null) => void) {
+  const at = { ...lastClient };
+  setTimeout(() => valueInput(at.x, at.y, initial, txt => { done(txt); finishChange(); }), 60);
 }
 
 export const lineDimHover = { pick: null as null | { a: Pt; b: Pt; moved: Pt } };
@@ -728,6 +841,37 @@ function handleArcClick() {
   addShapes([arc]);
 }
 
+/** Bezugspunkt für „@“ in der Befehlszeile: letzter Punkt der laufenden Zeichnung, null = es wird nichts gezeichnet */
+export function drawingBase(): Pt | null {
+  const tool = currentTool();
+  if ((tool === "line" || tool === "arc" || tool === "arcCenter") && live.points.length) return live.points[live.points.length - 1];
+  return live.mode === "dragDraw" && live.dragStart ? live.dragStart : null;
+}
+
+/** Wie ein Klick an Stelle p (Welt-Pixel) mit dem aktuellen Zeichenwerkzeug – für getippte Punkte. false = Werkzeug zeichnet nicht */
+export function placePoint(p: Pt): boolean {
+  const tool = currentTool();
+  closeTypedBox();
+  const mouse = { ...live.raw };
+  live.world = { ...p };
+  live.raw = { ...p };
+  live.snap = null;
+  if (tool === "line") handleLineClick();
+  else if (tool === "arc") handleArcClick();
+  else if (tool === "arcCenter") handleCenterArcClick();
+  else if (tool === "text") openTextDialog({ ...p });
+  else if (["rect", "ellipse", "polygon", "star", "slot", "ring", "measure"].includes(tool)) {
+    if (live.mode === "dragDraw" && live.dragStart) finishDragDraw(tool);
+    else { live.dragStart = { ...p }; live.mode = "dragDraw"; live.clickDraw = true; }
+  } else return false;
+  // die Vorschau läuft danach wieder zur Maus
+  live.raw = mouse;
+  updateSnap();
+  updateLabel();
+  redrawFn();
+  return true;
+}
+
 function finishDragDraw(tool: ToolName) {
   const start = live.dragStart!;
   live.mode = "idle";
@@ -736,13 +880,20 @@ function finishDragDraw(tool: ToolName) {
   const minSize = screenDist(3);
 
   if (tool === "measure") {
+    if (size <= minSize && !live.clickDraw) { live.clickDraw = true; live.mode = "dragDraw"; return; }
+    live.clickDraw = false;
     live.measure = size > minSize ? { a: start, b: { ...w } } : null;
     live.dragStart = null;
     live.label = "";
     return;
   }
   live.dragStart = start;
-  if (size < minSize) { live.dragStart = null; return; }
+  if (size < minSize) {
+    // Klick ohne Ziehen: Startpunkt bleibt, der nächste Klick (oder getippte Maße + Enter) setzt die Form
+    if (!live.clickDraw) { live.clickDraw = true; live.mode = "dragDraw"; return; }
+    live.dragStart = null; live.clickDraw = false; return;
+  }
+  live.clickDraw = false;
 
   if (tool === "rect") {
     const r = dragRect();
@@ -786,6 +937,8 @@ export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
   // Doppelklick auf eine Maßzahl: Wert eingeben
   const d = dimAt(sx, sy);
   if (d && canvasEl) { dimCancel(); editDimValue(d, canvasEl, () => { finishChange(); window.dispatchEvent(new Event("cnc-dims-changed")); }); return; }
+  const gc = conAt(sx, sy);
+  if (gc) { conEdit(gc, openValue, () => finishChange()); return; }
   if (tool === "line") { finishLine(false); return; }
   if (tool === "node") { if (nodeDblClick(toWorld(sx, sy), sx, sy)) finishChange(); return; }
   if (tool === "pen") { const s = penFinish(false); if (s) addShapes([s]); return; }
@@ -802,8 +955,9 @@ export function onDoubleClick(_e: MouseEvent, sx: number, sy: number) {
 export function onToolKey(e: KeyboardEvent): boolean {
   readModifiers(e);
   const tool = currentTool();
+  if (startTyping(e)) return true;
   if (e.key === "Escape") {
-    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure || pen.nodes.length > 0 || !!dimTool.a;
+    const busy = live.points.length > 0 || live.mode !== "idle" || live.measure || pen.nodes.length > 0 || !!dimTool.a || live.clickDraw || !!pick.cancel;
     dimSel.cur = null;
     if (busy) cancelCurrent();
     else if (tool !== "select") setTool("select");
@@ -819,6 +973,12 @@ export function onToolKey(e: KeyboardEvent): boolean {
     const s = penFinish(false);
     if (s) addShapes([s]);
     redrawFn();
+    return true;
+  }
+  // gewählte Bedingung löschen (nicht die Form)
+  if ((e.key === "Delete" || e.key === "Backspace") && conTool.sel) {
+    conDeleteSelected();
+    finishChange();
     return true;
   }
   // gewähltes Maß löschen (nicht die Form)

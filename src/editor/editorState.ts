@@ -8,7 +8,7 @@
 import { MM_TO_PIXEL } from "../shapeTransform";
 import { fmtLen } from "../units";
 
-export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim";
+export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim" | "corner" | "extend" | "constrain";
 
 export function app(): any {
   return (window as any).cncState;
@@ -23,6 +23,9 @@ export const options = {
   starTips: 5,         // Zacken für das Stern-Werkzeug
   starInner: 50,       // Innenradius des Sterns in % vom Außenradius
   ringWall: 5,         // Wandstärke für das Ring-Werkzeug in mm
+  cornerSize: 3,       // Werkzeug „Ecke“: Radius bzw. Fasenlänge in mm
+  cornerChamfer: false, // Werkzeug „Ecke“: Fase statt Rundung
+  conKind: "h",        // Werkzeug „Bedingung“: Art (h, v, par, perp, eq, len, coin)
   showTools: true      // Fräserbreite + Werkzeug-Marken auf der Zeichenfläche zeigen
 };
 

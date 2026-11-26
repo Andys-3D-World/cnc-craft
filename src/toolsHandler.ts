@@ -10,7 +10,7 @@ export function setupToolsHandler(_state: any) {
   });
 
   loadOptions();
-  const bindCheck = (id: string, key: "snapObjects" | "snapGrid" | "showTools") => {
+  const bindCheck = (id: string, key: "snapObjects" | "snapGrid" | "showTools" | "cornerChamfer") => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.checked = options[key];
@@ -20,7 +20,7 @@ export function setupToolsHandler(_state: any) {
       window.dispatchEvent(new Event("cnc-redraw"));
     });
   };
-  const bindNum = (id: string, key: "gridStep" | "rectRadius" | "polygonSides" | "starTips" | "starInner" | "ringWall", min: number, max = Infinity) => {
+  const bindNum = (id: string, key: "gridStep" | "rectRadius" | "polygonSides" | "starTips" | "starInner" | "ringWall" | "cornerSize", min: number, max = Infinity) => {
     const el = document.getElementById(id) as HTMLInputElement | null;
     if (!el) return;
     el.value = String(options[key]);
@@ -40,4 +40,15 @@ export function setupToolsHandler(_state: any) {
   bindNum("opt-star-tips", "starTips", 3, 100);
   bindNum("opt-star-inner", "starInner", 5, 95);
   bindNum("opt-ring-wall", "ringWall", 0.01);
+  bindNum("opt-corner-size", "cornerSize", 0.01);
+  bindCheck("opt-corner-chamfer", "cornerChamfer");
+  const conSel = document.getElementById("opt-con-kind") as HTMLSelectElement | null;
+  if (conSel) {
+    conSel.value = options.conKind;
+    conSel.addEventListener("change", () => {
+      options.conKind = conSel.value;
+      saveOptions();
+      window.dispatchEvent(new Event("cnc-con-kind"));
+    });
+  }
 }

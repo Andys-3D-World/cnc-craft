@@ -4,7 +4,7 @@
  * Fangpunkt-Markierung, Messlinie, Info-Text an der Maus, Statuszeile.
  */
 import { app, toScreen, toWorld, fmtMm, options, bedSizeMm } from "./editorState";
-import { live, currentTool, toolHint, dragRect, dragPolygonPoints, dragSlotPoints, dragStarPoints, lineDimHover, measureText, previewCenterArc } from "./tools";
+import { live, pick, currentTool, toolHint, dragRect, dragPolygonPoints, dragSlotPoints, dragStarPoints, lineDimHover, measureText, previewCenterArc } from "./tools";
 import { t } from "../i18n/i18n";
 import { selectionBounds, selectionHandles, HANDLE_SIZE, selectedShapes } from "./selection";
 import { Pt, shapeToPaths, makeEllipsePoints, makeRectPoints, arcGeometry, MM_TO_PIXEL } from "../shapeTransform";
@@ -15,6 +15,8 @@ import { drawRotaryBand } from "../rotary";
 import { isPlasma } from "../machineMode";
 import { livePreview } from "./livePreview";
 import { trimHover } from "./trimTool";
+import { cornerHover } from "./cornerTool";
+import { drawConstraints } from "./constrainTool";
 import { cutMark, hasCutSetting, MachineKind } from "../cutSetting";
 import { isLaser } from "../machineMode";
 import { unitName } from "../units";
@@ -78,9 +80,25 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasEle
     polyPath(ctx, trimHover.removed, false);
     ctx.stroke();
   }
+  // ---- Ecke: Ecke markieren, neue Rundung/Fase gelb ----
+  if (tool === "corner" && cornerHover.corner) {
+    const c = toScreen(cornerHover.corner.x, cornerHover.corner.y);
+    ctx.strokeStyle = "#ffe14d";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI * 2); ctx.stroke();
+    if (cornerHover.piece) { ctx.lineWidth = 3; polyPath(ctx, cornerHover.piece, false); ctx.stroke(); }
+  }
+  // ---- Verlängern: gestrichelt bis zur nächsten Form ----
+  if (tool === "extend" && cornerHover.ext) {
+    ctx.strokeStyle = "#ffe14d";
+    ctx.lineWidth = 2.5;
+    polyPath(ctx, [cornerHover.ext.a, cornerHover.ext.b], false);
+    ctx.setLineDash([6, 4]); ctx.stroke(); ctx.setLineDash([]);
+  }
   // ---- Maße (immer sichtbar) + Vorschau beim Bemaßen ----
   drawDims(ctx);
   if (tool === "dim") drawDimPreview(ctx);
+  drawConstraints(ctx, tool);
   // ---- Kurven: Knoten und Tangenten (Punkte bearbeiten, Kurve zeichnen) ----
   if (tool === "node" || tool === "pen") drawBezierOverlay(ctx, tool);
 
@@ -216,6 +234,21 @@ function drawToolPreview(ctx: CanvasRenderingContext2D, tool: string) {
   ctx.lineWidth = 1.6;
   const w = live.world;
 
+  // Versatz offener Linien: Vorschau auf der Seite der Maus
+  if (pick.lines) {
+    ctx.save();
+    ctx.strokeStyle = "#ffe14d"; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+    for (const l of pick.lines) { polyPath(ctx, l, false); ctx.stroke(); }
+    ctx.restore();
+  }
+  // Befehlszeile wartet auf den zweiten Punkt (Kreis, Verschieben, Drehen): Gummiband vom ersten Punkt
+  if (pick.hook && pick.from) {
+    polyPath(ctx, [pick.from, w], false);
+    ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
+    const c = toScreen(pick.from.x, pick.from.y);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 3, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
+  }
+
   if (tool === "line" && live.points.length > 0) {
     polyPath(ctx, [...live.points, w], false);
     ctx.stroke();
@@ -318,8 +351,18 @@ function drawSnapMarker(ctx: CanvasRenderingContext2D, x: number, y: number, kin
   if (kind === "center") ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
   else if (kind === "mid") { ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x + 7, s.y + 5); ctx.lineTo(s.x - 7, s.y + 5); ctx.closePath(); }
   else if (kind === "grid") { ctx.moveTo(s.x - 5, s.y - 5); ctx.lineTo(s.x + 5, s.y + 5); ctx.moveTo(s.x + 5, s.y - 5); ctx.lineTo(s.x - 5, s.y + 5); }
+  else if (kind === "quad") { ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x + 7, s.y); ctx.lineTo(s.x, s.y + 7); ctx.lineTo(s.x - 7, s.y); ctx.closePath(); }
+  else if (kind === "int") { ctx.lineWidth = 2.2; ctx.moveTo(s.x - 7, s.y - 7); ctx.lineTo(s.x + 7, s.y + 7); ctx.moveTo(s.x + 7, s.y - 7); ctx.lineTo(s.x - 7, s.y + 7); }
+  else if (kind === "perp") { ctx.moveTo(s.x - 7, s.y + 6); ctx.lineTo(s.x + 7, s.y + 6); ctx.moveTo(s.x, s.y + 6); ctx.lineTo(s.x, s.y - 8); ctx.rect(s.x, s.y + 1, 5, 5); }
+  else if (kind === "tan") { ctx.arc(s.x, s.y + 1, 5, 0, Math.PI * 2); ctx.moveTo(s.x - 8, s.y - 4); ctx.lineTo(s.x + 8, s.y - 4); }
   else ctx.rect(s.x - 5, s.y - 5, 10, 10);
   ctx.stroke();
+  // Name des Fangpunkts daneben (Raster nicht – das wäre bei jeder Bewegung da)
+  if (kind !== "grid") {
+    ctx.font = "11px sans-serif";
+    ctx.fillStyle = "#ff3df0";
+    ctx.fillText(t(`snap.${kind}`), s.x + 11, s.y - 9);
+  }
 }
 
 export function drawStatusBar(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, tool: string) {
