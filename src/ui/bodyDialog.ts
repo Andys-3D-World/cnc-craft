@@ -13,10 +13,11 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { t } from "../i18n/i18n";
 import { app } from "../editor/editorState";
 import { selectedShapes } from "../editor/selection";
-import { isClosedShape, newId } from "../shapeTransform";
+import { MM_TO_PIXEL, createPolyline, isClosedShape, newId } from "../shapeTransform";
 import { Viewer3D } from "../view3d/viewer3d";
 import { regionOf, shellBounds, shellMeshes, stlBinary, type Shell } from "../view3d/solid";
-import { bodyShells, topOf, volume, zRange, type EvalFeat, type Feature, type FeatOp } from "../editor/body3d";
+import { bodyShells, millPlan, topOf, volume, zRange, type EvalFeat, type Feature, type FeatOp } from "../editor/body3d";
+import { isMill } from "../machineMode";
 import { getStock } from "../stock";
 import { checkpoint } from "../editor/history";
 
@@ -69,6 +70,7 @@ export function openBodyDialog(log: (s: string) => void, addSelection: boolean, 
       </div>
       <div class="dlg-buttons">
         <button id="body-close" class="btn-secondary">${t("dlg.close")}</button>
+        <button id="body-mill" class="btn-secondary" title="${t("body.millTip")}">⚙ ${t("body.mill")}</button>
         <button id="body-stl" class="btn-primary">💾 ${t("body.save")}</button>
       </div>
     </div>`;
@@ -88,6 +90,7 @@ export function openBodyDialog(log: (s: string) => void, addSelection: boolean, 
     $<HTMLElement>("body-info").textContent = !viewer.ok ? t("v3d.noGl")
       : b ? t("body.info", { w: (b.x1 - b.x0).toFixed(1), d: (b.y1 - b.y0).toFixed(1), h: (b.z1 - b.z0).toFixed(1), v: (v / 1000).toFixed(1) }) : t("body.empty");
     $<HTMLButtonElement>("body-stl").disabled = !shells.length;
+    $<HTMLButtonElement>("body-mill").disabled = !shells.length || !isMill();
     redraw();
   };
 
@@ -126,6 +129,7 @@ export function openBodyDialog(log: (s: string) => void, addSelection: boolean, 
       q<HTMLButtonElement>("b-del").onclick = () => {
         e.owner.feat3d = (e.owner.feat3d as Feature[]).filter(x => x !== f);
         if (!e.owner.feat3d.length) delete e.owner.feat3d;
+        releaseSketch();
         checkpoint();
         list(); rebuild();
       };
@@ -142,6 +146,7 @@ export function openBodyDialog(log: (s: string) => void, addSelection: boolean, 
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
   ov.addEventListener("mousedown", e => { if (e.target === ov) close(); });
   $<HTMLElement>("body-close").onclick = close;
+  $<HTMLElement>("body-mill").onclick = () => { if (makeMillShapes(log)) { checkpoint(); redraw(); } };
   $<HTMLElement>("body-stl").onclick = async () => {
     if (!shells.length) return;
     try {
@@ -172,5 +177,38 @@ function addFromSelection(log: (s: string) => void): boolean {
   const owner = sel[0];
   owner.feat3d = [...(owner.feat3d || []), f];
   log(t(op === "join" ? "body.addedJoin" : "body.addedCut", { n: sel.length }));
+  return true;
+}
+
+/** Formen, die zu keinem Schritt mehr gehören, werden wieder normal gefräst */
+function releaseSketch() {
+  const used = new Set(allFeatures().flatMap(e => e.f.profile));
+  for (const s of app().shapes) if (s.noMill && !used.has(s.id)) delete s.noMill;
+}
+
+/**
+ * Fräsformen aus dem Körper erzeugen (Rechnung: millPlan in body3d.ts). Die Oberkante des Körpers liegt auf Z 0
+ * (Material-Oberseite), Tiefen negativ wie bei jeder Form. Vorher erzeugte Fräsformen (from3d) werden ersetzt,
+ * die Skizzen-Formen werden „nicht fräsen“ (noMill, grau gestrichelt). Erhebungen über der Grundplatte gehen noch
+ * nicht – dann wird lieber nichts erzeugt als falsche Tiefen.
+ */
+function makeMillShapes(log: (s: string) => void): boolean {
+  const st = app();
+  const entries = allFeatures().filter(e => !e.f.off);
+  const byId = new Map<string, any>(st.shapes.map((s: any) => [s.id, s]));
+  const plan = millPlan(entries.map(e => evalFeat(e.f, byId)));
+  if (!plan.ops.length) { log(t("body.millNone")); return false; }
+  if (plan.raised) { log(t("body.millRaised", { n: plan.raised })); return false; }
+  const gid = "grp-3d-" + newId();
+  const made = plan.ops.map(o => createPolyline(o.ring.map(([x, y]) => ({ x: x * MM_TO_PIXEL, y: y * MM_TO_PIXEL })), true, o.mode,
+    { groupId: gid, millingDepth: -+o.depth.toFixed(4), from3d: true }));
+  const sketch = new Set(entries.flatMap(e => e.f.profile));
+  st.shapes = [...st.shapes.filter((s: any) => !s.from3d), ...made];
+  for (const s of st.shapes) if (sketch.has(s.id)) s.noMill = true;
+  st.selectedShapeIds = made.map(s => s.id);
+  const thick = Number(getStock().thick) || 0;
+  log(t("body.millDone", { n: made.length, h: +plan.height.toFixed(2) }));
+  if (thick > 0 && Math.abs(thick - plan.height) > 0.01) log(t("body.millThick", { h: +plan.height.toFixed(2), t: thick }));
+  if (plan.inner) log(t("body.millInner", { n: plan.inner }));
   return true;
 }

@@ -80,3 +80,46 @@ export function topOf(feats: EvalFeat[]): number {
   const s = slabs(feats);
   return s.length ? s[s.length - 1].z1 : 0;
 }
+
+// ---------------------------------------------------------------------
+// Fräsen aus dem Körper (von oben, Oberkante des Körpers = Z 0 = Material-Oberseite)
+// ---------------------------------------------------------------------
+
+/**
+ * Eine Fräs-Form: Ring in mm (geschlossen, ohne Wiederholung des ersten Punkts), Art und Tiefe ab Oberkante (positiv)
+ *   outside  Außenkontur, volle Höhe (Teil ausschneiden)
+ *   inside   Durchbruch, volle Höhe
+ *   pocket   Tasche bis zur Tiefe; Inseln (stehen bleibende Stellen in der Tasche) kommen als outside mit derselben Tiefe –
+ *            so erkennt die Fräsbahn sie als Insel und fährt ihre Wand sauber ab
+ */
+export interface MillOp { mode: "outside" | "inside" | "pocket"; depth: number; ring: [number, number][] }
+/** Hinweise: inner = Ausschnitt erreicht die Oberkante nicht (von oben nicht fräsbar), raised = Aufbauen über der Grundplatte */
+export interface MillPlan { ops: MillOp[]; height: number; bottom: number; inner: number; raised: number }
+
+const openRing = (r: [number, number][]) => (r.length > 1 && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1] ? r.slice(0, -1) : r.slice());
+
+/** Fräs-Formen aus den Schritten des Körpers. eps: Höhen-Toleranz in mm */
+export function millPlan(feats: EvalFeat[], eps = 1e-6): MillPlan {
+  const s = slabs(feats);
+  if (!s.length) return { ops: [], height: 0, bottom: 0, inner: 0, raised: 0 };
+  const bottom = s[0].z0, top = s[s.length - 1].z1, height = top - bottom;
+  // Grundfläche: alles, was irgendwo Körper ist; ihre Löcher gehen ganz durch
+  let foot: MultiPolygon = s[0].region;
+  for (const x of s.slice(1)) foot = polygonClipping.union(foot, x.region);
+  const ops: MillOp[] = [];
+  for (const poly of foot) poly.forEach((ring, i) => ops.push({ mode: i === 0 ? "outside" : "inside", depth: height, ring: openRing(ring as [number, number][]) }));
+
+  let inner = 0, raised = 0;
+  // Grundplatte = erster Aufbau-Schritt, der ganz unten beginnt; spätere Aufbauten über ihr sind Erhebungen
+  const firstJoin = feats.findIndex(f => f.op === "join" && f.region.length && f.z1 - f.z0 > eps);
+  feats.forEach((f, i) => {
+    if (!f.region.length || f.z1 - f.z0 <= eps) return;
+    if (f.op === "join") { if (i !== firstJoin && f.z1 > bottom + eps && f.z0 > bottom + eps) raised++; return; }
+    if (f.z1 < top - eps) { if (f.z0 < top - eps) inner++; return; }   // erreicht die Oberkante nicht
+    if (f.z0 <= bottom + eps) return;                                  // geht ganz durch: steckt schon in den Löchern der Grundfläche
+    const area = polygonClipping.intersection(f.region, foot);         // nur, wo Körper ist
+    const depth = top - f.z0;
+    for (const poly of area) poly.forEach((ring, k) => ops.push({ mode: k === 0 ? "pocket" : "outside", depth, ring: openRing(ring as [number, number][]) }));
+  });
+  return { ops: ops.filter(o => o.ring.length >= 3), height, bottom, inner, raised };
+}

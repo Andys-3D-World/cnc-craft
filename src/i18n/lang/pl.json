@@ -702,7 +702,7 @@
   "hint.pan": "Przeciągnij = przesuń widok · Kółko myszy = powiększenie",
   "hint.line": "Klik = dodaj punkt · Dwuklik / Enter / prawy klik = koniec · Kliknij punkt startowy = zamknij · Shift = 15° · Esc = anuluj",
   "hint.rect": "Przeciągnij = prostokąt · Shift = kwadrat · Ctrl/Alt = od środka · Promień narożników na pasku narzędzi",
-  "hint.ellipse": "Przeciągnij = elipsa · Shift = okrąg · Ctrl/Alt = od środka",
+  "hint.ellipse": "Przeciągnij od środka = elipsa · Shift = okrąg · Ctrl/Alt = od narożnika",
   "hint.polygon": "Przeciągnij od środka · Shift = obrót co 15° · Liczba boków na pasku narzędzi",
   "hint.arc": "1. klik = początek · 2. klik = koniec · 3. klik = wygięcie · Esc = anuluj",
   "hint.text": "Kliknij w miejscu, gdzie ma być tekst",
@@ -7834,5 +7834,14 @@
   "body.none": "Jeszcze brak bryły 3D. Zaznacz zamknięte kształty i wybierz „Wyciągnij”.",
   "body.selectClosed": "Najpierw zaznacz zamknięte kształty (prostokąt, okrąg, zamknięta linia …).",
   "body.addedJoin": "Wyciągnięto {n} kształt(y).",
-  "body.addedCut": "Dodano {n} kształt(y) jako wycięcie (5 mm od góry – do zmiany w oknie)."
+  "body.addedCut": "Dodano {n} kształt(y) jako wycięcie (5 mm od góry – do zmiany w oknie).",
+  "body.mill": "Utwórz kształty frezowania",
+  "body.millTip": "Zamień bryłę na kształty frezowania: obrys i otwory przelotowe na pełną wysokość, kieszenie na ich głębokość. Góra bryły = wierzch materiału (Z 0). Szkic nie jest potem frezowany (szara przerywana). Po zmianach po prostu utwórz je ponownie.",
+  "body.millNone": "Brak bryły – nic do frezowania.",
+  "body.millRaised": "Nie utworzono kształtów: {n} krok(i) dodają materiał nad płytą bazową (wypukłości). Automatyczne frezowanie jeszcze tego nie umie – dodaj płytę na pełną wysokość i wytnij niższe miejsca.",
+  "body.millDone": "Utworzono {n} kształt(ów) frezowania z bryły (wysokość {h} mm, góra = Z 0). Przed frezowaniem sprawdź narzędzie, mostki i symulację.",
+  "body.millThick": "Uwaga: bryła ma {h} mm wysokości, materiał ustawiono na {t} mm.",
+  "body.millInner": "{n} wycięcie(a) nie sięgają góry i nie da się ich frezować od góry – brakuje ich w kształtach frezowania.",
+  "tip.tool.circle": "Okrąg (C) – pierwszy klik = środek, potem przeciągnij promień lub wpisz Ø",
+  "hint.circle": "Klik = środek · przeciągnij lub drugi klik = promień · wpisz liczbę = średnica · Esc = anuluj"
 }

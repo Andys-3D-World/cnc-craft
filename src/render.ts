@@ -161,7 +161,7 @@ export function drawEverything(
       return c ? { diameter: Math.max(c.kerf, 0.3), color: c.color } : null;
     });
   }
-  else if (options.showTools && !lathe) drawToolBands(ctx, shapes, sx, sy, scale);
+  else if (options.showTools && !lathe) drawToolBands(ctx, shapes.filter((s: any) => !s.noMill), sx, sy, scale);
 
   // 6. Formen
   const selected = new Set(selectedShapeIds);
@@ -183,6 +183,18 @@ export function drawEverything(
       ctx.setLineDash([6, 4]);
       ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : "#ff4d4d";
       ctx.lineWidth = isSel ? 2.2 : 1.5;
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+    if (shape.noMill) {
+      // Skizze eines 3D-Körpers: grau gestrichelt – wird nicht gefräst (die erzeugten Fräsformen schon)
+      ctx.beginPath();
+      tracePath(ctx, shape, sx, sy, scale);
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = isSel ? (isLight() ? "#12924f" : "#34d17b") : "rgba(150,150,170,0.85)";
+      ctx.lineWidth = isSel ? 2 : 1.2;
       ctx.stroke();
       ctx.restore();
       continue;

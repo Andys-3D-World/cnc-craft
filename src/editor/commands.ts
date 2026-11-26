@@ -78,7 +78,7 @@ let clipboard: any[] = [];
 let pasteCount = 0;
 
 const TOOL_KEYS: Record<string, ToolName> = {
-  v: "select", h: "pan", l: "line", r: "rect", e: "ellipse", p: "polygon", a: "arc", t: "text", m: "measure",
+  v: "select", h: "pan", l: "line", r: "rect", c: "circle", e: "ellipse", p: "polygon", a: "arc", t: "text", m: "measure",
   n: "node", b: "pen", d: "dim"
 };
 
@@ -334,6 +334,7 @@ export function makeCopies(source: any[], offsetPx: number, linked = false): any
     const c = cloneShape(s);
     c.id = newId();
     delete c.ngOut; // Kopie gehört nicht mehr zum Ergebnis des Knotengraphen
+    delete c.from3d; // Kopie einer Fräsform aus dem 3D-Körper: wird beim nächsten Erzeugen nicht mitgelöscht
     if (c.gen) { // Kopie eines Generator-Laufs = eigener Lauf
       if (!genMap.has(c.gen.id)) genMap.set(c.gen.id, newId());
       c.gen.id = genMap.get(c.gen.id);

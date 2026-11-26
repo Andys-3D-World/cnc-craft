@@ -8,7 +8,7 @@
 import { MM_TO_PIXEL } from "../shapeTransform";
 import { fmtLen } from "../units";
 
-export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim" | "corner" | "extend" | "constrain";
+export type ToolName = "select" | "pan" | "line" | "rect" | "ellipse" | "polygon" | "arc" | "text" | "measure" | "tab" | "node" | "pen" | "dim" | "trim" | "star" | "slot" | "ring" | "arcCenter" | "lineDim" | "corner" | "extend" | "constrain" | "circle";
 
 export function app(): any {
   return (window as any).cncState;

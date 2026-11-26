@@ -702,7 +702,7 @@
   "hint.pan": "Slepen = weergave verschuiven · Muiswiel = zoom",
   "hint.line": "Klik = punt zetten · Dubbelklik / Enter / rechtsklik = klaar · Startpunt aanklikken = sluiten · Shift = 15° · Esc = annuleren",
   "hint.rect": "Slepen = rechthoek · Shift = vierkant · Ctrl/Alt = vanuit het midden · Hoekradius in de werkbalk",
-  "hint.ellipse": "Slepen = ellips · Shift = cirkel · Ctrl/Alt = vanuit het midden",
+  "hint.ellipse": "Vanuit het midden slepen = ellips · Shift = cirkel · Ctrl/Alt = vanuit een hoek",
   "hint.polygon": "Vanuit het midden slepen · Shift = draaien in stappen van 15° · Hoeken in de werkbalk",
   "hint.arc": "1e klik = begin · 2e klik = einde · 3e klik = welving · Esc = annuleren",
   "hint.text": "Klik waar de tekst moet komen",
@@ -7834,5 +7834,14 @@
   "body.none": "Nog geen 3D-lichaam. Selecteer gesloten vormen en kies „Extruderen”.",
   "body.selectClosed": "Selecteer eerst gesloten vormen (rechthoek, cirkel, gesloten lijn …).",
   "body.addedJoin": "{n} vorm(en) geëxtrudeerd.",
-  "body.addedCut": "{n} vorm(en) als uitsnede toegevoegd (5 mm vanaf de bovenkant – in het venster te wijzigen)."
+  "body.addedCut": "{n} vorm(en) als uitsnede toegevoegd (5 mm vanaf de bovenkant – in het venster te wijzigen).",
+  "body.mill": "Freesvormen maken",
+  "body.millTip": "Het lichaam omzetten in freesvormen: omtrek en doorgaande gaten over de volle hoogte, kamers op hun diepte. Bovenkant van het lichaam = bovenkant materiaal (Z 0). De schets wordt daarna niet meer gefreesd (grijs gestreept). Na wijzigingen gewoon opnieuw maken.",
+  "body.millNone": "Geen lichaam – niets te frezen.",
+  "body.millRaised": "Geen freesvormen gemaakt: {n} stap(pen) bouwen boven de grondplaat op (verhogingen). Automatisch frezen kan dat nog niet – bouw de plaat op volle hoogte op en snijd de lagere delen uit.",
+  "body.millDone": "{n} freesvorm(en) uit het lichaam gemaakt (hoogte {h} mm, bovenkant = Z 0). Controleer gereedschap, bruggetjes en simulatie vóór het frezen.",
+  "body.millThick": "Let op: het lichaam is {h} mm hoog, het materiaal staat op {t} mm.",
+  "body.millInner": "{n} uitsnede(n) bereiken de bovenkant niet en kunnen niet van boven gefreesd worden – ze ontbreken in de freesvormen.",
+  "tip.tool.circle": "Cirkel (C) – eerste klik = middelpunt, dan straal slepen of Ø typen",
+  "hint.circle": "Klik = middelpunt · slepen of tweede klik = straal · getal typen = diameter · Esc = afbreken"
 }

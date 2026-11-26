@@ -702,7 +702,7 @@
   "hint.pan": "Arrastrar = desplazar vista · Rueda = zoom",
   "hint.line": "Clic = añadir punto · Doble clic / Intro / clic derecho = terminar · Clic en el punto inicial = cerrar · Mayús = 15° · Esc = cancelar",
   "hint.rect": "Arrastrar = rectángulo · Mayús = cuadrado · Ctrl/Alt = desde el centro · Radio de esquina en la barra de herramientas",
-  "hint.ellipse": "Arrastrar = elipse · Mayús = círculo · Ctrl/Alt = desde el centro",
+  "hint.ellipse": "Arrastrar desde el centro = elipse · Mayús = círculo · Ctrl/Alt = desde una esquina",
   "hint.polygon": "Arrastrar desde el centro · Mayús = girar en pasos de 15° · Lados en la barra de herramientas",
   "hint.arc": "1.er clic = inicio · 2.º clic = final · 3.er clic = curvatura · Esc = cancelar",
   "hint.text": "Haz clic donde debe ir el texto",
@@ -7834,5 +7834,14 @@
   "body.none": "Aún no hay cuerpo 3D. Selecciona formas cerradas y elige «Extruir».",
   "body.selectClosed": "Selecciona primero formas cerradas (rectángulo, círculo, línea cerrada …).",
   "body.addedJoin": "{n} forma(s) extruida(s).",
-  "body.addedCut": "{n} forma(s) añadida(s) como recorte (5 mm desde arriba; se cambia en la ventana)."
+  "body.addedCut": "{n} forma(s) añadida(s) como recorte (5 mm desde arriba; se cambia en la ventana).",
+  "body.mill": "Crear formas de fresado",
+  "body.millTip": "Convertir el cuerpo en formas de fresado: contorno y agujeros pasantes a toda la altura, cajeras a su profundidad. Parte superior del cuerpo = superficie del material (Z 0). Después el boceto ya no se fresa (trazos grises). Tras cambios, basta con crearlas de nuevo.",
+  "body.millNone": "No hay cuerpo: nada que fresar.",
+  "body.millRaised": "No se crearon formas de fresado: {n} paso(s) añaden material por encima de la placa base (partes elevadas). El fresado automático aún no lo hace: añade la placa a toda la altura y recorta las zonas más bajas.",
+  "body.millDone": "{n} forma(s) de fresado creada(s) desde el cuerpo (altura {h} mm, parte superior = Z 0). Revisa herramienta, puentes y simulación antes de fresar.",
+  "body.millThick": "Atención: el cuerpo mide {h} mm de alto y el material está puesto a {t} mm.",
+  "body.millInner": "{n} recorte(s) no llegan a la parte superior y no se pueden fresar desde arriba: faltan en las formas de fresado.",
+  "tip.tool.circle": "Círculo (C) – primer clic = centro, luego arrastra el radio o escribe Ø",
+  "hint.circle": "Clic = centro · arrastrar o segundo clic = radio · escribir un número = diámetro · Esc = cancelar"
 }

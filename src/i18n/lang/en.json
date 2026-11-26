@@ -702,7 +702,7 @@
   "hint.pan": "Drag = pan view · Mouse wheel = zoom",
   "hint.line": "Click = add point · Double-click / Enter / right-click = finish · Click start point = close · Shift = 15° · Esc = cancel",
   "hint.rect": "Drag = rectangle · Shift = square · Ctrl/Alt = from center · Corner radius in the toolbar",
-  "hint.ellipse": "Drag = ellipse · Shift = circle · Ctrl/Alt = from center",
+  "hint.ellipse": "Drag from the centre = ellipse · Shift = circle · Ctrl/Alt = from a corner",
   "hint.polygon": "Drag from the center · Shift = rotate in 15° steps · Corners in the toolbar",
   "hint.arc": "1st click = start · 2nd click = end · 3rd click = set bulge · Esc = cancel",
   "hint.text": "Click where the text should go",
@@ -7834,5 +7834,14 @@
   "body.none": "No 3D body yet. Select closed shapes and choose “Extrude”.",
   "body.selectClosed": "Please select closed shapes first (rectangle, circle, closed line …).",
   "body.addedJoin": "{n} shape(s) extruded.",
-  "body.addedCut": "{n} shape(s) added as a cut (5 mm from the top – change it in the window)."
+  "body.addedCut": "{n} shape(s) added as a cut (5 mm from the top – change it in the window).",
+  "body.mill": "Make milling shapes",
+  "body.millTip": "Turn the body into milling shapes: outline and through-holes at full height, pockets at their depth. Top of the body = top of the material (Z 0). The sketch is not milled any more afterwards (grey dashes). After changes just make them again.",
+  "body.millNone": "No body – nothing to mill.",
+  "body.millRaised": "No milling shapes made: {n} step(s) add material above the base plate (raised parts). Automatic milling can't do that yet – please add the plate at full height and cut out the lower areas.",
+  "body.millDone": "{n} milling shape(s) made from the body (height {h} mm, top = Z 0). Check tool, tabs and the simulation before milling.",
+  "body.millThick": "Note: the body is {h} mm high, the material is set to {t} mm.",
+  "body.millInner": "{n} cut(s) don't reach the top and can't be milled from above – they are missing in the milling shapes.",
+  "tip.tool.circle": "Circle (C) – first click = centre, then drag the radius or type Ø",
+  "hint.circle": "Click = centre · drag or second click = radius · type a number = diameter · Esc = cancel"
 }

@@ -702,7 +702,7 @@
   "hint.pan": "Ziehen = Ansicht verschieben · Mausrad = Zoom",
   "hint.line": "Klick = Punkt setzen · Doppelklick / Enter / Rechtsklick = fertig · Startpunkt anklicken = schließen · Shift = 15° · Esc = abbrechen",
   "hint.rect": "Ziehen = Rechteck · Shift = Quadrat · Strg/Alt = von der Mitte · Eckenradius in der Werkzeugleiste",
-  "hint.ellipse": "Ziehen = Ellipse · Shift = Kreis · Strg/Alt = von der Mitte",
+  "hint.ellipse": "Von der Mitte aus ziehen = Ellipse · Shift = Kreis · Strg/Alt = von der Ecke",
   "hint.polygon": "Von der Mitte aus ziehen · Shift = Drehung in 15°-Schritten · Ecken in der Werkzeugleiste",
   "hint.arc": "1. Klick = Start · 2. Klick = Ende · 3. Klick = Wölbung festlegen · Esc = abbrechen",
   "hint.text": "Klicken, wo der Text hin soll",
@@ -7834,5 +7834,14 @@
   "body.none": "Noch kein 3D-Körper. Geschlossene Formen auswählen und „Hochziehen“ wählen.",
   "body.selectClosed": "Bitte zuerst geschlossene Formen auswählen (Rechteck, Kreis, geschlossene Linie …).",
   "body.addedJoin": "{n} Form(en) hochgezogen.",
-  "body.addedCut": "{n} Form(en) als Ausschnitt angelegt (5 mm ab Oberkante – im Fenster änderbar)."
+  "body.addedCut": "{n} Form(en) als Ausschnitt angelegt (5 mm ab Oberkante – im Fenster änderbar).",
+  "body.mill": "Fräsformen erzeugen",
+  "body.millTip": "Aus dem Körper Fräsformen machen: Außenkontur und Durchbrüche in voller Höhe, Taschen mit ihrer Tiefe. Oberkante des Körpers = Material-Oberseite (Z 0). Die Skizze wird danach nicht mehr gefräst (grau gestrichelt). Nach Änderungen einfach nochmal erzeugen.",
+  "body.millNone": "Kein Körper – nichts zu fräsen.",
+  "body.millRaised": "Fräsformen nicht erzeugt: {n} Schritt(e) bauen über der Grundplatte auf (Erhebungen). Das kann das automatische Fräsen noch nicht – bitte die Platte in voller Höhe aufbauen und die tieferen Stellen ausschneiden.",
+  "body.millDone": "{n} Fräsform(en) aus dem Körper erzeugt (Höhe {h} mm, Oberkante = Z 0). Vor dem Fräsen Werkzeug, Haltestege und die Simulation prüfen.",
+  "body.millThick": "Achtung: Der Körper ist {h} mm hoch, das Material ist mit {t} mm eingetragen.",
+  "body.millInner": "{n} Ausschnitt(e) erreichen die Oberkante nicht und können von oben nicht gefräst werden – sie fehlen in den Fräsformen.",
+  "tip.tool.circle": "Kreis (C) – erster Klick = Mitte, dann Radius ziehen oder Ø tippen",
+  "hint.circle": "Klick = Mitte · ziehen oder zweiter Klick = Radius · Zahl tippen = Durchmesser · Esc = abbrechen"
 }

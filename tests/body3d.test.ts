@@ -70,3 +70,48 @@ test("Netz ist wasserdicht: jede Kante gehört zu genau zwei Dreiecken, STL hat 
   const stl = stlBinary(shells);
   assert.equal(stl.length, 84 + (t.length / 9) * 50);
 });
+
+// ---- Fräsen aus dem Körper ----
+import { millPlan } from "../src/editor/body3d.ts";
+
+test("Platte: nur die Außenkontur in voller Höhe", () => {
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 12)]);
+  assert.equal(p.ops.length, 1);
+  assert.equal(p.ops[0].mode, "outside"); near(p.ops[0].depth, 12); near(p.height, 12);
+  assert.equal(p.ops[0].ring.length, 4); // ohne doppelten Endpunkt
+});
+
+test("Platte mit Tasche und Durchbruch", () => {
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(rect(10, 10, 30, 30), 6, 10), cut(rect(60, 10, 80, 30), -1, 11)]);
+  const modes = p.ops.map(o => `${o.mode}:${o.depth}`).sort();
+  assert.deepEqual(modes, ["inside:10", "outside:10", "pocket:4"]);
+});
+
+test("Tasche ragt über den Rand: nur der Teil im Körper", () => {
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(rect(90, 10, 120, 30), 5, 10)]);
+  const pk = p.ops.find(o => o.mode === "pocket")!;
+  const xs = pk.ring.map(q => q[0]);
+  near(Math.max(...xs), 100); near(Math.min(...xs), 90);
+});
+
+test("Ring-Tasche um einen stehenbleibenden Zapfen: Insel als Außenkontur mit gleicher Tiefe", () => {
+  const ring: MultiPolygon = [[[[20, 10], [80, 10], [80, 40], [20, 40], [20, 10]], [[40, 20], [40, 30], [60, 30], [60, 20], [40, 20]]]];
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(ring, 7, 10)]);
+  const pockets = p.ops.filter(o => o.depth === 3);
+  assert.deepEqual(pockets.map(o => o.mode).sort(), ["outside", "pocket"]);
+});
+
+test("Tasche in der Tasche: zwei Tiefen", () => {
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(rect(10, 10, 60, 40), 7, 10), cut(rect(20, 20, 30, 30), 4, 10)]);
+  assert.deepEqual(p.ops.filter(o => o.mode === "pocket").map(o => o.depth).sort(), [3, 6]);
+});
+
+test("Hinweise: Ausschnitt innen und Erhebung oben", () => {
+  const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(rect(10, 10, 20, 20), 2, 5), join(rect(40, 10, 60, 30), 10, 15)]);
+  assert.equal(p.inner, 1);
+  assert.equal(p.raised, 1);
+});
+
+test("Ohne Körper: nichts zu fräsen", () => {
+  assert.equal(millPlan([cut(rect(0, 0, 10, 10), 0, 5)]).ops.length, 0);
+});

@@ -702,7 +702,7 @@
   "hint.pan": "Trascina = sposta vista · Rotellina = zoom",
   "hint.line": "Clic = aggiungi punto · Doppio clic / Invio / clic destro = fine · Clic sul punto iniziale = chiudi · Maiusc = 15° · Esc = annulla",
   "hint.rect": "Trascina = rettangolo · Maiusc = quadrato · Ctrl/Alt = dal centro · Raggio angoli nella barra strumenti",
-  "hint.ellipse": "Trascina = ellisse · Maiusc = cerchio · Ctrl/Alt = dal centro",
+  "hint.ellipse": "Trascina dal centro = ellisse · Maiusc = cerchio · Ctrl/Alt = da un angolo",
   "hint.polygon": "Trascina dal centro · Maiusc = rotazione a passi di 15° · Lati nella barra strumenti",
   "hint.arc": "1° clic = inizio · 2° clic = fine · 3° clic = curvatura · Esc = annulla",
   "hint.text": "Clicca dove deve andare il testo",
@@ -7834,5 +7834,14 @@
   "body.none": "Ancora nessun corpo 3D. Seleziona forme chiuse e scegli «Estrudi».",
   "body.selectClosed": "Seleziona prima forme chiuse (rettangolo, cerchio, linea chiusa …).",
   "body.addedJoin": "{n} forma/e estrusa/e.",
-  "body.addedCut": "{n} forma/e aggiunta/e come ritaglio (5 mm dall’alto – modificabile nella finestra)."
+  "body.addedCut": "{n} forma/e aggiunta/e come ritaglio (5 mm dall’alto – modificabile nella finestra).",
+  "body.mill": "Crea forme di fresatura",
+  "body.millTip": "Trasforma il corpo in forme di fresatura: contorno e fori passanti a tutta altezza, tasche alla loro profondità. Parte alta del corpo = superficie del materiale (Z 0). Dopo, lo schizzo non viene più fresato (tratteggio grigio). Dopo modifiche basta crearle di nuovo.",
+  "body.millNone": "Nessun corpo: niente da fresare.",
+  "body.millRaised": "Nessuna forma di fresatura creata: {n} passo/i aggiungono materiale sopra la piastra di base (parti in rilievo). La fresatura automatica non lo sa ancora fare: aggiungi la piastra a tutta altezza e ritaglia le zone più basse.",
+  "body.millDone": "{n} forma/e di fresatura create dal corpo (altezza {h} mm, sopra = Z 0). Controlla utensile, ponticelli e simulazione prima di fresare.",
+  "body.millThick": "Attenzione: il corpo è alto {h} mm, il materiale è impostato a {t} mm.",
+  "body.millInner": "{n} ritaglio/i non raggiungono la parte alta e non si possono fresare dall’alto: mancano nelle forme di fresatura.",
+  "tip.tool.circle": "Cerchio (C) – primo clic = centro, poi trascina il raggio o digita Ø",
+  "hint.circle": "Clic = centro · trascina o secondo clic = raggio · digita un numero = diametro · Esc = annulla"
 }

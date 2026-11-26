@@ -7,6 +7,7 @@
  *   Linie                  Länge, Winkel     Winkel in Grad, 0° = nach rechts, gegen den Uhrzeigersinn
  *   Rechteck/Ellipse/Langloch  Breite, Höhe   die Richtung (links/rechts, oben/unten) bestimmt die Maus
  *   Polygon/Stern/Ring     Durchmesser, Winkel
+ *   Kreis                  Durchmesser (von der Mitte aus)
  *
  * Getippt werden darf auch gerechnet: „100/3“, „2*(40+5)“, „12,5“. Eine Einheit dahinter gewinnt immer
  * („10mm“, „2cm“, „0.5in“, „1/2"“), sonst gilt die eingestellte Einheit. Kein eval – eigener kleiner Rechner.
@@ -20,6 +21,7 @@ export interface FieldSpec { key: string; kind: FieldKind }
 const LEN_ANGLE: FieldSpec[] = [{ key: "typed.len", kind: "len" }, { key: "typed.angle", kind: "angle" }];
 const W_H: FieldSpec[] = [{ key: "typed.w", kind: "len" }, { key: "typed.h", kind: "len" }];
 const DIA_ANGLE: FieldSpec[] = [{ key: "typed.dia", kind: "len" }, { key: "typed.angle", kind: "angle" }];
+const DIA: FieldSpec[] = [{ key: "typed.dia", kind: "len" }];
 
 /** Welche Felder ein Werkzeug hat – null: kein Tippen möglich */
 export function fieldsFor(tool: string): FieldSpec[] | null {
@@ -27,6 +29,7 @@ export function fieldsFor(tool: string): FieldSpec[] | null {
     case "line": return LEN_ANGLE;
     case "rect": case "ellipse": case "slot": return W_H;
     case "polygon": case "star": case "ring": return DIA_ANGLE;
+    case "circle": return DIA;
     default: return null;
   }
 }
@@ -126,7 +129,7 @@ export function lockPoint(tool: string, from: P, mouse: P, lock: Lock, fromCente
   const hasB = lock.b !== undefined && Number.isFinite(lock.b);
   if (!hasA && !hasB) return { ...mouse };
 
-  if (tool === "line" || tool === "polygon" || tool === "star" || tool === "ring") {
+  if (tool === "line" || tool === "polygon" || tool === "star" || tool === "ring" || tool === "circle") {
     const mouseAng = dx || dy ? Math.atan2(dy, dx) : 0;
     const ang = hasB ? lock.b! * RAD : mouseAng;
     let len: number;

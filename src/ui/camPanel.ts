@@ -30,7 +30,7 @@ export function renderCamPanel(container: HTMLElement) {
     ${tool("select", "select", "tip.tool.select", true)}
     ${tool("pan", "pan", "tip.tool.pan")}
     <div class="strip-sep"></div>
-    ${flyTools("shapes", [["line", "line", "tip.tool.line"], ["rect", "rect", "tip.tool.rect"], ["ellipse", "ellipse", "tip.tool.ellipse"],
+    ${flyTools("shapes", [["line", "line", "tip.tool.line"], ["rect", "rect", "tip.tool.rect"], ["circle", "circle", "tip.tool.circle"], ["ellipse", "ellipse", "tip.tool.ellipse"],
       ["polygon", "polygon", "tip.tool.polygon"], ["star", "star", "tip.tool.star"], ["slot", "slot", "tip.tool.slot"], ["ring", "ring", "tip.tool.ring"],
       ["arc", "arc", "tip.tool.arc"], ["arcCenter", "arcCenter", "tip.tool.arcCenter"]])}
     ${tool("text", "text", "tip.tool.text")}

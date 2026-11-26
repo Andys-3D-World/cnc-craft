@@ -702,7 +702,7 @@
   "hint.pan": "Glisser = déplacer la vue · Molette = zoom",
   "hint.line": "Clic = ajouter un point · Double-clic / Entrée / clic droit = terminer · Cliquer le point de départ = fermer · Maj = 15° · Échap = annuler",
   "hint.rect": "Glisser = rectangle · Maj = carré · Ctrl/Alt = depuis le centre · Rayon des coins dans la barre d'outils",
-  "hint.ellipse": "Glisser = ellipse · Maj = cercle · Ctrl/Alt = depuis le centre",
+  "hint.ellipse": "Glisser depuis le centre = ellipse · Maj = cercle · Ctrl/Alt = depuis un coin",
   "hint.polygon": "Glisser depuis le centre · Maj = rotation par pas de 15° · Côtés dans la barre d'outils",
   "hint.arc": "1er clic = début · 2e clic = fin · 3e clic = courbure · Échap = annuler",
   "hint.text": "Cliquez à l'endroit où placer le texte",
@@ -7834,5 +7834,14 @@
   "body.none": "Pas encore de corps 3D. Sélectionnez des formes fermées et choisissez « Extruder ».",
   "body.selectClosed": "Sélectionnez d’abord des formes fermées (rectangle, cercle, ligne fermée …).",
   "body.addedJoin": "{n} forme(s) extrudée(s).",
-  "body.addedCut": "{n} forme(s) ajoutée(s) en découpe (5 mm depuis le dessus – modifiable dans la fenêtre)."
+  "body.addedCut": "{n} forme(s) ajoutée(s) en découpe (5 mm depuis le dessus – modifiable dans la fenêtre).",
+  "body.mill": "Créer les formes d’usinage",
+  "body.millTip": "Transformer le corps en formes d’usinage : contour et trous traversants sur toute la hauteur, poches à leur profondeur. Dessus du corps = dessus du matériau (Z 0). L’esquisse n’est ensuite plus usinée (tirets gris). Après des modifications, il suffit de les recréer.",
+  "body.millNone": "Pas de corps – rien à usiner.",
+  "body.millRaised": "Aucune forme d’usinage créée : {n} étape(s) ajoutent de la matière au-dessus de la plaque de base (parties en relief). L’usinage automatique ne le gère pas encore – ajoutez la plaque sur toute la hauteur et découpez les zones plus basses.",
+  "body.millDone": "{n} forme(s) d’usinage créée(s) depuis le corps (hauteur {h} mm, dessus = Z 0). Vérifiez outil, attaches et simulation avant d’usiner.",
+  "body.millThick": "Attention : le corps fait {h} mm de haut, le matériau est réglé à {t} mm.",
+  "body.millInner": "{n} découpe(s) n’atteignent pas le dessus et ne peuvent pas être usinées par le haut – elles manquent dans les formes d’usinage.",
+  "tip.tool.circle": "Cercle (C) – premier clic = centre, puis tirer le rayon ou taper Ø",
+  "hint.circle": "Clic = centre · glisser ou deuxième clic = rayon · taper un nombre = diamètre · Échap = annuler"
 }

@@ -5,7 +5,8 @@
  *  Hand (H)      Ansicht verschieben (auch: mittlere Maustaste oder Leertaste gedrückt halten)
  *  Linie (L)     Punkt für Punkt, Shift = 15°-Schritte, Doppelklick/Enter = fertig
  *  Rechteck (R)  ziehen, Shift = Quadrat, Strg/Alt = von der Mitte
- *  Ellipse (E)   ziehen, Shift = Kreis, Strg/Alt = von der Mitte
+ *  Kreis (C)     erster Punkt = Mitte, dann Radius ziehen/klicken oder Ø tippen (echter Kreis)
+ *  Ellipse (E)   von der Mitte aus ziehen, Shift = Kreis, Strg/Alt = von der Ecke
  *  Polygon (P)   von der Mitte ziehen, Ecken-Anzahl in den Werkzeug-Optionen
  *  Stern         von der Mitte ziehen, Zacken und Innenradius in den Werkzeug-Optionen
  *  Langloch      Rahmen ziehen, die kurzen Seiten werden Halbkreise
@@ -249,6 +250,7 @@ export function onMouseDown(e: MouseEvent, sx: number, sy: number) {
       break;
     case "rect":
     case "ellipse":
+    case "circle":
     case "polygon":
     case "star":
     case "slot":
@@ -443,7 +445,7 @@ function updateSnap() {
   if (typedOpen() && from) {
     const lock = typedLock();
     if (lock.a !== undefined || lock.b !== undefined) {
-      live.world = lockPoint(tool, from, live.world, lock, live.ctrl || live.alt);
+      live.world = lockPoint(tool, from, live.world, lock, fromCenter());
       live.snap = null;
     }
   }
@@ -602,7 +604,10 @@ function updateLabel() {
     live.label = `${fmtMm(len)} ${unitName()}  ${ang.toFixed(1)}°`;
   } else if (live.mode === "dragDraw" && live.dragStart) {
     const r = dragRect();
-    if (tool === "rect" || tool === "ellipse" || tool === "slot") {
+    if (tool === "circle") {
+      const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
+      live.label = `Ø ${fmtMm(rad * 2)} ${unitName()}`;
+    } else if (tool === "rect" || tool === "ellipse" || tool === "slot") {
       live.label = `${fmtMm(Math.abs(r.x1 - r.x0))} × ${fmtMm(Math.abs(r.y1 - r.y0))} ${unitName()}`;
     } else if (tool === "polygon") {
       const rad = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
@@ -633,7 +638,13 @@ export function measureText(a: Pt, b: Pt): string {
   return `${fmtMm(len)} ${unitName()} · ${ang.toFixed(1)}° · ΔX ${fmtMm(dx)} · ΔY ${fmtMm(dy)}`;
 }
 
-/** Rechteck aus Ziehpunkt und Maus, mit Shift (quadratisch) und Strg/Alt (von der Mitte) */
+/** Von der Mitte aus? Ellipse: immer, außer mit Strg/Alt (dann von der Ecke). Rechteck & Co.: nur mit Strg/Alt */
+function fromCenter(): boolean {
+  const mod = live.ctrl || live.alt;
+  return currentTool() === "ellipse" ? !mod : mod;
+}
+
+/** Rechteck aus Ziehpunkt und Maus, mit Shift (quadratisch) und Strg/Alt (von der Mitte, bei der Ellipse von der Ecke) */
 export function dragRect(): { x0: number; y0: number; x1: number; y1: number } {
   const a = live.dragStart!, b = live.world;
   let dx = b.x - a.x, dy = b.y - a.y;
@@ -642,7 +653,7 @@ export function dragRect(): { x0: number; y0: number; x1: number; y1: number } {
     dx = Math.sign(dx || 1) * m;
     dy = Math.sign(dy || 1) * m;
   }
-  if (live.ctrl || live.alt) return { x0: a.x - dx, y0: a.y - dy, x1: a.x + dx, y1: a.y + dy };
+  if (fromCenter()) return { x0: a.x - dx, y0: a.y - dy, x1: a.x + dx, y1: a.y + dy };
   return { x0: a.x, y0: a.y, x1: a.x + dx, y1: a.y + dy };
 }
 
@@ -860,7 +871,7 @@ export function placePoint(p: Pt): boolean {
   else if (tool === "arc") handleArcClick();
   else if (tool === "arcCenter") handleCenterArcClick();
   else if (tool === "text") openTextDialog({ ...p });
-  else if (["rect", "ellipse", "polygon", "star", "slot", "ring", "measure"].includes(tool)) {
+  else if (["rect", "ellipse", "circle", "polygon", "star", "slot", "ring", "measure"].includes(tool)) {
     if (live.mode === "dragDraw" && live.dragStart) finishDragDraw(tool);
     else { live.dragStart = { ...p }; live.mode = "dragDraw"; live.clickDraw = true; }
   } else return false;
@@ -900,6 +911,9 @@ function finishDragDraw(tool: ToolName) {
     if (Math.abs(r.x1 - r.x0) > 0 && Math.abs(r.y1 - r.y0) > 0) {
       addShapes([createPolyline(makeRectPoints(r.x0, r.y0, r.x1, r.y1, options.rectRadius * MM_TO_PIXEL), true, "outside")]);
     }
+  } else if (tool === "circle") {
+    // echter Kreis um den ersten Punkt (wird mit G2/G3 gefräst)
+    addShapes([createCircle(start.x, start.y, size)]);
   } else if (tool === "ellipse") {
     const r = dragRect();
     const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2;

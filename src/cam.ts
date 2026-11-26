@@ -170,8 +170,9 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   if (two) allShapes = two.shapes;
   zoneSource = two ? two.shapes : null;
   skinStock = two ? two.stockUnder : null;
-  // Sperrzonen werden nie geschnitten; sie gelten auch, wenn nur ein Teil der Zeichnung erzeugt wird
-  const shapes = allShapes.filter((s: any) => !isKeepOut(s));
+  // Sperrzonen werden nie geschnitten; sie gelten auch, wenn nur ein Teil der Zeichnung erzeugt wird.
+  // noMill: Skizze eines 3D-Körpers (bodyDialog.ts) – gefräst werden die daraus erzeugten Formen, nicht die Skizze
+  const shapes = allShapes.filter((s: any) => !isKeepOut(s) && !s.noMill);
   // Formen auf verbrauchter Fläche weglassen (Schalter in "Material-Platte")
   // Zweiseitig: die Rückseite liegt genau dort, wo die Vorderseite schon gefräst hat – „verbraucht“ gilt hier nicht
   const skipped = two ? new Set<any>() : usedAreaShapes(shapes);

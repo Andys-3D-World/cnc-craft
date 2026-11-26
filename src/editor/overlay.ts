@@ -305,6 +305,13 @@ function drawToolPreview(ctx: CanvasRenderingContext2D, tool: string) {
     ctx.stroke();
     const c = toScreen(live.dragStart.x, live.dragStart.y);
     ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
+  } else if (tool === "circle") {
+    const r = Math.hypot(w.x - live.dragStart.x, w.y - live.dragStart.y);
+    polyPath(ctx, makeEllipsePoints(live.dragStart.x, live.dragStart.y, r, r), true);
+    ctx.stroke();
+    const c = toScreen(live.dragStart.x, live.dragStart.y), e = toScreen(w.x, w.y);
+    ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.lineTo(e.x, e.y); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(c.x, c.y, 2.5, 0, Math.PI * 2); ctx.fillStyle = PREVIEW; ctx.fill();
   } else if (tool === "star" || tool === "ring") {
     if (tool === "star") polyPath(ctx, dragStarPoints(), true);
     else {

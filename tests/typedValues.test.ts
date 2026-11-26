@@ -85,3 +85,9 @@ test("Polygon: Durchmesser und Winkel", () => {
   const q = lockPoint("ring", P(0, 0), P(0, 3), { a: 20 });
   near(q.x, 0); near(q.y, 10);
 });
+
+test("Kreis: nur ein Feld (Durchmesser), Punkt liegt Radius weit in Richtung Maus", () => {
+  assert.deepEqual(fieldsFor("circle")!.map(f => f.key), ["typed.dia"]);
+  const p = lockPoint("circle", P(10, 10), P(10, 50), { a: 40 });
+  near(p.x, 10); near(p.y, 30);
+});
