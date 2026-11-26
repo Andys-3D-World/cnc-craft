@@ -106,10 +106,77 @@ test("Tasche in der Tasche: zwei Tiefen", () => {
   assert.deepEqual(p.ops.filter(o => o.mode === "pocket").map(o => o.depth).sort(), [3, 6]);
 });
 
-test("Hinweise: Ausschnitt innen und Erhebung oben", () => {
+test("Hinweise: Hohlraum unter Material und Erhebung oben", () => {
   const p = millPlan([join(rect(0, 0, 100, 50), 0, 10), cut(rect(10, 10, 20, 20), 2, 5), join(rect(40, 10, 60, 30), 10, 15)]);
   assert.equal(p.inner, 1);
   assert.equal(p.raised, 1);
+});
+
+// ---- Nachrechnen: welche Höhe bleibt nach dem Fräsen an jedem Punkt? (ohne Fräser-Radius) ----
+type Op = ReturnType<typeof millPlan>["ops"][number];
+const inRing = (r: [number, number][], x: number, y: number) => {
+  let c = false;
+  for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
+    const [xi, yi] = r[i], [xj, yj] = r[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+};
+/** Höhe nach dem Fräsen: Tasche wirkt, außer auf ihren eigenen Inseln; Durchbruch = ganz weg */
+function milledHeight(ops: Op[], top: number, x: number, y: number): number {
+  if (ops.some(o => o.mode === "inside" && inRing(o.ring, x, y))) return -Infinity;
+  let h = top;
+  for (const p of ops) {
+    if (p.mode !== "pocket" || !inRing(p.ring, x, y)) continue;
+    if (ops.some(i => i.islandOf === p.key && inRing(i.ring, x, y))) continue;
+    h = Math.min(h, top - p.depth);
+  }
+  return h;
+}
+/** Oberkante der Körper-Säule an diesem Punkt */
+function bodyHeight(f: EvalFeat[], x: number, y: number): number {
+  let h = -Infinity;
+  for (const s of slabs(f)) if (s.region.some(poly => inRing(poly[0] as [number, number][], x, y) && !poly.slice(1).some(r => inRing(r as [number, number][], x, y)))) h = Math.max(h, s.z1);
+  return h;
+}
+function checkMilled(f: EvalFeat[], w: number, d: number) {
+  const plan = millPlan(f);
+  const top = plan.bottom + plan.height;
+  let n = 0;
+  for (let x = 0.5; x < w; x += 1.7) for (let y = 0.5; y < d; y += 1.3) {
+    const want = bodyHeight(f, x, y);
+    if (want === -Infinity) continue;
+    near(milledHeight(plan.ops, top, x, y), want, 1e-6);
+    n++;
+  }
+  assert.ok(n > 100);
+  return plan;
+}
+
+test("Erhebung: Zapfen auf der Platte – drumherum eine Tasche, der Zapfen ist ihre Insel", () => {
+  const f = [join(rect(0, 0, 100, 50), 0, 10), join(rect(40, 15, 60, 35), 10, 25)];
+  const p = checkMilled(f, 100, 50);
+  const pk = p.ops.filter(o => o.mode === "pocket");
+  assert.equal(pk.length, 1); near(pk[0].depth, 15);
+  assert.equal(p.ops.filter(o => o.islandOf === pk[0].key).length, 1);
+  near(p.height, 25);
+});
+
+test("Gestufter Zapfen (Hochzeitstorte): Inseln gelten nur für ihre Tasche", () => {
+  const f = [join(rect(0, 0, 100, 60), 0, 10), join(rect(20, 10, 80, 50), 10, 20), join(rect(40, 20, 60, 40), 20, 30)];
+  const p = checkMilled(f, 100, 60);
+  assert.deepEqual(p.ops.filter(o => o.mode === "pocket").map(o => o.depth).sort((a, b) => a - b), [10, 20]);
+});
+
+test("Zapfen mit Loch, Tasche daneben, Durchbruch: alles stimmt an jedem Punkt", () => {
+  const ring: MultiPolygon = [[[[30, 10], [70, 10], [70, 40], [30, 40], [30, 10]], [[45, 20], [45, 30], [55, 30], [55, 20], [45, 20]]]];
+  const f = [join(rect(0, 0, 100, 50), 0, 8), join(ring, 8, 20), cut(rect(5, 5, 20, 20), 4, 8), cut(rect(80, 10, 95, 40), -1, 30)];
+  checkMilled(f, 100, 50);
+});
+
+test("Nur Ausschnitte (wie bisher): Tasche in der Tasche und Ring-Tasche stimmen", () => {
+  const ring: MultiPolygon = [[[[20, 10], [80, 10], [80, 40], [20, 40], [20, 10]], [[40, 20], [40, 30], [60, 30], [60, 20], [40, 20]]]];
+  checkMilled([join(rect(0, 0, 100, 50), 0, 10), cut(ring, 7, 10), cut(rect(5, 5, 15, 45), 3, 10)], 100, 50);
 });
 
 test("Ohne Körper: nichts zu fräsen", () => {

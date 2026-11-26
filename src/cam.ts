@@ -691,6 +691,8 @@ const generateGcodeInner = (shapes: any): string | null => {
       // noIsland: Umriss eines Stücks aus „Großes Teil teilen“ (seamSplit.ts) – die Tasche reicht dort über das Stück hinaus
       // Stufenbohrung: das Loch in der Mitte ist keine Insel
       if (s === shape || s.noIsland || (shape.cbore && s === shape.opOf)) continue;
+      // islandFor: Insel nur für diese Taschen (Fräsformen aus dem 3D-Körper, bodyDialog.ts) – sonst gilt sie für jede Tasche
+      if (Array.isArray(s.islandFor) && !s.islandFor.includes(shape.id)) continue;
       const o = closedInfo(s);
       if (!o.pts) continue;
       // Punkt außerhalb des umgebenden Rechtecks -> kann nicht drin liegen

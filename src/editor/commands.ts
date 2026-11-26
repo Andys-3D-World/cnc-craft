@@ -358,6 +358,8 @@ export function makeCopies(source: any[], offsetPx: number, linked = false): any
     });
     if (!c.gcons.length) delete c.gcons;
   }
+  // Inseln einer bestimmten Tasche (Fräsformen aus dem 3D-Körper): auf die kopierte Tasche zeigen
+  for (const c of out) if (Array.isArray(c.islandFor)) c.islandFor = c.islandFor.map((id: string) => idMap.get(id) ?? id);
   // 3D-Schritte (bodyDialog.ts): Profil auf die neuen Kennungen, nur wenn alle Profil-Formen mitkopiert wurden
   for (const c of out) if (c.feat3d) {
     c.feat3d = c.feat3d.filter((f: any) => f.profile.every((id: string) => idMap.has(id)))

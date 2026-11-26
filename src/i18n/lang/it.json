@@ -7838,10 +7838,10 @@
   "body.mill": "Crea forme di fresatura",
   "body.millTip": "Trasforma il corpo in forme di fresatura: contorno e fori passanti a tutta altezza, tasche alla loro profondità. Parte alta del corpo = superficie del materiale (Z 0). Dopo, lo schizzo non viene più fresato (tratteggio grigio). Dopo modifiche basta crearle di nuovo.",
   "body.millNone": "Nessun corpo: niente da fresare.",
-  "body.millRaised": "Nessuna forma di fresatura creata: {n} passo/i aggiungono materiale sopra la piastra di base (parti in rilievo). La fresatura automatica non lo sa ancora fare: aggiungi la piastra a tutta altezza e ritaglia le zone più basse.",
   "body.millDone": "{n} forma/e di fresatura create dal corpo (altezza {h} mm, sopra = Z 0). Controlla utensile, ponticelli e simulazione prima di fresare.",
   "body.millThick": "Attenzione: il corpo è alto {h} mm, il materiale è impostato a {t} mm.",
-  "body.millInner": "{n} ritaglio/i non raggiungono la parte alta e non si possono fresare dall’alto: mancano nelle forme di fresatura.",
+  "body.millInner": "In {n} punto/i il corpo sporge sopra uno spazio vuoto: dall’alto non si può, viene fresato come pieno.",
   "tip.tool.circle": "Cerchio (C) – primo clic = centro, poi trascina il raggio o digita Ø",
-  "hint.circle": "Clic = centro · trascina o secondo clic = raggio · digita un numero = diametro · Esc = annulla"
+  "hint.circle": "Clic = centro · trascina o secondo clic = raggio · digita un numero = diametro · Esc = annulla",
+  "body.millRaisedOk": "{n} parte/i in rilievo: intorno si fresa una tasca per ogni altezza, il rilievo resta come isola."
 }

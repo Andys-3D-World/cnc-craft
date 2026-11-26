@@ -7838,10 +7838,10 @@
   "body.mill": "Utwórz kształty frezowania",
   "body.millTip": "Zamień bryłę na kształty frezowania: obrys i otwory przelotowe na pełną wysokość, kieszenie na ich głębokość. Góra bryły = wierzch materiału (Z 0). Szkic nie jest potem frezowany (szara przerywana). Po zmianach po prostu utwórz je ponownie.",
   "body.millNone": "Brak bryły – nic do frezowania.",
-  "body.millRaised": "Nie utworzono kształtów: {n} krok(i) dodają materiał nad płytą bazową (wypukłości). Automatyczne frezowanie jeszcze tego nie umie – dodaj płytę na pełną wysokość i wytnij niższe miejsca.",
   "body.millDone": "Utworzono {n} kształt(ów) frezowania z bryły (wysokość {h} mm, góra = Z 0). Przed frezowaniem sprawdź narzędzie, mostki i symulację.",
   "body.millThick": "Uwaga: bryła ma {h} mm wysokości, materiał ustawiono na {t} mm.",
-  "body.millInner": "{n} wycięcie(a) nie sięgają góry i nie da się ich frezować od góry – brakuje ich w kształtach frezowania.",
+  "body.millInner": "W {n} miejscu(ach) bryła wisi nad pustą przestrzenią – od góry się nie da, frezowane jako pełne.",
   "tip.tool.circle": "Okrąg (C) – pierwszy klik = środek, potem przeciągnij promień lub wpisz Ø",
-  "hint.circle": "Klik = środek · przeciągnij lub drugi klik = promień · wpisz liczbę = średnica · Esc = anuluj"
+  "hint.circle": "Klik = środek · przeciągnij lub drugi klik = promień · wpisz liczbę = średnica · Esc = anuluj",
+  "body.millRaisedOk": "{n} wypukłość(i): wokół frezowana jest kieszeń dla każdej wysokości, wypukłość zostaje jako wyspa."
 }

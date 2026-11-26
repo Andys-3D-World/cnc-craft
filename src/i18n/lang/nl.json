@@ -7838,10 +7838,10 @@
   "body.mill": "Freesvormen maken",
   "body.millTip": "Het lichaam omzetten in freesvormen: omtrek en doorgaande gaten over de volle hoogte, kamers op hun diepte. Bovenkant van het lichaam = bovenkant materiaal (Z 0). De schets wordt daarna niet meer gefreesd (grijs gestreept). Na wijzigingen gewoon opnieuw maken.",
   "body.millNone": "Geen lichaam – niets te frezen.",
-  "body.millRaised": "Geen freesvormen gemaakt: {n} stap(pen) bouwen boven de grondplaat op (verhogingen). Automatisch frezen kan dat nog niet – bouw de plaat op volle hoogte op en snijd de lagere delen uit.",
   "body.millDone": "{n} freesvorm(en) uit het lichaam gemaakt (hoogte {h} mm, bovenkant = Z 0). Controleer gereedschap, bruggetjes en simulatie vóór het frezen.",
   "body.millThick": "Let op: het lichaam is {h} mm hoog, het materiaal staat op {t} mm.",
-  "body.millInner": "{n} uitsnede(n) bereiken de bovenkant niet en kunnen niet van boven gefreesd worden – ze ontbreken in de freesvormen.",
+  "body.millInner": "Op {n} plek(ken) hangt het lichaam boven lege ruimte – dat kan niet van boven en wordt als massief gefreesd.",
   "tip.tool.circle": "Cirkel (C) – eerste klik = middelpunt, dan straal slepen of Ø typen",
-  "hint.circle": "Klik = middelpunt · slepen of tweede klik = straal · getal typen = diameter · Esc = afbreken"
+  "hint.circle": "Klik = middelpunt · slepen of tweede klik = straal · getal typen = diameter · Esc = afbreken",
+  "body.millRaisedOk": "{n} verhoging(en): eromheen wordt per hoogte een kamer gefreesd, de verhoging blijft als eiland staan."
 }

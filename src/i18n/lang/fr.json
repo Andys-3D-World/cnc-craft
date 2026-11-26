@@ -7838,10 +7838,10 @@
   "body.mill": "Créer les formes d’usinage",
   "body.millTip": "Transformer le corps en formes d’usinage : contour et trous traversants sur toute la hauteur, poches à leur profondeur. Dessus du corps = dessus du matériau (Z 0). L’esquisse n’est ensuite plus usinée (tirets gris). Après des modifications, il suffit de les recréer.",
   "body.millNone": "Pas de corps – rien à usiner.",
-  "body.millRaised": "Aucune forme d’usinage créée : {n} étape(s) ajoutent de la matière au-dessus de la plaque de base (parties en relief). L’usinage automatique ne le gère pas encore – ajoutez la plaque sur toute la hauteur et découpez les zones plus basses.",
   "body.millDone": "{n} forme(s) d’usinage créée(s) depuis le corps (hauteur {h} mm, dessus = Z 0). Vérifiez outil, attaches et simulation avant d’usiner.",
   "body.millThick": "Attention : le corps fait {h} mm de haut, le matériau est réglé à {t} mm.",
-  "body.millInner": "{n} découpe(s) n’atteignent pas le dessus et ne peuvent pas être usinées par le haut – elles manquent dans les formes d’usinage.",
+  "body.millInner": "À {n} endroit(s), le corps surplombe un vide – impossible par le dessus, usiné comme plein.",
   "tip.tool.circle": "Cercle (C) – premier clic = centre, puis tirer le rayon ou taper Ø",
-  "hint.circle": "Clic = centre · glisser ou deuxième clic = rayon · taper un nombre = diamètre · Échap = annuler"
+  "hint.circle": "Clic = centre · glisser ou deuxième clic = rayon · taper un nombre = diamètre · Échap = annuler",
+  "body.millRaisedOk": "{n} partie(s) en relief : une poche est usinée autour pour chaque hauteur, le relief reste comme îlot."
 }

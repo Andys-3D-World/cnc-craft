@@ -87,39 +87,58 @@ export function topOf(feats: EvalFeat[]): number {
 
 /**
  * Eine Fräs-Form: Ring in mm (geschlossen, ohne Wiederholung des ersten Punkts), Art und Tiefe ab Oberkante (positiv)
- *   outside  Außenkontur, volle Höhe (Teil ausschneiden)
+ *   outside  Außenkontur, volle Höhe (Teil ausschneiden) – oder Insel einer Tasche (islandOf), dann deren Tiefe
  *   inside   Durchbruch, volle Höhe
- *   pocket   Tasche bis zur Tiefe; Inseln (stehen bleibende Stellen in der Tasche) kommen als outside mit derselben Tiefe –
- *            so erkennt die Fräsbahn sie als Insel und fährt ihre Wand sauber ab
+ *   pocket   Tasche bis zur Tiefe (key: Kennung, auf die sich ihre Inseln beziehen)
+ * Inseln gelten nur für ihre eigene Tasche (cam.ts: islandFor). So bleibt bei Stufen nichts falsch stehen: eine Insel der
+ * tiefen Tasche ist für die flachere Tasche darüber keine.
  */
-export interface MillOp { mode: "outside" | "inside" | "pocket"; depth: number; ring: [number, number][] }
-/** Hinweise: inner = Ausschnitt erreicht die Oberkante nicht (von oben nicht fräsbar), raised = Aufbauen über der Grundplatte */
+export interface MillOp { mode: "outside" | "inside" | "pocket"; depth: number; ring: [number, number][]; key?: string; islandOf?: string }
+/** Hinweise: inner = Ausschnitt erreicht die Oberkante nicht (von oben nicht fräsbar, wird aufgefüllt), raised = Erhebungen */
 export interface MillPlan { ops: MillOp[]; height: number; bottom: number; inner: number; raised: number }
 
 const openRing = (r: [number, number][]) => (r.length > 1 && r[0][0] === r[r.length - 1][0] && r[0][1] === r[r.length - 1][1] ? r.slice(0, -1) : r.slice());
 
-/** Fräs-Formen aus den Schritten des Körpers. eps: Höhen-Toleranz in mm */
+/**
+ * Fräs-Formen aus den Schritten des Körpers (von oben, Oberkante = Z 0). eps: Höhen-Toleranz in mm.
+ * Für jede Höhe a, an der eine Scheibe beginnt: Tasche über alles, was ab a nach oben leer ist, bis Tiefe (Oberkante − a).
+ * Was darin stehen bleibt, sind Inseln dieser Tasche. Hohlräume unter Material (von oben nicht erreichbar) gelten als voll.
+ */
 export function millPlan(feats: EvalFeat[], eps = 1e-6): MillPlan {
   const s = slabs(feats);
   if (!s.length) return { ops: [], height: 0, bottom: 0, inner: 0, raised: 0 };
   const bottom = s[0].z0, top = s[s.length - 1].z1, height = top - bottom;
-  // Grundfläche: alles, was irgendwo Körper ist; ihre Löcher gehen ganz durch
   let foot: MultiPolygon = s[0].region;
   for (const x of s.slice(1)) foot = polygonClipping.union(foot, x.region);
   const ops: MillOp[] = [];
   for (const poly of foot) poly.forEach((ring, i) => ops.push({ mode: i === 0 ? "outside" : "inside", depth: height, ring: openRing(ring as [number, number][]) }));
 
+  let n = 0;
+  for (let i = 1; i < s.length; i++) {
+    const a = s[i].z0;
+    if (a <= bottom + eps) continue;
+    // alles, was ab dieser Höhe nach oben Körper ist (Spalten von oben gesehen)
+    let above: MultiPolygon = s[i].region;
+    for (const x of s.slice(i + 1)) above = polygonClipping.union(above, x.region);
+    const free = polygonClipping.difference(foot, above);
+    if (regionArea(free) < 1e-6) continue;
+    const depth = top - a;
+    for (const poly of free) {
+      const key = "p" + (n++);
+      ops.push({ mode: "pocket", depth, ring: openRing(poly[0] as [number, number][]), key });
+      for (const hole of poly.slice(1)) {
+        // Loch der Tasche: steht dort Körper, ist es eine Insel; sonst ist es ein Durchbruch (schon als „inside“ da)
+        const hp: MultiPolygon = [[hole]];
+        if (regionArea(polygonClipping.intersection(hp, above)) < 1e-6) continue;
+        ops.push({ mode: "outside", depth, ring: openRing(hole as [number, number][]), islandOf: key });
+      }
+    }
+  }
+
+  // Hinweise: inner = Stellen, an denen Körper über leerem Raum hängt (von oben nicht fräsbar, wird als voll gefräst)
   let inner = 0, raised = 0;
-  // Grundplatte = erster Aufbau-Schritt, der ganz unten beginnt; spätere Aufbauten über ihr sind Erhebungen
+  for (let i = 0; i + 1 < s.length; i++) if (regionArea(polygonClipping.difference(s[i + 1].region, s[i].region)) > 1e-6) inner++;
   const firstJoin = feats.findIndex(f => f.op === "join" && f.region.length && f.z1 - f.z0 > eps);
-  feats.forEach((f, i) => {
-    if (!f.region.length || f.z1 - f.z0 <= eps) return;
-    if (f.op === "join") { if (i !== firstJoin && f.z1 > bottom + eps && f.z0 > bottom + eps) raised++; return; }
-    if (f.z1 < top - eps) { if (f.z0 < top - eps) inner++; return; }   // erreicht die Oberkante nicht
-    if (f.z0 <= bottom + eps) return;                                  // geht ganz durch: steckt schon in den Löchern der Grundfläche
-    const area = polygonClipping.intersection(f.region, foot);         // nur, wo Körper ist
-    const depth = top - f.z0;
-    for (const poly of area) poly.forEach((ring, k) => ops.push({ mode: k === 0 ? "pocket" : "outside", depth, ring: openRing(ring as [number, number][]) }));
-  });
+  feats.forEach((f, i) => { if (f.op === "join" && i !== firstJoin && f.region.length && f.z1 - f.z0 > eps && f.z0 > bottom + eps) raised++; });
   return { ops: ops.filter(o => o.ring.length >= 3), height, bottom, inner, raised };
 }

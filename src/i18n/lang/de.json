@@ -7838,10 +7838,10 @@
   "body.mill": "Fräsformen erzeugen",
   "body.millTip": "Aus dem Körper Fräsformen machen: Außenkontur und Durchbrüche in voller Höhe, Taschen mit ihrer Tiefe. Oberkante des Körpers = Material-Oberseite (Z 0). Die Skizze wird danach nicht mehr gefräst (grau gestrichelt). Nach Änderungen einfach nochmal erzeugen.",
   "body.millNone": "Kein Körper – nichts zu fräsen.",
-  "body.millRaised": "Fräsformen nicht erzeugt: {n} Schritt(e) bauen über der Grundplatte auf (Erhebungen). Das kann das automatische Fräsen noch nicht – bitte die Platte in voller Höhe aufbauen und die tieferen Stellen ausschneiden.",
   "body.millDone": "{n} Fräsform(en) aus dem Körper erzeugt (Höhe {h} mm, Oberkante = Z 0). Vor dem Fräsen Werkzeug, Haltestege und die Simulation prüfen.",
   "body.millThick": "Achtung: Der Körper ist {h} mm hoch, das Material ist mit {t} mm eingetragen.",
-  "body.millInner": "{n} Ausschnitt(e) erreichen die Oberkante nicht und können von oben nicht gefräst werden – sie fehlen in den Fräsformen.",
+  "body.millInner": "An {n} Stelle(n) hängt Körper über leerem Raum – das geht von oben nicht und wird als voll gefräst.",
   "tip.tool.circle": "Kreis (C) – erster Klick = Mitte, dann Radius ziehen oder Ø tippen",
-  "hint.circle": "Klick = Mitte · ziehen oder zweiter Klick = Radius · Zahl tippen = Durchmesser · Esc = abbrechen"
+  "hint.circle": "Klick = Mitte · ziehen oder zweiter Klick = Radius · Zahl tippen = Durchmesser · Esc = abbrechen",
+  "body.millRaisedOk": "{n} Erhebung(en): drumherum wird je Höhe eine Tasche gefräst, die Erhebung bleibt als Insel stehen."
 }

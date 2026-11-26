@@ -7838,10 +7838,10 @@
   "body.mill": "Crear formas de fresado",
   "body.millTip": "Convertir el cuerpo en formas de fresado: contorno y agujeros pasantes a toda la altura, cajeras a su profundidad. Parte superior del cuerpo = superficie del material (Z 0). Después el boceto ya no se fresa (trazos grises). Tras cambios, basta con crearlas de nuevo.",
   "body.millNone": "No hay cuerpo: nada que fresar.",
-  "body.millRaised": "No se crearon formas de fresado: {n} paso(s) añaden material por encima de la placa base (partes elevadas). El fresado automático aún no lo hace: añade la placa a toda la altura y recorta las zonas más bajas.",
   "body.millDone": "{n} forma(s) de fresado creada(s) desde el cuerpo (altura {h} mm, parte superior = Z 0). Revisa herramienta, puentes y simulación antes de fresar.",
   "body.millThick": "Atención: el cuerpo mide {h} mm de alto y el material está puesto a {t} mm.",
-  "body.millInner": "{n} recorte(s) no llegan a la parte superior y no se pueden fresar desde arriba: faltan en las formas de fresado.",
+  "body.millInner": "En {n} sitio(s) el cuerpo cuelga sobre un hueco: desde arriba no se puede y se fresa como macizo.",
   "tip.tool.circle": "Círculo (C) – primer clic = centro, luego arrastra el radio o escribe Ø",
-  "hint.circle": "Clic = centro · arrastrar o segundo clic = radio · escribir un número = diámetro · Esc = cancelar"
+  "hint.circle": "Clic = centro · arrastrar o segundo clic = radio · escribir un número = diámetro · Esc = cancelar",
+  "body.millRaisedOk": "{n} parte(s) elevada(s): alrededor se fresa una cajera por cada altura, la parte elevada queda como isla."
 }

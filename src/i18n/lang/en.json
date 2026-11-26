@@ -7838,10 +7838,10 @@
   "body.mill": "Make milling shapes",
   "body.millTip": "Turn the body into milling shapes: outline and through-holes at full height, pockets at their depth. Top of the body = top of the material (Z 0). The sketch is not milled any more afterwards (grey dashes). After changes just make them again.",
   "body.millNone": "No body – nothing to mill.",
-  "body.millRaised": "No milling shapes made: {n} step(s) add material above the base plate (raised parts). Automatic milling can't do that yet – please add the plate at full height and cut out the lower areas.",
   "body.millDone": "{n} milling shape(s) made from the body (height {h} mm, top = Z 0). Check tool, tabs and the simulation before milling.",
   "body.millThick": "Note: the body is {h} mm high, the material is set to {t} mm.",
-  "body.millInner": "{n} cut(s) don't reach the top and can't be milled from above – they are missing in the milling shapes.",
+  "body.millInner": "At {n} place(s) the body hangs over empty space – that can't be done from above and is milled as solid.",
   "tip.tool.circle": "Circle (C) – first click = centre, then drag the radius or type Ø",
-  "hint.circle": "Click = centre · drag or second click = radius · type a number = diameter · Esc = cancel"
+  "hint.circle": "Click = centre · drag or second click = radius · type a number = diameter · Esc = cancel",
+  "body.millRaisedOk": "{n} raised part(s): a pocket is milled around them for each height, the raised part stays as an island."
 }

@@ -189,8 +189,8 @@ function releaseSketch() {
 /**
  * Fräsformen aus dem Körper erzeugen (Rechnung: millPlan in body3d.ts). Die Oberkante des Körpers liegt auf Z 0
  * (Material-Oberseite), Tiefen negativ wie bei jeder Form. Vorher erzeugte Fräsformen (from3d) werden ersetzt,
- * die Skizzen-Formen werden „nicht fräsen“ (noMill, grau gestrichelt). Erhebungen über der Grundplatte gehen noch
- * nicht – dann wird lieber nichts erzeugt als falsche Tiefen.
+ * die Skizzen-Formen werden „nicht fräsen“ (noMill, grau gestrichelt). Erhebungen: drumherum wird je Höhe eine Tasche
+ * gefräst, die Erhebung ist deren Insel (islandFor = nur diese Tasche).
  */
 function makeMillShapes(log: (s: string) => void): boolean {
   const st = app();
@@ -198,10 +198,13 @@ function makeMillShapes(log: (s: string) => void): boolean {
   const byId = new Map<string, any>(st.shapes.map((s: any) => [s.id, s]));
   const plan = millPlan(entries.map(e => evalFeat(e.f, byId)));
   if (!plan.ops.length) { log(t("body.millNone")); return false; }
-  if (plan.raised) { log(t("body.millRaised", { n: plan.raised })); return false; }
   const gid = "grp-3d-" + newId();
   const made = plan.ops.map(o => createPolyline(o.ring.map(([x, y]) => ({ x: x * MM_TO_PIXEL, y: y * MM_TO_PIXEL })), true, o.mode,
     { groupId: gid, millingDepth: -+o.depth.toFixed(4), from3d: true }));
+  // Inseln gelten nur für ihre eigene Tasche (cam.ts → islandFor)
+  const byKey = new Map<string, string>();
+  plan.ops.forEach((o, i) => { if (o.key) byKey.set(o.key, made[i].id); });
+  plan.ops.forEach((o, i) => { if (o.islandOf && byKey.has(o.islandOf)) made[i].islandFor = [byKey.get(o.islandOf)]; });
   const sketch = new Set(entries.flatMap(e => e.f.profile));
   st.shapes = [...st.shapes.filter((s: any) => !s.from3d), ...made];
   for (const s of st.shapes) if (sketch.has(s.id)) s.noMill = true;
@@ -210,5 +213,6 @@ function makeMillShapes(log: (s: string) => void): boolean {
   log(t("body.millDone", { n: made.length, h: +plan.height.toFixed(2) }));
   if (thick > 0 && Math.abs(thick - plan.height) > 0.01) log(t("body.millThick", { h: +plan.height.toFixed(2), t: thick }));
   if (plan.inner) log(t("body.millInner", { n: plan.inner }));
+  if (plan.raised) log(t("body.millRaisedOk", { n: plan.raised }));
   return true;
 }
