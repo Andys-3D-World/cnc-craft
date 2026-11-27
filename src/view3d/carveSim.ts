@@ -8,9 +8,12 @@
  *   V-Fräser, Fase, Senker, Bohrer: Kegel (mit Spitzen-Durchmesser)
  * Welcher Fräser gerade arbeitet, ergibt sich aus den Werkzeugwechseln (M0/M1/M6) im G-Code.
  * Nur Anzeige – rechnet in Stücken, damit die Oberfläche flüssig bleibt.
+ * In der App rechnet das Rust (carveRust.ts, src-tauri/src/carvesim.rs); im Browser, in den Tests und wenn Rust
+ * nicht geht, rechnet carveHere() hier. Beide liefern dasselbe (tests/carveSimRust.test.ts).
  */
 import { parseGcodeProgram } from "../sim/gcodeParser.ts";
 import { taperHeight, type ToolGeom } from "../toolGraphics.ts";
+import { carveInRust, rustCarveOn } from "./carveRust.ts";
 
 export interface CarveResult {
   nx: number; ny: number;      // Zellen
@@ -73,6 +76,14 @@ export function exactKernel(tool: ToolGeom | null, c: number): Kernel {
  * @param onProgress 0…1; gibt false zurück = abbrechen
  */
 export async function carve(lines: string[], tools: (ToolGeom | null)[], onProgress: (f: number) => boolean, maxCells = MAX_CELLS): Promise<CarveResult | null> {
+  if (rustCarveOn(tools, maxCells)) {
+    try { return await carveInRust(lines, tools, onProgress, maxCells); } catch { /* weiter mit TypeScript */ }
+  }
+  return carveHere(lines, tools, onProgress, maxCells);
+}
+
+/** Dieselbe Rechnung in TypeScript (Browser-Vorschau, Tests, Ersatz wenn Rust nicht geht) */
+export async function carveHere(lines: string[], tools: (ToolGeom | null)[], onProgress: (f: number) => boolean, maxCells = MAX_CELLS): Promise<CarveResult | null> {
   const prog = parseGcodeProgram(lines);
   // Abschnitt (Werkzeug) je Zeile
   const sect = new Int32Array(lines.length + 1);

@@ -15,7 +15,7 @@
  * dadurch wird der Stecker oben breiter und passt umgedreht genau in die Tasche. Wände bis Tiefe S + P.
  * Alles in mm.
  */
-import { offsetPolygon, polygonArea, P } from "./polyOffset";
+import { offsetPolygon, polygonArea, type P } from "./polyOffset.ts";
 
 export interface VPath { pts: P[]; closed: boolean; z: number }
 export interface VOptions {

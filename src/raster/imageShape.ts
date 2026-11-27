@@ -13,6 +13,7 @@ import { MM_TO_PIXEL, Pt, newId, updatePolylineBounds } from "../shapeTransform"
 import { enableGpuAdjust } from "./gpuAdjust";
 import { maskBurn, burnPixels } from "./burnImage";
 import { Adjust, NO_ADJUST, RasterSettings, EngravePreset, presetSettings, toGray, resample, applyAdjust, rasterize, autoAdjust, removeBackground } from "./dither";
+import { rasterInRust, rasterJob, rustRasterOn } from "./rasterRust";
 
 export interface ImageSettings {
   src: string;          // Bild als Daten-URL (verkleinert)
@@ -175,57 +176,86 @@ export function adoptResult(fromId: string, s: any) {
   if (hit.key === resultKey(s.img, gw, gh)) results.set(s.id, hit);
 }
 
-// ---- Hintergrund-Thread fürs Rastern (siehe rasterWorker.ts) ----
+// ---- Rastern im Hintergrund: in der App Rust (rasterRust.ts), sonst der Hintergrund-Thread (rasterWorker.ts) ----
 type Job = { id: string; key: string; img: ImageSettings; gw: number; gh: number; step: number; done: Promise<Processed | null>; finish: (r: Processed | null) => void };
 let rWorker: Worker | null = null, rBroken = false, rSeq = 0;
 const rPending = new Map<string, Job>(); // Form-ID -> Auftrag, der gerade gerechnet wird
 const rJobs = new Map<number, Job>();
+
+/** Fertig gerechnet: Maske anwenden (falls noch nicht geschehen), Vorschau bauen, merken, neu zeichnen */
+function deliver(job: Job, burn: Float32Array, masked: boolean, px?: Uint8ClampedArray<ArrayBuffer>) {
+  if (rPending.get(job.id) === job) rPending.delete(job.id);
+  if (job.img.mask?.length && !masked) applyMask(burn, job.gw, job.gh, job.img.mask);
+  const res: Processed = { burn, gw: job.gw, gh: job.gh, step: job.step, canvas: burnCanvas(burn, job.gw, job.gh, masked ? px : undefined) };
+  results.set(job.id, { key: job.key, res });
+  job.finish(res);
+  window.dispatchEvent(new Event("cnc-redraw"));
+}
+
+/** Hintergrund-Thread starten, falls noch nicht geschehen. false = geht nicht */
+function startWorker(): boolean {
+  if (rWorker) return true;
+  if (rBroken) return false;
+  try {
+    rWorker = new Worker(new URL("./rasterWorker.ts", import.meta.url), { type: "module" });
+    rWorker.onmessage = (ev: MessageEvent) => {
+      const job = rJobs.get(ev.data?.seq);
+      if (!job) return;
+      rJobs.delete(ev.data.seq);
+      if (!ev.data.ok) { if (rPending.get(job.id) === job) rPending.delete(job.id); job.finish(null); return; }
+      // Maske und Vorschau-Pixel macht normalerweise schon der Thread
+      deliver(job, ev.data.burn as Float32Array, !!ev.data.masked, ev.data.px);
+    };
+    rWorker.onerror = (ev) => {
+      ev.preventDefault();
+      rBroken = true; rWorker?.terminate(); rWorker = null;
+      for (const j of rJobs.values()) j.finish(null);
+      rPending.clear(); rJobs.clear();
+      window.dispatchEvent(new Event("cnc-redraw"));
+    };
+    return true;
+  } catch { rBroken = true; return false; }
+}
+
+/** Auftrag an den Hintergrund-Thread geben. false = geht nicht (der Aufrufer rechnet dann im Hauptfenster) */
+function toWorker(job: Job, base: Float32Array, sw: number, sh: number): boolean {
+  if (!startWorker()) return false;
+  const seq = ++rSeq;
+  rJobs.set(seq, job);
+  rWorker!.postMessage({ seq, base, sw, sh, gw: job.gw, gh: job.gh, adjust: job.img.adjust, raster: job.img.raster, mask: job.img.mask }, [base.buffer]);
+  return true;
+}
 
 /**
  * Rastern im Hintergrund starten (Ergebnis landet im Zwischenspeicher, danach wird neu gezeichnet).
  * null = geht nicht (dann im Hauptfenster rechnen). Läuft derselbe Auftrag schon, kommt dessen Ergebnis.
  */
 function rasterAsync(id: string, img: ImageSettings, src: { gray: Float32Array; w: number; h: number }, gw: number, gh: number, step: number): Promise<Processed | null> | null {
-  if (rBroken) return null;
   const key = resultKey(img, gw, gh);
   const running = rPending.get(id);
   if (running?.key === key) return running.done;
-  try {
-    if (!rWorker) {
-      rWorker = new Worker(new URL("./rasterWorker.ts", import.meta.url), { type: "module" });
-      rWorker.onmessage = (ev: MessageEvent) => {
-        const job = rJobs.get(ev.data?.seq);
-        if (!job) return;
-        rJobs.delete(ev.data.seq);
-        if (rPending.get(job.id) === job) rPending.delete(job.id);
-        if (!ev.data.ok) { job.finish(null); return; }
-        const burn = ev.data.burn as Float32Array;
-        // Maske und Vorschau-Pixel macht normalerweise schon der Thread
-        if (job.img.mask?.length && !ev.data.masked) applyMask(burn, job.gw, job.gh, job.img.mask);
-        const res: Processed = { burn, gw: job.gw, gh: job.gh, step: job.step, canvas: burnCanvas(burn, job.gw, job.gh, ev.data.masked ? ev.data.px : undefined) };
-        results.set(job.id, { key: job.key, res });
-        job.finish(res);
-        window.dispatchEvent(new Event("cnc-redraw"));
-      };
-      rWorker.onerror = (ev) => {
-        ev.preventDefault();
-        rBroken = true; rWorker?.terminate(); rWorker = null;
-        for (const j of rJobs.values()) j.finish(null);
-        rPending.clear(); rJobs.clear();
-        window.dispatchEvent(new Event("cnc-redraw"));
-      };
-    }
-  } catch { rBroken = true; return null; }
-  const base = (img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray).slice();
-  const seq = ++rSeq;
-  let finish: (r: Processed | null) => void = () => {};
-  const done = new Promise<Processed | null>(r => { finish = r; });
   // Einstellungen festhalten (der Dialog verändert sein Objekt weiter, während gerechnet wird)
   const snap: ImageSettings = { ...img, adjust: { ...(img.adjust || NO_ADJUST) }, raster: { ...img.raster } };
+  const useRust = rustRasterOn() && rasterJob(src.w, src.h, gw, gh, snap.adjust, snap.raster) !== null;
+  if (!useRust && !startWorker()) return null;
+  const base = (img.bg?.on ? withoutBackground(img.src, src, img.bg.tol) : src.gray).slice();
+  let finish: (r: Processed | null) => void = () => {};
+  const done = new Promise<Processed | null>(r => { finish = r; });
   const job: Job = { id, key, img: snap, gw, gh, step, done, finish };
   rPending.set(id, job);
-  rJobs.set(seq, job);
-  rWorker.postMessage({ seq, base, sw: src.w, sh: src.h, gw, gh, adjust: snap.adjust, raster: snap.raster, mask: snap.mask }, [base.buffer]);
+  if (useRust) {
+    // Rust rechnet; geht das schief, übernimmt der Hintergrund-Thread (und ohne ihn das Hauptfenster)
+    rasterInRust(base, src.w, src.h, gw, gh, snap.adjust, snap.raster)
+      .then(burn => deliver(job, burn, false))
+      .catch(() => {
+        if (toWorker(job, base, src.w, src.h)) return;
+        if (rPending.get(id) === job) rPending.delete(id);
+        finish(null);
+        window.dispatchEvent(new Event("cnc-redraw"));
+      });
+    return done;
+  }
+  toWorker(job, base, src.w, src.h);
   return done;
 }
 

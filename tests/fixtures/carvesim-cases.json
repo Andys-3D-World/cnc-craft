@@ -1,0 +1,1405 @@
+[
+ {
+  "name": "end mill hole",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "end mill hole, fine cells",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 1,
+     "shankDia": 1,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 60000
+  }
+ },
+ {
+  "name": "ball",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "ball",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "ball small",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.4 F100",
+   "G1 X3 Y0.5",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "ball",
+     "diameter": 1,
+     "shankDia": 1,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 30000
+  }
+ },
+ {
+  "name": "bullnose",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "bullnose",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 1.5
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "bullnose corner too big",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "bullnose",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 9
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "bullnose corner negative",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "bullnose",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": -1
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "v bit 90",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 10,
+     "shankDia": 10,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 90,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "v bit 60 with flat tip",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 8,
+     "shankDia": 8,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 60,
+     "tipDia": 0.5,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "v bit shallow",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.15 F100",
+   "G1 X20 Y3",
+   "G1 X25 Y9 Z-0.02",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 12,
+     "shankDia": 12,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 90,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 20000
+  }
+ },
+ {
+  "name": "v bit no angle",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "chamfer",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "chamfer",
+     "diameter": 8,
+     "shankDia": 8,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 90,
+     "tipDia": 2,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "countersink",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "countersink",
+     "diameter": 12,
+     "shankDia": 12,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 82,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 8000
+  }
+ },
+ {
+  "name": "drill default angle",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "drill",
+     "diameter": 5,
+     "shankDia": 5,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 8000
+  }
+ },
+ {
+  "name": "drill 135",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "drill",
+     "diameter": 5,
+     "shankDia": 5,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 135,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 8000
+  }
+ },
+ {
+  "name": "spot drill",
+  "lines": [
+   "G21",
+   "G90",
+   "G0 X10.013 Y20.037",
+   "G1 Z-2 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "spotdrill",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 120,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 8000
+  }
+ },
+ {
+  "name": "taper",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "taper",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 10,
+     "tipDia": 1,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "taper sharp",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "taper",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 30,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "taper wide angle",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.6 F100",
+   "G1 X6 Y2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "taper",
+     "diameter": 8,
+     "shankDia": 8,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 200,
+     "tipDia": 3,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 15000
+  }
+ },
+ {
+  "name": "face mill and reamer",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5",
+   "M6",
+   "G0 X30 Y0",
+   "G1 Z-4 F100",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "facemill",
+     "diameter": 25,
+     "shankDia": 25,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "reamer",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "thread mill counts as flat",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "threadmill",
+     "diameter": 5,
+     "shankDia": 5,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "no tool list",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "tool missing",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    null
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "tool without sizes",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1.5 F100",
+   "G1 X12.3 Y1.7 F400",
+   "G1 X14 Y9.1 Z-3",
+   "G2 X2 Y9.1 I-6 J0",
+   "G1 X0 Y0 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "ball"
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "tiny tool",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.1 F100",
+   "G1 X1 Y0.3",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 0.05,
+     "shankDia": 0.05,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 30000
+  }
+ },
+ {
+  "name": "three tools",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1 F100",
+   "G1 X20",
+   "G0 Z5",
+   "M6 T2",
+   "G0 X0 Y6",
+   "G1 Z-2",
+   "G1 X20",
+   "G0 Z5",
+   "(m0) x",
+   "M0 (change)",
+   " m01",
+   "G0 X0 Y12",
+   "G1 Z-1.2",
+   "G1 X20",
+   "G0 Z5",
+   "M10",
+   "G1 M6",
+   "G0 X0 Y18",
+   "G1 Z-0.5",
+   "G1 X20",
+   "M00",
+   "G1 X25 Y20"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "ball",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    null,
+    {
+     "type": "vbit",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 90,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "drill",
+     "diameter": 2,
+     "shankDia": 2,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 12000
+  }
+ },
+ {
+  "name": "more changes than tools",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1 F100",
+   "G1 X5",
+   "M6",
+   "G1 X10",
+   "M6",
+   "G1 X15",
+   "M6",
+   "G1 X20"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 2,
+     "shankDia": 2,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "ball",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 6000
+  }
+ },
+ {
+  "name": "nothing below the surface",
+  "lines": [
+   "G0 X5 Y5",
+   "G1 X20 F300",
+   "G1 Z0"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 4000
+  }
+ },
+ {
+  "name": "ramp from above",
+  "lines": [
+   "G0 X0 Y0 Z2",
+   "G1 X20 Z-2 F300",
+   "G1 X40 Z2",
+   "G1 X41 Z-0.0001"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "plunges only",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.5 F100",
+   "G0 Z3",
+   "G0 X4 Y7",
+   "G1 Z-0.8 F100",
+   "G0 Z3",
+   "G0 X8 Y3",
+   "G1 Z-1.1 F100",
+   "G0 Z3",
+   "G0 X12 Y10",
+   "G1 Z-1.4 F100",
+   "G0 Z3",
+   "G0 X16 Y6",
+   "G1 Z-1.7 F100",
+   "G0 Z3",
+   "G0 X20 Y2",
+   "G1 Z-2.0 F100",
+   "G0 Z3",
+   "G0 X24 Y9",
+   "G1 Z-2.3 F100",
+   "G0 Z3",
+   "G0 X28 Y5",
+   "G1 Z-2.6 F100",
+   "G0 Z3"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "drill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 118,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "drill cycle and arcs",
+  "lines": [
+   "G0 Z5",
+   "G83 X5 Y5 Z-6 R1 Q2 F80",
+   "X15",
+   "G80",
+   "G0 X30 Y5",
+   "G1 Z-1",
+   "G3 X30 Y5 I-5 J0 F300",
+   "G2 X40 Y15 R12",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "inch program",
+  "lines": [
+   "G20",
+   "G0 X0 Y0",
+   "G1 Z-0.05 F10",
+   "G1 X1 Y0.2",
+   "G0 Z0.2"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "ball",
+     "diameter": 3.175,
+     "shankDia": 3.175,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "large area",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-3 F300",
+   "G1 X900",
+   "G1 Y600",
+   "G1 X0",
+   "G1 Y0",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 12,
+     "shankDia": 12,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 20000
+  }
+ },
+ {
+  "name": "router job",
+  "file": "post-drawing.gcode",
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "router job, v bit and ball",
+  "file": "post-drawing.gcode",
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 60,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "ball",
+     "diameter": 6,
+     "shankDia": 6,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "cell size from a 0.4 mm tool",
+  "lines": [
+   "G0 X0.2 Y0.1",
+   "G1 Z-0.3 F100",
+   "G1 X0.9 Y0.35",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 0.4,
+     "shankDia": 0.4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 100000
+  }
+ },
+ {
+  "name": "cell size lower limit",
+  "lines": [
+   "G0 X0.2 Y0.1",
+   "G1 Z-0.3 F100",
+   "G1 X0.9 Y0.35",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 0.2,
+     "shankDia": 0.2,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 200000
+  }
+ },
+ {
+  "name": "cell size upper limit",
+  "lines": [
+   "G0 X0.2 Y0.1",
+   "G1 Z-0.3 F100",
+   "G1 X0.9 Y0.35",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "ball",
+     "diameter": 1,
+     "shankDia": 1,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 100000
+  }
+ },
+ {
+  "name": "cell size from the smallest of two tools",
+  "lines": [
+   "G0 X0.2 Y0.1",
+   "G1 Z-0.3 F100",
+   "G1 X0.9 Y0.35",
+   "G0 Z5",
+   "M6",
+   "G0 X2 Y2",
+   "G1 Z-0.2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 0.5,
+     "shankDia": 0.5,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 100000
+  }
+ },
+ {
+  "name": "tool thinner than the smallest radius",
+  "lines": [
+   "G0 X0.2 Y0.1",
+   "G1 Z-0.3 F100",
+   "G1 X0.9 Y0.35",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 0.05,
+     "shankDia": 0.05,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 400000
+  }
+ },
+ {
+  "name": "tool change after a comment",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-1 F100",
+   "G1 X6",
+   "G0 Z5",
+   "(next tool) M6",
+   "G0 X0 Y5",
+   "G1 Z-1",
+   "G1 X6",
+   "G0 Z5",
+   "((x) M0",
+   "G0 X0 Y10",
+   "G1 Z-1",
+   "G1 X6",
+   "G0 Z5",
+   "(open M6",
+   "G0 X0 Y15",
+   "G1 Z-1",
+   "G1 X6",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 1,
+     "shankDia": 1,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 2,
+     "shankDia": 2,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 9000
+  }
+ },
+ {
+  "name": "deepest point at the very end",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-0.5 F100",
+   "G1 X10 Z-2"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 6000
+  }
+ },
+ {
+  "name": "v bit 30",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-2 F100",
+   "G1 X8 Y2",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 4,
+     "shankDia": 4,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 30,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 15000
+  }
+ },
+ {
+  "name": "v bit 4 degrees",
+  "lines": [
+   "G0 X0 Y0",
+   "G1 Z-3 F100",
+   "G1 X4 Y1",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "vbit",
+     "diameter": 2,
+     "shankDia": 2,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 4,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 15000
+  }
+ },
+ {
+  "name": "byte layout sample",
+  "lines": [
+   "G0 X1.25 Y2.5",
+   "G1 Z-1.75 F100",
+   "G1 X9.5 Y4.25",
+   "G1 X12 Y11 Z-0.5",
+   "G0 Z5",
+   "M6",
+   "G0 X3 Y9",
+   "G1 Z-3",
+   "G0 Z5"
+  ],
+  "job": {
+   "tools": [
+    {
+     "type": "endmill",
+     "diameter": 3,
+     "shankDia": 3,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    },
+    {
+     "type": "endmill",
+     "diameter": 1.5,
+     "shankDia": 1.5,
+     "fluteLen": 20,
+     "length": 40,
+     "flutes": 2,
+     "helix": "up",
+     "angle": 0,
+     "tipDia": 0,
+     "cornerR": 0
+    }
+   ],
+   "maxCells": 2500
+  }
+ }
+]

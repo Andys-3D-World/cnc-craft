@@ -43,6 +43,7 @@ import { helixZ, trochoidPlan, troFits, troSettings } from "./trochoid";
 import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan, type SkinSettings } from "./onionSkin";
 import { postCtx } from "./post/postContext";
 import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
+import { shadowMill } from "./camJob";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -509,7 +510,9 @@ const generateGcodeInner = (shapes: any): string | null => {
     let s0 = 0, gap = -1;
     centers.forEach((c, i) => {
       const next = i + 1 < centers.length ? centers[i + 1] : centers[0] + L;
-      if (next - c > gap) { gap = next - c; s0 = (c + next) / 2; }
+      // gleich große Lücken (gleichmäßig verteilte Stege): immer die erste – sonst entschiede die letzte Rechenstelle,
+      // und derselbe Auftrag finge je nach Rechner in einer anderen Lücke an
+      if (next - c > gap + 1e-9) { gap = next - c; s0 = (c + next) / 2; }
     });
     // Startpunkt von Hand: die Bahn beginnt schon dort. Liegt er in einem Steg, gewinnt der Steg
     if (cutStartOf(shape) !== null) {
@@ -1459,6 +1462,9 @@ const generateGcodeInner = (shapes: any): string | null => {
 
   // ---- 7. FOOTER ----
   gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
+
+  // Entwicklungs-Build: Rust rechnet denselben Fräs-G-Code daneben und vergleicht (camJob.ts) – ändert hier nichts
+  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode);
 
   // ---- 8. NACHMESSEN (Wärmegang, Einstellung „Werkzeug nachmessen“): Mess-Punkte nach geschätzter Laufzeit ----
   if (driftOn) {

@@ -1,9 +1,10 @@
 /**
- * G-CODE IM HINTERGRUND EINLESEN (Simulation): Große Programme liest parseWorker.ts in einem eigenen Thread,
- * so bleibt das Fenster bedienbar. Kleine Programme liest der Aufrufer weiter sofort (das Hin und Her
+ * G-CODE IM HINTERGRUND EINLESEN (Simulation): Große Programme liest in der App Rust (parseRust.ts, gcodesim.rs),
+ * im Browser parseWorker.ts in einem eigenen Thread – so bleibt das Fenster bedienbar. Geht Rust nicht, liest der Thread. Kleine Programme liest der Aufrufer weiter sofort (das Hin und Her
  * würde dort länger dauern als das Lesen). Geht der Thread nicht, wird im Hauptfenster gelesen – gleiches Ergebnis.
  */
 import { parseGcodeProgram, type ParseOptions, type SimProgram } from "./gcodeParser";
+import { parseInRust, rustParseOn } from "./parseRust";
 
 /** Ab so vielen Zeilen lohnt der Hintergrund (Mac: etwa 0,05 s Lesezeit, auf alten Rechnern deutlich mehr) */
 export const WORKER_MIN_LINES = 100_000;
@@ -41,6 +42,11 @@ function startWorker(): Worker {
 
 /** Liest `lines` im Hintergrund. Das Ergebnis enthält dieselben Zeilen (`lines`) wie übergeben. */
 export function parseGcodeAsync(lines: string[], opts: ParseOptions = {}): Promise<SimProgram> {
+  if (rustParseOn(opts)) return parseInRust(lines, opts).catch(() => parseInThread(lines, opts));
+  return parseInThread(lines, opts);
+}
+
+function parseInThread(lines: string[], opts: ParseOptions): Promise<SimProgram> {
   return new Promise(done => {
     const job: Job = { lines, opts, done };
     if (broken || typeof Worker === "undefined") { readHere(job); return; }

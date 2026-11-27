@@ -5,7 +5,8 @@
  *
  *   1. Nächster Nachbar: vom aktuellen Punkt aus immer die Kontur, deren Einstieg am nächsten liegt.
  *   2. 2-opt: Stücke der Reihenfolge umdrehen, solange die Leerfahrten dadurch kürzer werden
- *      (mit Zeitgrenze – bei sehr vielen Teilen wird früher aufgehört, das Ergebnis bleibt gültig).
+ *      (mit Grenze für die Rechenmenge – bei sehr vielen Teilen wird früher aufgehört, das Ergebnis bleibt gültig).
+ *      Die Grenze zählt Rechenschritte, nicht Zeit: dieselbe Zeichnung gibt auf jedem Rechner dieselbe Reihenfolge.
  *   3. Startpunkte: geschlossene Konturen ohne festen Start (Laser ohne Freischnitt/Haltestege)
  *      beginnen an dem Punkt, der zwischen Vorgänger und Nachfolger am günstigsten liegt.
  *
@@ -15,9 +16,10 @@
  *   - Einstiege mit Anfahrbahn / Einstichpunkt (Plasma, Laser-Freischnitt) bleiben, wo sie sind.
  *   - Ebenen- und Schnitt-Reihenfolge: es wird immer nur innerhalb EINER Ebene sortiert.
  *
- * Warum TypeScript und nicht Rust: der ganze CAM-Teil (Konturen, Anfahrbahnen, G-Code) läuft hier.
- * In Rust müssten alle Konturen hin- und zurückgeschickt werden; die Rechnung selbst dauert nur
- * Millisekunden. Bewusst ohne Laufzeit-Importe (nur Typen): Tests laufen direkt mit `node --test`.
+ * Zwilling in Rust: src-tauri/src/cutorder.rs rechnet Schritt für Schritt dasselbe (tests/cutOrderRust.test.ts und
+ * die Tests dort prüfen das mit denselben Fällen). Gerufen wird bisher diese Datei: der CAM-Teil (Konturen,
+ * Anfahrbahnen, G-Code) läuft noch hier und kann auf eine Antwort aus Rust nicht warten. Zieht er um, ruft er
+ * cutorder.rs direkt. Bewusst ohne Laufzeit-Importe (nur Typen): Tests laufen direkt mit `node --test`.
  */
 import type { Pt } from "./shapeTransform";
 
@@ -39,15 +41,25 @@ export interface CutStep {
 const SAMPLE = 16;       // so viele Punkte je Kontur reichen für die grobe Auswahl beim nächsten Nachbarn
 const TOL = 1e-6;
 const GRID_FROM = 1500; // ab so vielen Konturen sucht der nächste Nachbar über ein Raster (Ergebnis gleich gut)
+/**
+ * Rechenschritte von 2-opt, die einer Millisekunde entsprechen (gemessen: Mac mit M-Prozessor, node).
+ * Ein Schritt = ein geprüftes Paar (i, j); neu aufbauen nach einem Tausch zählt je Kontur einen Schritt.
+ */
+export const WORK_PER_MS = 25_000;
+
+/** Zähler für die Rechenmenge von 2-opt */
+interface Work { used: number; max: number }
 
 /**
  * Reihenfolge für die Konturen einer Ebene. `from` = wo der Kopf vorher steht.
- * `timeMs` begrenzt die Rechenzeit für 2-opt (der nächste Nachbar läuft immer ganz durch).
+ * `timeMs` begrenzt die Rechenmenge für 2-opt (der nächste Nachbar läuft immer ganz durch): so viel, wie ein
+ * schneller Rechner in dieser Zeit schafft (WORK_PER_MS). Auf einem langsamen Rechner dauert es entsprechend länger,
+ * das Ergebnis ist aber überall dasselbe. 0 = ohne 2-opt.
  */
 export function optimizeCutOrder(items: CutItem[], from: Pt, timeMs = 150): CutStep[] {
   const n = items.length;
   if (!n) return [];
-  const t0 = now();
+  const work: Work = { used: 0, max: timeMs * WORK_PER_MS };
   const preds = precedence(items);
   const rev = new Array<boolean>(n).fill(false);
   const start = new Array<number>(n).fill(0);
@@ -88,12 +100,12 @@ export function optimizeCutOrder(items: CutItem[], from: Pt, timeMs = 150): CutS
   }
   if (order.length < n) return items.map((_, i) => ({ index: i, reversed: false, start: 0 })); // (kann nicht passieren: keine Kreise)
 
-  // ---- 2. 2-opt + 3. Startpunkte, solange Zeit ist ----
+  // ---- 2. 2-opt + 3. Startpunkte, solange die Rechenmenge reicht ----
   for (let round = 0; round < 4; round++) {
-    const better = twoOpt(order, items, preds, rev, entryOf, exitOf, from, t0 + timeMs);
+    const better = twoOpt(order, items, preds, rev, entryOf, exitOf, from, work);
     const moved = placeStarts(order, items, start, entryOf, exitOf, from);
     if (!better && !moved) break;
-    if (now() > t0 + timeMs) break;
+    if (work.used >= work.max) break;
   }
   return order.map(i => ({ index: i, reversed: rev[i], start: start[i] }));
 }
@@ -162,7 +174,7 @@ function anyInside(a: Pt[], b: Pt[]): boolean {
  * Kontur und etwas darin liegen (das Innere käme sonst nach der Kontur).
  */
 function twoOpt(order: number[], items: CutItem[], preds: number[][], rev: boolean[],
-  entryOf: (i: number) => Pt, exitOf: (i: number) => Pt, from: Pt, deadline: number): boolean {
+  entryOf: (i: number) => Pt, exitOf: (i: number) => Pt, from: Pt, work: Work): boolean {
   const n = order.length;
   if (n < 3) return false;
   const posOf = new Array<number>(n);
@@ -173,6 +185,7 @@ function twoOpt(order: number[], items: CutItem[], preds: number[][], rev: boole
     return e ? exitOf(i) : entryOf(i);
   };
   const rebuild = () => {
+    work.used += n;
     order.forEach((it, k) => posOf[it] = k);
     for (let k = 0; k < n; k++) {
       let m = -1;
@@ -189,10 +202,11 @@ function twoOpt(order: number[], items: CutItem[], preds: number[][], rev: boole
   while (improved) {
     improved = false;
     for (let i = 0; i < n - 1; i++) {
-      if (now() > deadline) return any;
+      if (work.used >= work.max) return any;
       const before = i > 0 ? exitOf(order[i - 1]) : from;
       const oldIn = dist(before, entryOf(order[i]));
       for (let j = i + 1; j < n; j++) {
+        work.used++;
         if (maxPred[j] >= i) break; // ab hier läge eine Kontur samt Innerem im Abschnitt
         const after = j + 1 < n ? entryOf(order[j + 1]) : null;
         const oldD = oldIn + (F[j] - F[i]) + (after ? dist(exitOf(order[j]), after) : 0);
@@ -330,6 +344,3 @@ function dist(a: Pt, b: Pt): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
-function now(): number {
-  return typeof performance !== "undefined" ? performance.now() : Date.now();
-}

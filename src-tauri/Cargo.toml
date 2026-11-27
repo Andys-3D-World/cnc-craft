@@ -25,7 +25,9 @@ flate2 = "1"
 # Systemschriften für das Text-Werkzeug lesen (fonts.rs) – nur Namen/Gewicht, kein Zeichnen
 ttf-parser = "0.25"
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# float_roundtrip: Kommazahlen aus dem Fenster genau einlesen (sonst bis zu eine letzte Stelle daneben) – die
+# Rechen-Zwillinge müssen mit genau denselben Zahlen rechnen wie das TypeScript
+serde_json = { version = "1", features = ["float_roundtrip"] }
 serialport = "4"
 # Gamepad lesen (gamepad.rs): das Fenster meldet Controller auf dem Mac nicht zuverlässig
 gilrs = "0.11"
@@ -35,3 +37,20 @@ rusb = { version = "0.9", features = ["vendored"] }
 rayon = "1"
 # Modbus (modbus.rs, vfd.rs): Netzwerk + Zeitlimits. Tauri bringt tokio ohnehin mit – nur diese Teile einschalten
 tokio = { version = "1", features = ["net", "time", "io-util", "rt", "sync"] }
+# Winkelfunktionen wie im Fenster (jsmath.rs): reines Rust, auf jedem Rechner dieselben Zahlen – die Rechen-Zwillinge
+# (polyoffset.rs …) müssen bis zur letzten Stelle dasselbe liefern wie das TypeScript
+libm = "0.2"
+
+[dev-dependencies]
+# nur für die Tests: Kommazahlen aus den Vergleichsdateien genau einlesen (sonst bis zu eine letzte Stelle daneben)
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+# Entwicklungs-Build (tauri dev): nur den eigenen Code optimieren. Ohne das rechnen die Rechen-Module (Bildgravur,
+# G-Code lesen, 3D-Fraesen ...) im Entwicklungs-Build 10- bis 15-mal langsamer als in der fertigen App.
+[profile.dev.package.cnc-craft]
+opt-level = 2
+
+# Ohne Zwischenspeicher für Teil-Übersetzungen: zusammen mit der Optimierung oben stürzte der Rust-Compiler sonst
+# manchmal ab ("the compiler unexpectedly panicked", lto.rs) und half erst nach dem Löschen von target/debug/incremental.
+[profile.dev]
+incremental = false

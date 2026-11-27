@@ -25,6 +25,17 @@
 
 mod awake;
 mod cam3d;
+mod gcodesim;
+mod carvesim;
+mod cutorder;
+mod jsmath;
+mod polyoffset;
+mod vcarve;
+mod imgraster;
+mod pocket;
+mod arcfit;
+mod milllead;
+mod millgcode;
 mod controller;
 mod cycles;
 mod elfimg;
@@ -941,6 +952,122 @@ async fn flash_zip(app: AppHandle, port: String, path: String, baud: u32, usb_jt
     .map_err(|e| e.to_string())?
 }
 
+// ---- G-Code für die Simulation lesen (gcodesim.rs) ----
+
+/// G-Code-Text (Bytes) lesen: Bewegungen, Zeiten, Hinweise. Einstellungen als JSON im Kopf "opts".
+/// Antwort: Bytes (Aufbau siehe gcodesim::encode)
+#[tauri::command]
+async fn gcodesim_parse(request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else { return Err("expected G-code text".into()) };
+    let opts: gcodesim::Options = match request.headers().get("opts") {
+        Some(h) => serde_json::from_slice(h.as_bytes()).map_err(|e| e.to_string())?,
+        None => Default::default(),
+    };
+    let data = data.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        let prog = gcodesim::parse(&String::from_utf8_lossy(&data), &opts);
+        // nur beim Entwickeln: im Terminal sehen, dass Rust gelesen hat
+        if cfg!(debug_assertions) {
+            eprintln!("gcodesim: {} moves in {:.0} ms", prog.kind.len(), start.elapsed().as_secs_f64() * 1000.0);
+        }
+        gcodesim::encode(&prog)
+    })
+        .await
+        .map(tauri::ipc::Response::new)
+        .map_err(|e| e.to_string())
+}
+
+// ---- Fräsergebnis für die 3D-Ansicht (carvesim.rs) ----
+
+/// Kennung der Rechnung, die abgebrochen werden soll (0 = keine)
+static CARVESIM_CANCEL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Materialabtrag aus G-Code-Text (Bytes). Kopf "job": JSON mit Fräsern und Zellenzahl, Kopf "id": Kennung der Rechnung.
+/// Fortschritt: Ereignis "carvesim-progress" { id, p }. Antwort: Bytes (Aufbau siehe carvesim::encode), leer = nichts gefräst
+#[tauri::command]
+async fn carvesim_run(app: AppHandle, request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else { return Err("expected G-code text".into()) };
+    let head = |name: &str| request.headers().get(name).map(|h| h.as_bytes().to_vec());
+    let job: carvesim::Job = serde_json::from_slice(&head("job").ok_or("no job")?).map_err(|e| e.to_string())?;
+    let id: u64 = head("id").and_then(|h| String::from_utf8(h).ok()).and_then(|s| s.parse().ok()).ok_or("no id")?;
+    let data = data.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut prog = |p: f64| {
+            let _ = app.emit("carvesim-progress", serde_json::json!({ "id": id, "p": p }));
+            CARVESIM_CANCEL.load(Ordering::SeqCst) != id
+        };
+        if CARVESIM_CANCEL.load(Ordering::SeqCst) == id {
+            return Err("cancelled".to_string());
+        }
+        let start = std::time::Instant::now();
+        let res = carvesim::carve(&String::from_utf8_lossy(&data), &job, &mut prog);
+        // nur beim Entwickeln: im Terminal sehen, dass Rust gerechnet hat
+        if cfg!(debug_assertions) {
+            eprintln!("carvesim: {} cells in {:.0} ms", res.as_ref().map_or(0, |r| r.h.len()), start.elapsed().as_secs_f64() * 1000.0);
+        }
+        if CARVESIM_CANCEL.load(Ordering::SeqCst) == id {
+            return Err("cancelled".to_string());
+        }
+        Ok(tauri::ipc::Response::new(res.map(|r| carvesim::encode(&r)).unwrap_or_default()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Materialabtrag abbrechen (die Rechnung mit dieser Kennung hört beim nächsten Fortschritt auf)
+#[tauri::command]
+fn carvesim_cancel(id: u64) {
+    CARVESIM_CANCEL.store(id, Ordering::SeqCst);
+}
+
+// ---- Bildgravur rechnen (imgraster.rs) ----
+
+/// Graustufen des Quellbilds (32-Bit-Zahlen als Bytes) auf das Gravur-Raster umrechnen, verbessern und rastern.
+/// Kopf "job": JSON mit Größen und Einstellungen. Antwort: Bytes (Aufbau siehe imgraster::encode)
+#[tauri::command]
+async fn imgraster_run(request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::Response, String> {
+    let tauri::ipc::InvokeBody::Raw(data) = request.body() else { return Err("expected image data".into()) };
+    let job: imgraster::Job = serde_json::from_slice(request.headers().get("job").ok_or("no job")?.as_bytes()).map_err(|e| e.to_string())?;
+    let data = data.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        let burn = imgraster::run(&imgraster::floats(&data), &job)?;
+        // nur beim Entwickeln: im Terminal sehen, dass Rust gerechnet hat
+        if cfg!(debug_assertions) {
+            eprintln!("imgraster: {} x {} ({}) in {:.0} ms", job.gw, job.gh, job.raster.method, start.elapsed().as_secs_f64() * 1000.0);
+        }
+        Ok(tauri::ipc::Response::new(imgraster::encode(&burn, job.gw, job.gh)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// ---- Fräs-G-Code daneben rechnen und vergleichen (millgcode.rs) – die App fräst weiter mit dem G-Code aus dem Fenster ----
+
+/// Rechnet den Fräs-G-Code für den Auftrag in Rust und vergleicht ihn mit dem G-Code aus cam.ts (`expected`).
+/// Antwort: { same, lines, ms, line?, rust?, ts? } bzw. ein Fehlertext, wenn der Auftrag nicht passt.
+/// Das Ergebnis wird nirgends an eine Maschine geschickt.
+#[tauri::command(async)]
+fn millgcode_shadow(job: millgcode::Job, expected: String) -> Result<serde_json::Value, String> {
+    let start = std::time::Instant::now();
+    let mine = millgcode::generate(&job)?;
+    let ms = start.elapsed().as_secs_f64() * 1000.0;
+    let lines = expected.split('\n').count();
+    let diff = millgcode::compare(&mine, &expected);
+    if cfg!(debug_assertions) {
+        match &diff.first {
+            None if diff.near == 0 => eprintln!("millgcode: {} shapes, {lines} lines, same as cam.ts ({ms:.1} ms)", job.shapes.len()),
+            None => eprintln!("millgcode: {} shapes, {lines} lines, same as cam.ts except {} line(s) with 0.001 in one number ({ms:.1} ms)", job.shapes.len(), diff.near),
+            Some((n, a, b)) => eprintln!("millgcode: DIFFERENT from cam.ts at line {n}\n  Rust:   {a}\n  cam.ts: {b}"),
+        }
+    }
+    Ok(match diff.first {
+        None => serde_json::json!({ "same": true, "near": diff.near, "lines": lines, "ms": ms }),
+        Some((n, a, b)) => serde_json::json!({ "same": false, "near": diff.near, "lines": lines, "ms": ms, "line": n, "rust": a, "ts": b }),
+    })
+}
+
 // ---- 3D-Fräsen (cam3d.rs) ----
 
 /// zuletzt übergebenes 3D-Modell (Dreiecke in den Maßen der Datei)
@@ -1046,6 +1173,11 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            gcodesim_parse,
+            carvesim_run,
+            carvesim_cancel,
+            imgraster_run,
+            millgcode_shadow,
             gamepad_read,
             list_ports,
             port_scan,
