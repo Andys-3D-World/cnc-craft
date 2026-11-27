@@ -16,7 +16,7 @@
 //! siehe tests/fixtures/README.md) und die Tests unten.
 
 use crate::cutorder;
-use crate::gcodesim::{hypot2, mn, mx};
+use crate::gcodesim::{hypot2, hypot3, mn, mx};
 use crate::jsmath::{self, js_num, to_fixed};
 use crate::milllead::{dist_to_path, lead_at_point, plan_lead, plan_lead_at_start, LeadMove, LeadOpts, LeadPlan};
 use crate::pocket::{pocket_paths, pocket_wall_paths, PocketPath};
@@ -62,6 +62,9 @@ pub struct Tool {
     /// Reibahle: in einem Zug auf Tiefe und mit Vorschub wieder heraus
     #[serde(default)]
     pub reamer: bool,
+    /// Kegel, Reibahle, Gewindefräser, Konusfräser: damit wird nicht trochoidal gefräst
+    #[serde(default)]
+    pub no_tro: bool,
     /// Kegel-Werkzeug (V-Stichel, Fasenfräser, Senker, Bohrer): nur damit geht eine Fase
     #[serde(default)]
     pub cone: bool,
@@ -92,6 +95,229 @@ pub struct Thread {
     pub left: bool,
     pub passes: f64,
     pub spring: bool,
+}
+
+/// Trochoidal: Nutbreite und Vorschub je Kreis in % vom Fräser-Ø, Zustellung in mm (0 = vom Fräser)
+#[derive(Deserialize, Clone, Debug)]
+pub struct TroOpts {
+    pub w: f64,
+    pub step: f64,
+    pub down: f64,
+}
+
+/// so viel bleibt an der Wand für die Kontur danach stehen
+const TRO_LEAVE: f64 = 0.05;
+
+struct TroPlan {
+    /// Radius der kleinen Kreise
+    rho: f64,
+    /// je Umlauf: (Mitte des Kreises, Stelle auf dem Kreis, an der er beginnt und endet)
+    loops: Vec<Vec<(P, P)>>,
+    /// hat die Nut die ganze Kontur freigelegt?
+    full: bool,
+}
+
+/// Bahnen für eine Kontur in mm (trochoidPlan in trochoid.ts). None = kein Platz oder zu viele Kreise
+fn trochoid_plan(poly: &[P], inside: bool, r: f64, allow: f64, o: &TroOpts) -> Option<TroPlan> {
+    let rho = (2.0 * r * o.w / 100.0 - 2.0 * r) / 2.0;
+    let sg = if inside { -1.0 } else { 1.0 };
+    let rings = offset_polygon(poly, sg * (r + allow + TRO_LEAVE + rho), 0.01);
+    if rings.is_empty() || !(rho > 0.0) {
+        return None;
+    }
+    let step = 2.0 * r * o.step / 100.0;
+    let mut loops: Vec<Vec<(P, P)>> = Vec::new();
+    let mut total = 0.0;
+    for ring0 in &rings {
+        // Umlauf wie die normale Kontur: außen gegen, innen im Uhrzeigersinn
+        let ring = if (!inside) == (polygon_area(ring0) > 0.0) { ring0.clone() } else { reversed_keep_first(ring0) };
+        let n_pts = ring.len();
+        let mut cum = vec![0.0f64];
+        for i in 1..=n_pts {
+            cum.push(cum[i - 1] + hypot2(ring[i % n_pts][0] - ring[i - 1][0], ring[i % n_pts][1] - ring[i - 1][1]));
+        }
+        let l = cum[cum.len() - 1];
+        if l < 1e-6 {
+            continue;
+        }
+        let n = mx(8.0, (l / step).ceil());
+        total += n;
+        if total > 40000.0 {
+            return None;
+        }
+        let mut list = Vec::new();
+        let mut i = 1;
+        for k in 0..=(n as usize) {
+            let s = l * k as f64 / n;
+            while i < cum.len() - 1 && cum[i] < s {
+                i += 1;
+            }
+            let (a, b) = (ring[i - 1], ring[i % n_pts]);
+            let len = mx(1e-12, cum[i] - cum[i - 1]);
+            let f = (s - cum[i - 1]) / len;
+            let (ux, uy) = ((b[0] - a[0]) / len, (b[1] - a[1]) / len);
+            let c = [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f];
+            list.push((c, [c[0] - ux * rho, c[1] - uy * rho]));
+        }
+        loops.push(list);
+    }
+    if loops.is_empty() {
+        return None;
+    }
+    // Jeder Punkt der fertigen Kontur muss in der freigefrästen Nut liegen, sonst steht dort (enge Ecke) noch Material
+    let want = offset_polygon(poly, sg * (r + allow), 0.01);
+    let mut full = !want.is_empty();
+    let tol = TRO_LEAVE + mx(0.05, 0.1 * rho);
+    for w in &want {
+        let mut i = 0;
+        while full && i < w.len() {
+            let (a, b) = (w[i], w[(i + 1) % w.len()]);
+            let l = hypot2(b[0] - a[0], b[1] - a[1]);
+            let m = mx(1.0, (l / mx(0.2, r / 2.0)).ceil());
+            for k in 0..(m as usize) {
+                let p = [a[0] + (b[0] - a[0]) * k as f64 / m, a[1] + (b[1] - a[1]) * k as f64 / m];
+                if !rings.iter().any(|q| dist_to_path(p, q, true) <= rho + tol) {
+                    full = false;
+                    break;
+                }
+            }
+            i += 1;
+        }
+    }
+    Some(TroPlan { rho, loops, full })
+}
+
+/// Höhen, in denen der Fräser bei einem Kreis mit Radius rho in Schraubenlinie eintaucht (helixZ); `tan3` = tan(3°)
+fn helix_z(z_top: f64, z: f64, rho: f64, tan: f64, tan3: f64) -> Vec<f64> {
+    let drop = z_top - z;
+    if !(drop > 1e-6) {
+        return vec![z];
+    }
+    let revs = mx(1.0, mn(400.0, (drop / mx(1e-6, (if tan > 0.0 { tan } else { tan3 }) * 2.0 * std::f64::consts::PI * rho)).ceil()));
+    (0..revs as usize).map(|k| z_top - drop * (k as f64 + 1.0) / revs).collect()
+}
+
+/// Flöte: Länge von Ein- und Auslauf (mm), Tiefe am Anfang und Ende (% von voll), gerade Schräge statt S-Kurve
+#[derive(Deserialize, Clone, Debug)]
+pub struct FluteOpts {
+    #[serde(rename = "in")]
+    pub lin: f64,
+    pub out: f64,
+    pub start: f64,
+    pub end: f64,
+    pub linear: bool,
+}
+
+/// Ein- und Auslauf auf eine Bahn der Länge l bringen: zusammen nie länger als die Bahn (fluteZones)
+fn flute_zones(l: f64, o: &FluteOpts) -> (f64, f64) {
+    let sum = o.lin + o.out;
+    if sum > l && sum > 0.0 {
+        (l * o.lin / sum, l * o.out / sum)
+    } else {
+        (o.lin, o.out)
+    }
+}
+
+/// Anteil der vollen Tiefe (0…1) bei Länge s auf einer Bahn der Länge l (fluteFrac)
+fn flute_frac(s: f64, l: f64, o: &FluteOpts) -> f64 {
+    let (zin, zout) = flute_zones(l, o);
+    let ease = |u: f64| {
+        let u = mx(0.0, mn(1.0, u));
+        if o.linear {
+            u
+        } else {
+            u * u * (3.0 - 2.0 * u)
+        }
+    };
+    let a = if zin > 0.0 { o.start / 100.0 + (1.0 - o.start / 100.0) * ease(s / zin) } else { 1.0 };
+    let b = if zout > 0.0 { o.end / 100.0 + (1.0 - o.end / 100.0) * ease((l - s) / zout) } else { 1.0 };
+    mn(a, b)
+}
+
+/// Bahnen je Durchgang (flutePasses in fluting.ts): Punkte [x, y, z]. Jeder Durchgang fährt nur das Stück, das tiefer
+/// liegt als der Durchgang davor
+fn flute_passes(path: &[P], passes: &[f64], o: &FluteOpts) -> Vec<Vec<[f64; 3]>> {
+    let depth = passes[passes.len() - 1];
+    if path.len() < 2 || !(depth < 0.0) {
+        return vec![];
+    }
+    // Stützstellen mit der Tiefe nach der Kurve: alle Ecken und im Ein-/Auslauf alle ~0,5 mm
+    let mut cum = vec![0.0f64];
+    for i in 1..path.len() {
+        cum.push(cum[i - 1] + hypot2(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+    }
+    let l = cum[cum.len() - 1];
+    if !(l > 1e-6) {
+        return vec![];
+    }
+    let (zin, zout) = flute_zones(l, o);
+    let mut at: Vec<f64> = cum.clone();
+    for (from, len) in [(0.0, zin), (l - zout, zout)] {
+        let n = mn(400.0, mx(32.0, (len / 0.5).ceil()));
+        if len > 1e-6 {
+            for k in 0..=(n as usize) {
+                at.push(mn(l, mx(0.0, from + len * k as f64 / n)));
+            }
+        }
+    }
+    at.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mut prof: Vec<(f64, [f64; 3])> = Vec::new();
+    let mut i = 1;
+    for s in at {
+        if prof.last().is_some_and(|q| s - q.0 < 1e-6) {
+            continue;
+        }
+        while i < cum.len() - 1 && cum[i] < s {
+            i += 1;
+        }
+        let f = (s - cum[i - 1]) / mx(1e-12, cum[i] - cum[i - 1]);
+        prof.push((s, [path[i - 1][0] + (path[i][0] - path[i - 1][0]) * f, path[i - 1][1] + (path[i][1] - path[i - 1][1]) * f, depth * flute_frac(s, l, o)]));
+    }
+    let p: Vec<[f64; 3]> = prof.iter().map(|q| q.1).collect();
+    let mut out = Vec::new();
+    let mut prev = 0.0f64;
+    for &z in passes {
+        let deep = |w: Option<&[f64; 3]>| w.is_some_and(|w| w[2] < prev - 1e-9);
+        let mut pts: Vec<[f64; 3]> = Vec::new();
+        for i in 0..p.len() {
+            let q = p.get(i + 1);
+            let before = if i > 0 { p.get(i - 1) } else { None };
+            // genau auf der Höhe des vorigen Durchgangs zählt mit, wenn es daneben tiefer wird
+            let below = deep(Some(&p[i])) || (p[i][2] <= prev + 1e-9 && (deep(before) || deep(q)));
+            if below {
+                pts.push([p[i][0], p[i][1], mx(z, p[i][2])]);
+            }
+            // Übergänge genau treffen: Tiefe des vorigen Durchgangs (rein/raus) und Tiefe dieses Durchgangs (Knick)
+            if let Some(q) = q {
+                let mut cross: Vec<f64> = [prev, z].iter().map(|c| (c - p[i][2]) / (q[2] - p[i][2])).filter(|f| f.is_finite() && *f > 1e-9 && *f < 1.0 - 1e-9).collect();
+                cross.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+                for f in cross {
+                    let zz = p[i][2] + (q[2] - p[i][2]) * f;
+                    pts.push([p[i][0] + (q[0] - p[i][0]) * f, p[i][1] + (q[1] - p[i][1]) * f, mx(z, mn(prev, zz))]);
+                }
+            }
+        }
+        // Punkte, die auf einer Geraden im Raum liegen, weglassen (Abweichung unter 0,002 mm)
+        let mut thin: Vec<[f64; 3]> = Vec::new();
+        for i in 0..pts.len() {
+            if i == 0 || i == pts.len() - 1 {
+                thin.push(pts[i]);
+                continue;
+            }
+            let (a, b, c) = (thin[thin.len() - 1], pts[i + 1], pts[i]);
+            let (dx, dy, dz) = (b[0] - a[0], b[1] - a[1], b[2] - a[2]);
+            let l2 = dx * dx + dy * dy + dz * dz;
+            let f = if l2 > 0.0 { ((c[0] - a[0]) * dx + (c[1] - a[1]) * dy + (c[2] - a[2]) * dz) / l2 } else { 0.0 };
+            if f < 0.0 || f > 1.0 || hypot3(a[0] + dx * f - c[0], a[1] + dy * f - c[1], a[2] + dz * f - c[2]) > 0.002 {
+                thin.push(c);
+            }
+        }
+        if thin.len() > 1 {
+            out.push(thin);
+        }
+        prev = z;
+    }
+    out
 }
 
 /// Zwiebelhaut: Dicke der Haut, am Ende durchfräsen?, Vorschub dafür (0 = automatisch)
@@ -276,6 +502,15 @@ pub struct Shape {
     /// Zwiebelhaut (onionSkin.ts) für diesen Schnitt, None = keine
     #[serde(default)]
     pub skin: Option<SkinSettings>,
+    /// Trochoidal (trochoid.ts), None = aus
+    #[serde(default)]
+    pub tro: Option<TroOpts>,
+    /// Restmaterial: kleineres Werkzeug (Nummer in `tools`), das nach dem eigenen noch einmal kommt
+    #[serde(default)]
+    pub rest_tool: Option<usize>,
+    /// Flöte (fluting.ts): Nut, die sanft ein- und ausläuft; None = aus
+    #[serde(default)]
+    pub flute: Option<FluteOpts>,
     /// Inlay-Stecker (vplug): Start-Tiefe (positiv)
     #[serde(default)]
     pub v_start: f64,
@@ -327,7 +562,7 @@ pub struct Other {
 }
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie MILL_JOB_VERSION in camJob.ts)
-pub const JOB_VERSION: u32 = 12;
+pub const JOB_VERSION: u32 = 15;
 
 struct Gen<'a> {
     job: &'a Job,
@@ -722,7 +957,11 @@ impl Gen<'_> {
     }
     /// Andere Formen im Weg? Der Fräser muss mit seinem Radius (und etwas Luft) daran vorbeikommen
     fn lead_free(&self) -> impl Fn(&[P]) -> bool + '_ {
-        let (job, keep, k, converted) = (self.job, self.tool_radius + 0.1, self.cur_shape, self.converted);
+        self.lead_free_extra(0.0)
+    }
+    /// `extra` = so viel Platz braucht der Fräser zusätzlich (trochoidal: der Radius der kleinen Kreise)
+    fn lead_free_extra(&self, extra: f64) -> impl Fn(&[P]) -> bool + '_ {
+        let (job, keep, k, converted) = (self.job, self.tool_radius + 0.1 + extra, self.cur_shape, self.converted);
         move |pts: &[P]| {
             let k = job.shapes[k].base.unwrap_or(k);
             let chain = job.shapes[k].parent_chain_id.as_ref().filter(|c| !c.is_empty());
@@ -972,6 +1211,10 @@ impl Gen<'_> {
         let radius_mm = radius_final + if mode == "outside" { allow } else { -allow };
         let all_passes = self.passes.clone();
         let tab = if mode != "on-line" { shape.tab.as_ref() } else { None };
+        if !last && (mode == "outside" || mode == "inside") {
+            let r = radius_px / MM_TO_PIXEL;
+            self.mill_trochoid(shape, &ellipse_points(center[0], center[1], r, r), mode == "inside", allow, tab);
+        }
         let side_inside = match mode {
             "outside" => Some(false),
             "inside" => Some(true),
@@ -1114,6 +1357,243 @@ impl Gen<'_> {
     }
 
     /// PLANFRÄSEN (facingPath in facing.ts): Zeilen entlang X über die Fläche der Form, je Tiefe einmal
+    /// RESTMATERIAL mit dem aktuellen (kleinen) Werkzeug (millRest in cam.ts): Bahnen des kleinen Fräsers wie für die ganze
+    /// Form, aber nur die Stücke, an denen das große Werkzeug nicht hinkam. Ein Punkt gilt als schon frei, wenn der
+    /// kleine Fräser dort ganz in einen Kreis des großen passt: Abstand zur großen Bahn ≤ R − r
+    fn mill_rest(&mut self, k: usize) {
+        let job = self.job;
+        let shape = &job.shapes[k];
+        let Some(big) = shape.tool else { return };
+        let (big_r, r, dir) = (job.tools[big].diameter / 2.0, self.tool_radius, shape.mill_dir.as_str());
+        let (big_paths, small): (Vec<(Vec<P>, bool)>, Vec<(Vec<P>, bool)>);
+        if shape.mode == "pocket" {
+            let Some(outer) = closed_mm(shape) else { return };
+            let isl = islands_of(job, k, &outer);
+            big_paths = pocket_paths(&outer, &isl, big_r, mx(0.05, 2.0 * big_r * 0.4), &job.pocket_strategy, "").0.into_iter().map(|p| (p.pts, p.closed)).collect();
+            small = pocket_paths(&outer, &isl, r, mx(0.05, r * 2.0 * 0.4), "spiral", dir).0.into_iter().map(|p| (p.pts, p.closed)).collect();
+        } else if shape.kind == "polyline" && shape.closed {
+            let pts: Vec<P> = shape.points.iter().map(|p| to_machine(p[0], p[1])).collect();
+            big_paths = offset_polygon(&pts, -big_r, 0.01).into_iter().map(|l| (l, true)).collect();
+            // Standard wie die Konturen: innen im Uhrzeigersinn (umgedreht); sonst die Vorgabe der Form
+            small = offset_polygon(&pts, -r, 0.01).into_iter().map(|l| (if dir.is_empty() { reversed_keep_first(&l) } else { orient_loop(l, true, dir) }, true)).collect();
+        } else {
+            // Kreis innen: keine Ecken
+            let line = format!("{}\n", self.c("gc.restNone", &[]));
+            self.push(&line);
+            return;
+        }
+        if small.is_empty() {
+            return;
+        }
+        // Strecken der großen Bahn in einem Raster (schnelle Abstandsfrage)
+        let thr = big_r - r + 0.005;
+        let cell = mx(1.0, thr);
+        let mut grid: HashMap<(i64, i64), Vec<(P, P)>> = HashMap::new();
+        for (pts, closed) in &big_paths {
+            let count = if *closed { pts.len() } else { pts.len().saturating_sub(1) };
+            for i in 0..count {
+                let (a, b) = (pts[i], pts[(i + 1) % pts.len()]);
+                for gx in (mn(a[0], b[0]) / cell).floor() as i64..=(mx(a[0], b[0]) / cell).floor() as i64 {
+                    for gy in (mn(a[1], b[1]) / cell).floor() as i64..=(mx(a[1], b[1]) / cell).floor() as i64 {
+                        grid.entry((gx, gy)).or_default().push((a, b));
+                    }
+                }
+            }
+        }
+        let cleared = |p: P| -> bool {
+            for gx in ((p[0] - thr) / cell).floor() as i64..=((p[0] + thr) / cell).floor() as i64 {
+                for gy in ((p[1] - thr) / cell).floor() as i64..=((p[1] + thr) / cell).floor() as i64 {
+                    for (a, b) in grid.get(&(gx, gy)).map_or(&[][..], |v| &v[..]) {
+                        let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                        let l2 = dx * dx + dy * dy;
+                        let f = if l2 > 1e-12 { mx(0.0, mn(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) } else { 0.0 };
+                        if hypot2(a[0] + dx * f - p[0], a[1] + dy * f - p[1]) <= thr {
+                            return true;
+                        }
+                    }
+                }
+            }
+            false
+        };
+        let step_s = mx(0.02, mn(0.2, r / 4.0));
+        // Abtastpunkte auf geraden Stücken wieder weglassen (kürzerer G-Code)
+        let thin = |q: &[P]| -> Vec<P> {
+            (0..q.len())
+                .filter(|&i| {
+                    if i == 0 || i == q.len() - 1 {
+                        return true;
+                    }
+                    let (a, b, p) = (q[i - 1], q[i + 1], q[i]);
+                    ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])).abs() > 1e-6
+                })
+                .map(|i| q[i])
+                .collect()
+        };
+        let mut pieces = 0;
+        for (pts, closed) in &small {
+            let closed = *closed;
+            // Bahn fein abtasten
+            let mut seq = pts.clone();
+            if closed {
+                seq.push(pts[0]);
+            }
+            let mut sm: Vec<P> = vec![seq[0]];
+            for i in 1..seq.len() {
+                let (a, b) = (seq[i - 1], seq[i]);
+                let n = mx(1.0, (hypot2(b[0] - a[0], b[1] - a[1]) / step_s).ceil());
+                for kk in 1..=(n as usize) {
+                    sm.push([a[0] + (b[0] - a[0]) * kk as f64 / n, a[1] + (b[1] - a[1]) * kk as f64 / n]);
+                }
+            }
+            let need: Vec<bool> = sm.iter().map(|&p| !cleared(p)).collect();
+            if !need.iter().any(|&v| v) {
+                continue;
+            }
+            if need.iter().all(|&v| v) && closed {
+                self.mill_path(pts, true);
+                pieces += 1;
+                continue;
+            }
+            // jedes Stück um den Fräserradius verlängern (sauberer Übergang, Eintauchen im Freien)
+            let ext = (r / step_s).ceil() as i64 + 1;
+            let n = sm.len() as i64;
+            let mut keep = need.clone();
+            for (i, &v) in need.iter().enumerate() {
+                if !v {
+                    continue;
+                }
+                for d in -ext..=ext {
+                    let j = if closed { ((i as i64 + d) % n + n) % n } else { i as i64 + d };
+                    if j >= 0 && j < n {
+                        keep[j as usize] = true;
+                    }
+                }
+            }
+            // geschlossene Bahn: am Anfang eines freien Stücks beginnen, damit Stücke nicht über das Ende zerfallen
+            let s0 = if closed { keep.iter().position(|&v| !v).unwrap_or(0) } else { 0 };
+            let mut cur: Vec<P> = Vec::new();
+            for kk in 0..sm.len() {
+                let i = (s0 + kk) % sm.len();
+                if keep[i] {
+                    cur.push(sm[i]);
+                } else if !cur.is_empty() {
+                    if cur.len() > 1 {
+                        self.mill_path(&thin(&cur), false);
+                        pieces += 1;
+                    }
+                    cur.clear();
+                }
+            }
+            if cur.len() > 1 {
+                self.mill_path(&thin(&cur), false);
+                pieces += 1;
+            }
+        }
+        if pieces == 0 {
+            let line = format!("{}\n", self.c("gc.restNone", &[]));
+            self.push(&line);
+        }
+    }
+
+    /// TROCHOIDAL (millTrochoid in cam.ts): die Nut neben der Kontur in kleinen Kreisen freiräumen, bevor die normale
+    /// Kontur kommt. Bei Haltestegen nur bis zu deren Oberkante. Ist die ganze Kontur frei, fährt die Kontur danach in
+    /// einem Zug auf Tiefe (self.passes wird dafür gekürzt)
+    fn mill_trochoid(&mut self, shape: &Shape, poly: &[P], inside: bool, allow: f64, tab: Option<&Tab>) {
+        let Some(o) = shape.tro.as_ref() else { return };
+        if self.pass_top < 0.0 {
+            return;
+        }
+        let target = self.passes[self.passes.len() - 1];
+        if !(target < -1e-6) || self.tool.is_some_and(|t| t.no_tro) {
+            return;
+        }
+        let r = self.tool_radius;
+        let Some(plan) = trochoid_plan(poly, inside, r, allow, o) else { return };
+        // andere Formen: der Fräser braucht neben der Mitte den Kreisradius und seinen eigenen Radius Platz
+        let every = mx(1.0, (r / 2.0 / mx(1e-6, 2.0 * r * o.step / 100.0)).floor()) as usize;
+        {
+            let free = self.lead_free_extra(plan.rho);
+            for l in &plan.loops {
+                let centres: Vec<P> = l.iter().enumerate().filter(|(i, _)| i % every == 0).map(|(_, x)| x.0).collect();
+                if !free(&centres) {
+                    return;
+                }
+            }
+        }
+        let z_tab = tab.map_or(f64::NEG_INFINITY, |t| self.skin_depth.unwrap_or(target) + t.h);
+        let bottom = if z_tab < -0.001 { mx(target, z_tab) } else { target };
+        let levels = depth_passes(bottom, if o.down > 0.0 { mx(0.05, o.down) } else { self.step_z });
+        let cmd = if shape.mill_dir == "conventional" { "G2" } else { "G3" };
+        let line = format!("{}\n", self.c("gc.trochoid", &[("w", f2(2.0 * (r + plan.rho))), ("s", f2(2.0 * r * o.step / 100.0))]));
+        self.push(&line);
+        let ring = |at: &(P, P), z: Option<f64>, feed: &str| {
+            let zz = z.map_or(String::new(), |z| format!(" Z{}", f3(z)));
+            format!("{cmd} X{} Y{}{zz} I{} J{}{feed}\n", f3(at.1[0]), f3(at.1[1]), f3(at.0[0] - at.1[0]), f3(at.0[1] - at.1[1]))
+        };
+        let (feed, plunge, tan, tan3) = (js_num(self.feed_xy), js_num(self.plunge), self.ramp_tan, self.job.helix_tan);
+        for list in &plan.loops {
+            let first = list[0];
+            let s = format!("G0 Z{}\nG0 X{} Y{}\n", f2(SAFE_Z), f3(first.1[0]), f3(first.1[1]));
+            self.push(&s);
+            for (li, &z) in levels.iter().enumerate() {
+                let top = if li > 0 { levels[li - 1] } else { 0.0 };
+                // Anfang = Ende des Umlaufs: dort ist bis zur vorigen Ebene alles frei. Eintauchen in einer Schraube
+                let mut s = String::new();
+                if li > 0 {
+                    s += &format!("G1 X{} Y{} F{feed}\n", f3(first.1[0]), f3(first.1[1]));
+                }
+                s += &format!("G1 Z{} F{plunge}\n", f3(top));
+                for (i, zz) in helix_z(top, z, plan.rho, tan, tan3).into_iter().enumerate() {
+                    s += &ring(&first, Some(zz), &if i == 0 { format!(" F{feed}") } else { String::new() });
+                }
+                for (i, at) in list.iter().enumerate() {
+                    if i > 0 {
+                        s += &format!("G1 X{} Y{}\n", f3(at.1[0]), f3(at.1[1]));
+                    }
+                    s += &ring(at, None, "");
+                }
+                self.push(&s);
+            }
+        }
+        self.safe();
+        if plan.full && self.cur_lead.is_none() {
+            self.passes = if bottom > target + 1e-6 {
+                let mut v = vec![bottom];
+                v.extend(depth_passes_from(target, self.step_z, bottom));
+                v
+            } else {
+                vec![target]
+            };
+        }
+    }
+
+    /// FLÖTE (millFlute in cam.ts): offene Linie mit Tiefe nach Kurve
+    fn mill_flute(&mut self, shape: &Shape, o: &FluteOpts) {
+        let line = format!("{}\n", self.c("gc.flute", &[]));
+        self.push(&line);
+        let paths: Vec<Vec<P>> = match (shape.kind.as_str(), &shape.paths) {
+            (_, Some(p)) => p.iter().map(|q| q.pts.clone()).collect(),
+            ("polyline", _) => vec![shape.points.iter().map(|p| to_machine(p[0], p[1])).collect()],
+            ("line", _) => vec![vec![to_machine(shape.x, shape.y), to_machine(shape.x + shape.w, shape.y + shape.h)]],
+            _ => vec![],
+        };
+        let passes = self.passes.clone();
+        for path in paths {
+            let run = apply_cut(path, false, shape);
+            for pts in flute_passes(&run, &passes, o) {
+                let a = pts[0];
+                let s = format!("G0 Z{}\nG0 X{} Y{}\nG1 Z{} F{}\n", f2(SAFE_Z), f3(a[0]), f3(a[1]), f3(a[2]), js_num(self.plunge));
+                self.push(&s);
+                for (i, q) in pts[1..].iter().enumerate() {
+                    let feed = if i == 0 { format!(" F{}", js_num(self.feed_xy)) } else { String::new() };
+                    let s = format!("G1 X{} Y{} Z{}{feed}\n", f3(q[0]), f3(q[1]), f3(q[2]));
+                    self.push(&s);
+                }
+            }
+        }
+        self.safe();
+    }
+
     /// V-CARVE / Inlay-Stecker (millVcarve in cam.ts): alle Konturen einer Gruppe zusammen, Ringe von flach nach tief
     fn mill_vcarve(&mut self, list: &[usize], plug: bool, depth: f64, start: f64) {
         const VSTEP: f64 = 0.12;
@@ -1479,6 +1959,9 @@ impl Gen<'_> {
             apply_cut_closed(lp, shape)
         };
         let all_passes = self.passes.clone();
+        if !last && !loops.is_empty() {
+            self.mill_trochoid(shape, &pts, inside, allow, shape.tab.as_ref());
+        }
         let rough: Vec<Vec<P>> = loops.into_iter().map(orient).collect();
         for path in &rough {
             if let Some(tab) = shape.tab.as_ref() {
@@ -1808,9 +2291,20 @@ fn nearest_on(paths: &[PocketPath], p: P) -> Option<P> {
     best
 }
 
+/// Formen über ihre Eintragsnummer (siehe order)
+struct Entries<'a>(&'a [Shape]);
+impl std::ops::Index<usize> for Entries<'_> {
+    type Output = Shape;
+    fn index(&self, e: usize) -> &Shape {
+        &self.0[e % self.0.len()]
+    }
+}
+
 /// Reihenfolge der Formen eines Werkzeugs: innen vor außen, und innerhalb einer Art kurze Leerfahrten (cutOrder).
 /// `idx` = Nummern der Formen dieses Werkzeugs, `from` = wo der Fräser vorher steht (wird weitergetragen)
-fn order(shapes: &[Shape], mut idx: Vec<usize>, from: &mut P) -> Vec<usize> {
+/// Einträge ab shapes.len() sind die Restbearbeitung der Form (Eintrag − shapes.len()): Lage und Art der Original-Form
+fn order(all: &[Shape], mut idx: Vec<usize>, from: &mut P) -> Vec<usize> {
+    let shapes = Entries(all);
     let priority = |mode: &str| match mode {
         "face" => -2.0,
         "drill" => -1.0,
@@ -1899,7 +2393,43 @@ fn tool_groups(job: &Job) -> Vec<(Option<usize>, Vec<usize>)> {
         }
         std::cmp::Ordering::Equal
     });
-    groups
+    // RESTMATERIAL (withRestGroups in cam.ts): Formen mit Rest-Werkzeug bekommen nach ihrem Werkzeug einen zweiten Durchgang
+    // mit dem kleineren. Schneidet eine Gruppe auch Teile aus, wird sie geteilt: erst innen, dann Restmaterial, dann ausschneiden
+    let n = job.shapes.len();
+    let mut out: Vec<(Option<usize>, Vec<usize>)> = Vec::new();
+    let mut push = |tool: Option<usize>, list: Vec<usize>| {
+        if list.is_empty() {
+            return;
+        }
+        match out.last_mut() {
+            Some(last) if last.0 == tool => last.1.extend(list),
+            _ => out.push((tool, list)),
+        }
+    };
+    for grp in groups {
+        let mut rests: Vec<(usize, Vec<usize>)> = Vec::new();
+        for &k in &grp.1 {
+            if let Some(r) = job.shapes[k].rest_tool {
+                match rests.iter_mut().find(|x| x.0 == r) {
+                    Some(x) => x.1.push(k + n),
+                    None => rests.push((r, vec![k + n])),
+                }
+            }
+        }
+        if rests.is_empty() {
+            push(grp.0, grp.1);
+            continue;
+        }
+        let (outer, inner): (Vec<usize>, Vec<usize>) = grp.1.iter().partition(|&&k| job.shapes[k].mode == "outside");
+        push(grp.0, inner);
+        // größeres Restwerkzeug zuerst
+        rests.sort_by(|a, b| job.tools[b.0].raw_diameter.partial_cmp(&job.tools[a.0].raw_diameter).unwrap_or(std::cmp::Ordering::Equal));
+        for (tool, list) in rests {
+            push(Some(tool), list);
+        }
+        push(grp.0, outer);
+    }
+    out
 }
 
 /// G-Code für den Auftrag. Err = der Auftrag passt nicht zu dieser Datei
@@ -1957,6 +2487,33 @@ pub fn generate(job: &Job) -> Result<String, String> {
         let cut_key = |sh: &Shape| sh.cut.as_ref().map_or(String::new(), |r| format!("{}|{}|{}|{}", js_num(r.feedrate), js_num(r.rpm), js_num(r.step_z), js_num(r.plunge_feed)));
         for &k in &ordered[gi] {
             if v_done.contains(&k) {
+                continue;
+            }
+            // ---- Restmaterial einer Form: Werte des Werkzeugs (kein Material-Profil), dann nur die Stellen, die fehlen ----
+            if k >= job.shapes.len() {
+                let k = k - job.shapes.len();
+                g.step_z = tool_step;
+                g.plunge = tool_plunge;
+                last_cut_key = String::new();
+                if tool_rpm != g.rpm {
+                    let line = format!("G0 Z{}\n{} S{} {}\nG4 P2 {}\n", f2(SAFE_Z), job.spindle, js_num(tool_rpm), g.c("gc.spindleOn", &[("rpm", js_num(tool_rpm))]), g.c("gc.spinUp", &[]));
+                    g.push(&line);
+                    g.rpm = tool_rpm;
+                }
+                if tool_feed != g.feed_xy {
+                    let line = format!("F{} {}\n", js_num(tool_feed), g.c("gc.feed", &[("f", js_num(tool_feed))]));
+                    g.push(&line);
+                    g.feed_xy = tool_feed;
+                }
+                form_counter += 1;
+                g.cur_lead = None;
+                g.skin_depth = None;
+                g.converted = false;
+                g.cur_shape = k;
+                g.passes = depth_passes(job.shapes[k].depth, g.step_z);
+                let line = format!("\n{}\n", g.c("gc.rest", &[("n", form_counter.to_string())]));
+                g.push(&line);
+                g.mill_rest(k);
                 continue;
             }
             // Startpunkt/Richtung von Hand an Kreis, Bogen, Linie: als Linienzug fräsen (cutReady in cam.ts)
@@ -2036,6 +2593,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 let same: Vec<usize> = ordered[gi]
                     .iter()
                     .copied()
+                    .filter(|&o| o < job.shapes.len())
                     .filter(|&o| {
                         let sh = &job.shapes[o];
                         sh.mode == mode && sh.depth == shape.depth && cut_key(sh) == cut_key(shape) && (mode != "vplug" || sh.v_start == shape.v_start)
@@ -2085,6 +2643,10 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 if let Some(outer) = closed_mm(shape) {
                     g.mill_pocket(k, &outer);
                 }
+                continue;
+            }
+            if let Some(o) = shape.flute.as_ref().filter(|_| g.passes[g.passes.len() - 1] < 0.0) {
+                g.mill_flute(shape, o);
                 continue;
             }
             match shape.kind.as_str() {

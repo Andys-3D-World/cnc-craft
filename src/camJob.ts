@@ -1,5 +1,5 @@
 /**
- * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 5b (bis Zwiebelhaut; Trochoidal, Nut, Restmaterial fehlen noch)
+ * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 5 (alles außer Vorschub-Anpassung, Nachmessen, Drehachse, zweiseitig, Bilder)
  *
  * cam.ts liest beim Erzeugen des G-Codes aus vielen Stellen: Werkzeug-Bibliothek, Material-Profile, Einstellungen,
  * Sprachdatei, Eingabefelder. millJob() sammelt all das für eine Liste von Formen in EIN Objekt, das sich als JSON
@@ -29,10 +29,10 @@ import { toolChangeGcode } from "./toolChange";
 import { cloneShape, convertToPolyline, shapeBounds, shapeToPaths } from "./shapeTransform";
 
 /** gleiche Zahl wie JOB_VERSION in millgcode.rs – ändern, wenn sich der Auftrag ändert */
-export const MILL_JOB_VERSION = 12;
+export const MILL_JOB_VERSION = 15;
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn", "gc.spinUp", "gc.feed", "gc.shape", "gc.tab", "gc.ramp",
-  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut"];
+  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut", "gc.flute", "gc.trochoid", "gc.rest", "gc.restNone"];
 /** diese Texte nimmt cam.ts in der Sprache der Oberfläche (t), nicht in der des G-Codes */
 const TEXTS_UI = ["gc.threadIn", "gc.threadOut", "gc.threadLeft", "gc.threadRight"];
 
@@ -51,7 +51,11 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
   const all = expandOps(shapes);
   for (const s of all) {
     if (s.type === "image") return { no: "image" };
-    if (getTool(s.restToolId)) return { no: "rest tool" };
+    // Restmaterial (restToolFor in cam.ts): kleineres Werkzeug für Taschen und Innenkonturen
+    const restMode = s.millingMode || "outside", restT = getTool(s.restToolId), ownT = toolForShape(s);
+    const rest = (restMode === "pocket" || restMode === "inside") && restT && ownT && restT.id !== ownT.id && restT.diameter < ownT.diameter ? restT : null;
+    if (rest && skinRole(s) === "skin") return { no: "rest material on a shape with onion skin" };
+    if (rest && !tools.includes(rest)) tools.push(rest);
     const mode = s.millingMode || "outside";
     if (!["outside", "inside", "on-line", "pocket", "drill", "face", "chamfer", "thread", "cbore", "vcarve", "vplug"].includes(mode)) return { no: `mode ${mode}` };
     // Tasche: nur Kreis und geschlossener Linienzug (bei anderen Formen fräst cam.ts die Kontur – noch nicht hier)
@@ -70,8 +74,10 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
     // Zwiebelhaut (onionSkin.ts): nur der Schnitt, der sie bekommt. Zweiseitig kennt die echte Materialdicke – noch nicht hier
     const skin = skinRole(s) === "skin" ? skinSettings(s) : null;
     if (skin && twoSidedFingerprint()) return { no: "onion skin with two-sided milling" };
-    if (troSettings(s) && troFits(s)) return { no: "trochoidal" };
-    if (fluteFits(s) && fluteSettings(s)) return { no: "flute" };
+    // Trochoidal (trochoid.ts): die Nut neben der Kontur in kleinen Kreisen freiräumen
+    const tro = troFits(s) ? troSettings(s) : null;
+    // Flöte (fluting.ts): offene Linie auf der Linie, die Tiefe folgt einer Kurve
+    const flute = fluteFits(s) ? fluteSettings(s) : null;
     const sided = mode === "outside" || mode === "inside";
     const closedShape = s.type === "circle" || (s.type === "polyline" && s.closed);
     const lead = sided && closedShape ? leadOptions(s) : null;
@@ -89,7 +95,7 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       }
     }
     // Fase an einem Bogen: die Bahn als Punkte in mm (shapeToPaths – wie millChamfer in cam.ts)
-    const paths = mode === "chamfer" && s.type === "arc"
+    const paths = (mode === "chamfer" || flute) && s.type === "arc"
       ? shapeToPaths(s).map(q => ({ pts: q.pts.map(v => [v.x / 2, v.y / 2]), closed: !!q.closed })) : null;
     // Gewinde: Länge wie millThread in cam.ts (ohne Tiefe an der Form 0 – nicht die Tiefe aus dem Eingabefeld)
     if (mode === "thread" && typeof s.millingDepth === "number" && !Number.isFinite(s.millingDepth)) return { no: "thread without a length" };
@@ -119,7 +125,8 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       lead, face, paths, thread,
       // Kopie für eine weitere Bearbeitung: Nummer des Originals in dieser Liste
       cutDir: cutSet ? cutDirOf(s) ?? "" : "", cutStart: cutSet ? cutStartOf(s) : null, cutPoints,
-      skin,
+      skin, flute, tro,
+      restTool: rest ? tools.indexOf(rest) : null,
       vStart: mode === "vplug" ? Math.max(0, s.vStart ?? 0) : 0,
       base: s.opOf ? all.indexOf(s.opOf) : null,
       // Stufenbohrung: Ø der Senkung und Ø des Lochs darunter (0 = kein Kreis)
@@ -135,7 +142,7 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
   }
   // An-/Wegfahren: die Bahnen aller Formen in mm – daran muss die Anfahrbahn vorbeikommen (leadFree in cam.ts)
   const leadOthers: unknown[] = [];
-  if (out.some((o: any) => o.lead)) {
+  if (out.some((o: any) => o.lead || o.tro)) {
     shapes.forEach(s => {
       const owner = all.indexOf(s);
       try { for (const p of shapeToPaths(s)) leadOthers.push({ pts: p.pts.map(q => [q.x / 2, q.y / 2]), closed: p.closed, owner }); } catch { /* ohne Bahn */ }
@@ -156,6 +163,8 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
         // Anfang der Werkzeugwechsel-Zeile ("M0 " oder "M6 T3 "), der Hinweis dahinter entsteht in Rust
         change: toolChangeGcode(toolNumber(tool), ""),
         reamer: tool.type === "reamer",
+        // Werkzeuge, mit denen cam.ts nicht trochoidal fräst
+        noTro: CONE_TYPES.includes(tool.type) || tool.type === "reamer" || tool.type === "threadmill" || tool.type === "taper",
         // Fase: Kegel-Werkzeug (Winkel an der Spitze, Ø der Spitze); tan(halber Winkel) wie in cam.ts gerechnet
         cone: CONE_TYPES.includes(tool.type), angle: Number(tool.angle) || 0, tipDia: tool.tipDia || 0,
         chamferTan: Math.tan((tool.angle / 2) * Math.PI / 180) || 0,
