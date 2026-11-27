@@ -4,7 +4,7 @@ import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
 import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
-import { exportGcodeToFile, generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "./cam";
+import { exportGcodeToFile, generateGcodeFull } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
 import { openCostDialog } from "./ui/costCalc";
 import { initOpsPanel, refreshOps } from "./ui/opsPanel";
@@ -339,14 +339,15 @@ window.addEventListener("DOMContentLoaded", async () => {
       jobStartBtn?.classList.toggle("btn-secondary", !hasJob);
       if (headerStop) headerStop.style.display = streamState.isRunning ? "" : "none";
     }, 300);
-    document.getElementById("btn-simulate")?.addEventListener("click", () => {
+    document.getElementById("btn-simulate")?.addEventListener("click", async () => {
       if (isLathe()) { openLatheDialog(appendToConsole, redraw); return; } // Drehen hat seine eigene Simulation
       // Eckig/Vieleck: die Simulation braucht den echten G-Code mit den Drehungen auf die Flächen
       const prism = rotary.on && !isPlasma() && !isLathe() && isPrism(rotary);
-      const gcode = generateGcode(state.shapes, { flat: !prism });
-      if (!gcode) { appendToConsole(noGcodeMessage()); return; }
-      lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
-      lastGcodeNotes.forEach(n => appendToConsole(n));
+      // geprüfter Weg wie „Zur Maschine“ (in der App rechnet Rust, cam.ts daneben) – derselbe G-Code wie bisher
+      const res = await generateGcodeFull(state.shapes, { flat: !prism }), gcode = res.gcode;
+      if (!gcode) { appendToConsole(res.none); return; }
+      res.warnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
+      res.notes.forEach(n => appendToConsole(n));
       if (rotary.on && !isPlasma() && !isLathe()) appendToConsole(rotary.shape === "round" ? t("rot.simFlat", { d: rotary.diameter }) : t("rot.simShape", { name: t("rot.shape." + rotary.shape) }));
       setSimProgram(gcode.split("\n"), designLabel(), "design");
       openSimTab();

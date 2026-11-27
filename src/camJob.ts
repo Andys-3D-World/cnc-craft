@@ -1,5 +1,5 @@
 /**
- * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 6 (alles außer Bildern, Datei für Steuerungen mit Werkzeugtabelle und Zwiebelhaut beim zweiseitigen Fräsen)
+ * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – alles, was cam.ts beim Fräsen kann (nur Formen, die cam.ts selbst nicht kennt, lehnt der Auftrag ab)
  *
  * cam.ts liest beim Erzeugen des G-Codes aus vielen Stellen: Werkzeug-Bibliothek, Material-Profile, Einstellungen,
  * Sprachdatei, Eingabefelder. millJob() sammelt all das für eine Liste von Formen in EIN Objekt, das sich als JSON
@@ -24,7 +24,6 @@ import { cutDirOf, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSett
 import { fluteFits, fluteSettings } from "./fluting";
 import { troFits, troSettings } from "./trochoid";
 import { skinRole, skinSettings } from "./onionSkin";
-import { twoSidedFingerprint } from "./twoSidedJob";
 import { postCtx } from "./post/postContext";
 import { isInch } from "./units";
 import { getTool, getTools, toolNumber } from "./toolLibrary";
@@ -32,27 +31,36 @@ import { toolChangeGcode } from "./toolChange";
 import { cloneShape, convertToPolyline, shapeBounds, shapeToPaths } from "./shapeTransform";
 
 /** gleiche Zahl wie JOB_VERSION in millgcode.rs – ändern, wenn sich der Auftrag ändert */
-export const MILL_JOB_VERSION = 18;
+export const MILL_JOB_VERSION = 19;
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn", "gc.spinUp", "gc.feed", "gc.shape", "gc.tab", "gc.ramp",
-  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut", "gc.flute", "gc.trochoid", "gc.rest", "gc.restNone"];
+  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut", "gc.flute", "gc.trochoid", "gc.rest", "gc.restNone", "gc.toolLoad"];
 /** diese Texte nimmt cam.ts in der Sprache der Oberfläche (t), nicht in der des G-Codes */
 const TEXTS_UI = ["gc.threadIn", "gc.threadOut", "gc.threadLeft", "gc.threadRight"];
 
 export type MillJob = Record<string, unknown>;
 
 /** Schlüssel aller Hinweise, die cam.ts beim Fräsen melden kann (Rust bekommt die Texte dazu in der Sprache der Oberfläche) */
-const WARN_KEYS = Object.keys(en).filter(k => k.startsWith("gcw.") || k.startsWith("cut."));
+const WARN_KEYS = Object.keys(en).filter(k => k.startsWith("gcw.") || k.startsWith("cut.") || k === "img.onlyLaser");
 /** Werkzeugarten, die nicht für Konturen mit Fräser-Versatz und Taschen taugen (Hinweis gcw.toolType in cam.ts) */
 const NO_CONTOUR = ["vbit", "drill", "spotdrill", "reamer", "countersink", "threadmill", "taper"];
 /** Werkzeuge eines Auftrags in der Reihenfolge von job.tools – Rust nennt Werkzeuge nur mit ihrer Nummer darin */
 export const jobTools = new WeakMap<object, MillingTool[]>();
 
-/** Der Auftrag für diese Formen – oder { no: Grund }, wenn Etappe 1 das noch nicht kann */
-export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: string): MillJob | { no: string } {
+/**
+ * Was cam.ts außer den Formen noch weiß, wenn es den Fräs-G-Code erzeugt:
+ *   images      so viele Bilder lagen neben den Formen (cam.ts lässt sie weg und sagt es: img.onlyLaser)
+ *   stockUnder  zweiseitig fräsen: Material unter der Oberseite an der Stelle einer Form mit Zwiebelhaut, je Form-Kennung
+ */
+export interface MillExtra { images?: number; stockUnder?: Map<string, number> | null }
+
+/** Der Auftrag für diese Formen – oder { no: Grund }, wenn Rust das nicht kann */
+export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: string, extra: MillExtra = {}): MillJob | { no: string } {
   // Drehachse, Sperrzonen, Bogen-Glättung und der Kopf für zweiseitiges Fräsen laufen in cam.ts erst NACH dem G-Code,
   // den Rust erzeugt (generateGcode) – sie ändern hier nichts
-  if (postCtx.toolTable) return { no: "tool table post" };
+  // Bilder gibt es nur beim Laser: weglassen und zählen (cam.ts hat das meist schon getan, dann steht die Zahl in extra)
+  const images = (extra.images ?? 0) + shapes.filter(s => s.type === "image").length;
+  shapes = shapes.filter(s => s.type !== "image");
   const tools: MillingTool[] = [];
   const out: unknown[] = [];
   if (shapes.some(s => s.restOf || s.opOf)) return { no: "shapes that are already copies" };
@@ -62,16 +70,13 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
   const restFits = (s: any) => { const m = s.millingMode || "outside", r = getTool(s.restToolId), own = toolForShape(s); return !!((m === "pocket" || m === "inside") && r && own && r.id !== own.id && r.diameter < own.diameter); };
   const restIgnored = shapes.filter(s => getTool(s.restToolId) && !restFits(s)).length;
   for (const s of all) {
-    if (s.type === "image") return { no: "image" };
     // Restmaterial (restToolFor in cam.ts): kleineres Werkzeug für Taschen und Innenkonturen
     const restMode = s.millingMode || "outside", restT = getTool(s.restToolId), ownT = toolForShape(s);
     const rest = (restMode === "pocket" || restMode === "inside") && restT && ownT && restT.id !== ownT.id && restT.diameter < ownT.diameter ? restT : null;
-    if (rest && skinRole(s) === "skin") return { no: "rest material on a shape with onion skin" };
     if (rest && !tools.includes(rest)) tools.push(rest);
     const mode = s.millingMode || "outside";
     if (!["outside", "inside", "on-line", "pocket", "drill", "face", "chamfer", "thread", "cbore", "vcarve", "vplug"].includes(mode)) return { no: `mode ${mode}` };
-    // Tasche: nur Kreis und geschlossener Linienzug (bei anderen Formen fräst cam.ts die Kontur – noch nicht hier)
-    if (mode === "pocket" && !(s.type === "circle" || (s.type === "polyline" && s.closed && s.points?.length >= 3))) return { no: "pocket on an open shape" };
+    // Tasche: nur Kreis und geschlossener Linienzug – bei anderen Formen fräst cam.ts auf der Linie (Rust auch)
     if (s.type !== "polyline" && s.type !== "circle" && s.type !== "line" && s.type !== "arc") return { no: `shape ${s.type}` };
     if (s.type === "polyline" && !(Array.isArray(s.points) && s.points.length >= 1)) return { no: "polyline without points" };
     // Startpunkt/Richtung von Hand (cutSetting.ts) wirkt nur bei diesen Arten; Kreis, Bogen und Linie fährt cam.ts dann
@@ -83,9 +88,9 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       convertToPolyline(copy);
       cutPoints = { pts: copy.points.map((p: any) => [p.x, p.y]), closed: !!copy.closed };
     }
-    // Zwiebelhaut (onionSkin.ts): nur der Schnitt, der sie bekommt. Zweiseitig kennt die echte Materialdicke – noch nicht hier
+    // Zwiebelhaut (onionSkin.ts): nur der Schnitt, der sie bekommt. Zweiseitig kennt die echte Materialdicke (stockUnder)
     const skin = skinRole(s) === "skin" ? skinSettings(s) : null;
-    if (skin && twoSidedFingerprint()) return { no: "onion skin with two-sided milling" };
+    const under = skin ? extra.stockUnder?.get(String(s.id)) : undefined;
     // Trochoidal (trochoid.ts): die Nut neben der Kontur in kleinen Kreisen freiräumen
     const tro = troFits(s) ? troSettings(s) : null;
     // Flöte (fluting.ts): offene Linie auf der Linie, die Tiefe folgt einer Kurve
@@ -142,6 +147,8 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       // Kopie für eine weitere Bearbeitung: Nummer des Originals in dieser Liste
       cutDir: cutSet ? cutDirOf(s) ?? "" : "", cutStart: cutSet ? cutStartOf(s) : null, cutPoints,
       skin, flute, tro,
+      // zweiseitig: Material unter der Oberseite an dieser Stelle (null = die Frästiefe ist die Unterseite)
+      stockUnder: typeof under === "number" && Number.isFinite(under) ? under : null,
       cutOff: cutOff === null ? null : String(cutOff),
       cutWarn: !hasCutSetting(s) ? "" : !cutSet ? "ignored" : overridesMillDir(s) ? "millDir" : "",
       skinIgnored: skinRole(s) === "ignored",
@@ -169,8 +176,17 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
     });
   }
   const lib = getTools();
+  // ohne Werkzeug in der Bibliothek ("Standard", 12000 U/min): Wählrad-Stufe und Werkzeugwechsel-Zeile wie toolStart in cam.ts
+  const noDial = postCtx.foreign ? null : routerDial(12000);
   const job: MillJob = {
     version: MILL_JOB_VERSION,
+    images,
+    // Datei für eine Steuerung mit Werkzeugtabelle: jedes Werkzeug mit Nummer, auch das erste (gc.toolLoad)
+    toolTable: postCtx.toolTable,
+    noTool: {
+      change: toolChangeGcode(0, ""), dial: noDial ? ascii(tMm("gc.dial", { pos: noDial.pos, rpm: noDial.rpm })) : null,
+      dialOut: noDial?.out || null, dialRpm: noDial ? noDial.rpm : 0
+    },
     tools: tools.map(tool => {
       const dial = postCtx.foreign ? null : routerDial(tool.rpm);
       return {
@@ -222,7 +238,7 @@ export let lastShadow: { same?: boolean; no?: string; lines?: number; ms?: numbe
 /** Was cam.ts neben dem G-Code liefert: Hinweise (fertiger Text), Gewinde, Werkzeug je Abschnitt */
 export interface InnerSide { warnings: string[]; threads: unknown[]; sectionTools: (MillingTool | null)[] }
 /** Ergebnis des letzten Fräs-G-Codes aus cam.ts, noch vor Drehachse, Sperrzonen und Bogen-Glättung (für den Vergleich und die Testfälle) */
-export let lastInner: { shapes: any[]; fallbackDepth: number; pocketStrategy: string; gcode: string | null; side: InnerSide } | null = null;
+export let lastInner: { shapes: any[]; fallbackDepth: number; pocketStrategy: string; gcode: string | null; side: InnerSide; extra: MillExtra } | null = null;
 /** true, solange generateGcodeChecked (cam.ts) läuft: dann vergleicht rustChecked – nicht zusätzlich shadowMill */
 let checking = false;
 export const setChecking = (on: boolean) => { checking = on; };
@@ -236,7 +252,7 @@ export type RustMill =
  * Nimmt den Auftrag des letzten Fräs-G-Codes aus cam.ts (lastInner), lässt Rust denselben Auftrag rechnen und gibt Rusts
  * Ergebnis nur zurück, wenn es Zeichen für Zeichen gleich ist und Hinweise, Gewinde und Werkzeuge stimmen.
  * Sonst { ok: false }: der Aufrufer bleibt beim G-Code aus cam.ts. differs = Rust hat etwas anderes gerechnet (das soll
- * man melden); ohne differs kann Rust diesen Auftrag nur noch nicht (Bilder, Vorschau im Browser …).
+ * man melden); ohne differs gibt es Rust hier nicht (Vorschau im Browser) oder der Auftrag enthält etwas, das auch cam.ts nicht fräst.
  * Der Auftrag entsteht sofort (vor dem ersten await) – spätere Änderungen an der Zeichnung ändern ihn nicht mehr.
  */
 export function rustChecked(expected: string): Promise<RustMill> {
@@ -244,7 +260,7 @@ export function rustChecked(expected: string): Promise<RustMill> {
   if (!IN_TAURI) return Promise.resolve({ ok: false, no: "not in the app", differs: false });
   if (!inner || !inner.gcode || inner.gcode !== expected) return Promise.resolve({ ok: false, no: "no G-code", differs: false });
   let job: ReturnType<typeof millJob>;
-  try { job = millJob(inner.shapes, inner.fallbackDepth, inner.pocketStrategy); } catch (e) { job = { no: "job failed: " + String(e) }; }
+  try { job = millJob(inner.shapes, inner.fallbackDepth, inner.pocketStrategy, inner.extra); } catch (e) { job = { no: "job failed: " + String(e) }; }
   if ("no" in job) return Promise.resolve({ ok: false, no: String(job.no), differs: false });
   const tools = jobTools.get(job) || [];
   const side = { ...sideForJob(job as MillJob, inner.side), ...(isInch() ? { warnings: null } : {}) };
@@ -274,11 +290,11 @@ export const sideForJob = (job: MillJob, side: InnerSide) => {
  * Nur im Entwicklungs-Build der App: Rust rechnet denselben Auftrag daneben und vergleicht mit dem G-Code aus cam.ts.
  * Ändert nichts am G-Code, der benutzt wird. Jede Abweichung steht in der Konsole (und im Terminal).
  */
-export function shadowMill(shapes: any[], fallbackDepth: number, pocketStrategy: string, gcode: string | null, inner: InnerSide) {
-  lastInner = { shapes, fallbackDepth, pocketStrategy, gcode, side: inner };
+export function shadowMill(shapes: any[], fallbackDepth: number, pocketStrategy: string, gcode: string | null, inner: InnerSide, extra: MillExtra = {}) {
+  lastInner = { shapes, fallbackDepth, pocketStrategy, gcode, side: inner, extra };
   if (checking || !IN_TAURI || !(import.meta as any).env?.DEV || !gcode) return;
   let job: ReturnType<typeof millJob>;
-  try { job = millJob(shapes, fallbackDepth, pocketStrategy); } catch (e) { job = { no: "job failed: " + String(e) }; }
+  try { job = millJob(shapes, fallbackDepth, pocketStrategy, extra); } catch (e) { job = { no: "job failed: " + String(e) }; }
   if ("no" in job) { lastShadow = { no: String(job.no) }; console.debug("millgcode: not yet in Rust –", job.no); return; }
   void import("@tauri-apps/api/core").then(({ invoke }) => invoke<typeof lastShadow>("millgcode_shadow", { job, expected: gcode, side: { ...sideForJob(job as MillJob, inner), ...(isInch() ? { warnings: null } : {}) } }))
     .then(r => {

@@ -405,17 +405,30 @@ struct SkinPlan {
     last: Vec<f64>,
 }
 
-/// Err = die Haut ist so dick wie die Frästiefe: die Form wird ausgelassen
-fn skin_plan(depth: f64, step_z: f64, s: &SkinSettings) -> Result<SkinPlan, ()> {
+/// Was aus der Zwiebelhaut einer Form wird (skinPlan in onionSkin.ts)
+enum Skin {
+    Plan(SkinPlan),
+    /// die Haut ist so dick wie die Frästiefe: die Form wird ausgelassen
+    TooThick,
+    /// der Schnitt reicht nicht bis zur Unterseite (nur zweiseitig bekannt): fräsen wie immer, ohne Haut
+    NotThrough,
+}
+
+/// `stock_under` = zweiseitig fräsen: Material unter der Oberseite an dieser Stelle (None = die Frästiefe ist die Unterseite)
+fn skin_plan(depth: f64, step_z: f64, s: &SkinSettings, stock_under: Option<f64>) -> Skin {
     let d = -mn(0.0, depth);
-    let stock = d;
+    let known = stock_under.filter(|u| u.is_finite() && *u > 0.0);
+    if known.is_some_and(|u| d < u - 1e-6) {
+        return Skin::NotThrough;
+    }
+    let stock = known.map_or(d, |u| mn(d, u));
     let floor_d = ((stock - s.h) * 100.0 + 1e-6).floor() / 100.0;
     if !(floor_d >= 0.01) {
-        return Err(());
+        return Skin::TooThick;
     }
     let step = mx(0.05, step_z.abs());
     let (floor, through) = (-floor_d, -d);
-    Ok(SkinPlan {
+    Skin::Plan(SkinPlan {
         floor,
         through,
         stock,
@@ -448,6 +461,8 @@ struct SkinJob {
     plunge: f64,
     ramp_tan: f64,
     lead: Option<LeadOpts>,
+    /// der Gang gehört zur Restbearbeitung der Form (kleineres Werkzeug), nicht zur Form selbst
+    rest: bool,
 }
 
 /// Bahn einer Form in mm (shapeToPaths, im Fenster gerechnet)
@@ -564,6 +579,9 @@ pub struct Shape {
     /// Zwiebelhaut (onionSkin.ts) für diesen Schnitt, None = keine
     #[serde(default)]
     pub skin: Option<SkinSettings>,
+    /// zweiseitig fräsen: Material unter der Oberseite an der Stelle dieser Form (die Haut zählt von dort)
+    #[serde(default)]
+    pub stock_under: Option<f64>,
     /// Trochoidal (trochoid.ts), None = aus
     #[serde(default)]
     pub tro: Option<TroOpts>,
@@ -636,6 +654,29 @@ pub struct Job {
     /// Formen, deren Restmaterial-Werkzeug nicht passt (Hinweis gcw.restIgnored)
     #[serde(default)]
     pub rest_ignored: usize,
+    /// so viele Bilder lagen neben den Formen (nur der Laser kann sie): Hinweis img.onlyLaser, ganz vorn
+    #[serde(default)]
+    pub images: usize,
+    /// Datei für eine Steuerung mit Werkzeugtabelle: jedes Werkzeug mit Nummer, auch das erste (gc.toolLoad)
+    #[serde(default)]
+    pub tool_table: bool,
+    /// Formen ohne Werkzeug („Standard“): Anfang der Werkzeugwechsel-Zeile und Stufe am Wählrad der Oberfräse
+    #[serde(default)]
+    pub no_tool: Option<NoTool>,
+}
+
+/// Was für „Standard“ (kein Werkzeug in der Bibliothek, 12000 U/min) gilt – sonst steht es beim Werkzeug
+#[derive(Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct NoTool {
+    /// Anfang der Werkzeugwechsel-Zeile ("M0 " oder "M6 T0 ")
+    pub change: String,
+    #[serde(default)]
+    pub dial: Option<String>,
+    #[serde(default)]
+    pub dial_out: Option<String>,
+    #[serde(default)]
+    pub dial_rpm: f64,
 }
 
 /// Ein Hinweis zum G-Code: Schlüssel der Sprachdatei und die Werte dazu (das Fenster setzt sie mit t() ein).
@@ -685,7 +726,7 @@ pub struct Other {
 }
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie MILL_JOB_VERSION in camJob.ts)
-pub const JOB_VERSION: u32 = 18;
+pub const JOB_VERSION: u32 = 19;
 
 struct Gen<'a> {
     job: &'a Job,
@@ -1039,12 +1080,24 @@ impl Gen<'_> {
 
         // ---- Werkzeug einsetzen (ab dem zweiten mit Werkzeugwechsel) und Spindel starten ----
         let tool_name = t.map_or("Standard".to_string(), |t| job.tools[t].name.clone());
-        let dial = tool.and_then(|t| t.dial.clone());
-                if change {
+        let none = job.no_tool.as_ref();
+        let dial = match tool {
+            Some(t) => t.dial.clone(),
+            None => none.and_then(|n| n.dial.clone()),
+        };
+        let prefix = match tool {
+            Some(t) => t.change.clone(),
+            None => none.map_or("M0 ".to_string(), |n| n.change.clone()),
+        };
+        if change {
             let shown = dial.as_ref().map_or(tool_name.clone(), |d| format!("{tool_name} - {d}"));
-            let comment = self.c("gc.toolChange", &[("i", (gi + 1).to_string()), ("name", shown), ("d", to_fixed(dia, 1))]);
-            let prefix = tool.map_or("M0 ".to_string(), |t| t.change.clone());
+            let comment = self.c(if job.tool_table { "gc.toolLoad" } else { "gc.toolChange" }, &[("i", (gi + 1).to_string()), ("name", shown), ("d", to_fixed(dia, 1))]);
             let line = format!("\nG0 Z{}\nM5 {}\n{prefix}{comment}\n", f2(SAFE_Z), self.c("gc.spindleOff", &[]));
+            self.push(&line);
+        } else if job.tool_table {
+            // Datei für eine Steuerung mit Werkzeugtabelle: auch das erste Werkzeug mit Nummer (ohne die Stufe am Wählrad)
+            let comment = self.c("gc.toolLoad", &[("i", (gi + 1).to_string()), ("name", tool_name.clone()), ("d", to_fixed(dia, 1))]);
+            let line = format!("{prefix}{comment}\n");
             self.push(&line);
         }
         let line = format!("\n{}\n", self.c("gc.tool", &[("name", tool_name), ("d", to_fixed(dia, 1))]));
@@ -1053,8 +1106,12 @@ impl Gen<'_> {
             let line = format!("({d})\n");
             self.push(&line);
         }
-        if let Some((t, out)) = tool.and_then(|t| t.dial_out.as_ref().map(|o| (t, o))) {
-            self.w_once(&format!("gcw.dial.{out}"), &[("name", t.raw_name.clone()), ("rpm", js_num(self.rpm)), ("min", js_num(t.dial_rpm))]);
+        let dial_out = match tool {
+            Some(t) => t.dial_out.as_ref().map(|o| (o.clone(), t.raw_name.clone(), t.dial_rpm)),
+            None => none.and_then(|n| n.dial_out.as_ref().map(|o| (o.clone(), "Standard".to_string(), n.dial_rpm))),
+        };
+        if let Some((out, name, min)) = dial_out {
+            self.w_once(&format!("gcw.dial.{out}"), &[("name", name), ("rpm", js_num(self.rpm)), ("min", js_num(min))]);
         }
         let line = format!("{} S{} {}\n", job.spindle, js_num(self.rpm), self.c("gc.spindleOn", &[("rpm", js_num(self.rpm))]));
         self.push(&line);
@@ -2144,6 +2201,10 @@ impl Gen<'_> {
         } else {
             simplify_polyline(&mm, SIMPLIFY_MM)
         };
+        // (eine „Tasche“ kommt hier nur an, wenn die Form keine Fläche hat: dann auf der Linie, ohne Startpunkt von Hand)
+        if mode == "pocket" {
+            return self.mill_path(&pts, shape.closed);
+        }
         if !shape.closed || mode == "on-line" {
             return self.mill_path(&apply_cut(pts, shape.closed, shape), shape.closed);
         }
@@ -2686,9 +2747,6 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
         if !matches!(s.kind.as_str(), "polyline" | "circle" | "line" | "arc") || !matches!(s.mode.as_str(), "outside" | "inside" | "on-line" | "pocket" | "drill" | "face" | "chamfer" | "thread" | "cbore" | "vcarve" | "vplug") {
             return Err(format!("shape {} / {} is not in this stage", s.kind, s.mode));
         }
-        if s.mode == "pocket" && closed_mm(s).is_none() {
-            return Err("pocket on an open shape is not in this stage".into());
-        }
         if s.tool.is_some_and(|t| t >= job.tools.len()) {
             return Err("shape names a tool that is not in the job".into());
         }
@@ -2779,9 +2837,45 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
                 g.converted = false;
                 g.cur_shape = k;
                 g.passes = depth_passes(job.shapes[k].depth, g.step_z);
+                // Form mit Zwiebelhaut: auch der kleine Fräser hört auf der Haut auf (Hinweise kamen schon bei der Form selbst)
+                let rest = &job.shapes[k];
+                let rest_skin = match &rest.skin {
+                    Some(set) => match skin_plan(rest.depth, g.step_z, set, rest.stock_under) {
+                        Skin::Plan(plan) => Some((plan, set.clone())),
+                        Skin::TooThick => break 'shape,
+                        Skin::NotThrough => None,
+                    },
+                    None => None,
+                };
+                if let Some((plan, _)) = &rest_skin {
+                    g.passes = plan.passes.clone();
+                    g.skin_depth = Some(plan.through);
+                }
                 let line = format!("\n{}\n", g.c("gc.rest", &[("n", form_counter.to_string())]));
                 g.push(&line);
                 g.mill_rest(k);
+                if let Some((plan, set)) = rest_skin {
+                    if !plan.last.is_empty() {
+                        skin_jobs.push(SkinJob {
+                            rank: if rest.mode == "inside" { 0 } else { 1 },
+                            plan,
+                            set,
+                            shape: rest.clone(),
+                            k,
+                            gi,
+                            n: form_counter,
+                            tool: grp.0,
+                            dia: g.tool_radius * 2.0,
+                            step_z: g.step_z,
+                            feed: g.feed_xy,
+                            rpm: g.rpm,
+                            plunge: g.plunge,
+                            ramp_tan: g.ramp_tan,
+                            lead: None,
+                            rest: true,
+                        });
+                    }
+                }
                 break 'shape;
             }
             // Startpunkt/Richtung von Hand an Kreis, Bogen, Linie: als Linienzug fräsen (cutReady in cam.ts)
@@ -2840,16 +2934,22 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
             // nichts zu fräsen – die Form bleibt ganz
             g.skin_depth = None;
             let skin = match &shape.skin {
-                Some(set) => match skin_plan(shape.depth, g.step_z, set) {
-                    Ok(plan) => {
+                Some(set) => match skin_plan(shape.depth, g.step_z, set, shape.stock_under) {
+                    Skin::Plan(plan) => {
                         if set.h > mx(0.05, g.step_z.abs()) + 1e-9 {
                             g.w("gcw.skinThick", &[("n", form_counter.to_string()), ("h", js_num(set.h)), ("z", js_num(g.step_z))]);
                         }
                         Some((plan, set.clone()))
                     }
-                    Err(()) => {
+                    Skin::TooThick => {
                         g.w("gcw.skinTooThick", &[("n", form_counter.to_string()), ("h", js_num(set.h)), ("d", js_num(shape.depth.abs()))]);
                         break 'shape;
+                    }
+                    // zweiseitig: der Schnitt reicht nicht bis zur Unterseite – fräsen wie immer und sagen
+                    Skin::NotThrough => {
+                        let under: f64 = to_fixed(shape.stock_under.unwrap_or(0.0), 2).parse().unwrap_or(0.0);
+                        g.w("gcw.skinNotThrough", &[("n", form_counter.to_string()), ("d", js_num(shape.depth.abs())), ("t", js_num(under))]);
+                        None
                     }
                 },
                 None => None,
@@ -2934,10 +3034,9 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
                 let line = format!("{}\n", g.c("gc.skin", &[("h", f2(plan.skin)), ("t", f2(plan.stock))]));
                 g.push(&line);
             }
-            if mode == "pocket" {
-                if let Some(outer) = closed_mm(shape) {
-                    g.mill_pocket(k, &outer);
-                }
+            // Tasche an einer Form ohne Fläche (offene Linie, Bogen): cam.ts fräst dann auf der Linie – weiter unten
+            if let Some(outer) = closed_mm(shape).filter(|_| mode == "pocket") {
+                g.mill_pocket(k, &outer);
                 break 'shape;
             }
             if let Some(o) = shape.flute.as_ref().filter(|_| g.passes[g.passes.len() - 1] < 0.0) {
@@ -2969,6 +3068,7 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
                         plunge: g.plunge,
                         ramp_tan: g.ramp_tan,
                         lead: g.cur_lead.clone(),
+                        rest: false,
                     });
                 }
             }
@@ -3032,7 +3132,10 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
             // Hinweise, die schon beim Fräsen der Form kamen (Stege passen nicht, kein Platz zum Anfahren …), nicht doppelt
             let known = g.warns.len();
             let offset = if j.shape.mode == "inside" { -g.tool_radius } else { g.tool_radius };
-            if j.shape.kind == "circle" {
+            if j.rest {
+                g.converted = false;
+                g.mill_rest(j.k);
+            } else if j.shape.kind == "circle" {
                 g.mill_circle(&j.shape, offset, true);
             } else {
                 g.mill_polyline(&j.shape, offset, true);
@@ -3060,6 +3163,11 @@ pub fn generate_full(job: &Job) -> Result<Output, String> {
         if d.no_spot {
             g.w("gcw.driftNoSpot", &[]);
         }
+    }
+    // Bilder neben den Formen (Bildgravur gibt es nur beim Laser): der Hinweis steht ganz vorn
+    if job.images > 0 {
+        let w = g.warn_of("img.onlyLaser", &[("n", job.images.to_string())]);
+        g.warns.insert(0, w);
     }
     Ok(Output { gcode: g.out, warnings: g.warns, threads: g.threads, section_tools: g.sections })
 }
@@ -3179,7 +3287,45 @@ mod tests {
         }
     }
     fn job(shapes: Vec<Shape>) -> Job {
-        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), feed_adapt: None, drift: None, helix_tan: 0.0, lead_others: vec![], warn_texts: HashMap::new(), rest_ignored: 0 }
+        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), feed_adapt: None, drift: None, helix_tan: 0.0, lead_others: vec![], warn_texts: HashMap::new(), rest_ignored: 0, images: 0, tool_table: false, no_tool: None }
+    }
+
+    /// „Standard“ (kein Werkzeug in der Bibliothek) kann die Vorschau nicht erzeugen – die Bibliothek behält immer ein
+    /// Werkzeug. Darum von Hand nach toolStart in cam.ts: Name „Standard“, Ø 3,0, 12000 U/min, Vorschub 800
+    #[test]
+    fn standard_tool_with_router_dial_and_tool_table() {
+        let mut s = square("on-line");
+        s.tool = None;
+        let mut j = job(vec![s]);
+        j.tools.clear();
+        j.texts.insert("gc.toolLoad".into(), "load tool {i}: {name}, {d} mm".into());
+        j.warn_texts.insert("gcw.dial.low".into(), "{name}: {rpm} rpm is below the dial ({min})".into());
+        // ohne Angaben: wie bisher, keine Stufe, kein Hinweis
+        let plain = generate_full(&j).unwrap();
+        assert!(plain.gcode.starts_with("G21 (unit mm)\nG90 (absolute)\nG0 Z5.00 (safe height)\n\n(Tool: Standard, diameter 3.0 mm)\nM3 S12000 (spindle on, 12000 rpm)\nF800 (feed 800 mm/min)\n"));
+        assert!(plain.warnings.is_empty() && plain.section_tools == vec![None]);
+        // Oberfräse mit Wählrad: Stufe unter der Werkzeug-Zeile, Hinweis mit dem Namen „Standard“
+        j.no_tool = Some(NoTool { change: "M0 ".into(), dial: Some("dial 1 = 13000 rpm".into()), dial_out: Some("low".into()), dial_rpm: 13000.0 });
+        let dial = generate_full(&j).unwrap();
+        assert!(dial.gcode.contains("\n\n(Tool: Standard, diameter 3.0 mm)\n(dial 1 = 13000 rpm)\nM3 S12000 (spindle on, 12000 rpm)\nF800 (feed 800 mm/min)\n"));
+        assert_eq!(dial.warnings.iter().map(|w| w.text.as_str()).collect::<Vec<_>>(), ["Standard: 12000 rpm is below the dial (13000)"]);
+        // Datei für eine Steuerung mit Werkzeugtabelle: auch das erste Werkzeug mit Nummer – ohne Werkzeug die 0
+        j.tool_table = true;
+        j.no_tool = Some(NoTool { change: "M6 T0 ".into(), ..Default::default() });
+        let table = generate_full(&j).unwrap();
+        assert!(table.gcode.starts_with("G21 (unit mm)\nG90 (absolute)\nG0 Z5.00 (safe height)\nM6 T0 (load tool 1: Standard, 3.0 mm)\n\n(Tool: Standard, diameter 3.0 mm)\nM3 S12000"));
+    }
+
+    /// Bilder neben den Formen: der Hinweis steht vor allen anderen
+    #[test]
+    fn images_are_told_first() {
+        let mut j = job(vec![square("outside")]);
+        j.images = 2;
+        j.rest_ignored = 1;
+        j.warn_texts.insert("img.onlyLaser".into(), "{n} image(s) left out".into());
+        let out = generate_full(&j).unwrap();
+        assert_eq!(out.warnings.iter().map(|w| w.key.as_str()).collect::<Vec<_>>(), ["img.onlyLaser", "gcw.restIgnored"]);
+        assert_eq!(out.warnings[0].text, "2 image(s) left out");
     }
 
     #[test]

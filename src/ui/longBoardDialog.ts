@@ -13,7 +13,7 @@ import { bedSizeMm } from "../editor/editorState";
 import { getTools, MillingTool, DEFAULT_PLUNGE, toolForShape, cutDiameter, toolNumber } from "../toolLibrary";
 import { probeSettings } from "../probe";
 import { expandOps } from "../ops";
-import { generateGcode, lastGcodeWarnings } from "../cam";
+import { generateGcode, generateGcodeFull, type GcodeResult } from "../cam";
 import { spindleCode } from "../spindleDir";
 import { toolChangeGcode } from "../toolChange";
 import { postCtx } from "../post/postContext";
@@ -25,20 +25,28 @@ const KEY = "cnc_craft_longboard", SAFE_Z = 5.0;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 
 /** ganzes Programm der Zeichnung, ohne Nachmess-Punkte und Sperrzonen (die gehören zum Bett, nicht zur Platte) */
-function wholeProgram(): string | null {
+function wholeProgram(): Promise<GcodeResult> {
+  const dr = probeSettings.drOn;
+  probeSettings.drOn = 0;
+  // die Einstellung gilt, solange der G-Code entsteht – das geschieht sofort (vor dem ersten Warten), die Antwort kommt später
+  try { return generateGcodeFull((state.shapes as any[]).filter(s => !s.keepOut)); } finally { probeSettings.drOn = dr; }
+}
+
+/** dasselbe ohne Warten (cam.ts allein): beim Speichern für eine andere Steuerung, mitten in withPost() */
+function wholeProgramNow(): string | null {
   const dr = probeSettings.drOn;
   probeSettings.drOn = 0;
   try { return generateGcode((state.shapes as any[]).filter(s => !s.keepOut)); } finally { probeSettings.drOn = dr; }
 }
 
-export function openLongBoard(log: (s: string) => void) {
+export async function openLongBoard(log: (s: string) => void) {
   if (!isMill()) { log(t("deco.onlyMill")); return; }
   if (rotary.on || twoSidedOn()) { log(t("long.notHere")); return; }
-  const full = wholeProgram();
-  if (!full) { log(lastGcodeWarnings[0] || t("gcw.noObjects")); return; }
+  const whole = await wholeProgram(), full = whole.gcode;
+  if (!full) { log(whole.warnings[0] || t("gcw.noObjects")); return; }
   const lines = full.split("\n"), bad = unsupported(lines), bounds = cutBounds(lines);
   if (bad || !bounds) { log(t("long.unsupported", { g: bad || "?" })); return; }
-  const warnings = lastGcodeWarnings.slice(), hadZones = (state.shapes as any[]).some(s => s.keepOut);
+  const warnings = whole.warnings.slice(), hadZones = (state.shapes as any[]).some(s => s.keepOut);
   const bed = bedSizeMm(), tools = getTools().filter(x => x.type === "drill" || x.type === "endmill" || x.type === "bullnose");
   if (!tools.length) { log(t("face.noTool")); return; }
   const maxR = Math.max(...expandOps(state.shapes as any[]).map((s: any) => { const x = toolForShape(s); return x ? cutDiameter(x) / 2 : 1.5; }));
@@ -107,7 +115,7 @@ export function openLongBoard(log: (s: string) => void) {
   let secs: Section[] = [], parts: SplitProgram[] = [], okAll = false;
   const spoilProgram = () => [...head(tMm("long.gcSpoil")), ...startTool(pinTool()), ...drillPins(long().pins, o.spoil), ...foot()].join("\n") + "\n";
   /** Teilprogramm; beim Speichern für eine andere Steuerung neu gerechnet (dort schreibt cam.ts z. B. Werkzeugnummern) */
-  const part = (k: number): SplitProgram => (postCtx.foreign ? splitProgram((wholeProgram() || "").split("\n"), o.axis as Axis, secs[k], SAFE_Z, toolPrefix, postCtx.toolTable) : parts[k]);
+  const part = (k: number): SplitProgram => (postCtx.foreign ? splitProgram((wholeProgramNow() || "").split("\n"), o.axis as Axis, secs[k], SAFE_Z, toolPrefix, postCtx.toolTable) : parts[k]);
   const program = (k: number): string => {
     const p = part(k), last = k === secs.length - 1;
     const out = head(tMm("long.gcHead", { k: k + 1, n: secs.length, s: o.shift }));

@@ -20,7 +20,7 @@ import { drawEverything, modeColor } from "../render";
 import { getTools } from "../toolLibrary";
 import { drawTwoSided } from "../ui/twoSidedPanel";
 import { drawSplit } from "../ui/splitPanel";
-import { generateGcode, lastSectionTools } from "../cam";
+import { generateGcodeFull } from "../cam";
 import { isLaser, isLathe, isMill, isPlasma, MODE_CHANGED } from "../machineMode";
 import { machine } from "../machine";
 import { isKeepOut, keepValues } from "../keepOut";
@@ -342,9 +342,9 @@ async function runCarve() {
   const my = ++carveRun;
   if (!shapes.some(s => !isKeepOut(s))) { carve3d = null; carveGcode = ""; blockKey = ""; info(""); redraw(); return; }
   const t0 = performance.now();
-  let g: string | null = null;
-  try { g = generateGcode(shapes, { flat: true }); } catch { g = null; }
-  const tools = [...lastSectionTools];
+  let g: string | null = null, tools: Awaited<ReturnType<typeof generateGcodeFull>>["sectionTools"] = [];
+  try { const made = await generateGcodeFull(shapes, { flat: true }); g = made.gcode; tools = made.sectionTools; } catch { g = null; }
+  if (my !== carveRun || !el) return;
   const gk = (g || "") + JSON.stringify(tools);
   if (gk === carveGcode) return;
   info(t("v3d.carving", { p: 0 }));

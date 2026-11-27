@@ -8,7 +8,7 @@ import { t } from "../i18n/i18n";
 import { Viewer3D } from "../view3d/viewer3d";
 import { partsScene, cylinderScene, carveScene, cylinderCarveScene, carveAlongY } from "../view3d/scenes";
 import { carve, CarveResult } from "../view3d/carveSim";
-import { generateGcode, noGcodeMessage, lastSectionTools, lastThreads } from "../cam";
+import { generateGcodeFull } from "../cam";
 import { threadMeshes } from "../view3d/threadMesh";
 import { MATERIALS, materialView, materialOptionsHtml } from "../materialView";
 import { rotary } from "../rotary";
@@ -96,10 +96,11 @@ export function openView3D(want: "auto" | Mode = "auto") {
       info.textContent = t("rot.info", { c: (Math.PI * rotary.diameter).toFixed(1), d: rotary.diameter }).replace(/ – .*$/, "");
     } else if (carving) {
       // G-Code wie für die Maschine (ohne Drehachse), Fräser je Abschnitt in derselben Reihenfolge wie im G-Code
-      const g = generateGcode(shapes, { flat: true });
-      if (!g) { viewer.setMeshes([], keepView); info.textContent = noGcodeMessage(); return; }
+      const made = await generateGcodeFull(shapes, { flat: true }), g = made.gcode;
+      if (my !== run || closed) return;
+      if (!g) { viewer.setMeshes([], keepView); info.textContent = made.none; return; }
       // Fräser je Abschnitt, wie cam.ts sie eingesetzt hat (die Zwiebelhaut kann am Ende noch einmal ein früheres Werkzeug holen)
-      const sectionTools = [...lastSectionTools];
+      const sectionTools = made.sectionTools;
       const key = g + "|" + JSON.stringify(sectionTools);
       let res: CarveResult | null;
       if (carveCache?.key === key) res = carveCache.res;
@@ -123,7 +124,7 @@ export function openView3D(want: "auto" | Mode = "auto") {
       }
       const T = carveT();
       // Gewindegänge zeigt das Höhenraster nicht – als eigenes Netz dazu (threadMesh.ts)
-      const threads = [...lastThreads];
+      const threads = made.threads;
       viewer.setMeshes([...carveScene(res, m, T), ...threadMeshes(threads, T, [m.base[0] / 255 * 0.8, m.base[1] / 255 * 0.8, m.base[2] / 255 * 0.8])], keepView);
       info.textContent = t("v3d.carveInfo", { d: (-res.minZ).toFixed(2), c: res.cell.toFixed(2) })
         + (-res.minZ > T + 1e-3 ? " · " + t("v3d.carveThrough", { t: T }) : "");

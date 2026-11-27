@@ -11,7 +11,7 @@ import { save } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n/i18n";
 import { machine, canCommand, sendAndWait, exportRd } from "../machine";
 import { streamState } from "../machineStream";
-import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "../cam";
+import { generateGcodeFull, type GcodeResult } from "../cam";
 import { state } from "../main";
 import { rotary } from "../rotary";
 import { isLaser, isLathe, isPlasma } from "../machineMode";
@@ -74,10 +74,11 @@ export function jobBounds(lines: string[], laser = true): Bounds | null {
   return b;
 }
 
-function currentLines(): { lines: string[]; label: string } | null {
-  if (streamState.loadedLines.length) return { lines: streamState.loadedLines, label: streamState.label };
-  const g = generateGcode(state.shapes);
-  return g ? { lines: g.split("\n"), label: t("sim.currentDesign") } : null;
+/** Der geladene Job, sonst der G-Code der Zeichnung (made = sein Ergebnis mit Hinweisen; none = Meldung, wenn es keinen gibt) */
+async function currentLines(): Promise<{ lines: string[]; label: string; made: GcodeResult | null; none: string }> {
+  if (streamState.loadedLines.length) return { lines: streamState.loadedLines, label: streamState.label, made: null, none: "" };
+  const made = await generateGcodeFull(state.shapes);
+  return { lines: made.gcode ? made.gcode.split("\n") : [], label: t("sim.currentDesign"), made, none: made.none };
 }
 
 const r2 = (v: number) => (Math.round(v * 100) / 100).toFixed(2);
@@ -86,8 +87,11 @@ export async function runFrame(log: (s: string) => void) {
   if (isLathe()) { log(t("lathe.noMove")); return; }
   if (!machine.connected) { log(t("conn.connectFirst")); return; }
   if (!canCommand()) { log(t("m.why.job running")); return; }
-  const job = currentLines();
-  if (!job) { log(noGcodeMessage()); return; }
+  const job = await currentLines();
+  if (job.none) { log(job.none); return; }
+  // während des Wartens auf den G-Code kann sich die Lage geändert haben: noch einmal fragen, bevor sich etwas bewegt
+  if (!machine.connected) { log(t("conn.connectFirst")); return; }
+  if (!canCommand()) { log(t("m.why.job running")); return; }
   const b = jobBounds(job.lines, true);
   if (!b) { log(t("frame.empty")); return; }
   log(t("frame.start", { w: r2(b.x1 - b.x0), h: r2(b.y1 - b.y0), label: job.label }));
@@ -108,7 +112,7 @@ export async function runFrame(log: (s: string) => void) {
 }
 
 /** Auftrag dort starten, wo der Kopf steht: Bezugspunkt wählen, dann wird nur der Nullpunkt gesetzt (jobOrigin.ts) */
-export function openJobHereDialog(log: (s: string) => void, redraw: () => void) {
+export async function openJobHereDialog(log: (s: string) => void, redraw: () => void) {
   if (isLathe()) { log(t("lathe.noMove")); return; }
   if (!machine.connected) { log(t("conn.connectFirst")); return; }
   if (machine.protocol !== "grbl") { log(t("jobhere.grblOnly")); return; }
@@ -116,8 +120,11 @@ export function openJobHereDialog(log: (s: string) => void, redraw: () => void) 
   if (!canCommand() || machine.job.active) { log(t("m.why.job running")); return; }
   // Zweiseitig, Rückseite: X/Y-Null bleibt von der Vorderseite – ein neuer Nullpunkt würde die Seiten gegeneinander verschieben
   if (activeSetup() && (streamState.loadedLines.length ? loadedJobSide() : viewSide()) === "back") { log(t("two.jobHereBack")); return; }
-  const job = currentLines();
-  if (!job) { log(noGcodeMessage()); return; }
+  const job = await currentLines();
+  if (job.none) { log(job.none); return; }
+  // während des Wartens auf den G-Code kann sich die Lage geändert haben: noch einmal fragen
+  if (!machine.connected) { log(t("conn.connectFirst")); return; }
+  if (!canCommand() || machine.job.active) { log(t("m.why.job running")); return; }
   const laser = isLaser();
   const b = jobBounds(job.lines, laser);
   if (!b) { log(t("frame.empty")); return; }
@@ -157,11 +164,11 @@ export function openJobHereDialog(log: (s: string) => void, redraw: () => void) 
 }
 
 export async function saveRdFile(log: (s: string) => void) {
-  const job = currentLines();
-  if (!job) { log(noGcodeMessage()); return; }
-  if (!streamState.loadedLines.length) {
-    lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
-    lastGcodeNotes.forEach(n => log(n));
+  const job = await currentLines();
+  if (job.none) { log(job.none); return; }
+  if (job.made) {
+    job.made.warnings.forEach(w => log(`${t("log.warning")} ${w}`));
+    job.made.notes.forEach(n => log(n));
   }
   try {
     const path = await save({ title: t("rd.save"), defaultPath: "cnc-craft.rd", filters: [{ name: "Ruida (.rd)", extensions: ["rd"] }] });

@@ -18,7 +18,7 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { layersUsedBy } from "../laserLayers";
 import { isLaser } from "../machineMode";
 import { t, currentLanguage } from "../i18n/i18n";
-import { generateGcode, noGcodeMessage } from "../cam";
+import { generateGcodeFull } from "../cam";
 import { parseGcodeProgram } from "../sim/gcodeParser";
 import { motionLimits } from "../sim/motionLimits";
 import { groupBounds, MM_TO_PIXEL } from "../shapeTransform";
@@ -112,9 +112,9 @@ function hms(s: number): string {
   return h > 0 ? `${h} h ${String(m).padStart(2, "0")} min` : m > 0 ? `${m} min ${String(sec).padStart(2, "0")} s` : `${sec} s`;
 }
 
-export function openCostDialog(shapes: any[], log: (s: string) => void) {
-  const gcode = generateGcode(shapes, { flat: true });
-  if (!gcode) { log(noGcodeMessage()); return; }
+export async function openCostDialog(shapes: any[], log: (s: string) => void) {
+  const res = await generateGcodeFull(shapes, { flat: true }), gcode = res.gcode;
+  if (!gcode) { log(res.none); return; }
   const timeS = parseGcodeProgram(gcode.split("\n"), { motion: motionLimits() }).totalTime;
   // Fläche der Teile: Umriss aller Formen + 5 mm Rand ringsum
   const b = groupBounds(shapes.filter((s: any) => s.type !== "image" && !s.keepOut));

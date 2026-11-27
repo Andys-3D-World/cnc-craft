@@ -1,8 +1,8 @@
 // Makes tests/fixtures/millgcode-cases.json.gz: for a set of small test drawings, the job for Rust (src/camJob.ts) and the
 // G-code that src/cam.ts gives for it. `cargo test millgcode` then checks that src-tauri/src/millgcode.rs gives the
 // same G-code line by line. cam.ts cannot run under node (it needs the window), so this runs in the preview:
-//   1. start the preview (vite) and make the 6 mm tool of a fresh install the active one (the cases were made with it:
-//      6 mm, step 1.5... as the library has it, ramp angle 3 degrees); language as it comes
+//   1. start the preview (vite, router mode, millimetres) with the tools of a fresh install (T1 = 3 mm active, T2 = 6 mm,
+//      ramp angle 3 degrees); language as it comes; no arc fitting, no keep-out zones, no stock entered
 //   2. in the page:  await (await import("/tests/fixtures/millgcode-make.js")).make()   → returns the JSON text
 //   3. save that text as tests/fixtures/millgcode-cases.json and pack it:  gzip -9 -n tests/fixtures/millgcode-cases.json
 // Run it again whenever cam.ts changes something in the parts stage 1 covers.
@@ -226,17 +226,58 @@ export async function make() {
   // found by the fault check of the warnings
   add("warning: tabs that do not fit are told once, not again when the onion skin is cut", [rect(0, 0, 20, 12, "outside", -6, { ...skinCut, tabLen: 4, tabH: 1.5, tabN: 12 }), rect(40, 0, 100, 40, "outside", -6, { ...skinCut, ...tabs }), rect(120, 0, 140, 12, "outside", -6, { tabLen: 4, tabH: 1.5, tabN: 12 })]);
   add("warning: rest material tool that does not fit either", [rect(0, 0, 2, 2, "inside", -2, { toolId: t2.id, restToolId: tool.id }), rect(20, 0, 60, 30, "inside", -2, { toolId: t2.id, restToolId: tool.id })]);
+  // ---- stage 8: what the job refused until now ----
+  // images beside shapes: cam.ts leaves them out and says so (img.onlyLaser, first warning)
+  const image = (x, y, w, h) => ({ id: "s" + ++id, type: "image", rotation: 0, x: mm(x), y: mm(y), w: mm(w), h: mm(h) });
+  add("images beside shapes are left out and told first", [image(0, 0, 30, 20), rect(40, 0, 80, 30, "outside", -3), image(90, 0, 20, 20), circle(140, 15, 12, "inside", -3), rect(160, 0, 164.5, 4.5, "inside", -3, tro)]);
+  add("one image beside one line", [line(0, 0, 40, 10, -1), image(50, 0, 30, 20)]);
+  // file for a controller with a tool table (post/postContext.ts): every tool with its number, the first one too
+  const post = await import("/src/post/postContext.ts");
+  const table = (foreign, toolTable) => () => { const old = { ...post.postCtx }; post.postCtx.foreign = foreign; post.postCtx.toolTable = toolTable; return () => { Object.assign(post.postCtx, old); }; };
+  add("tool table: one tool", [rect(0, 0, 40, 30, "outside", -3), circle(60, 15, 8, "inside", -3)], table(true, true));
+  add("tool table: three tools, thread, onion skin brings the first tool back", [rect(0, 0, 60, 40, "outside", -6, skinCut), circle(30, 20, 8, "inside", -6, { ...skinCut, toolId: t2.id }), thread(circle(90, 20, 3.375), -1, -8), drill(120, 20, 3, -6, { toolId: rm }), rect(140, 0, 180, 30, "pocket", -2, rest)], both(table(true, true), strategy("linear")));
+  add("tool table with a router dial and re-measuring set: neither is written into a file for another controller", [rect(0, 0, 40, 30, "outside", -3), circle(60, 15, 8, "inside", -3, { toolId: t2.id })], both(table(true, true), dial("own", "13000,15000,17000,19000"), drift(1)));
+  add("file for another controller without tool table: no dial, no re-measuring, M0 at the tool change", [rect(0, 0, 40, 30, "outside", -3), circle(60, 15, 8, "inside", -3, { toolId: t2.id })], both(table(true, false), dial("own", "13000,15000,17000,19000"), drift(1)));
+  // rest material on a shape with onion skin: the small tool stops on the skin too; its last pass comes at the end
+  const spiky = (x, y, extra) => poly([[x, y], [x + 35, y], [x + 35, y + 20], [x + 20, y + 20], [x + 18, y + 8], [x + 16, y + 20], [x, y + 20]], true, "inside", -4, extra);
+  add("rest material with onion skin: cut at the end, skin that stays, circle, too thick", [spiky(0, 0, { ...rest, ...skinCut }), spiky(50, 0, { ...rest, ...skin }), circle(120, 10, 9, "inside", -4, { ...rest, ...skinCut }), spiky(140, 0, { ...rest, skinH: 3, skinCut: true, millingDepth: -2 }), rect(190, 0, 220, 20, "inside", -4, { ...rest, ...skinCut }), rect(230, 0, 260, 20, "outside", -4, { toolId: t2.id, ...skinCut })]);
+  add("rest material with onion skin: material profile, thick skin, straight plunge, mill direction, skin feed", [spiky(0, 0, { ...rest, ...skinCut, cutData: { ...cutFast, toolId: t2.id, d: 6 } }), spiky(50, 0, { ...rest, skinH: 1.7, skinCut: true, skinFeed: 150, millDir: "climb" }), spiky(100, 0, { ...rest, skinH: 0.777, skinCut: true, millingDepth: -5.555 }), rect(150, 0, 180, 20, "inside", -3, { toolId: t2.id, restToolId: tms, ...skinCut })], ramp(0));
+  add("rest material with onion skin, feed adaption and re-measuring", [spiky(0, 0, { ...rest, ...skinCut }), rect(50, 0, 90, 30, "outside", -6, { ...skinCut, toolId: t2.id }), spiky(100, 0, { ...rest, ...skinCut, millingDepth: -6 })], both(adapt(40), drift(1)));
+  // pocket on a shape without area: cam.ts mills on the line
+  add("pocket on open shapes: line, arc, open polyline, closed line of two points", [line(0, 0, 40, 10, -2, { millingMode: "pocket" }), arc(50, 0, 90, 0, 70, 10, "pocket", -2), poly([[100, 0], [120, 8], [140, 0], [160, 9]], false, "pocket", -2.5), poly([[170, 0], [190, 6]], true, "pocket", -2), poly(ring(220, 10, 9, 60).slice(0, 40), false, "pocket", -1), rect(240, 0, 260, 14, "pocket", -2), circle(280, 7, 6, "pocket", -2)]);
+  add("pocket on open shapes: by-hand setting is ignored, finish allowance, rest tool, flute, V-bit, second tool", [line(0, 0, 40, 10, -2, { millingMode: "pocket", cutDir: "reverse" }), poly([[50, 0], [70, 8], [90, 0]], false, "pocket", -2, { cutDir: "reverse", cutStart: 0.4, finishAllow: 0.3 }), poly([[100, 0], [120, 8], [140, 0]], false, "pocket", -2, rest), line(150, 0, 190, 0, -3, { millingMode: "pocket", ...fl }), arc(200, 0, 240, 0, 220, 10, "pocket", -1, { toolId: vb }), poly([[250, 0], [270, 8], [290, 0]], false, "pocket", -2, { ...tabs, ...lead, ...skinCut, ...tro })], ramp(0));
+  add("pocket on open shapes with the adaptive strategy and feed adaption", [poly([[0, 0], [20, 8], [21, 0], [40, 9]], false, "pocket", -2), line(50, 0, 90, 10, -2, { millingMode: "pocket" }), rect(100, 0, 116, 12, "pocket", -2)], both(strategy("adaptive"), adapt(30)));
+  add("pocket on open shapes with the linear strategy and feed adaption", [poly([[0, 0], [20, 8], [21, 0], [40, 9]], false, "pocket", -2), arc(50, 0, 60, 0, 55, 4, "pocket", -2)], both(strategy("linear"), adapt(30)));
+  // two-sided milling (twoSidedJob.ts): the onion skin is measured from the real underside of the material
+  const beds = await import("/src/editor/beds.ts");
+  const two = await import("/src/twoSided.ts");
+  const main = await import("/src/main.ts");
+  const sided = (setup, back = []) => shapes => {
+    const old = { shapes: main.state.shapes, two: beds.bedSetup(), other: beds.hiddenShapes() };
+    main.state.shapes = shapes;
+    beds.setBedSetup({ ...two.defaultSetup(), on: true, ...setup });
+    beds.setHiddenShapes(back);
+    return () => { beds.setHiddenShapes(old.other); beds.setBedSetup(old.two); main.state.shapes = old.shapes; };
+  };
+  add("two-sided, 6 mm: skin from the underside, cut that does not go through, cut exactly as deep as the material", [rect(30, 30, 70, 60, "outside", -6.2, skinCut), circle(100, 45, 10, "inside", -6.2, skin), rect(120, 30, 160, 60, "outside", -4, skinCut), rect(30, 80, 70, 110, "outside", -6, skinCut), rect(90, 80, 130, 110, "outside", -7, { skinH: 0.5, skinCut: true }), rect(150, 80, 190, 110, "outside", -5.9999995, skinCut), rect(30, 130, 70, 160, "outside", -6.2)], sided({ thickness: 6, pinsOn: false }));
+  add("two-sided, 6 mm, pocket on the back under two shapes, pin holes in the front program", [rect(30, 30, 70, 60, "outside", -4.2, skinCut), rect(30, 80, 70, 110, "inside", -3, skinCut), rect(120, 30, 160, 60, "outside", -6.2, { ...skinCut, ...tabs }), circle(140, 100, 12, "outside", -6.2, { ...skinCut, ...lead })], sided({ thickness: 6, pinsOn: true }, [rect(160, 20, 220, 120, "pocket", -2)]));
+  add("two-sided, 12.7 mm: thick skin, skin as thick as what is left, rest material, several tools", [rect(30, 30, 70, 60, "outside", -12.9, { skinH: 2.5, skinCut: true }), rect(90, 30, 130, 60, "outside", -12.9, { skinH: 3, skinCut: true, skinFeed: 120, toolId: t2.id }), spiky(30, 80, { ...rest, ...skinCut, millingDepth: -12.9 }), spiky(80, 80, { ...rest, ...skinCut, millingDepth: -5 }), rect(150, 30, 190, 60, "outside", -12.9, { ...skinCut, finishAllow: 0.3 })], sided({ thickness: 12.7, pinsOn: false }));
+  add("two-sided, 3 mm: the back removes everything under a shape (nothing known there), skin too thick for what is left", [rect(30, 30, 70, 60, "outside", -3.2, skinCut), rect(120, 30, 160, 60, "outside", -1.2, { skinH: 0.9, skinCut: true })], sided({ thickness: 3, pinsOn: false }, [rect(160, 20, 220, 120, "pocket", -3), rect(70, 20, 130, 70, "pocket", -2)]));
+  add("two-sided, 6.125 mm: the warning names the thickness with two decimals", [rect(30, 30, 70, 60, "outside", -4, skinCut), rect(90, 30, 130, 60, "outside", -6.3, skinCut), rect(150, 30, 190, 60, "inside", -6.1249995, skin)], sided({ thickness: 6.125, pinsOn: false }));
   const out = [];
   try {
   for (const c of cases) {
-    const undo = c.prep ? c.prep() : null;
+    const undo = c.prep ? c.prep(c.shapes) : null;
     try {
-      const job = millJob(c.shapes, fallback, sel.value === "spiral" || sel.value === "adaptive" ? sel.value : "linear");
-      if (job.no) throw new Error(`${c.name}: not in stage 1 (${job.no})`);
       const gcode = generateGcode(c.shapes);
       if (!gcode) throw new Error(`${c.name}: no G-code`);
+      // the job is built from what cam.ts really milled (two-sided: with the pin holes; without the images) and from
+      // what it knew beside the shapes – the same way the app does it (rustChecked in camJob.ts)
+      const inner = camJob.lastInner;
+      const job = millJob(inner.shapes, inner.fallbackDepth, inner.pocketStrategy, inner.extra);
+      if (job.no) throw new Error(`${c.name}: no job (${job.no})`);
       // what cam.ts gives beside the G-code: warnings (as shown), threads, tool per section (number in job.tools)
-      out.push({ name: c.name, job, gcode, side: camJob.sideForJob(job, camJob.lastInner.side) });
+      out.push({ name: c.name, job, gcode: inner.gcode, side: camJob.sideForJob(job, inner.side) });
     } finally { if (undo) undo(); }
   }
   } finally { added.forEach(a => lib.removeTool(a.id)); }
@@ -247,11 +288,10 @@ export async function make() {
 export async function makeFrom(shapes) {
   const { generateGcode } = await import("/src/cam.ts");
   const { millJob } = await import("/src/camJob.ts");
-  const depthInput = document.getElementById("dim-depth");
-  const fallback = depthInput && Number.isFinite(parseFloat(depthInput.value)) ? parseFloat(depthInput.value) : -2.0;
-  const sel = document.getElementById("dim-pocket-strategy");
-  const job = millJob(shapes, fallback, sel && (sel.value === "spiral" || sel.value === "adaptive") ? sel.value : "linear");
+  const camJob = await import("/src/camJob.ts");
   const t0 = performance.now();
-  const gcode = generateGcode(shapes);
-  return { job, gcode, ms: Math.round(performance.now() - t0) };
+  generateGcode(shapes);
+  const ms = Math.round(performance.now() - t0), inner = camJob.lastInner;
+  const job = millJob(inner.shapes, inner.fallbackDepth, inner.pocketStrategy, inner.extra);
+  return { job, gcode: inner.gcode, ms };
 }

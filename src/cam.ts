@@ -168,20 +168,39 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
 export let lastGcodeSource = "";
 
 /**
- * Wie generateGcode() – für G-Code, der an die Maschine oder in eine Datei geht („Zur Maschine“, „G-Code speichern“).
+ * Wie generateGcode(), aber mit Warten – für G-Code, der an die Maschine oder in eine Datei geht („Zur Maschine“,
+ * „G-Code speichern“) und für alle Vorschauen (Simulation, 3D-Ansicht, Kosten, Einrichteblatt, Rahmen abfahren …).
  * FRÄSE IN DER APP: der G-Code kommt aus Rust (src-tauri/src/millgcode.rs). cam.ts rechnet denselben Auftrag daneben, und
  * Rusts Ergebnis gilt nur, wenn es Zeichen für Zeichen gleich ist (auch Hinweise, Gewinde, Werkzeuge). Weicht etwas ab,
  * bleibt es beim G-Code aus cam.ts, und ein Hinweis bittet darum, das zu melden. Laser, Plasma, Drehbank, die Vorschau im
- * Browser und alles, was Rust noch nicht kann (Bilder, Werkzeugtabelle …), nimmt wie bisher cam.ts.
+ * Browser nehmen wie bisher cam.ts.
  * Danach laufen dieselben Schritte wie immer: Bogen-Glättung, Sperrzonen, Drehachse, Kopf für zweiseitiges Fräsen.
  */
 export async function generateGcodeChecked(allShapes: any, opts: { flat?: boolean; side?: Side } = {}): Promise<string | null> {
+  return (await generateGcodeFull(allShapes, opts)).gcode;
+}
+
+/**
+ * Ergebnis von generateGcodeFull(): der G-Code und alles, was dazugehört. Wer nach einem await erst die Werte
+ * lastGcodeWarnings & Co. liest, kann die eines anderen Aufrufs erwischen (zwei Fenster rechnen gleichzeitig) – hier
+ * gehören sie fest zusammen. none = Meldung, wenn es keinen G-Code gibt (noGcodeMessage).
+ */
+export interface GcodeResult {
+  gcode: string | null; warnings: string[]; notes: string[]; threads: ThreadInfo[]; sectionTools: (MillingTool | null)[]; none: string;
+}
+
+/** Wie generateGcodeChecked(), gibt aber Hinweise, Gewinde und Werkzeuge gleich mit zurück (für alle, die darauf warten) */
+export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; side?: Side } = {}): Promise<GcodeResult> {
+  const result = (gcode: string | null): GcodeResult => ({
+    gcode, warnings: lastGcodeWarnings.slice(), notes: lastGcodeNotes.slice(), threads: lastThreads.slice(),
+    sectionTools: lastSectionTools.slice(), none: gcode ? "" : noGcodeMessage()
+  });
   setChecking(true);
   let run: ReturnType<typeof gcodeRun>;
   try { run = gcodeRun(allShapes, opts); } finally { setChecking(false); }
   lastGcodeSource = "cam.ts";
-  if ("done" in run) return run.done;
-  if (!run.inner || !isMill()) return run.finish(run.inner);
+  if ("done" in run) return result(run.done);
+  if (!run.inner || !isMill()) return result(run.finish(run.inner));
   // was cam.ts beim Fräs-G-Code gemeldet hat (Hinweise, Gewinde, Werkzeuge) – das await unten kann andere Aufrufe dazwischenlassen
   const mine = { warnings: lastGcodeWarnings, threads: lastThreads, tools: lastSectionTools };
   const r = await rustChecked(run.inner);
@@ -196,7 +215,7 @@ export async function generateGcodeChecked(allShapes: any, opts: { flat?: boolea
     lastGcodeSource = "cam.ts: " + r.no;
     if (r.differs) { console.warn("millgcode: Rust differs from cam.ts, cam.ts is used –", r.no); lastGcodeNotes.push(t("gcw.rustDiff")); }
   }
-  return run.finish(inner);
+  return result(run.finish(inner));
 }
 
 /**
@@ -1531,9 +1550,10 @@ const generateGcodeInner = (shapes: any): string | null => {
   }
 
   // Entwicklungs-Build: Rust rechnet denselben Fräs-G-Code daneben und vergleicht (camJob.ts) – ändert hier nichts
-  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode, { warnings: lastGcodeWarnings.slice(), threads: lastThreads.slice(), sectionTools: lastSectionTools.slice() });
-
+  // (der Hinweis auf weggelassene Bilder gehört dazu – Rust meldet ihn auch)
   imageNote();
+  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode, { warnings: lastGcodeWarnings.slice(), threads: lastThreads.slice(), sectionTools: lastSectionTools.slice() }, { images, stockUnder: skinStock });
+
   return gcode;
 };
 

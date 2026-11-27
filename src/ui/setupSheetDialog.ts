@@ -8,7 +8,7 @@ import { writeFile } from "@tauri-apps/plugin-fs";
 import { t, currentLanguage } from "../i18n/i18n";
 import { state } from "../main";
 import { streamState } from "../machineStream";
-import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage } from "../cam";
+import { generateGcodeFull } from "../cam";
 import { machine } from "../machine";
 import { getMachineMode } from "../machineMode";
 import { getStock } from "../stock";
@@ -98,20 +98,22 @@ function programInfo(lines: string[], zones: { pts: { x: number; y: number }[] }
 }
 
 /** Zweiseitig fräsen: gemeinsame Einrichtung, Schritte am Tisch und je Seite ein Programm (null = geht nicht) */
-function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): { part: SheetTwo; warnings: string[] } | null {
+async function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): Promise<{ part: SheetTwo; warnings: string[] } | null> {
   const turn = t(two.flip === "lr" ? "two.turnLr" : "two.turnFb");
   const sides: SheetSide[] = [];
   const common = new Set<string>();
   const shared = new Set([...pinWarnings(two), ...depthWarnings(two)]);
   const line = flipLine(two);
+  let none = "";
   for (const side of ["front", "back"] as Side[]) {
-    const g = generateGcode(state.shapes, { side });
+    const res = await generateGcodeFull(state.shapes, { side }), g = res.gcode;
+    none = res.none;
     const name = t(side === "front" ? "sheet.two.front" : "sheet.two.back", { turn });
-    if (!g) { sides.push({ name, time: "–", partSize: "–", tools: [], ops: [], changes: [], warnings: [noGcodeMessage()], svg: "" }); continue; }
+    if (!g) { sides.push({ name, time: "–", partSize: "–", tools: [], ops: [], changes: [], warnings: [res.none], svg: "" }); continue; }
     const lines = g.split("\n");
     // Warnungen zu Stiften und Tiefen gelten für beide Seiten – nur einmal unten nennen
     const own: string[] = [];
-    for (const w of [...lastGcodeWarnings, ...lastGcodeNotes]) { if (shared.has(w)) common.add(w); else own.push(w); }
+    for (const w of [...res.warnings, ...res.notes]) { if (shared.has(w)) common.add(w); else own.push(w); }
     own.push(...limitReport(lines));
     const pins = two.pinsOn ? two.pins.map(p => (side === "back" ? mirrorPoint(p, two) : p)).map(p => ({ x: p.x, y: p.y, r: two.pinDia / 2 })) : [];
     const list = sideShapes(side);
@@ -121,7 +123,7 @@ function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): { part: Sh
       tools: toolRows(true, list, side === "front" && two.pinsOn ? [pinTool(two)] : []),
     });
   }
-  if (sides.every(sd => !sd.svg)) { log(noGcodeMessage()); return null; }
+  if (sides.every(sd => !sd.svg)) { log(none); return null; }
   const st = two.stock, f1 = (v: number) => (+v.toFixed(2)).toString();
   const rows: [string, string][] = [
     [t("sheet.two.turn"), t(two.flip === "lr" ? "sheet.two.turnLr" : "sheet.two.turnFb")],
@@ -172,21 +174,21 @@ function assemblySheet(): SheetAssembly | null {
   };
 }
 
-export function openSetupSheet(log: (s: string) => void) {
+export async function openSetupSheet(log: (s: string) => void) {
   const fromFile = streamState.loadedLines.length > 0;
   let lines: string[];
   let warnings: string[] = [];
   // Zweiseitig fräsen: ein Blatt für beide Seiten – aus der Zeichnung, auch wenn schon ein Job einer Seite geladen ist
   const twoSetup = activeSetup();
-  const two = twoSetup ? twoSidedSheet(twoSetup, log) : null;
+  const two = twoSetup ? await twoSidedSheet(twoSetup, log) : null;
   if (twoSetup && !two) return;
   if (two) { lines = []; warnings = two.warnings; }
   else if (fromFile) lines = streamState.loadedLines;
   else {
-    const g = generateGcode(state.shapes);
-    if (!g) { log(noGcodeMessage()); return; }
+    const res = await generateGcodeFull(state.shapes), g = res.gcode;
+    if (!g) { log(res.none); return; }
     lines = g.split("\n");
-    warnings = [...lastGcodeWarnings, ...lastGcodeNotes];
+    warnings = [...res.warnings, ...res.notes];
   }
   const drawing = !fromFile || !!two;
   const zones = drawing ? zonesFromShapes(state.shapes) : [];

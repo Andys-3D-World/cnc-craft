@@ -17,7 +17,7 @@ import { getMachineMode, MODE_CHANGED, MachineMode } from "../machineMode";
 import { translateShape, groupBounds, MM_TO_PIXEL } from "../shapeTransform";
 import { updateDimensionInputs } from "../uiInputs";
 import { checkpoint } from "../editor/history";
-import { generateGcode, noGcodeMessage } from "../cam";
+import { generateGcodeFull } from "../cam";
 import { icon } from "./icons";
 
 function state(): any { return (window as any).cncState; }
@@ -189,11 +189,11 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
   $("stock-skip-used")?.addEventListener("change", () => { stockOptions.skipUsed = $("stock-skip-used")!.checked; saveStockOptions(); });
 
   // ---- Knöpfe ----
-  document.getElementById("stock-mark")?.addEventListener("click", () => {
+  document.getElementById("stock-mark")?.addEventListener("click", async () => {
     const st = state();
     if (!st.shapes.length) { log(t("gcw.noObjects")); return; }
-    const g = generateGcode(st.shapes);
-    if (!g) { log(noGcodeMessage()); return; }
+    const res = await generateGcodeFull(st.shapes), g = res.gcode;
+    if (!g) { log(res.none); return; }
     const added = markFromGcode(g.split("\n"), t("stock.designLabel"), cutWidthFor(st.shapes));
     log(t("stock.marked", { p: added.toFixed(1), total: usedPercent().toFixed(1) }));
   });

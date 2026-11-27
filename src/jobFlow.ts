@@ -4,7 +4,7 @@
  * „Zur Maschine“ macht aus der Zeichnung den Job und zeigt ihn in der Simulation. Gestartet wird nie von selbst:
  * Start bleibt immer ein eigener Klick. Vor dem Start wird geprüft, ob der Job noch zur Zeichnung passt.
  */
-import { generateGcode, generateGcodeChecked, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage, lastSectionTools } from "./cam";
+import { generateGcodeChecked, generateGcodeFull } from "./cam";
 import { loadGcodeFromText, streamState } from "./machineStream";
 import { t } from "./i18n/i18n";
 import { askChoice } from "./ui/unsavedDialog";
@@ -82,15 +82,15 @@ export async function buildJob(shapes: any, log: Log): Promise<boolean> {
   const two = activeSetup(), side = two ? viewSide() : null;
   // Kennung der Zeichnung VOR dem Warten: der G-Code gehört zu diesem Stand, auch wenn inzwischen weitergezeichnet wird
   const print = fingerprint(shapes);
-  const gcode = await generateGcodeChecked(shapes);
-  if (!gcode) { log(noGcodeMessage()); return false; }
-  lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
-  lastGcodeNotes.forEach(n => log(n));
+  const res = await generateGcodeFull(shapes), gcode = res.gcode;
+  if (!gcode) { log(res.none); return false; }
+  res.warnings.forEach(w => log(`${t("log.warning")} ${w}`));
+  res.notes.forEach(n => log(n));
   warnIfSuspicious(gcode, log);
   building = true;
   const ok = loadGcodeFromText(gcode, designLabel(), log);
   building = false;
-  if (ok) { streamState.firstTool = lastSectionTools[0]?.id || ""; builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = print; builtSide = side; }
+  if (ok) { streamState.firstTool = res.sectionTools[0]?.id || ""; builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = print; builtSide = side; }
   lastLog = log;
   if (ok && two && side) log(t(side === "front" ? "two.builtFront" : "two.builtBack", { turn: t(two.flip === "lr" ? "two.turnLr" : "two.turnFb") }));
   return ok;
@@ -153,7 +153,8 @@ export async function okToBuild(): Promise<boolean> {
 export async function okToStart(shapes: any, log: Log, onRebuilt: () => void): Promise<boolean> {
   if (streamState.isRunning || !builtGcode || streamState.loadedLines !== builtLines) return true;
   // Zweiseitig: mit der Seite vergleichen, für die gebaut wurde – auch wenn inzwischen die andere gezeigt wird
-  if (fingerprint(shapes) === builtPrint || generateGcode(shapes, builtSide ? { side: builtSide } : {}) === builtGcode) return true;
+  // (gleicher Weg wie beim Bauen: in der App aus Rust, mit cam.ts geprüft – der Text ist derselbe)
+  if (fingerprint(shapes) === builtPrint || await generateGcodeChecked(shapes, builtSide ? { side: builtSide } : {}) === builtGcode) return true;
   const r = await askChoice(t("job.staleTitle"), t("job.staleText"), [
     { key: "old", label: t("job.staleOld") },
     { key: "cancel", label: t("dlg.cancel"), cancel: true },
