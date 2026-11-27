@@ -320,6 +320,43 @@ fn flute_passes(path: &[P], passes: &[f64], o: &FluteOpts) -> Vec<Vec<[f64; 3]>>
     out
 }
 
+/// Nachmessen: Abstand zwischen zwei Messungen in Minuten (geschätzte Laufzeit) und die Zeile für einen Mess-Punkt
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Drift {
+    pub every_min: f64,
+    pub marker: String,
+}
+
+/// Platzhalter-Zeile an jeder sicheren Stelle (zwischen zwei Formen, Fräser oben)
+const DRIFT_SLOT: &str = "(#drift-slot#)";
+
+/// Aus den Platzhaltern Mess-Punkte machen (placeDriftPoints): am ersten Platz einer, danach einer, sobald seit dem
+/// letzten die geschätzte Laufzeit erreicht ist. Alle anderen Plätze fallen weg. Die Laufzeit kommt aus gcodesim.rs
+fn place_drift_points(gcode: &str, d: &Drift) -> String {
+    let lines: Vec<&str> = gcode.split('\n').collect();
+    let prog = crate::gcodesim::parse(gcode, &crate::gcodesim::Options::default());
+    let every = mx(1.0, d.every_min) * 60.0;
+    let mut out: Vec<&str> = Vec::with_capacity(lines.len());
+    let (mut k, mut t_now, mut last, mut points) = (0usize, 0.0f64, f64::NEG_INFINITY, 0usize);
+    for (i, l) in lines.iter().enumerate() {
+        while k < prog.line.len() && (prog.line[k] as usize) < i {
+            t_now = prog.t0[k] + prog.dur[k] as f64;
+            k += 1;
+        }
+        if *l != DRIFT_SLOT {
+            out.push(l);
+            continue;
+        }
+        if points == 0 || t_now - last >= every {
+            out.push(&d.marker);
+            last = t_now;
+            points += 1;
+        }
+    }
+    out.join("\n")
+}
+
 /// Zwiebelhaut: Dicke der Haut, am Ende durchfräsen?, Vorschub dafür (0 = automatisch)
 #[derive(Deserialize, Clone, Debug)]
 pub struct SkinSettings {
@@ -544,6 +581,12 @@ pub struct Job {
     /// Taschen-Strategie: "linear" | "spiral" | "adaptive"
     #[serde(default)]
     pub pocket_strategy: String,
+    /// Vorschub in Kurven anpassen (feedadapt.rs): kleinster Vorschub in %, None = aus
+    #[serde(default)]
+    pub feed_adapt: Option<f64>,
+    /// Werkzeug während langer Jobs nachmessen (driftPoints.ts), None = aus
+    #[serde(default)]
+    pub drift: Option<Drift>,
     /// tan(3°) für den Helix-Einstieg der adaptiven Tasche, vom Fenster gerechnet (Grund wie bei ramp_tan)
     #[serde(default)]
     pub helix_tan: f64,
@@ -562,7 +605,7 @@ pub struct Other {
 }
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie MILL_JOB_VERSION in camJob.ts)
-pub const JOB_VERSION: u32 = 15;
+pub const JOB_VERSION: u32 = 17;
 
 struct Gen<'a> {
     job: &'a Job,
@@ -2486,8 +2529,22 @@ pub fn generate(job: &Job) -> Result<String, String> {
         let mut v_done: HashSet<usize> = HashSet::new();
         let cut_key = |sh: &Shape| sh.cut.as_ref().map_or(String::new(), |r| format!("{}|{}|{}|{}", js_num(r.feedrate), js_num(r.rpm), js_num(r.step_z), js_num(r.plunge_feed)));
         for &k in &ordered[gi] {
+            // Vorschub in engen Kurven und Innenecken senken: den G-Code dieser Form für sich erzeugen, anpassen, anhängen.
+            // Nur bei Fräsern mit Schneide am Umfang – nicht Bohren, V-Carve, Fase, Planfräsen, adaptive Tasche,
+            // Trochoidal, Flöte (adaptsFeed in cam.ts)
+            // sichere Stelle (Fräser oben) – hier darf später zum Nachmessen angehalten werden
+            if job.drift.is_some() {
+                g.push(DRIFT_SLOT);
+                g.push("\n");
+            }
+            let mark = g.out.len();
+            let adapts = job.feed_adapt.is_some() && !g.tool.is_some_and(|t| t.no_tro) && (k >= job.shapes.len() || {
+                let sh = &job.shapes[k];
+                sh.tro.is_none() && sh.flute.is_none() && !matches!(sh.mode.as_str(), "drill" | "vcarve" | "vplug" | "chamfer" | "face") && !(sh.mode == "pocket" && job.pocket_strategy == "adaptive")
+            });
+            'shape: {
             if v_done.contains(&k) {
-                continue;
+                break 'shape;
             }
             // ---- Restmaterial einer Form: Werte des Werkzeugs (kein Material-Profil), dann nur die Stellen, die fehlen ----
             if k >= job.shapes.len() {
@@ -2514,7 +2571,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 let line = format!("\n{}\n", g.c("gc.rest", &[("n", form_counter.to_string())]));
                 g.push(&line);
                 g.mill_rest(k);
-                continue;
+                break 'shape;
             }
             // Startpunkt/Richtung von Hand an Kreis, Bogen, Linie: als Linienzug fräsen (cutReady in cam.ts)
             let derived: Shape;
@@ -2528,7 +2585,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
             g.converted = shape.converted;
             if let Some(id) = shape.parent_chain_id.as_ref().filter(|id| !id.is_empty()) {
                 if !chained.insert(id.clone()) {
-                    continue;
+                    break 'shape;
                 }
             }
             // ---- Schnittwerte der Form (Material-Profil) ----
@@ -2566,7 +2623,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
             let skin = match &shape.skin {
                 Some(set) => match skin_plan(shape.depth, g.step_z, set) {
                     Ok(plan) => Some((plan, set.clone())),
-                    Err(()) => continue,
+                    Err(()) => break 'shape,
                 },
                 None => None,
             };
@@ -2586,7 +2643,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
             if let Some([d, hole]) = shape.cbore {
                 // an anderen Formen als Kreisen geht keine Stufenbohrung; die Senkung muss größer sein als das Loch
                 if mode == "cbore" || d <= hole + 0.01 {
-                    continue;
+                    break 'shape;
                 }
             }
             if mode == "vcarve" || mode == "vplug" {
@@ -2603,18 +2660,18 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 let line = format!("\n{}\n", g.c(if mode == "vplug" { "gc.vplug" } else { "gc.vcarve" }, &[("n", form_counter.to_string()), ("k", same.len().to_string())]));
                 g.push(&line);
                 g.mill_vcarve(&same, mode == "vplug", shape.depth, shape.v_start);
-                continue;
+                break 'shape;
             }
             if mode == "chamfer" {
                 let w = if shape.chamfer_w != 0.0 { shape.chamfer_w } else { 1.0 };
                 let line = format!("\n{}\n", g.c("gc.chamfer", &[("n", form_counter.to_string()), ("w", js_num(w))]));
                 g.push(&line);
                 g.mill_chamfer(shape);
-                continue;
+                break 'shape;
             }
             if mode == "thread" {
                 g.mill_thread(shape, form_counter);
-                continue;
+                break 'shape;
             }
             if mode == "face" || mode == "drill" {
                 let line = match (&shape.pin_mark, mode) {
@@ -2627,7 +2684,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 } else {
                     g.mill_drill(shape);
                 }
-                continue;
+                break 'shape;
             }
             let line = match &shape.pin_mark {
                 Some(pin) => format!("\n{pin}\n"),
@@ -2643,11 +2700,11 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 if let Some(outer) = closed_mm(shape) {
                     g.mill_pocket(k, &outer);
                 }
-                continue;
+                break 'shape;
             }
             if let Some(o) = shape.flute.as_ref().filter(|_| g.passes[g.passes.len() - 1] < 0.0) {
                 g.mill_flute(shape, o);
-                continue;
+                break 'shape;
             }
             match shape.kind.as_str() {
                 "line" => g.mill_line(shape),
@@ -2677,6 +2734,12 @@ pub fn generate(job: &Job) -> Result<String, String> {
                     });
                 }
             }
+            }
+            if adapts {
+                let own = g.out.split_off(mark);
+                let adapted = crate::feedadapt::adapt_feed(&own, g.tool_radius, job.feed_adapt.unwrap_or(100.0));
+                g.push(&adapted);
+            }
         }
     }
 
@@ -2694,6 +2757,10 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 in_use = next;
                 rest.retain(|&i| skin_jobs[i].tool != next);
             }
+        }
+        if job.drift.is_some() {
+            g.push(DRIFT_SLOT);
+            g.push("\n");
         }
         let line = format!("\n{}\n", g.c("gc.skinCutAll", &[]));
         g.push(&line);
@@ -2737,6 +2804,10 @@ pub fn generate(job: &Job) -> Result<String, String> {
     // ---- Programmende ----
     let foot = format!("\nG0 Z{}\nM5 {}\nG0 X0 Y0 {}\nM30 {}\n", f2(SAFE_Z), g.c("gc.spindleOff", &[]), g.c("gc.park", &[]), g.c("gc.end", &[]));
     g.push(&foot);
+    // ---- Nachmessen: Mess-Punkte nach geschätzter Laufzeit ----
+    if let Some(d) = &job.drift {
+        return Ok(place_drift_points(&g.out, d));
+    }
     Ok(g.out)
 }
 
@@ -2822,7 +2893,7 @@ mod tests {
         }
     }
     fn job(shapes: Vec<Shape>) -> Job {
-        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), helix_tan: 0.0, lead_others: vec![] }
+        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), feed_adapt: None, drift: None, helix_tan: 0.0, lead_others: vec![] }
     }
 
     #[test]

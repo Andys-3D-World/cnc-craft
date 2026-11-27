@@ -1463,9 +1463,6 @@ const generateGcodeInner = (shapes: any): string | null => {
   // ---- 7. FOOTER ----
   gcode += `\nG0 Z${SAFE_Z.toFixed(2)}\nM5 ${c("gc.spindleOff")}\nG0 X0 Y0 ${c("gc.park")}\nM30 ${c("gc.end")}\n`;
 
-  // Entwicklungs-Build: Rust rechnet denselben Fräs-G-Code daneben und vergleicht (camJob.ts) – ändert hier nichts
-  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode);
-
   // ---- 8. NACHMESSEN (Wärmegang, Einstellung „Werkzeug nachmessen“): Mess-Punkte nach geschätzter Laufzeit ----
   if (driftOn) {
     const lines = gcode.split("\n");
@@ -1480,6 +1477,9 @@ const generateGcodeInner = (shapes: any): string | null => {
     gcode = res.lines.join("\n");
     if (probeSettings.tcMode !== 1 && !probeSettings.tcPos) lastGcodeWarnings.push(t("gcw.driftNoSpot"));
   }
+
+  // Entwicklungs-Build: Rust rechnet denselben Fräs-G-Code daneben und vergleicht (camJob.ts) – ändert hier nichts
+  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode);
 
   imageNote();
   return gcode;

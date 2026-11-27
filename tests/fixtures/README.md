@@ -20,7 +20,7 @@ To make them again after a change to the generator: start the preview, build the
 `nodegraph-0.4.8.cncgraph` is a node-graph template file as version 0.4.8 wrote it: every node type of that version
 with the settings and connections it had then. `tests/nodeGraph.test.ts` loads it to make sure old templates keep working.
 
-`millgcode-cases.json.gz` (gzip, because pocket G-code is long; pack it with `gzip -9 -n`) holds, for 119 small test drawings, the job for the Rust mill G-code (`src/camJob.ts`) and the G-code
+`millgcode-cases.json.gz` (gzip, because pocket G-code is long; pack it with `gzip -9 -n`) holds, for 129 small test drawings, the job for the Rust mill G-code (`src/camJob.ts`) and the G-code
 that `src/cam.ts` gives for it. `cargo test millgcode` checks that `src-tauri/src/millgcode.rs` gives the same G-code line
 by line. `cam.ts` cannot run under node, so the file is made in the preview with `millgcode-make.js` (the steps are at the
 top of that file). Make it again whenever `cam.ts` changes something in the parts the Rust version covers – otherwise

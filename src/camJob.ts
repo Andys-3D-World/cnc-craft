@@ -1,5 +1,5 @@
 /**
- * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 5 (alles außer Vorschub-Anpassung, Nachmessen, Drehachse, zweiseitig, Bilder)
+ * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 6 (alles außer Bildern, Datei für Steuerungen mit Werkzeugtabelle und Zwiebelhaut beim zweiseitigen Fräsen)
  *
  * cam.ts liest beim Erzeugen des G-Codes aus vielen Stellen: Werkzeug-Bibliothek, Material-Profile, Einstellungen,
  * Sprachdatei, Eingabefelder. millJob() sammelt all das für eine Liste von Formen in EIN Objekt, das sich als JSON
@@ -15,7 +15,6 @@ import { expandOps } from "./ops";
 import { spindleCode } from "./spindleDir";
 import { leadOptions } from "./millLead";
 import { ascii, t, tMm } from "./i18n/i18n";
-import { rotary } from "./rotary";
 import { feedAdapt } from "./feedAdapt";
 import { probeSettings } from "./probe";
 import { cutDirOf, cutStartOf, hasCutSetting } from "./cutSetting";
@@ -29,7 +28,7 @@ import { toolChangeGcode } from "./toolChange";
 import { cloneShape, convertToPolyline, shapeBounds, shapeToPaths } from "./shapeTransform";
 
 /** gleiche Zahl wie JOB_VERSION in millgcode.rs – ändern, wenn sich der Auftrag ändert */
-export const MILL_JOB_VERSION = 15;
+export const MILL_JOB_VERSION = 17;
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn", "gc.spinUp", "gc.feed", "gc.shape", "gc.tab", "gc.ramp",
   "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut", "gc.flute", "gc.trochoid", "gc.rest", "gc.restNone"];
@@ -40,9 +39,8 @@ export type MillJob = Record<string, unknown>;
 
 /** Der Auftrag für diese Formen – oder { no: Grund }, wenn Etappe 1 das noch nicht kann */
 export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: string): MillJob | { no: string } {
-  if (rotary.on) return { no: "rotary axis" };
-  if (feedAdapt.on) return { no: "feed adaption" };
-  if (probeSettings.drOn === 1 && !postCtx.foreign) return { no: "re-measure tool" };
+  // Drehachse, Sperrzonen, Bogen-Glättung und der Kopf für zweiseitiges Fräsen laufen in cam.ts erst NACH dem G-Code,
+  // den Rust erzeugt (generateGcode) – sie ändern hier nichts
   if (postCtx.toolTable) return { no: "tool table post" };
   const tools: MillingTool[] = [];
   const out: unknown[] = [];
@@ -176,6 +174,10 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
     texts: Object.fromEntries([...TEXTS.map(k => [k, ascii(tMm(k))]), ...TEXTS_UI.map(k => [k, ascii(t(k))])]),
     shapes: out,
     pocketStrategy,
+    // Vorschub in Kurven anpassen (feedAdapt.ts): kleinster Vorschub in %, null = aus
+    feedAdapt: feedAdapt.on ? feedAdapt.minPct : null,
+    // Werkzeug während langer Jobs nachmessen (driftPoints.ts): Abstand in Minuten und die Zeile für einen Mess-Punkt
+    drift: probeSettings.drOn === 1 && !postCtx.foreign ? { everyMin: probeSettings.drMin, marker: `M0 (${ascii(tMm("gc.remeasure"))})` } : null,
     helixTan: Math.tan((3 * Math.PI) / 180),
     leadOthers
   };

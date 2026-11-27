@@ -36,6 +36,7 @@ mod pocket;
 mod arcfit;
 mod milllead;
 mod millgcode;
+mod feedadapt;
 mod controller;
 mod cycles;
 mod elfimg;
