@@ -6484,6 +6484,7 @@
   "mprof.newName": "Neues Profil",
   "gc.cutData": "Profil {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "Das Profil „{name}“ passt nicht mehr zum Werkzeug der Form (Werkzeug getauscht oder Ø geändert). Es wurden die Werte des Werkzeugs benutzt.",
+  "gcw.rustDiff": "Interne Prüfung: Das neue Rechenwerk (Rust) hat einen anderen G-Code ergeben als das bewährte. Verwendet wurde der bewährte G-Code. Bitte melde das mit dem Projekt („Fehler melden“).",
   "camz.xh": "Fadenkreuz",
   "camz.xhTip": "Fadenkreuz über dem Kamerabild ein/aus. Dazu gehören der Kamera-Offset und „Kamera-Nullpunkt setzen“ – für eine Kamera am Maschinenkopf.",
   "camz.adjust": "Mitte verschieben",

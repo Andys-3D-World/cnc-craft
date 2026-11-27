@@ -8,7 +8,8 @@
 // Run it again whenever cam.ts changes something in the parts stage 1 covers.
 export async function make() {
   const { generateGcode } = await import("/src/cam.ts");
-  const { millJob } = await import("/src/camJob.ts");
+  const camJob = await import("/src/camJob.ts");
+  const { millJob } = camJob;
   const lib = await import("/src/toolLibrary.ts");
   document.querySelectorAll(".ms-btn")[0]?.click(); // router
   await new Promise(r => setTimeout(r, 100));
@@ -213,6 +214,18 @@ export async function make() {
   add("re-measure with less than a minute asked for: counted as one minute", [...Array.from({ length: 6 }, (_, i) => rect(i * 45, 0, i * 45 + 40, 30, "outside", -4))], drift(0.2));
   add("re-measure before the onion skin is cut", [rect(0, 0, 150, 100, "outside", -6, skinCut), rect(170, 0, 320, 100, "outside", -6, skinCut), rect(340, 0, 490, 100, "outside", -6, skinCut)], drift(1));
   add("feed adaption leaves a V-bit and a flute with a corner alone", [rect(0, 0, 20, 14, "on-line", -0.5, { toolId: vb }), poly([[30, 0], [50, 0], [50, 14], [30, 14]], true, "inside", -0.5, { toolId: vb }), poly([[0, 30], [40, 30], [40, 60], [80, 60]], false, "on-line", -4, { ...fl, fluteIn: 10, fluteOut: 10 }), rect(100, 30, 130, 50, "inside", -2)], adapt(20));
+  // ---- stage 7: warnings, threads and tool per section (what cam.ts gives beside the G-code) ----
+  add("warning: inside contour that splits into two", [poly([[0, 0], [14, 0], [14, 6.5], [26, 6.5], [26, 0], [40, 0], [40, 16], [26, 16], [26, 9], [14, 9], [14, 16], [0, 16]], true, "inside", -2)]);
+  add("warning: conventional pocket with the adaptive strategy", [rect(0, 0, 30, 20, "pocket", -2, { millDir: "conventional" }), rect(40, 0, 70, 20, "pocket", -2, { millDir: "climb" })], strategy("adaptive"));
+  add("warning: trochoidal without room, told once per shape", [circle(20, 20, 2, "inside", -3, tro), rect(40, 0, 44.5, 4.5, "inside", -3, tro), rect(60, 0, 100, 30, "outside", -3, tro), rect(120, 0, 124.5, 4.5, "inside", -6, { ...tro, skinH: 0.3, skinCut: true })]);
+  add("warning: V-carve of a shape without area", [vc(poly([[0, 0], [10, 0], [20, 0]], true), -2)]);
+  add("warning: single-tooth thread mill does not reach", [thread(circle(20, 20, 3.375), -1, -30), thread(circle(50, 20, 3.375), -1, -10)]);
+  const dial = (router, table) => () => { const old = { router: lib.toolSettings.router, dial: lib.toolSettings.dial }; lib.setToolSettings({ router, dial: table }); return () => { lib.setToolSettings(old); }; };
+  add("warning: router dial too slow and too fast, each tool told once", [rect(0, 0, 40, 30, "outside", -3), rect(50, 0, 90, 30, "outside", -3), drill(110, 15, 3, -6, { toolId: rm }), circle(140, 15, 10, "inside", -3, { toolId: t2.id }), thread(circle(170, 15, 0.8), -1, -3, {}, tms), rect(200, 0, 240, 30, "outside", -6, skinCut)], dial("own", "13000,15000,17000,19000"));
+  add("warning: the same warning from two shapes with one V-bit, tool type told once", [poly([[0, 0], [20, 0], [20, 14], [0, 14]], true, "inside", -0.5, { toolId: vb }), poly([[30, 0], [50, 0], [50, 14], [30, 14]], true, "outside", -0.5, { toolId: vb }), circle(70, 7, 6, "pocket", -0.5, { toolId: vb })]);
+  // found by the fault check of the warnings
+  add("warning: tabs that do not fit are told once, not again when the onion skin is cut", [rect(0, 0, 20, 12, "outside", -6, { ...skinCut, tabLen: 4, tabH: 1.5, tabN: 12 }), rect(40, 0, 100, 40, "outside", -6, { ...skinCut, ...tabs }), rect(120, 0, 140, 12, "outside", -6, { tabLen: 4, tabH: 1.5, tabN: 12 })]);
+  add("warning: rest material tool that does not fit either", [rect(0, 0, 2, 2, "inside", -2, { toolId: t2.id, restToolId: tool.id }), rect(20, 0, 60, 30, "inside", -2, { toolId: t2.id, restToolId: tool.id })]);
   const out = [];
   try {
   for (const c of cases) {
@@ -222,7 +235,8 @@ export async function make() {
       if (job.no) throw new Error(`${c.name}: not in stage 1 (${job.no})`);
       const gcode = generateGcode(c.shapes);
       if (!gcode) throw new Error(`${c.name}: no G-code`);
-      out.push({ name: c.name, job, gcode });
+      // what cam.ts gives beside the G-code: warnings (as shown), threads, tool per section (number in job.tools)
+      out.push({ name: c.name, job, gcode, side: camJob.sideForJob(job, camJob.lastInner.side) });
     } finally { if (undo) undo(); }
   }
   } finally { added.forEach(a => lib.removeTool(a.id)); }

@@ -6484,6 +6484,7 @@
   "mprof.newName": "Nieuw profiel",
   "gc.cutData": "Profiel {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "Het profiel \"{name}\" past niet meer bij het gereedschap van de vorm (gereedschap gewisseld of diameter gewijzigd). De waarden van het gereedschap zijn gebruikt.",
+  "gcw.rustDiff": "Interne controle: de nieuwe rekenkern (Rust) gaf andere G-code dan de beproefde. De beproefde G-code is gebruikt. Meld dit alsjeblieft samen met het project («Fout melden»).",
   "camz.xh": "Dradenkruis",
   "camz.xhTip": "Dradenkruis over het camerabeeld aan/uit. Hierbij horen ook de camera-offset en „Camera-nulpunt instellen” – voor een camera op de machinekop.",
   "camz.adjust": "Midden verplaatsen",

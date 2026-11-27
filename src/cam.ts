@@ -43,7 +43,7 @@ import { helixZ, trochoidPlan, troFits, troSettings } from "./trochoid";
 import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan, type SkinSettings } from "./onionSkin";
 import { postCtx } from "./post/postContext";
 import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
-import { shadowMill } from "./camJob";
+import { shadowMill, rustChecked, setChecking } from "./camJob";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -160,11 +160,56 @@ let skinStock: Map<string, number> | null = null;
  * Ohne Zweiseitig ändert sich nichts: derselbe G-Code wie immer.
  */
 export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Side } = {}): string | null => {
+  const run = gcodeRun(allShapes, opts);
+  return "done" in run ? run.done : run.finish(run.inner);
+};
+
+/** Wo der Fräs-G-Code des letzten generateGcodeChecked() herkam: "rust" = aus Rust, mit cam.ts geprüft; sonst der Grund für cam.ts */
+export let lastGcodeSource = "";
+
+/**
+ * Wie generateGcode() – für G-Code, der an die Maschine oder in eine Datei geht („Zur Maschine“, „G-Code speichern“).
+ * FRÄSE IN DER APP: der G-Code kommt aus Rust (src-tauri/src/millgcode.rs). cam.ts rechnet denselben Auftrag daneben, und
+ * Rusts Ergebnis gilt nur, wenn es Zeichen für Zeichen gleich ist (auch Hinweise, Gewinde, Werkzeuge). Weicht etwas ab,
+ * bleibt es beim G-Code aus cam.ts, und ein Hinweis bittet darum, das zu melden. Laser, Plasma, Drehbank, die Vorschau im
+ * Browser und alles, was Rust noch nicht kann (Bilder, Werkzeugtabelle …), nimmt wie bisher cam.ts.
+ * Danach laufen dieselben Schritte wie immer: Bogen-Glättung, Sperrzonen, Drehachse, Kopf für zweiseitiges Fräsen.
+ */
+export async function generateGcodeChecked(allShapes: any, opts: { flat?: boolean; side?: Side } = {}): Promise<string | null> {
+  setChecking(true);
+  let run: ReturnType<typeof gcodeRun>;
+  try { run = gcodeRun(allShapes, opts); } finally { setChecking(false); }
+  lastGcodeSource = "cam.ts";
+  if ("done" in run) return run.done;
+  if (!run.inner || !isMill()) return run.finish(run.inner);
+  // was cam.ts beim Fräs-G-Code gemeldet hat (Hinweise, Gewinde, Werkzeuge) – das await unten kann andere Aufrufe dazwischenlassen
+  const mine = { warnings: lastGcodeWarnings, threads: lastThreads, tools: lastSectionTools };
+  const r = await rustChecked(run.inner);
+  lastGcodeNotes = [];
+  let inner = run.inner;
+  if (r.ok) {
+    inner = r.gcode;
+    lastGcodeWarnings = r.warnings; lastThreads = r.threads as ThreadInfo[]; lastSectionTools = r.sectionTools;
+    lastGcodeSource = "rust";
+  } else {
+    lastGcodeWarnings = mine.warnings; lastThreads = mine.threads; lastSectionTools = mine.tools;
+    lastGcodeSource = "cam.ts: " + r.no;
+    if (r.differs) { console.warn("millgcode: Rust differs from cam.ts, cam.ts is used –", r.no); lastGcodeNotes.push(t("gcw.rustDiff")); }
+  }
+  return run.finish(inner);
+}
+
+/**
+ * Die Schritte von generateGcode(), in zwei Hälften: inner = Fräs-/Laser-/Plasma-G-Code der Formen (generateGcodeInner),
+ * finish(g) = alles danach (Bogen-Glättung, Sperrzonen, Drehachse, Hinweise zur Platte, Kopf für zweiseitiges Fräsen).
+ * { done } = schon fertig (Drehbank).
+ */
+function gcodeRun(allShapes: any, opts: { flat?: boolean; side?: Side }): { done: string | null } | { inner: string | null; finish: (g: string | null) => string | null } {
   // DREHBANK: ganz eigenes Programm (X/Z), nichts von den Fräs-Schritten unten gilt dort
   if (isLathe()) {
     const res = latheGcodeFromDesign(allShapes);
     lastGcodeWarnings = res.warnings; lastGcodeNotes = res.notes; lastThreads = []; lastSectionTools = []; allSkipped = false;
-    return res.gcode;
+    return { done: res.gcode };
   }
   flatOnly = !!opts.flat;
   const two = twoSidedJob(allShapes, opts.side);
@@ -181,7 +226,12 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   const used = skipped.size ? shapes.filter((s: any) => !skipped.has(s)) : shapes;
   lastGcodeNotes = [];
   // Zweiseitig: das Programm der Vorderseite bohrt die Löcher für die Passstifte mit
-  let g = generateGcodeInner(two && two.pins.length ? [...used, ...two.pins] : used);
+  const inner = generateGcodeInner(two && two.pins.length ? [...used, ...two.pins] : used);
+  const finish = (g: string | null): string | null => {
+  // nach einem await (generateGcodeChecked) können andere Aufrufe diese Werte geändert haben
+  flatOnly = !!opts.flat;
+  zoneSource = two ? two.shapes : null;
+  allSkipped = skipped.size > 0 && skipped.size === shapes.length;
   // Arc Fitting: nach Vorschub-Anpassung und Nachmess-Punkten, nur Fräse, nicht mit Drehachse (arcFit.ts)
   if (g && arcFit.on && isMill() && !rotary.on) {
     const r = fitArcs(g, arcFit.tol);
@@ -195,7 +245,9 @@ export const generateGcode = (allShapes: any, opts: { flat?: boolean; side?: Sid
   if (g && !two) lastGcodeWarnings.push(...fitWarnings(g, used));
   if (g && two) { g = two.header + g; lastGcodeWarnings.push(...two.warnings); }
   return g;
-};
+  };
+  return { inner, finish };
+}
 
 /** Passt der Auftrag ins eingetragene Rohteil? Nur Hinweise – ohne eingetragene Maße passiert hier nichts */
 function fitWarnings(g: string, used: any[]): string[] {
@@ -1479,7 +1531,7 @@ const generateGcodeInner = (shapes: any): string | null => {
   }
 
   // Entwicklungs-Build: Rust rechnet denselben Fräs-G-Code daneben und vergleicht (camJob.ts) – ändert hier nichts
-  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode);
+  shadowMill(shapes, fallbackDepth, pocketStrategy, gcode, { warnings: lastGcodeWarnings.slice(), threads: lastThreads.slice(), sectionTools: lastSectionTools.slice() });
 
   imageNote();
   return gcode;
@@ -1498,7 +1550,9 @@ function showWarnings(appendToConsole: (t: string) => void) {
  */
 export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string) => void, fileName = "cnc-auftrag.gcode") {
   // Post-Prozessor (post/): nur die Datei. GRBL in mm liefert genau den Text von generateGcode()
-  const neutral = withPost(() => generateGcode(shapes));
+  // die Einstellungen des Post-Prozessors gelten nur, solange cam.ts rechnet und der Auftrag für Rust entsteht – beides
+  // geschieht sofort (vor dem ersten Warten); withPost setzt sie danach gleich zurück, die Antwort kommt später
+  const neutral = await withPost(() => generateGcodeChecked(shapes));
   if (!neutral) { appendToConsole(noGcodeMessage()); return; }
   showWarnings(appendToConsole);
   const gcode = postedText(neutral, appendToConsole);

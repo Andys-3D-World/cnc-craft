@@ -1050,10 +1050,13 @@ async fn imgraster_run(request: tauri::ipc::Request<'_>) -> Result<tauri::ipc::R
 /// Antwort: { same, lines, ms, line?, rust?, ts? } bzw. ein Fehlertext, wenn der Auftrag nicht passt.
 /// Das Ergebnis wird nirgends an eine Maschine geschickt.
 #[tauri::command(async)]
-fn millgcode_shadow(job: millgcode::Job, expected: String) -> Result<serde_json::Value, String> {
+fn millgcode_shadow(job: millgcode::Job, expected: String, side: Option<serde_json::Value>) -> Result<serde_json::Value, String> {
     let start = std::time::Instant::now();
-    let mine = millgcode::generate(&job)?;
+    let full = millgcode::generate_full(&job)?;
     let ms = start.elapsed().as_secs_f64() * 1000.0;
+    // Hinweise, Gewinde, Werkzeug je Abschnitt: None = gleich wie cam.ts
+    let side_diff = side.as_ref().and_then(|s| millgcode::compare_side(&full, s));
+    let mine = full.gcode;
     let lines = expected.split('\n').count();
     let diff = millgcode::compare(&mine, &expected);
     if cfg!(debug_assertions) {
@@ -1062,11 +1065,44 @@ fn millgcode_shadow(job: millgcode::Job, expected: String) -> Result<serde_json:
             None => eprintln!("millgcode: {} shapes, {lines} lines, same as cam.ts except {} line(s) with 0.001 in one number ({ms:.1} ms)", job.shapes.len(), diff.near),
             Some((n, a, b)) => eprintln!("millgcode: DIFFERENT from cam.ts at line {n}\n  Rust:   {a}\n  cam.ts: {b}"),
         }
+        match &side_diff {
+            None if side.is_some() => eprintln!("millgcode: {} warning(s), {} thread(s), {} tool section(s) same as cam.ts", full.warnings.len(), full.threads.len(), full.section_tools.len()),
+            None => {}
+            Some(d) => eprintln!("millgcode: WARNINGS/THREADS/TOOLS DIFFERENT from cam.ts – {d}"),
+        }
     }
     Ok(match diff.first {
-        None => serde_json::json!({ "same": true, "near": diff.near, "lines": lines, "ms": ms }),
-        Some((n, a, b)) => serde_json::json!({ "same": false, "near": diff.near, "lines": lines, "ms": ms, "line": n, "rust": a, "ts": b }),
+        None => serde_json::json!({ "same": true, "near": diff.near, "lines": lines, "ms": ms, "side": side_diff }),
+        Some((n, a, b)) => serde_json::json!({ "same": false, "near": diff.near, "lines": lines, "ms": ms, "line": n, "rust": a, "ts": b, "side": side_diff }),
     })
+}
+
+/// FRÄS-G-CODE FÜR DIE MASCHINE UND DIE DATEI: rechnet den Auftrag in Rust und vergleicht mit dem G-Code aus cam.ts
+/// (`expected`) samt Hinweisen, Gewinden und Werkzeugen (`side`). Antwort: der G-Code aus Rust und das Ergebnis des
+/// Vergleichs – das Fenster nimmt ihn nur, wenn alles gleich ist (rustChecked in camJob.ts), sonst bleibt es bei cam.ts.
+#[tauri::command(async)]
+fn millgcode_generate(job: millgcode::Job, expected: String, side: serde_json::Value) -> Result<serde_json::Value, String> {
+    let start = std::time::Instant::now();
+    let full = millgcode::generate_full(&job)?;
+    let ms = start.elapsed().as_secs_f64() * 1000.0;
+    let side_diff = millgcode::compare_side(&full, &side);
+    let diff = millgcode::compare(&full.gcode, &expected);
+    if cfg!(debug_assertions) {
+        match (&diff.first, &side_diff) {
+            (None, None) if diff.near == 0 => eprintln!("millgcode: G-code from Rust, {} shapes, {} lines, {} warning(s), checked against cam.ts ({ms:.1} ms)", job.shapes.len(), expected.split('\n').count(), full.warnings.len()),
+            (None, None) => eprintln!("millgcode: {} line(s) with 0.001 in one number – cam.ts is used", diff.near),
+            (Some((n, a, b)), _) => eprintln!("millgcode: DIFFERENT from cam.ts at line {n} – cam.ts is used\n  Rust:   {a}\n  cam.ts: {b}"),
+            (None, Some(d)) => eprintln!("millgcode: WARNINGS/THREADS/TOOLS DIFFERENT from cam.ts – cam.ts is used – {d}"),
+        }
+    }
+    let (line, rust, ts) = match diff.first {
+        Some((n, a, b)) => (Some(n), Some(a), Some(b)),
+        None => (None, None, None),
+    };
+    Ok(serde_json::json!({
+        "gcode": full.gcode, "same": line.is_none(), "near": diff.near, "side": side_diff, "line": line, "rust": rust, "ts": ts, "ms": ms,
+        "warnings": full.warnings, "threads": full.threads, "sectionTools": full.section_tools,
+    }))
 }
 
 // ---- 3D-Fräsen (cam3d.rs) ----
@@ -1179,6 +1215,7 @@ pub fn run() {
             carvesim_cancel,
             imgraster_run,
             millgcode_shadow,
+            millgcode_generate,
             gamepad_read,
             list_ports,
             port_scan,

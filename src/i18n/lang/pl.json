@@ -6484,6 +6484,7 @@
   "mprof.newName": "Nowy profil",
   "gc.cutData": "Profil {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "Profil „{name}” nie pasuje już do narzędzia kształtu (zmienione narzędzie lub średnica). Użyto wartości narzędzia.",
+  "gcw.rustDiff": "Kontrola wewnętrzna: nowy silnik obliczeń (Rust) dał inny G-code niż sprawdzony. Użyto sprawdzonego G-code. Zgłoś to proszę razem z projektem («Zgłoś błąd»).",
   "camz.xh": "Celownik",
   "camz.xhTip": "Włącza lub wyłącza celownik na obrazie. Otwiera też przesunięcie kamery i „Ustaw zero kamerą” – dla kamery zamontowanej na głowicy maszyny.",
   "camz.adjust": "Przesuń środek",

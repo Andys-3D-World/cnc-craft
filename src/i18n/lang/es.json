@@ -6484,6 +6484,7 @@
   "mprof.newName": "Nuevo perfil",
   "gc.cutData": "Perfil {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "El perfil «{name}» ya no coincide con la herramienta de la forma (herramienta cambiada o diámetro modificado). Se usaron los valores de la herramienta.",
+  "gcw.rustDiff": "Comprobación interna: el nuevo motor de cálculo (Rust) ha dado un G-code distinto del probado. Se ha usado el G-code probado. Por favor, avísanos y adjunta el proyecto («Informar de un error»).",
   "camz.xh": "Retícula",
   "camz.xhTip": "Muestra u oculta la retícula sobre la imagen. También abre el desfase de la cámara y «Fijar cero con cámara»: para una cámara montada en el cabezal.",
   "camz.adjust": "Mover centro",

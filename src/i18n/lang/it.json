@@ -6484,6 +6484,7 @@
   "mprof.newName": "Nuovo profilo",
   "gc.cutData": "Profilo {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "Il profilo «{name}» non corrisponde più all'utensile della forma (utensile cambiato o diametro modificato). Sono stati usati i valori dell'utensile.",
+  "gcw.rustDiff": "Controllo interno: il nuovo motore di calcolo (Rust) ha dato un G-code diverso da quello collaudato. È stato usato il G-code collaudato. Per favore segnalalo insieme al progetto («Segnala un bug»).",
   "camz.xh": "Mirino",
   "camz.xhTip": "Mostra o nasconde il mirino sull’immagine. Apre anche l’offset della camera e «Imposta zero con camera»: per una camera montata sulla testa della macchina.",
   "camz.adjust": "Sposta centro",

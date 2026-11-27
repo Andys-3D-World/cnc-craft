@@ -6484,6 +6484,7 @@
   "mprof.newName": "New profile",
   "gc.cutData": "Profile {name}: F{f} S{s} Z{z}",
   "gcw.cutDataOff": "The profile \"{name}\" no longer matches the shape's tool (tool swapped or diameter changed). The tool's values were used.",
+  "gcw.rustDiff": "Internal check: the new engine (Rust) gave different G-code than the proven one. The proven G-code was used. Please report this together with the project (“Report a bug”).",
   "camz.xh": "Crosshair",
   "camz.xhTip": "Show or hide the crosshair over the camera image. This also opens the camera offset and “Set camera zero point” – for a camera mounted on the machine head.",
   "camz.adjust": "Move centre",

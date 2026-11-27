@@ -10,8 +10,11 @@
 //! Alles andere (Bohren, V-Carve, Gewinde, Fase, An-/Wegfahren, Schlichtgang, Zwiebelhaut, Trochoidal,
 //! Drehachse …) meldet camJob.ts als „noch nicht“ – dann entsteht hier gar nichts.
 //!
-//! NOCH NICHT AN DER MASCHINE: die App fräst weiter mit dem G-Code aus cam.ts. Dieser hier wird im Entwicklungs-Build
-//! nur daneben gerechnet und verglichen (Befehl `millgcode_shadow`), damit Abweichungen an echten Projekten auffallen.
+//! AN DER MASCHINE NUR GEPRÜFT: „Zur Maschine“ und „G-Code speichern“ holen den G-Code hier (Befehl `millgcode_generate`),
+//! cam.ts rechnet denselben Auftrag daneben, und das Fenster nimmt diesen G-Code nur, wenn er Zeichen für Zeichen gleich ist
+//! und Hinweise, Gewinde und Werkzeuge stimmen (rustChecked in camJob.ts) – sonst bleibt es bei cam.ts. Alle Vorschauen
+//! rechnen weiter mit cam.ts; im Entwicklungs-Build wird dort daneben verglichen (Befehl `millgcode_shadow`).
+//! Neben dem G-Code entstehen hier auch die Hinweise (gcw.*, cut.*), die Gewinde-Liste und das Werkzeug je Abschnitt.
 //! Geprüft außerdem mit festen Fällen: tests/fixtures/millgcode-cases.json.gz (in der Vorschau aus cam.ts erzeugt,
 //! siehe tests/fixtures/README.md) und die Tests unten.
 
@@ -22,7 +25,7 @@ use crate::milllead::{dist_to_path, lead_at_point, plan_lead, plan_lead_at_start
 use crate::pocket::{pocket_paths, pocket_wall_paths, PocketPath};
 use crate::vcarve::{vcarve_paths, VOptions};
 use crate::polyoffset::{offset_polygon, point_in_poly, polygon_area, simplify_polygon, simplify_polyline, P};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 const MM_TO_PIXEL: f64 = 2.0;
@@ -38,6 +41,25 @@ const ARC_TOL: f64 = 0.02;
 pub struct Tool {
     /// Name, schon ohne Umlaute und Sonderzeichen (wie er im G-Code steht)
     pub name: String,
+    /// Name, wie er in der Bibliothek steht (für Hinweise)
+    #[serde(default)]
+    pub raw_name: String,
+    /// Wählrad der Oberfräse reicht nicht: "low" | "high" (Hinweis gcw.dial.*) und die Drehzahl der Stufe
+    #[serde(default)]
+    pub dial_out: Option<String>,
+    #[serde(default)]
+    pub dial_rpm: f64,
+    /// Anbohrer: sein Ø muss nicht zum Loch passen
+    #[serde(default)]
+    pub spot: bool,
+    /// Werkzeugart in der Sprache der Oberfläche – nur bei Arten, die nicht für Konturen/Taschen taugen (gcw.toolType)
+    #[serde(default)]
+    pub type_text: Option<String>,
+    /// Einzahn-Gewindefräser und die Länge seines Halses (gcw.threadReach)
+    #[serde(default)]
+    pub thread_single: bool,
+    #[serde(default)]
+    pub flute_len: f64,
     /// Schneiden-Ø abzüglich Verschleiß (cutDiameter)
     pub diameter: f64,
     pub step_z: f64,
@@ -326,6 +348,9 @@ fn flute_passes(path: &[P], passes: &[f64], o: &FluteOpts) -> Vec<Vec<[f64; 3]>>
 pub struct Drift {
     pub every_min: f64,
     pub marker: String,
+    /// kein Messplatz eingetragen (Hinweis gcw.driftNoSpot)
+    #[serde(default)]
+    pub no_spot: bool,
 }
 
 /// Platzhalter-Zeile an jeder sicheren Stelle (zwischen zwei Formen, Fräser oben)
@@ -564,6 +589,18 @@ pub struct Shape {
     /// beim Anfahren als fremde Form)
     #[serde(skip)]
     pub converted: bool,
+    /// Material-Profil gilt für ein anderes Werkzeug: sein Name (Hinweis gcw.cutDataOff)
+    #[serde(default)]
+    pub cut_off: Option<String>,
+    /// Startpunkt/Richtung von Hand: "ignored" (wirkt bei dieser Art nicht) | "millDir" (gewinnt über Gleich-/Gegenlauf)
+    #[serde(default)]
+    pub cut_warn: String,
+    /// Zwiebelhaut eingestellt, wirkt hier aber nicht (zählt für gcw.skinIgnored)
+    #[serde(default)]
+    pub skin_ignored: bool,
+    /// Gewinde in ein Loch, das als Kontur „Innen“ gefräst wird: Schneiden-Ø und Ø jenes Fräsers (gcw.threadCore)
+    #[serde(default)]
+    pub thread_first: Option<[f64; 2]>,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -593,6 +630,49 @@ pub struct Job {
     /// Bahnen aller Formen in mm (shapeToPaths) – nur wenn An-/Wegfahren vorkommt: dort darf nichts im Weg sein
     #[serde(default)]
     pub lead_others: Vec<Other>,
+    /// Texte der Hinweise (gcw.*, cut.*) in der Sprache der Oberfläche, mit Platzhaltern {n}
+    #[serde(default)]
+    pub warn_texts: HashMap<String, String>,
+    /// Formen, deren Restmaterial-Werkzeug nicht passt (Hinweis gcw.restIgnored)
+    #[serde(default)]
+    pub rest_ignored: usize,
+}
+
+/// Ein Hinweis zum G-Code: Schlüssel der Sprachdatei und die Werte dazu (das Fenster setzt sie mit t() ein).
+/// `text` = derselbe Hinweis schon eingesetzt (in mm) – daran wird „schon gemeldet“ erkannt, wie in cam.ts
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct Warn {
+    pub key: String,
+    pub p: Vec<(String, String)>,
+    pub text: String,
+}
+
+/// Ein gefrästes Gewinde (ThreadInfo in threadMill.ts) – die 3D-Ansicht zeichnet daraus die Gewindegänge
+#[derive(Serialize, Clone, Debug, PartialEq)]
+pub struct ThreadInfo {
+    pub cx: f64,
+    pub cy: f64,
+    #[serde(rename = "D")]
+    pub d: f64,
+    #[serde(rename = "P")]
+    pub p: f64,
+    pub internal: bool,
+    pub left: bool,
+    pub length: f64,
+    #[serde(rename = "majorD")]
+    pub major_d: f64,
+    #[serde(rename = "minorD")]
+    pub minor_d: f64,
+}
+
+/// Alles, was cam.ts beim Erzeugen liefert: G-Code, Hinweise, Gewinde, Werkzeug je Abschnitt (Nummer in job.tools)
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Output {
+    pub gcode: String,
+    pub warnings: Vec<Warn>,
+    pub threads: Vec<ThreadInfo>,
+    pub section_tools: Vec<Option<usize>>,
 }
 
 /// Bahn einer Form, an der eine Anfahrbahn vorbeikommen muss
@@ -605,7 +685,7 @@ pub struct Other {
 }
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie MILL_JOB_VERSION in camJob.ts)
-pub const JOB_VERSION: u32 = 17;
+pub const JOB_VERSION: u32 = 18;
 
 struct Gen<'a> {
     job: &'a Job,
@@ -632,6 +712,14 @@ struct Gen<'a> {
     pass_top: f64,
     /// Frästiefe der Form, solange eine Form mit Haut gefräst wird
     skin_depth: Option<f64>,
+    /// Hinweise (lastGcodeWarnings), Gewinde (lastThreads), Werkzeug je Abschnitt (lastSectionTools)
+    warns: Vec<Warn>,
+    threads: Vec<ThreadInfo>,
+    sections: Vec<Option<usize>>,
+    /// Nummer der Form im G-Code (formCounter)
+    n: usize,
+    /// Formen, deren Zwiebelhaut nicht wirkt
+    skin_ignored: usize,
 }
 
 fn to_machine(x: f64, y: f64) -> P {
@@ -891,6 +979,35 @@ impl Gen<'_> {
     fn push(&mut self, s: &str) {
         self.out.push_str(s);
     }
+    fn warn_of(&self, key: &str, params: &[(&str, String)]) -> Warn {
+        let mut text = self.job.warn_texts.get(key).cloned().unwrap_or_else(|| key.to_string());
+        for (k, v) in params {
+            text = text.replace(&format!("{{{k}}}"), v);
+        }
+        Warn { key: key.to_string(), p: params.iter().map(|(k, v)| (k.to_string(), v.clone())).collect(), text }
+    }
+    /// Hinweis melden:  w("gcw.split", { n, parts })
+    fn w(&mut self, key: &str, params: &[(&str, String)]) {
+        let w = self.warn_of(key, params);
+        self.warns.push(w);
+    }
+    /// Hinweis nur melden, wenn derselbe Text noch nicht da ist
+    fn w_once(&mut self, key: &str, params: &[(&str, String)]) {
+        let w = self.warn_of(key, params);
+        if !self.warns.iter().any(|o| o.text == w.text) {
+            self.warns.push(w);
+        }
+    }
+    /// Hinweis, der nur die Nummer der Form nennt
+    fn wn(&mut self, key: &str) {
+        self.w(key, &[("n", self.n.to_string())]);
+    }
+    fn too_big(&mut self) {
+        self.w("gcw.toolTooBig", &[("n", self.n.to_string()), ("d", js_num(self.tool_radius * 2.0))]);
+    }
+    fn no_lead(&mut self) {
+        self.w_once("gcw.leadNoRoom", &[("n", self.n.to_string())]);
+    }
     fn safe(&mut self) {
         let s = format!("G0 Z{}\n", f2(SAFE_Z));
         self.push(&s);
@@ -936,6 +1053,9 @@ impl Gen<'_> {
             let line = format!("({d})\n");
             self.push(&line);
         }
+        if let Some((t, out)) = tool.and_then(|t| t.dial_out.as_ref().map(|o| (t, o))) {
+            self.w_once(&format!("gcw.dial.{out}"), &[("name", t.raw_name.clone()), ("rpm", js_num(self.rpm)), ("min", js_num(t.dial_rpm))]);
+        }
         let line = format!("{} S{} {}\n", job.spindle, js_num(self.rpm), self.c("gc.spindleOn", &[("rpm", js_num(self.rpm))]));
         self.push(&line);
         if change {
@@ -944,7 +1064,7 @@ impl Gen<'_> {
         }
         let line = format!("F{} {}\n", js_num(self.feed_xy), self.c("gc.feed", &[("f", js_num(self.feed_xy))]));
         self.push(&line);
-
+        self.sections.push(t);
     }
 
     /// EINTAUCHEN von z_top auf z am Anfang der Bahn pts – mit Eintauchwinkel als Rampe entlang der Bahn
@@ -1106,7 +1226,9 @@ impl Gen<'_> {
         let target = self.skin_depth.unwrap_or(passes[passes.len() - 1]);
         let z_tab = target + tab.h;
         if z_tab >= -0.001 {
-            return false; // Stege höher als die Frästiefe
+            // Stege höher als die Frästiefe
+            self.w("gcw.tabsTooHigh", &[("n", self.n.to_string()), ("h", js_num(tab.h))]);
+            return false;
         }
         let cum = cumulative(lp);
         let len = cum[cum.len() - 1];
@@ -1128,11 +1250,16 @@ impl Gen<'_> {
             }
         }
         // Startpunkt von Hand: die Bahn beginnt schon dort. Liegt er in einem Steg, gewinnt der Steg
-        if shape.cut_start.is_some() && !centers.iter().any(|&c| mn(c.abs(), (c - len).abs()) < half) {
-            s0 = 0.0;
+        if shape.cut_start.is_some() {
+            if centers.iter().any(|&c| mn(c.abs(), (c - len).abs()) < half) {
+                self.w("cut.startInTab", &[]);
+            } else {
+                s0 = 0.0;
+            }
         }
         let too_many = if tab.manual { gap <= 2.0 * half } else { len / (centers.len() as f64) < 3.0 * half };
         if too_many {
+            self.w("gcw.tabsTooMany", &[("n", self.n.to_string()), ("k", centers.len().to_string())]);
             return false;
         }
         let rel = |x: f64| (((x - s0) % len) + len) % len;
@@ -1198,6 +1325,7 @@ impl Gen<'_> {
                     self.safe();
                     return true;
                 }
+                self.no_lead();
             }
         }
         let entry = lead.and_then(|l| nearest_on(&loops_as_paths(l), start));
@@ -1249,6 +1377,7 @@ impl Gen<'_> {
         // Schlichtgang: erst mit Aufmaß (außen größer, innen kleiner), danach auf Maß
         let mut allow = if !last && (mode == "outside" || mode == "inside") { shape.finish_allow } else { 0.0 };
         if allow > 0.0 && mode == "inside" && radius_final - allow <= 0.05 {
+            self.w("gcw.finishSkip", &[("n", self.n.to_string()), ("a", js_num(allow))]);
             allow = 0.0;
         }
         let radius_mm = radius_final + if mode == "outside" { allow } else { -allow };
@@ -1306,7 +1435,11 @@ impl Gen<'_> {
                 (Some(o), Some(ins)) => {
                     let ccw = cmd == "G3";
                     let tan = [if ccw { -1.0 } else { 1.0 }, 0.0];
-                    lead_at_point([entry_x, entry_y], tan, tan, &ellipse_points(center[0], center[1], radius_mm, radius_mm), ccw, ins, &o, &self.lead_free())
+                    let plan = lead_at_point([entry_x, entry_y], tan, tan, &ellipse_points(center[0], center[1], radius_mm, radius_mm), ccw, ins, &o, &self.lead_free());
+                    if plan.is_none() {
+                        self.no_lead();
+                    }
+                    plan
                 }
                 _ => None,
             };
@@ -1362,6 +1495,7 @@ impl Gen<'_> {
         } else {
             let line = format!("{}\n", self.c("gc.circleTooSmall", &[]));
             self.push(&line);
+            self.wn("gcw.circleTooSmall");
         }
     }
 
@@ -1369,16 +1503,21 @@ impl Gen<'_> {
     fn mill_drill(&mut self, shape: &Shape) {
         /// so weit über dem Material beginnt der Vorschub (DRILL_CLEAR in cam.ts)
         const DRILL_CLEAR: f64 = 0.5;
-        let c_px = if shape.kind == "circle" {
-            [shape.x, shape.y]
+        let (c_px, hole_px) = if shape.kind == "circle" {
+            ([shape.x, shape.y], 2.0 * shape.w.abs())
         } else {
             let (min_x, max_x, min_y, max_y) = match (shape.kind.as_str(), shape.bounds) {
                 (_, Some(b)) => (b[0], b[2], b[1], b[3]),
                 ("polyline", _) => (shape.x, shape.x + shape.w, shape.y, shape.y + shape.h),
                 _ => (mn(shape.x, shape.x + shape.w), mx(shape.x, shape.x + shape.w), mn(shape.y, shape.y + shape.h), mx(shape.y, shape.y + shape.h)),
             };
-            [(min_x + max_x) / 2.0, (min_y + max_y) / 2.0]
+            ([(min_x + max_x) / 2.0, (min_y + max_y) / 2.0], mx(max_x - min_x, max_y - min_y))
         };
+        // Anbohrer: zentriert nur, sein Ø muss nicht zum Loch passen
+        let hole_dia = hole_px / MM_TO_PIXEL;
+        if !self.tool.is_some_and(|t| t.spot) && (hole_dia - self.tool_radius * 2.0).abs() > 0.05 {
+            self.w("gcw.drillSize", &[("n", self.n.to_string()), ("h", to_fixed(hole_dia, 2)), ("d", js_num(self.tool_radius * 2.0))]);
+        }
         let p = to_machine(c_px[0], c_px[1]);
         let passes = self.passes.clone();
         let line = format!("G0 Z{}\nG0 X{} Y{}\nG0 Z{}\n", f2(SAFE_Z), f3(p[0]), f3(p[1]), f2(DRILL_CLEAR));
@@ -1426,6 +1565,7 @@ impl Gen<'_> {
             return;
         }
         if small.is_empty() {
+            self.too_big();
             return;
         }
         // Strecken der großen Bahn in einem Raster (schnelle Abstandsfrage)
@@ -1547,21 +1687,27 @@ impl Gen<'_> {
             return;
         }
         let target = self.passes[self.passes.len() - 1];
-        if !(target < -1e-6) || self.tool.is_some_and(|t| t.no_tro) {
+        if !(target < -1e-6) {
             return;
         }
+        if self.tool.is_some_and(|t| t.no_tro) {
+            return self.w_once("gcw.troTool", &[("n", self.n.to_string())]);
+        }
         let r = self.tool_radius;
-        let Some(plan) = trochoid_plan(poly, inside, r, allow, o) else { return };
+        let Some(plan) = trochoid_plan(poly, inside, r, allow, o) else {
+            return self.w_once("gcw.troNoRoom", &[("n", self.n.to_string())]);
+        };
         // andere Formen: der Fräser braucht neben der Mitte den Kreisradius und seinen eigenen Radius Platz
         let every = mx(1.0, (r / 2.0 / mx(1e-6, 2.0 * r * o.step / 100.0)).floor()) as usize;
-        {
+        let near = {
             let free = self.lead_free_extra(plan.rho);
-            for l in &plan.loops {
+            plan.loops.iter().any(|l| {
                 let centres: Vec<P> = l.iter().enumerate().filter(|(i, _)| i % every == 0).map(|(_, x)| x.0).collect();
-                if !free(&centres) {
-                    return;
-                }
-            }
+                !free(&centres)
+            })
+        };
+        if near {
+            return self.w_once("gcw.troNear", &[("n", self.n.to_string())]);
         }
         let z_tab = tab.map_or(f64::NEG_INFINITY, |t| self.skin_depth.unwrap_or(target) + t.h);
         let bottom = if z_tab < -0.001 { mx(target, z_tab) } else { target };
@@ -1641,20 +1787,22 @@ impl Gen<'_> {
     fn mill_vcarve(&mut self, list: &[usize], plug: bool, depth: f64, start: f64) {
         const VSTEP: f64 = 0.12;
         const CLEAR: f64 = 1.0;
-        let Some(tool) = self.tool else { return };
-        if !tool.cone || !(tool.angle > 0.0) {
-            return;
-        }
+        let Some(tool) = self.tool.filter(|t| t.cone && t.angle > 0.0) else {
+            return self.wn("gcw.vNeedsVbit");
+        };
         let loops: Vec<Vec<P>> = list.iter().filter_map(|&k| closed_mm(&self.job.shapes[k])).collect();
         if loops.is_empty() {
             return;
         }
         let o = VOptions { angle: tool.angle, tip_dia: tool.tip_dia, tool_dia: tool.raw_diameter, max_depth: depth.abs(), start, step: VSTEP, outside: plug, outside_limit: None };
-        let (paths, _flat) = vcarve_paths(&loops, &o);
+        let (paths, flat) = vcarve_paths(&loops, &o);
         if paths.is_empty() {
-            return;
+            return self.wn("gcw.vEmpty");
         }
         let deepest = paths.iter().fold(f64::INFINITY, |a, p| mn(a, p.z));
+        if !plug && flat && depth.abs() > 0.0 {
+            self.w("gcw.vFlat", &[("n", self.n.to_string()), ("d", to_fixed(-deepest, 2))]);
+        }
         self.passes = depth_passes(deepest, self.step_z);
         let mut prev = 0.0;
         for lz in self.passes.clone() {
@@ -1681,15 +1829,14 @@ impl Gen<'_> {
     /// FASE mit Fasen- oder V-Fräser (millChamfer in cam.ts): Tiefe = Breite / tan(halber Winkel); die Spitze läuft
     /// um ihren halben Ø neben der Kante (außen bei Außenkonturen, innen bei Löchern)
     fn mill_chamfer(&mut self, shape: &Shape) {
-        let Some(tool) = self.tool else { return };
-        if !tool.cone || !(tool.angle > 0.0) || tool.angle >= 180.0 {
-            return;
-        }
+        let Some(tool) = self.tool.filter(|t| t.cone && t.angle > 0.0 && !(t.angle >= 180.0)) else {
+            return self.wn("gcw.chamferTool");
+        };
         let w = mx(0.05, if shape.chamfer_w != 0.0 { shape.chamfer_w } else { 1.0 });
         let h = w / tool.chamfer_tan;
         let o = tool.tip_dia / 2.0;
         if o + w > tool.raw_diameter / 2.0 + 1e-6 {
-            return;
+            return self.w("gcw.chamferWide", &[("n", self.n.to_string()), ("w", js_num(w)), ("d", js_num(tool.raw_diameter))]);
         }
         self.passes = depth_passes(-h, self.step_z);
         let side = shape.chamfer_side;
@@ -1699,7 +1846,7 @@ impl Gen<'_> {
             let c0 = to_machine(shape.x, shape.y);
             let r = shape.w.abs() / MM_TO_PIXEL + side * o;
             if r <= 0.05 {
-                return;
+                return self.too_big();
             }
             let cmd = match wants_ccw(inside, dir) {
                 Some(true) => "G3",
@@ -1719,6 +1866,9 @@ impl Gen<'_> {
         if shape.kind == "polyline" && shape.closed && side != 0.0 {
             let pts: Vec<P> = shape.points.iter().map(|p| to_machine(p[0], p[1])).collect();
             let loops = if o > 1e-9 { offset_polygon(&pts, side * o, 0.01) } else { vec![pts] };
+            if loops.is_empty() {
+                return self.too_big();
+            }
             // Standard wie die Konturen: außen gegen, innen im Uhrzeigersinn; sonst die Vorgabe
             for l in loops {
                 let l = if !dir.is_empty() {
@@ -1749,14 +1899,23 @@ impl Gen<'_> {
 
     /// GEWINDE an einem Kreis (millThread in cam.ts, Bahn aus threadMill.ts)
     fn mill_thread(&mut self, shape: &Shape, n: usize) {
-        let Some(tool_pitch) = self.tool.and_then(|t| t.thread_pitch) else { return };
+        let Some((tool, tool_pitch)) = self.tool.and_then(|t| t.thread_pitch.map(|p| (t, p))) else {
+            return self.wn("gcw.threadTool");
+        };
         let Some(th) = shape.thread.as_ref() else { return };
-        let Some((x, y, r)) = round_of(shape) else { return };
+        let Some((x, y, r)) = round_of(shape) else {
+            return self.wn("gcw.threadCircle");
+        };
         let side = shape.chamfer_side;
         if side == 0.0 {
-            return;
+            return self.wn("gcw.threadSide");
         }
         let c0 = to_machine(x, y);
+        // Loch nur als Kontur „Innen“ gefräst: ab Loch-Ø > 2 × Fräser-Ø bleibt in der Mitte ein Kern stehen
+        if let Some([first_cut, first_d]) = shape.thread_first.filter(|f| side < 0.0 && 2.0 * r / MM_TO_PIXEL > 2.0 * f[0] - 0.01) {
+            let _ = first_cut;
+            self.w("gcw.threadCore", &[("n", self.n.to_string()), ("h", to_fixed(2.0 * r / MM_TO_PIXEL, 2)), ("d", js_num(first_d))]);
+        }
         let p = ThreadParams {
             cx: c0[0],
             cy: c0[1],
@@ -1774,7 +1933,15 @@ impl Gen<'_> {
             plunge: self.plunge,
             safe_z: SAFE_Z,
         };
-        let Some((lines, d, pitch)) = thread_path(&p) else { return };
+        let (lines, d, pitch, info) = match thread_path(&p) {
+            Ok(r) => r,
+            Err(why) => return self.w(&format!("gcw.thread.{why}"), &[("n", self.n.to_string()), ("d", js_num(tool.raw_diameter))]),
+        };
+        // Einzahn: Hals muss tief genug reichen
+        if tool.thread_single && tool.flute_len > 0.0 && info.length > tool.flute_len + 1e-6 {
+            self.w("gcw.threadReach", &[("n", self.n.to_string()), ("l", js_num(info.length)), ("r", js_num(tool.flute_len))]);
+        }
+        self.threads.push(info);
         let side_text = self.job.texts.get(if side < 0.0 { "gc.threadIn" } else { "gc.threadOut" }).cloned().unwrap_or_default();
         let hand = self.job.texts.get(if th.left { "gc.threadLeft" } else { "gc.threadRight" }).cloned().unwrap_or_default();
         let head = self.c("gc.thread", &[("n", n.to_string()), ("d", js_num(d)), ("p", js_num(pitch)), ("l", js_num(th.len)), ("side", side_text), ("hand", hand)]);
@@ -1786,7 +1953,7 @@ impl Gen<'_> {
         let Some([x0, y0, w, h]) = shape.face else { return };
         let (depth, step_z, tool_d) = (shape.depth.abs(), self.step_z, self.tool_radius * 2.0);
         if !(w > 0.0 && h > 0.0 && depth > 0.0 && tool_d > 0.0 && step_z > 0.0) {
-            return;
+            return self.wn("gcw.faceEmpty");
         }
         // Zahl wie String(+v.toFixed(3)): höchstens drei Stellen, ohne Nullen am Ende
         let n3 = |v: f64| js_num(to_fixed(v, 3).parse::<f64>().unwrap_or(v));
@@ -1795,7 +1962,7 @@ impl Gen<'_> {
         let (a0, a1) = (x0 - r - 1.0, x0 + w + r + 1.0);
         let (c0, c1) = (y0, y0 + h);
         if !(a1 > a0 && c1 >= c0) {
-            return;
+            return self.wn("gcw.faceEmpty");
         }
         // Zeilen gleichmäßig von Kante zu Kante (Fräsermitte genau auf beiden Kanten)
         let rows = if c1 - c0 < 1e-9 { 1.0 } else { mx(1.0, ((c1 - c0) / step).ceil()) + 1.0 };
@@ -1834,16 +2001,21 @@ impl Gen<'_> {
         let strategy = if job.pocket_strategy == "spiral" || job.pocket_strategy == "adaptive" { job.pocket_strategy.as_str() } else { "linear" };
         let dir = shape.mill_dir.as_str();
         let mut allow = shape.finish_allow;
+        // adaptive Bögen laufen fest im Gleichlauf: die Vorgabe gilt dort nur für die Wand
+        if dir == "conventional" && strategy == "adaptive" {
+            self.wn("gcw.dirAdaptive");
+        }
         let (mut paths, mut too_big) = pocket_paths(outer, &islands, self.tool_radius + allow, step, strategy, dir);
         if allow > 0.0 && (too_big || paths.is_empty()) {
             // mit Aufmaß passt der Fräser nicht mehr hinein → ohne Schlichtgang
+            self.w("gcw.finishSkip", &[("n", self.n.to_string()), ("a", js_num(allow))]);
             allow = 0.0;
             (paths, too_big) = pocket_paths(outer, &islands, self.tool_radius, step, strategy, dir);
         }
         if too_big || paths.is_empty() {
             let line = format!("{}\n", self.c("gc.toolTooBig", &[]));
             self.push(&line);
-            return;
+            return self.too_big();
         }
         let passes = self.passes.clone();
         for (i, &z) in passes.iter().enumerate() {
@@ -1937,7 +2109,7 @@ impl Gen<'_> {
         if r_new <= 0.05 {
             let line = format!("{}\n", self.c("gc.toolTooBig", &[]));
             self.push(&line);
-            return;
+            return self.too_big();
         }
         let k = r_new / r_mm;
         let radial = |p: P| -> P { [center[0] + (p[0] - center[0]) * k, center[1] + (p[1] - center[1]) * k] };
@@ -1980,12 +2152,17 @@ impl Gen<'_> {
         let sign = if offset > 0.0 { 1.0 } else if offset < 0.0 { -1.0 } else { 0.0 };
         let mut loops = offset_polygon(&pts, offset + sign * allow, 0.01);
         if allow > 0.0 && loops.is_empty() {
+            self.w("gcw.finishSkip", &[("n", self.n.to_string()), ("a", js_num(allow))]);
             allow = 0.0;
             loops = offset_polygon(&pts, offset, 0.01);
         }
         if loops.is_empty() {
             let line = format!("{}\n", self.c("gc.toolTooBig", &[]));
             self.push(&line);
+            self.too_big();
+        }
+        if loops.len() > 1 {
+            self.w("gcw.split", &[("n", self.n.to_string()), ("parts", loops.len().to_string())]);
         }
         // Standard: außen gegen den Uhrzeigersinn, innen im Uhrzeigersinn; mit Vorgabe der Form die gewählte Richtung
         let inside = mode == "inside";
@@ -2022,6 +2199,7 @@ impl Gen<'_> {
                     self.mill_path_plan(&lp, &plan);
                     continue;
                 }
+                self.no_lead();
             }
             self.mill_path(path, true);
         }
@@ -2173,26 +2351,30 @@ fn resolve_thread(p: &ThreadParams) -> (f64, f64) {
     (d, pitch)
 }
 
-/// Bahn des Gewindefräsers (threadPath in threadMill.ts): Zeilen, Nenn-Ø, Steigung. None = geht nicht
-fn thread_path(p: &ThreadParams) -> Option<(Vec<String>, f64, f64)> {
+/// Bahn des Gewindefräsers (threadPath in threadMill.ts): Zeilen, Nenn-Ø, Steigung, das Gewinde.
+/// Err = geht nicht, mit dem Grund ("pitch" | "length" | "small" | "toolTooBig" | "toolNoFit")
+fn thread_path(p: &ThreadParams) -> Result<(Vec<String>, f64, f64, ThreadInfo), &'static str> {
     let t3 = |v: f64| to_fixed(if v.abs() < 5e-4 { 0.0 } else { v }, 3);
     let (d, pitch) = resolve_thread(p);
-    if !(pitch > 0.0) || !(p.length > 0.0) {
-        return None;
+    if !(pitch > 0.0) {
+        return Err("pitch");
+    }
+    if !(p.length > 0.0) {
+        return Err("length");
     }
     let rt = p.tool_d / 2.0;
     if !(d > pitch) {
-        return None;
+        return Err("small");
     }
     let minor = d - 1.22687 * pitch;
     // Bahnradius der Fräsermitte bei voller Tiefe
     let rf = if p.internal { d / 2.0 - rt } else { minor / 2.0 + rt };
     if p.internal && rf < 0.05 {
-        return None;
+        return Err("toolTooBig");
     }
     // innen muss der Fräser ins Kernloch passen
     if p.internal && p.tool_d > p.hole_d + 1e-6 {
-        return None;
+        return Err("toolNoFit");
     }
     // Radien der Durchgänge: vom ersten Kontakt mit dem Material bis zur vollen Tiefe
     let passes = if p.passes != 0.0 && !p.passes.is_nan() { p.passes } else { 1.0 };
@@ -2244,7 +2426,18 @@ fn thread_path(p: &ThreadParams) -> Option<(Vec<String>, f64, f64)> {
         }
     }
     l.push(format!("G0 Z{}", t3(p.safe_z)));
-    Some((l, d, pitch))
+    let info = ThreadInfo {
+        cx: p.cx,
+        cy: p.cy,
+        d,
+        p: pitch,
+        internal: p.internal,
+        left: p.left,
+        length: p.length,
+        major_d: if p.internal { d } else { mn(d, p.hole_d) },
+        minor_d: if p.internal { mx(p.hole_d, minor) } else { minor },
+    };
+    Ok((l, d, pitch, info))
 }
 
 fn closed_mm(s: &Shape) -> Option<Vec<P>> {
@@ -2476,7 +2669,13 @@ fn tool_groups(job: &Job) -> Vec<(Option<usize>, Vec<usize>)> {
 }
 
 /// G-Code für den Auftrag. Err = der Auftrag passt nicht zu dieser Datei
+#[cfg(test)]
 pub fn generate(job: &Job) -> Result<String, String> {
+    generate_full(job).map(|o| o.gcode)
+}
+
+/// Wie `generate`, dazu die Hinweise, die Gewinde und das Werkzeug je Abschnitt (alles, was cam.ts liefert)
+pub fn generate_full(job: &Job) -> Result<Output, String> {
     if job.version != JOB_VERSION {
         return Err(format!("job version {} (this build understands {})", job.version, JOB_VERSION));
     }
@@ -2494,12 +2693,15 @@ pub fn generate(job: &Job) -> Result<String, String> {
             return Err("shape names a tool that is not in the job".into());
         }
     }
-    let mut g = Gen { job, out: String::new(), tool_radius: 1.5, step_z: 1.5, feed_xy: 800.0, rpm: 12000.0, plunge: 300.0, ramp_tan: 0.0, passes: vec![], cur_lead: None, cur_shape: 0, reamer: false, tool: None, converted: false, pass_top: 0.0, skin_depth: None };
+    let mut g = Gen { job, out: String::new(), tool_radius: 1.5, step_z: 1.5, feed_xy: 800.0, rpm: 12000.0, plunge: 300.0, ramp_tan: 0.0, passes: vec![], cur_lead: None, cur_shape: 0, reamer: false, tool: None, converted: false, pass_top: 0.0, skin_depth: None, warns: vec![], threads: vec![], sections: vec![], n: 0, skin_ignored: 0 };
 
     // ---- Kopf ----
     let head = format!("G21 {}\nG90 {}\nG0 Z{} {}\n", g.c("gc.unitMm", &[]), g.c("gc.absolute", &[]), f2(SAFE_Z), g.c("gc.safeZ", &[]));
     g.push(&head);
     let groups = tool_groups(job);
+    if job.rest_ignored > 0 {
+        g.w("gcw.restIgnored", &[("n", job.rest_ignored.to_string())]);
+    }
     let name_of = |t: Option<usize>| t.map_or("Standard".to_string(), |t| job.tools[t].name.clone());
     if groups.len() > 1 {
         let line = format!("{}\n", g.c("gc.toolList", &[("n", groups.len().to_string())]));
@@ -2543,6 +2745,14 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 sh.tro.is_none() && sh.flute.is_none() && !matches!(sh.mode.as_str(), "drill" | "vcarve" | "vplug" | "chamfer" | "face") && !(sh.mode == "pocket" && job.pocket_strategy == "adaptive")
             });
             'shape: {
+            // Startpunkt/Richtung von Hand, die hier nicht wirken oder über Gleich-/Gegenlauf gewinnen (cutReady in cam.ts)
+            if k < job.shapes.len() {
+                match job.shapes[k].cut_warn.as_str() {
+                    "ignored" => g.w("cut.ignored", &[("n", (form_counter + 1).to_string())]),
+                    "millDir" => g.w("cut.millDir", &[("n", (form_counter + 1).to_string())]),
+                    _ => {}
+                }
+            }
             if v_done.contains(&k) {
                 break 'shape;
             }
@@ -2563,6 +2773,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
                     g.feed_xy = tool_feed;
                 }
                 form_counter += 1;
+                g.n = form_counter;
                 g.cur_lead = None;
                 g.skin_depth = None;
                 g.converted = false;
@@ -2589,6 +2800,10 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 }
             }
             // ---- Schnittwerte der Form (Material-Profil) ----
+            // für ein anderes Werkzeug angewendet: Werkzeug-Werte nehmen und sagen
+            if let Some(label) = &shape.cut_off {
+                g.w_once("gcw.cutDataOff", &[("name", label.clone())]);
+            }
             let r = shape.cut.as_ref();
             let f = r.map_or(tool_feed, |r| r.feedrate);
             let s = r.map_or(tool_rpm, |r| r.rpm);
@@ -2615,15 +2830,27 @@ pub fn generate(job: &Job) -> Result<String, String> {
             }
 
             form_counter += 1;
+            g.n = form_counter;
             g.passes = depth_passes(shape.depth, g.step_z);
             let mode = shape.mode.as_str();
+            if shape.skin_ignored {
+                g.skin_ignored += 1;
+            }
             // Zwiebelhaut: geschlossene Konturen außen/innen hören über dem Boden auf. Haut so dick wie die Frästiefe:
             // nichts zu fräsen – die Form bleibt ganz
             g.skin_depth = None;
             let skin = match &shape.skin {
                 Some(set) => match skin_plan(shape.depth, g.step_z, set) {
-                    Ok(plan) => Some((plan, set.clone())),
-                    Err(()) => break 'shape,
+                    Ok(plan) => {
+                        if set.h > mx(0.05, g.step_z.abs()) + 1e-9 {
+                            g.w("gcw.skinThick", &[("n", form_counter.to_string()), ("h", js_num(set.h)), ("z", js_num(g.step_z))]);
+                        }
+                        Some((plan, set.clone()))
+                    }
+                    Err(()) => {
+                        g.w("gcw.skinTooThick", &[("n", form_counter.to_string()), ("h", js_num(set.h)), ("d", js_num(shape.depth.abs()))]);
+                        break 'shape;
+                    }
                 },
                 None => None,
             };
@@ -2642,7 +2869,12 @@ pub fn generate(job: &Job) -> Result<String, String> {
             };
             if let Some([d, hole]) = shape.cbore {
                 // an anderen Formen als Kreisen geht keine Stufenbohrung; die Senkung muss größer sein als das Loch
-                if mode == "cbore" || d <= hole + 0.01 {
+                if mode == "cbore" {
+                    g.wn("gcw.cboreShape");
+                    break 'shape;
+                }
+                if d <= hole + 0.01 {
+                    g.w("gcw.cboreSmall", &[("n", form_counter.to_string()), ("d", js_num(d)), ("h", to_fixed(hole, 2))]);
                     break 'shape;
                 }
             }
@@ -2685,6 +2917,12 @@ pub fn generate(job: &Job) -> Result<String, String> {
                     g.mill_drill(shape);
                 }
                 break 'shape;
+            }
+            // V-Stichel, Bohrer und Senker taugen nicht für Konturen mit Fräser-Versatz/Taschen
+            if mode != "on-line" {
+                if let Some((t, ty)) = g.tool.and_then(|t| t.type_text.as_ref().map(|ty| (t, ty))) {
+                    g.w_once("gcw.toolType", &[("name", t.raw_name.clone()), ("type", ty.clone())]);
+                }
             }
             let line = match &shape.pin_mark {
                 Some(pin) => format!("\n{pin}\n"),
@@ -2790,12 +3028,21 @@ pub fn generate(job: &Job) -> Result<String, String> {
             g.cur_lead = j.lead.clone();
             g.cur_shape = j.k;
             g.converted = j.shape.converted;
+            g.n = j.n;
+            // Hinweise, die schon beim Fräsen der Form kamen (Stege passen nicht, kein Platz zum Anfahren …), nicht doppelt
+            let known = g.warns.len();
             let offset = if j.shape.mode == "inside" { -g.tool_radius } else { g.tool_radius };
             if j.shape.kind == "circle" {
                 g.mill_circle(&j.shape, offset, true);
             } else {
                 g.mill_polyline(&j.shape, offset, true);
             }
+            let old: Vec<String> = g.warns[..known].iter().map(|w| w.text.clone()).collect();
+            let mut i = 0;
+            g.warns.retain(|w| {
+                i += 1;
+                i <= known || !old.contains(&w.text)
+            });
             g.pass_top = 0.0;
             g.skin_depth = None;
         }
@@ -2804,11 +3051,17 @@ pub fn generate(job: &Job) -> Result<String, String> {
     // ---- Programmende ----
     let foot = format!("\nG0 Z{}\nM5 {}\nG0 X0 Y0 {}\nM30 {}\n", f2(SAFE_Z), g.c("gc.spindleOff", &[]), g.c("gc.park", &[]), g.c("gc.end", &[]));
     g.push(&foot);
+    if g.skin_ignored > 0 {
+        g.w("gcw.skinIgnored", &[("n", g.skin_ignored.to_string())]);
+    }
     // ---- Nachmessen: Mess-Punkte nach geschätzter Laufzeit ----
     if let Some(d) = &job.drift {
-        return Ok(place_drift_points(&g.out, d));
+        g.out = place_drift_points(&g.out, d);
+        if d.no_spot {
+            g.w("gcw.driftNoSpot", &[]);
+        }
     }
-    Ok(g.out)
+    Ok(Output { gcode: g.out, warnings: g.warns, threads: g.threads, section_tools: g.sections })
 }
 
 /// Zwei Zeilen sind „fast gleich“, wenn nur Zahlen um höchstens ein Tausendstel abweichen (X12.345 / X12.346).
@@ -2864,6 +3117,39 @@ pub fn compare(mine: &str, theirs: &str) -> Diff {
     }
 }
 
+/// Gleiche JSON-Werte? Zahlen zählen als Zahl (8 und 8.0 sind gleich)
+fn same_json(a: &serde_json::Value, b: &serde_json::Value) -> bool {
+    use serde_json::Value::*;
+    match (a, b) {
+        (Number(x), Number(y)) => x.as_f64() == y.as_f64(),
+        (Array(x), Array(y)) => x.len() == y.len() && x.iter().zip(y).all(|(p, q)| same_json(p, q)),
+        (Object(x), Object(y)) => x.len() == y.len() && x.iter().all(|(k, v)| y.get(k).is_some_and(|w| same_json(v, w))),
+        _ => a == b,
+    }
+}
+
+/// Hinweise, Gewinde und Werkzeug je Abschnitt mit denen aus cam.ts vergleichen.
+/// `side` = { warnings: [Text, …] | null, threads: […], sectionTools: [Nummer | null, …] }; None = alles gleich
+pub fn compare_side(out: &Output, side: &serde_json::Value) -> Option<String> {
+    if let Some(want) = side["warnings"].as_array() {
+        let want: Vec<&str> = want.iter().map(|w| w.as_str().unwrap_or("")).collect();
+        let got: Vec<&str> = out.warnings.iter().map(|w| w.text.as_str()).collect();
+        if got != want {
+            let i = (0..got.len().max(want.len())).find(|&i| got.get(i) != want.get(i)).unwrap_or(0);
+            return Some(format!("warning {} of {} / {}: Rust {:?}, cam.ts {:?}", i + 1, got.len(), want.len(), got.get(i).unwrap_or(&"(none)"), want.get(i).unwrap_or(&"(none)")));
+        }
+    }
+    let threads = serde_json::to_value(&out.threads).unwrap_or_default();
+    if !same_json(&threads, &side["threads"]) {
+        return Some(format!("threads: Rust {threads}, cam.ts {}", side["threads"]));
+    }
+    let sections = serde_json::to_value(&out.section_tools).unwrap_or_default();
+    if !same_json(&sections, &side["sectionTools"]) {
+        return Some(format!("tools per section: Rust {sections}, cam.ts {}", side["sectionTools"]));
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2893,7 +3179,7 @@ mod tests {
         }
     }
     fn job(shapes: Vec<Shape>) -> Job {
-        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), feed_adapt: None, drift: None, helix_tan: 0.0, lead_others: vec![] }
+        Job { version: JOB_VERSION, tools: vec![tool()], spindle: "M3".into(), texts: texts(), shapes, pocket_strategy: String::new(), feed_adapt: None, drift: None, helix_tan: 0.0, lead_others: vec![], warn_texts: HashMap::new(), rest_ignored: 0 }
     }
 
     #[test]
@@ -2988,16 +3274,23 @@ mod tests {
         let cases: Value = serde_json::from_reader(flate2::read::GzDecoder::new(file)).unwrap();
         let cases = cases.as_array().unwrap();
         assert!(cases.len() >= 20, "only {} cases", cases.len());
-        let (mut lines, mut shapes, mut near) = (0usize, 0usize, 0usize);
+        let (mut lines, mut shapes, mut near, mut warnings, mut threads) = (0usize, 0usize, 0usize, 0usize, 0usize);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let job: Job = serde_json::from_value(c["job"].clone()).unwrap_or_else(|e| panic!("{name}: {e}"));
             let want = c["gcode"].as_str().unwrap();
-            let got = generate(&job).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let full = generate_full(&job).unwrap_or_else(|e| panic!("{name}: {e}"));
+            let got = full.gcode.clone();
             let d = compare(&got, want);
             if let Some((n, mine, theirs)) = d.first {
                 panic!("{name}: line {n}\n  Rust:   {mine}\n  cam.ts: {theirs}");
             }
+            // Hinweise, Gewinde, Werkzeug je Abschnitt: genau wie cam.ts, in derselben Reihenfolge
+            if let Some(diff) = compare_side(&full, &c["side"]) {
+                panic!("{name}: {diff}");
+            }
+            warnings += full.warnings.len();
+            threads += full.threads.len();
             let count = want.split('\n').count();
             // Ein Tausendstel in einer Zahl: kommt bei Rampen auf Anfahr-Bögen vor (deren Punkte brauchen Sinus/Kosinus,
             // und Rampen-Höhen liegen oft genau auf einer Rundungsgrenze). Höchstens eine von 300 Zeilen.
@@ -3009,7 +3302,7 @@ mod tests {
             lines += count;
             shapes += job.shapes.len();
         }
-        println!("{} cases, {shapes} shapes, {lines} G-code lines the same as cam.ts ({near} of them differ by 0.001 in one number)", cases.len());
+        println!("{} cases, {shapes} shapes, {lines} G-code lines the same as cam.ts ({near} of them differ by 0.001 in one number); {warnings} warnings and {threads} threads the same", cases.len());
     }
 
     /// Eigene Projekte (nicht im Repository): Ordner mit *.milljob.json = { job, gcode } aus der Vorschau

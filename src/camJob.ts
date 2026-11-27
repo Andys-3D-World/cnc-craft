@@ -5,11 +5,14 @@
  * Sprachdatei, Eingabefelder. millJob() sammelt all das für eine Liste von Formen in EIN Objekt, das sich als JSON
  * verschicken lässt. Was Rust noch nicht kann, wird hier erkannt: dann gibt es keinen Auftrag, sondern den Grund.
  *
- * NOCH NICHT AN DER MASCHINE: gefräst wird mit dem G-Code aus cam.ts. Im Entwicklungs-Build rechnet Rust daneben
- * und vergleicht (shadowMill) – das Ergebnis steht im Terminal (`millgcode: … same as cam.ts`) und in der Konsole.
+ * AN DER MASCHINE NUR GEPRÜFT: „Zur Maschine“ und „G-Code speichern“ nehmen den G-Code aus Rust, wenn er Zeichen für
+ * Zeichen gleich dem aus cam.ts ist (rustChecked, generateGcodeChecked in cam.ts) – sonst den aus cam.ts.
+ * Alle Vorschauen rechnen mit cam.ts; im Entwicklungs-Build rechnet Rust daneben und vergleicht (shadowMill) – das
+ * Ergebnis steht im Terminal (`millgcode: … same as cam.ts`) und in der Konsole.
  */
 import { toolForShape, cutDiameter, routerDial, toolSettings, CONE_TYPES, DEFAULT_PLUNGE, type MillingTool } from "./toolLibrary";
-import { resolveCut } from "./millProfiles";
+import { resolveCut, cleanCutData } from "./millProfiles";
+import en from "./i18n/lang/en.json";
 import { tabSettings } from "./tabs";
 import { expandOps } from "./ops";
 import { spindleCode } from "./spindleDir";
@@ -17,18 +20,19 @@ import { leadOptions } from "./millLead";
 import { ascii, t, tMm } from "./i18n/i18n";
 import { feedAdapt } from "./feedAdapt";
 import { probeSettings } from "./probe";
-import { cutDirOf, cutStartOf, hasCutSetting } from "./cutSetting";
+import { cutDirOf, cutStartOf, hasCutSetting, overridesMillDir } from "./cutSetting";
 import { fluteFits, fluteSettings } from "./fluting";
 import { troFits, troSettings } from "./trochoid";
 import { skinRole, skinSettings } from "./onionSkin";
 import { twoSidedFingerprint } from "./twoSidedJob";
 import { postCtx } from "./post/postContext";
+import { isInch } from "./units";
 import { getTool, getTools, toolNumber } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
 import { cloneShape, convertToPolyline, shapeBounds, shapeToPaths } from "./shapeTransform";
 
 /** gleiche Zahl wie JOB_VERSION in millgcode.rs – ändern, wenn sich der Auftrag ändert */
-export const MILL_JOB_VERSION = 17;
+export const MILL_JOB_VERSION = 18;
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn", "gc.spinUp", "gc.feed", "gc.shape", "gc.tab", "gc.ramp",
   "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut", "gc.flute", "gc.trochoid", "gc.rest", "gc.restNone"];
@@ -36,6 +40,13 @@ const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn"
 const TEXTS_UI = ["gc.threadIn", "gc.threadOut", "gc.threadLeft", "gc.threadRight"];
 
 export type MillJob = Record<string, unknown>;
+
+/** Schlüssel aller Hinweise, die cam.ts beim Fräsen melden kann (Rust bekommt die Texte dazu in der Sprache der Oberfläche) */
+const WARN_KEYS = Object.keys(en).filter(k => k.startsWith("gcw.") || k.startsWith("cut."));
+/** Werkzeugarten, die nicht für Konturen mit Fräser-Versatz und Taschen taugen (Hinweis gcw.toolType in cam.ts) */
+const NO_CONTOUR = ["vbit", "drill", "spotdrill", "reamer", "countersink", "threadmill", "taper"];
+/** Werkzeuge eines Auftrags in der Reihenfolge von job.tools – Rust nennt Werkzeuge nur mit ihrer Nummer darin */
+export const jobTools = new WeakMap<object, MillingTool[]>();
 
 /** Der Auftrag für diese Formen – oder { no: Grund }, wenn Etappe 1 das noch nicht kann */
 export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: string): MillJob | { no: string } {
@@ -47,6 +58,9 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
   if (shapes.some(s => s.restOf || s.opOf)) return { no: "shapes that are already copies" };
   // weitere Bearbeitungen (ops.ts): jede ist für den G-Code eine eigene Form (Kopie mit opOf = Original)
   const all = expandOps(shapes);
+  // Restmaterial-Werkzeug gewählt, das nicht passt (restIgnored in cam.ts – dort über die Formen wie gezeichnet)
+  const restFits = (s: any) => { const m = s.millingMode || "outside", r = getTool(s.restToolId), own = toolForShape(s); return !!((m === "pocket" || m === "inside") && r && own && r.id !== own.id && r.diameter < own.diameter); };
+  const restIgnored = shapes.filter(s => getTool(s.restToolId) && !restFits(s)).length;
   for (const s of all) {
     if (s.type === "image") return { no: "image" };
     // Restmaterial (restToolFor in cam.ts): kleineres Werkzeug für Taschen und Innenkonturen
@@ -103,6 +117,10 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       passes: Number(s.threadPasses) || 1, spring: !!s.threadSpring
     } : null;
     const cut = resolveCut(s.cutData, tool, toolSettings);
+    // Material-Profil, das für ein anderes Werkzeug angewendet wurde: cam.ts nimmt die Werkzeug-Werte und sagt es
+    const cutOff = !cut && !s.opOf ? cleanCutData(s.cutData)?.label ?? null : null;
+    // Gewinde in ein Loch, das nur als Kontur „Innen“ gefräst wird: Werkzeug jener Kontur (Hinweis gcw.threadCore)
+    const firstTool = mode === "thread" && s.opOf?.millingMode === "inside" ? toolForShape(s.opOf) : null;
     // Stege: Kreis nur außen/innen; Linienzug nur geschlossen außen/innen (sonst fragt cam.ts gar nicht danach)
     const tab = sided && closedShape ? tabSettings(s) : null;
     out.push({
@@ -124,6 +142,10 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       // Kopie für eine weitere Bearbeitung: Nummer des Originals in dieser Liste
       cutDir: cutSet ? cutDirOf(s) ?? "" : "", cutStart: cutSet ? cutStartOf(s) : null, cutPoints,
       skin, flute, tro,
+      cutOff: cutOff === null ? null : String(cutOff),
+      cutWarn: !hasCutSetting(s) ? "" : !cutSet ? "ignored" : overridesMillDir(s) ? "millDir" : "",
+      skinIgnored: skinRole(s) === "ignored",
+      threadFirst: firstTool ? [cutDiameter(firstTool), firstTool.diameter] : null,
       restTool: rest ? tools.indexOf(rest) : null,
       vStart: mode === "vplug" ? Math.max(0, s.vStart ?? 0) : 0,
       base: s.opOf ? all.indexOf(s.opOf) : null,
@@ -152,7 +174,10 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
     tools: tools.map(tool => {
       const dial = postCtx.foreign ? null : routerDial(tool.rpm);
       return {
-        name: ascii(tool.name), diameter: cutDiameter(tool), rawDiameter: tool.diameter, libIndex: lib.indexOf(tool),
+        name: ascii(tool.name), rawName: String(tool.name), dialOut: dial?.out || null, dialRpm: dial ? dial.rpm : 0,
+        spot: tool.type === "spotdrill", typeText: NO_CONTOUR.includes(tool.type) ? t("tl.type." + tool.type) : null,
+        threadSingle: !!tool.threadSingle, fluteLen: Number(tool.fluteLen) || 0,
+        diameter: cutDiameter(tool), rawDiameter: tool.diameter, libIndex: lib.indexOf(tool),
         stepZ: tool.stepZ, feedrate: tool.feedrate, rpm: tool.rpm,
         plungeFeed: tool.plungeFeed ?? DEFAULT_PLUNGE,
         // tan(Eintauchwinkel) wie in cam.ts gerechnet – Rust nimmt genau diese Zahl (sein Tangens kann in der letzten Stelle abweichen)
@@ -177,10 +202,14 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
     // Vorschub in Kurven anpassen (feedAdapt.ts): kleinster Vorschub in %, null = aus
     feedAdapt: feedAdapt.on ? feedAdapt.minPct : null,
     // Werkzeug während langer Jobs nachmessen (driftPoints.ts): Abstand in Minuten und die Zeile für einen Mess-Punkt
-    drift: probeSettings.drOn === 1 && !postCtx.foreign ? { everyMin: probeSettings.drMin, marker: `M0 (${ascii(tMm("gc.remeasure"))})` } : null,
+    drift: probeSettings.drOn === 1 && !postCtx.foreign ? { everyMin: probeSettings.drMin, marker: `M0 (${ascii(tMm("gc.remeasure"))})`, noSpot: probeSettings.tcMode !== 1 && !probeSettings.tcPos } : null,
     helixTan: Math.tan((3 * Math.PI) / 180),
-    leadOthers
+    leadOthers,
+    // Hinweise: Texte in der Sprache der Oberfläche (Rust erkennt daran „schon gemeldet“, eingesetzt wird hier mit t())
+    warnTexts: Object.fromEntries(WARN_KEYS.map(k => [k, t(k)])),
+    restIgnored
   };
+  jobTools.set(job, tools);
   // nur Zahlen, die JSON unverändert überträgt
   let ok = true;
   JSON.stringify(job, (_k, v) => { if (typeof v === "number" && !Number.isFinite(v)) ok = false; return v; });
@@ -189,18 +218,73 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
 
 const IN_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 /** Ergebnis des letzten Vergleichs (für Tests in der App und die Konsole) */
-export let lastShadow: { same?: boolean; no?: string; lines?: number; ms?: number; line?: number; rust?: string; ts?: string } | null = null;
+export let lastShadow: { same?: boolean; no?: string; lines?: number; ms?: number; line?: number; rust?: string; ts?: string; side?: string | null } | null = null;
+/** Was cam.ts neben dem G-Code liefert: Hinweise (fertiger Text), Gewinde, Werkzeug je Abschnitt */
+export interface InnerSide { warnings: string[]; threads: unknown[]; sectionTools: (MillingTool | null)[] }
+/** Ergebnis des letzten Fräs-G-Codes aus cam.ts, noch vor Drehachse, Sperrzonen und Bogen-Glättung (für den Vergleich und die Testfälle) */
+export let lastInner: { shapes: any[]; fallbackDepth: number; pocketStrategy: string; gcode: string | null; side: InnerSide } | null = null;
+/** true, solange generateGcodeChecked (cam.ts) läuft: dann vergleicht rustChecked – nicht zusätzlich shadowMill */
+let checking = false;
+export const setChecking = (on: boolean) => { checking = on; };
+
+export type RustMill =
+  | { ok: true; gcode: string; warnings: string[]; threads: unknown[]; sectionTools: (MillingTool | null)[]; ms: number }
+  | { ok: false; no: string; differs: boolean };
+
+/**
+ * FRÄS-G-CODE AUS RUST, MIT cam.ts GEPRÜFT – für „Zur Maschine“ und „G-Code speichern“ (generateGcodeChecked in cam.ts).
+ * Nimmt den Auftrag des letzten Fräs-G-Codes aus cam.ts (lastInner), lässt Rust denselben Auftrag rechnen und gibt Rusts
+ * Ergebnis nur zurück, wenn es Zeichen für Zeichen gleich ist und Hinweise, Gewinde und Werkzeuge stimmen.
+ * Sonst { ok: false }: der Aufrufer bleibt beim G-Code aus cam.ts. differs = Rust hat etwas anderes gerechnet (das soll
+ * man melden); ohne differs kann Rust diesen Auftrag nur noch nicht (Bilder, Vorschau im Browser …).
+ * Der Auftrag entsteht sofort (vor dem ersten await) – spätere Änderungen an der Zeichnung ändern ihn nicht mehr.
+ */
+export function rustChecked(expected: string): Promise<RustMill> {
+  const inner = lastInner;
+  if (!IN_TAURI) return Promise.resolve({ ok: false, no: "not in the app", differs: false });
+  if (!inner || !inner.gcode || inner.gcode !== expected) return Promise.resolve({ ok: false, no: "no G-code", differs: false });
+  let job: ReturnType<typeof millJob>;
+  try { job = millJob(inner.shapes, inner.fallbackDepth, inner.pocketStrategy); } catch (e) { job = { no: "job failed: " + String(e) }; }
+  if ("no" in job) return Promise.resolve({ ok: false, no: String(job.no), differs: false });
+  const tools = jobTools.get(job) || [];
+  const side = { ...sideForJob(job as MillJob, inner.side), ...(isInch() ? { warnings: null } : {}) };
+  type Reply = { gcode: string; same: boolean; near: number; side: string | null; line?: number; rust?: string; ts?: string; ms: number;
+    warnings: { key: string; p: [string, string][] }[]; threads: unknown[]; sectionTools: (number | null)[] };
+  return import("@tauri-apps/api/core").then(({ invoke }) => invoke<Reply>("millgcode_generate", { job, expected: inner.gcode, side }))
+    .then((r): RustMill => {
+      if (!r.same) return { ok: false, no: `line ${r.line}: Rust "${r.rust}", cam.ts "${r.ts}"`, differs: true };
+      if (r.side) return { ok: false, no: r.side, differs: true };
+      // ein Tausendstel in einer Zahl (Rundungsgrenze bei Sinus/Kosinus): kein Fehler, aber nicht derselbe Text
+      if (r.near > 0 || r.gcode !== inner.gcode) return { ok: false, no: `${r.near} line(s) differ by 0.001`, differs: false };
+      return {
+        ok: true, gcode: r.gcode, ms: r.ms, threads: r.threads,
+        warnings: r.warnings.map(w => t(w.key, Object.fromEntries(w.p))),
+        sectionTools: r.sectionTools.map(i => i === null ? null : tools[i] ?? null)
+      };
+    })
+    .catch(e => ({ ok: false, no: String(e), differs: false }));
+}
+/** Nebenergebnisse so, wie Rust sie nennt: Werkzeuge als Nummer in job.tools */
+export const sideForJob = (job: MillJob, side: InnerSide) => {
+  const tools = jobTools.get(job) || [];
+  return { warnings: side.warnings, threads: side.threads, sectionTools: side.sectionTools.map(tl => tl ? tools.indexOf(tl) : null) };
+};
 
 /**
  * Nur im Entwicklungs-Build der App: Rust rechnet denselben Auftrag daneben und vergleicht mit dem G-Code aus cam.ts.
  * Ändert nichts am G-Code, der benutzt wird. Jede Abweichung steht in der Konsole (und im Terminal).
  */
-export function shadowMill(shapes: any[], fallbackDepth: number, pocketStrategy: string, gcode: string | null) {
-  if (!IN_TAURI || !(import.meta as any).env?.DEV || !gcode) return;
+export function shadowMill(shapes: any[], fallbackDepth: number, pocketStrategy: string, gcode: string | null, inner: InnerSide) {
+  lastInner = { shapes, fallbackDepth, pocketStrategy, gcode, side: inner };
+  if (checking || !IN_TAURI || !(import.meta as any).env?.DEV || !gcode) return;
   let job: ReturnType<typeof millJob>;
   try { job = millJob(shapes, fallbackDepth, pocketStrategy); } catch (e) { job = { no: "job failed: " + String(e) }; }
   if ("no" in job) { lastShadow = { no: String(job.no) }; console.debug("millgcode: not yet in Rust –", job.no); return; }
-  void import("@tauri-apps/api/core").then(({ invoke }) => invoke<typeof lastShadow>("millgcode_shadow", { job, expected: gcode }))
-    .then(r => { lastShadow = r; if (r && !r.same) console.warn(`millgcode: Rust differs from cam.ts at line ${r.line}\n  Rust:   ${r.rust}\n  cam.ts: ${r.ts}`); })
+  void import("@tauri-apps/api/core").then(({ invoke }) => invoke<typeof lastShadow>("millgcode_shadow", { job, expected: gcode, side: { ...sideForJob(job as MillJob, inner), ...(isInch() ? { warnings: null } : {}) } }))
+    .then(r => {
+      lastShadow = r;
+      if (r && !r.same) console.warn(`millgcode: Rust differs from cam.ts at line ${r.line}\n  Rust:   ${r.rust}\n  cam.ts: ${r.ts}`);
+      if (r && r.side) console.warn(`millgcode: warnings, threads or tools differ from cam.ts – ${r.side}`);
+    })
     .catch(e => { lastShadow = { no: String(e) }; console.warn("millgcode: comparison failed", e); });
 }

@@ -6484,6 +6484,7 @@
   "mprof.newName": "Nouveau profil",
   "gc.cutData": "Profil {name} : F{f} S{s} Z{z}",
   "gcw.cutDataOff": "Le profil « {name} » ne correspond plus à l'outil de la forme (outil changé ou diamètre modifié). Les valeurs de l'outil ont été utilisées.",
+  "gcw.rustDiff": "Contrôle interne : le nouveau moteur de calcul (Rust) a donné un G-code différent de celui qui a fait ses preuves. Le G-code éprouvé a été utilisé. Merci de le signaler avec le projet («Signaler un bug»).",
   "camz.xh": "Réticule",
   "camz.xhTip": "Affiche ou masque le réticule sur l’image de la caméra. Donne aussi accès au décalage de la caméra et à « Définir le zéro caméra » – pour une caméra montée sur la tête de la machine.",
   "camz.adjust": "Déplacer le centre",

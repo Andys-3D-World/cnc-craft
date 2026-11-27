@@ -4,7 +4,7 @@
  * „Zur Maschine“ macht aus der Zeichnung den Job und zeigt ihn in der Simulation. Gestartet wird nie von selbst:
  * Start bleibt immer ein eigener Klick. Vor dem Start wird geprüft, ob der Job noch zur Zeichnung passt.
  */
-import { generateGcode, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage, lastSectionTools } from "./cam";
+import { generateGcode, generateGcodeChecked, lastGcodeWarnings, lastGcodeNotes, noGcodeMessage, lastSectionTools } from "./cam";
 import { loadGcodeFromText, streamState } from "./machineStream";
 import { t } from "./i18n/i18n";
 import { askChoice } from "./ui/unsavedDialog";
@@ -73,11 +73,16 @@ export function designLabel(): string {
   return activeSetup() ? `${t("sim.currentDesign")} – ${t(viewSide() === "front" ? "two.front" : "two.back")}` : t("sim.currentDesign");
 }
 
-/** Zeichnung als Job bereitlegen. true = Job liegt bereit */
-export function buildJob(shapes: any, log: Log): boolean {
+/**
+ * Zeichnung als Job bereitlegen. true = Job liegt bereit. Startet nichts – Start bleibt ein eigener Klick.
+ * Fräse in der App: der G-Code kommt aus Rust und ist mit cam.ts geprüft (generateGcodeChecked) – deshalb mit await.
+ */
+export async function buildJob(shapes: any, log: Log): Promise<boolean> {
   // Zweiseitig: immer nur das Programm der gezeigten Seite – jede Seite wird für sich gebaut, geprüft und gestartet
   const two = activeSetup(), side = two ? viewSide() : null;
-  const gcode = generateGcode(shapes);
+  // Kennung der Zeichnung VOR dem Warten: der G-Code gehört zu diesem Stand, auch wenn inzwischen weitergezeichnet wird
+  const print = fingerprint(shapes);
+  const gcode = await generateGcodeChecked(shapes);
   if (!gcode) { log(noGcodeMessage()); return false; }
   lastGcodeWarnings.forEach(w => log(`${t("log.warning")} ${w}`));
   lastGcodeNotes.forEach(n => log(n));
@@ -85,7 +90,7 @@ export function buildJob(shapes: any, log: Log): boolean {
   building = true;
   const ok = loadGcodeFromText(gcode, designLabel(), log);
   building = false;
-  if (ok) { streamState.firstTool = lastSectionTools[0]?.id || ""; builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = fingerprint(shapes); builtSide = side; }
+  if (ok) { streamState.firstTool = lastSectionTools[0]?.id || ""; builtLines = streamState.loadedLines; builtGcode = gcode; builtPrint = print; builtSide = side; }
   lastLog = log;
   if (ok && two && side) log(t(side === "front" ? "two.builtFront" : "two.builtBack", { turn: t(two.flip === "lr" ? "two.turnLr" : "two.turnFb") }));
   return ok;
@@ -155,6 +160,6 @@ export async function okToStart(shapes: any, log: Log, onRebuilt: () => void): P
     { key: "rebuild", label: t("job.staleRebuild"), primary: true }
   ]);
   // Neu erstellen baut die gezeigte Seite – bei der Rückseite erst nach der Frage, ob gewendet wurde
-  if (r === "rebuild" && (await okToBuild()) && buildJob(shapes, log)) onRebuilt();
+  if (r === "rebuild" && (await okToBuild()) && (await buildJob(shapes, log))) onRebuilt();
   return r === "old";
 }

@@ -372,7 +372,7 @@ export function initSimulation(container: HTMLElement | null, appendToConsole: (
 
   $("sim-to-job").addEventListener("click", () => {
     // echter G-Code aus der Zeichnung (die Vorschau kann bei der Drehachse abgewickelt sein)
-    if (prog) void okToBuild().then(ok => { if (ok) buildJob(appState.shapes, log); });
+    if (prog) void okToBuild().then(ok => { if (ok) void buildJob(appState.shapes, log); });
   });
   $("sim-job-start").addEventListener("click", () => document.getElementById("btn-job-start")?.click());
   $("sim-job-pause").addEventListener("click", () => document.getElementById("btn-job-pause")?.click());

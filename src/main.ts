@@ -326,7 +326,7 @@ window.addEventListener("DOMContentLoaded", async () => {
     document.getElementById("btn-to-machine")?.addEventListener("click", async () => {
       // Zweiseitig, Rückseite: erst fragen, ob das Rohteil gewendet auf den Stiften liegt (jobFlow.ts)
       if (!(await okToBuild())) return;
-      if (buildJob(state.shapes, appendToConsole)) showBuiltJob();
+      if (await buildJob(state.shapes, appendToConsole)) showBuiltJob();
     });
     // Job-Leiste: was als Nächstes dran ist, ist der farbige Knopf. Stopp oben, solange ein Job läuft (auch in den anderen Reitern)
     const toMachineBtn = document.getElementById("btn-to-machine"), headerStop = document.getElementById("header-stop");
