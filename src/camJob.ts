@@ -1,5 +1,5 @@
 /**
- * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 5a (bis V-Carve; Zwiebelhaut, Trochoidal, Nut, Restmaterial fehlen noch)
+ * FRÄS-AUFTRAG FÜR RUST (src-tauri/src/millgcode.rs) – ETAPPEN 1 BIS 5b (bis Zwiebelhaut; Trochoidal, Nut, Restmaterial fehlen noch)
  *
  * cam.ts liest beim Erzeugen des G-Codes aus vielen Stellen: Werkzeug-Bibliothek, Material-Profile, Einstellungen,
  * Sprachdatei, Eingabefelder. millJob() sammelt all das für eine Liste von Formen in EIN Objekt, das sich als JSON
@@ -21,17 +21,18 @@ import { probeSettings } from "./probe";
 import { cutDirOf, cutStartOf, hasCutSetting } from "./cutSetting";
 import { fluteFits, fluteSettings } from "./fluting";
 import { troFits, troSettings } from "./trochoid";
-import { skinRole } from "./onionSkin";
+import { skinRole, skinSettings } from "./onionSkin";
+import { twoSidedFingerprint } from "./twoSidedJob";
 import { postCtx } from "./post/postContext";
 import { getTool, getTools, toolNumber } from "./toolLibrary";
 import { toolChangeGcode } from "./toolChange";
 import { cloneShape, convertToPolyline, shapeBounds, shapeToPaths } from "./shapeTransform";
 
 /** gleiche Zahl wie JOB_VERSION in millgcode.rs – ändern, wenn sich der Auftrag ändert */
-export const MILL_JOB_VERSION = 11;
+export const MILL_JOB_VERSION = 12;
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "gc.safeZ", "gc.tool", "gc.spindleOn", "gc.spinUp", "gc.feed", "gc.shape", "gc.tab", "gc.ramp",
-  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug"];
+  "gc.cutData", "gc.circleTooSmall", "gc.toolTooBig", "gc.spindleOff", "gc.park", "gc.end", "gc.toolList", "gc.toolListItem", "gc.toolChange", "gc.helix", "gc.finish", "gc.face", "gc.drill", "gc.peck", "gc.chamfer", "gc.thread", "gc.vcarve", "gc.vplug", "gc.skin", "gc.skinCutAll", "gc.skinCut"];
 /** diese Texte nimmt cam.ts in der Sprache der Oberfläche (t), nicht in der des G-Codes */
 const TEXTS_UI = ["gc.threadIn", "gc.threadOut", "gc.threadLeft", "gc.threadRight"];
 
@@ -66,7 +67,9 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       convertToPolyline(copy);
       cutPoints = { pts: copy.points.map((p: any) => [p.x, p.y]), closed: !!copy.closed };
     }
-    if (skinRole(s) === "skin") return { no: "onion skin" };
+    // Zwiebelhaut (onionSkin.ts): nur der Schnitt, der sie bekommt. Zweiseitig kennt die echte Materialdicke – noch nicht hier
+    const skin = skinRole(s) === "skin" ? skinSettings(s) : null;
+    if (skin && twoSidedFingerprint()) return { no: "onion skin with two-sided milling" };
     if (troSettings(s) && troFits(s)) return { no: "trochoidal" };
     if (fluteFits(s) && fluteSettings(s)) return { no: "flute" };
     const sided = mode === "outside" || mode === "inside";
@@ -116,6 +119,7 @@ export function millJob(shapes: any[], fallbackDepth: number, pocketStrategy: st
       lead, face, paths, thread,
       // Kopie für eine weitere Bearbeitung: Nummer des Originals in dieser Liste
       cutDir: cutSet ? cutDirOf(s) ?? "" : "", cutStart: cutSet ? cutStartOf(s) : null, cutPoints,
+      skin,
       vStart: mode === "vplug" ? Math.max(0, s.vStart ?? 0) : 0,
       base: s.opOf ? all.indexOf(s.opOf) : null,
       // Stufenbohrung: Ø der Senkung und Ø des Lochs darunter (0 = kein Kreis)

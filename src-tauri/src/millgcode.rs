@@ -94,6 +94,74 @@ pub struct Thread {
     pub spring: bool,
 }
 
+/// Zwiebelhaut: Dicke der Haut, am Ende durchfräsen?, Vorschub dafür (0 = automatisch)
+#[derive(Deserialize, Clone, Debug)]
+pub struct SkinSettings {
+    pub h: f64,
+    pub cut: bool,
+    pub feed: f64,
+}
+
+/// Zustellungen mit Zwiebelhaut (skinPlan in onionSkin.ts)
+#[derive(Clone, Debug)]
+struct SkinPlan {
+    /// Z des tiefsten normalen Gangs
+    floor: f64,
+    /// Frästiefe der Form – tiefer geht nie etwas
+    through: f64,
+    stock: f64,
+    /// Dicke der Haut, die wirklich stehen bleibt
+    skin: f64,
+    passes: Vec<f64>,
+    /// Gänge des letzten Schnitts durch die Haut (leer = die Haut bleibt)
+    last: Vec<f64>,
+}
+
+/// Err = die Haut ist so dick wie die Frästiefe: die Form wird ausgelassen
+fn skin_plan(depth: f64, step_z: f64, s: &SkinSettings) -> Result<SkinPlan, ()> {
+    let d = -mn(0.0, depth);
+    let stock = d;
+    let floor_d = ((stock - s.h) * 100.0 + 1e-6).floor() / 100.0;
+    if !(floor_d >= 0.01) {
+        return Err(());
+    }
+    let step = mx(0.05, step_z.abs());
+    let (floor, through) = (-floor_d, -d);
+    Ok(SkinPlan {
+        floor,
+        through,
+        stock,
+        skin: to_fixed(stock - floor_d, 6).parse().unwrap_or(stock - floor_d),
+        passes: depth_passes_from(floor, step, 0.0),
+        last: if s.cut { depth_passes_from(through, step, floor) } else { vec![] },
+    })
+}
+
+/// Vorschub des letzten Gangs: der Wunsch, aber nie schneller als normal; ohne Wunsch die Hälfte (skinFeed)
+fn skin_feed(s: &SkinSettings, normal: f64) -> f64 {
+    let f = if s.feed > 0.0 { mn(s.feed, normal) } else { jsmath::js_round(normal / 2.0) };
+    mx(1.0, mn(normal, mx(10.0, f)))
+}
+
+/// Der letzte Gang einer Form mit Haut, vorgemerkt für das Programmende – mit allem, was beim Fräsen der Form galt
+struct SkinJob {
+    rank: u8,
+    plan: SkinPlan,
+    set: SkinSettings,
+    shape: Shape,
+    k: usize,
+    gi: usize,
+    n: usize,
+    tool: Option<usize>,
+    dia: f64,
+    step_z: f64,
+    feed: f64,
+    rpm: f64,
+    plunge: f64,
+    ramp_tan: f64,
+    lead: Option<LeadOpts>,
+}
+
 /// Bahn einer Form in mm (shapeToPaths, im Fenster gerechnet)
 #[derive(Deserialize, Clone, Debug)]
 pub struct MmPath {
@@ -205,6 +273,9 @@ pub struct Shape {
     /// Zweiseitig, Loch für einen Passstift: fertige Kommentar-Zeile statt „Form n“
     #[serde(default)]
     pub pin_mark: Option<String>,
+    /// Zwiebelhaut (onionSkin.ts) für diesen Schnitt, None = keine
+    #[serde(default)]
+    pub skin: Option<SkinSettings>,
     /// Inlay-Stecker (vplug): Start-Tiefe (positiv)
     #[serde(default)]
     pub v_start: f64,
@@ -256,7 +327,7 @@ pub struct Other {
 }
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie MILL_JOB_VERSION in camJob.ts)
-pub const JOB_VERSION: u32 = 11;
+pub const JOB_VERSION: u32 = 12;
 
 struct Gen<'a> {
     job: &'a Job,
@@ -279,6 +350,10 @@ struct Gen<'a> {
     tool: Option<&'a Tool>,
     /// die laufende Form wird als Linienzug-Kopie gefräst (Startpunkt/Richtung von Hand an Kreis, Bogen, Linie)
     converted: bool,
+    /// Z, bei dem der erste Durchgang anfängt: 0 = Oberseite; beim letzten Gang durch die Zwiebelhaut die Haut
+    pass_top: f64,
+    /// Frästiefe der Form, solange eine Form mit Haut gefräst wird
+    skin_depth: Option<f64>,
 }
 
 fn to_machine(x: f64, y: f64) -> P {
@@ -413,11 +488,15 @@ fn ellipse_points(cx: f64, cy: f64, rx: f64, ry: f64) -> Vec<P> {
 
 /// Zustellungen bis `target` in Schritten von step_z (depthPasses in onionSkin.ts, ab Oberseite 0)
 fn depth_passes(target: f64, step_z: f64) -> Vec<f64> {
+    depth_passes_from(target, step_z, 0.0)
+}
+/// `from` = Z, bei dem der Schnitt anfängt (0 = Oberseite)
+fn depth_passes_from(target: f64, step_z: f64, from: f64) -> Vec<f64> {
     let mut passes = Vec::new();
-    if target >= 0.0 {
+    if target >= from {
         passes.push(if target == 0.0 { 0.0 } else { target });
     } else {
-        let mut z = 0.0 - step_z;
+        let mut z = from - step_z;
         let mut guard = 0;
         while z > target + 0.001 && guard < 100_000 {
             passes.push(z);
@@ -547,6 +626,49 @@ impl Gen<'_> {
         self.push(&s);
     }
 
+    /// Werkzeug-Werte setzen (useTool), Werkzeug einsetzen und Spindel starten (toolStart in cam.ts);
+    /// `gi` = Nummer in der Werkzeugliste, `change` = mit Werkzeugwechsel
+    fn start_tool(&mut self, t: Option<usize>, gi: usize, change: bool) {
+        let job = self.job;
+        // ---- Werkzeug-Werte ----
+        let tool = t.map(|t| &job.tools[t]);
+        let dia = tool.map_or(3.0, |t| t.diameter);
+        self.tool_radius = dia / 2.0;
+        self.step_z = tool.map_or(1.5, |t| mx(0.05, t.step_z.abs()));
+        self.feed_xy = tool.map_or(800.0, |t| t.feedrate);
+        self.rpm = tool.map_or(12000.0, |t| t.rpm);
+        self.plunge = tool.map_or(300.0, |t| t.plunge_feed);
+        self.ramp_tan = tool.map_or(0.0, |t| t.ramp_tan);
+        self.reamer = tool.is_some_and(|t| t.reamer);
+        self.tool = tool;
+
+        // ---- Werkzeug einsetzen (ab dem zweiten mit Werkzeugwechsel) und Spindel starten ----
+        let tool_name = t.map_or("Standard".to_string(), |t| job.tools[t].name.clone());
+        let dial = tool.and_then(|t| t.dial.clone());
+                if change {
+            let shown = dial.as_ref().map_or(tool_name.clone(), |d| format!("{tool_name} - {d}"));
+            let comment = self.c("gc.toolChange", &[("i", (gi + 1).to_string()), ("name", shown), ("d", to_fixed(dia, 1))]);
+            let prefix = tool.map_or("M0 ".to_string(), |t| t.change.clone());
+            let line = format!("\nG0 Z{}\nM5 {}\n{prefix}{comment}\n", f2(SAFE_Z), self.c("gc.spindleOff", &[]));
+            self.push(&line);
+        }
+        let line = format!("\n{}\n", self.c("gc.tool", &[("name", tool_name), ("d", to_fixed(dia, 1))]));
+        self.push(&line);
+        if let Some(d) = dial {
+            let line = format!("({d})\n");
+            self.push(&line);
+        }
+        let line = format!("{} S{} {}\n", job.spindle, js_num(self.rpm), self.c("gc.spindleOn", &[("rpm", js_num(self.rpm))]));
+        self.push(&line);
+        if change {
+            let line = format!("G4 P2 {}\n", self.c("gc.spinUp", &[]));
+            self.push(&line);
+        }
+        let line = format!("F{} {}\n", js_num(self.feed_xy), self.c("gc.feed", &[("f", js_num(self.feed_xy))]));
+        self.push(&line);
+
+    }
+
     /// EINTAUCHEN von z_top auf z am Anfang der Bahn pts – mit Eintauchwinkel als Rampe entlang der Bahn
     fn plunge_to(&mut self, pts: &[P], closed: bool, z_top: f64, z: f64, max_len: f64) {
         let drop = z_top - z;
@@ -626,7 +748,7 @@ impl Gen<'_> {
     /// false = keine Anfahrbahn (nur Wegfahren): der Aufrufer taucht an der Kontur ein
     fn lead_begin(&mut self, plan: &LeadPlan, top: f64, z: f64) -> bool {
         let p0 = plan.lin.as_ref().map_or(plan.start, |m| m.from);
-        let line = format!("G0 Z{}\nG0 X{} Y{}\nG0 Z{}\n", f2(SAFE_Z), f3(p0[0]), f3(p0[1]), f3(top + 0.5));
+        let line = format!("G0 Z{}\nG0 X{} Y{}\nG0 Z{}\n", f2(SAFE_Z), f3(p0[0]), f3(p0[1]), f3((if self.pass_top < 0.0 { 0.0 } else { top }) + 0.5));
         self.push(&line);
         match &plan.lin {
             Some(m) => {
@@ -651,7 +773,7 @@ impl Gen<'_> {
         }
         let passes = self.passes.clone();
         for (i, &z) in passes.iter().enumerate() {
-            let top = if i > 0 { passes[i - 1] } else { 0.0 };
+            let top = if i > 0 { passes[i - 1] } else { self.pass_top };
             if !self.lead_begin(plan, top, z) {
                 self.plunge_to(pts, true, top, z, f64::INFINITY);
             }
@@ -683,7 +805,7 @@ impl Gen<'_> {
                 self.safe();
                 self.g0(start);
             }
-            self.plunge_to(pts, closed, if i > 0 { passes[i - 1] } else { 0.0 }, z, f64::INFINITY);
+            self.plunge_to(pts, closed, if i > 0 { passes[i - 1] } else { self.pass_top }, z, f64::INFINITY);
             for p in &pts[1..] {
                 self.g1(*p);
             }
@@ -698,7 +820,8 @@ impl Gen<'_> {
     /// `lead` = Schrupp-Bahnen beim Schlichtgang: dort eintauchen (da ist schon alles frei), dann seitlich anfahren
     fn mill_tabbed(&mut self, lp: &[P], shape: &Shape, tab: &Tab, lead: Option<&[Vec<P>]>) -> bool {
         let passes = self.passes.clone();
-        let target = passes[passes.len() - 1];
+        // mit Zwiebelhaut zählen die Stege weiter ab der Frästiefe der Form
+        let target = self.skin_depth.unwrap_or(passes[passes.len() - 1]);
         let z_tab = target + tab.h;
         if z_tab >= -0.001 {
             return false; // Stege höher als die Frästiefe
@@ -783,7 +906,7 @@ impl Gen<'_> {
                 }
                 if let Some(pl) = plan {
                     for (pi, &z) in passes.iter().enumerate() {
-                        let top = if pi > 0 { passes[pi - 1] } else { 0.0 };
+                        let top = if pi > 0 { passes[pi - 1] } else { self.pass_top };
                         if !self.lead_begin(&pl, top, z) {
                             self.plunge_to(&seq_pts, false, top, z, ramp_len);
                         }
@@ -803,7 +926,7 @@ impl Gen<'_> {
                 let line = format!("G1 Z{} F{}\nG1 X{} Y{} F{}\n", f3(z), js_num(self.plunge), f3(start[0]), f3(start[1]), js_num(self.feed_xy));
                 self.push(&line);
             } else {
-                self.plunge_to(&seq_pts, false, if pi > 0 { passes[pi - 1] } else { 0.0 }, z, ramp_len);
+                self.plunge_to(&seq_pts, false, if pi > 0 { passes[pi - 1] } else { self.pass_top }, z, ramp_len);
             }
             round!(z);
         }
@@ -834,14 +957,15 @@ impl Gen<'_> {
         self.safe();
     }
 
-    fn mill_circle(&mut self, shape: &Shape, offset: f64) {
+    /// `last` = letzter Gang der Zwiebelhaut (am Programmende): nur die Kontur auf Maß, ohne Schlicht-Aufmaß
+    fn mill_circle(&mut self, shape: &Shape, offset: f64, last: bool) {
         let pi = std::f64::consts::PI;
         let mode = shape.mode.as_str();
         let center = to_machine(shape.x, shape.y);
         let radius_px = shape.w.abs();
         let radius_final = radius_px / MM_TO_PIXEL + offset;
         // Schlichtgang: erst mit Aufmaß (außen größer, innen kleiner), danach auf Maß
-        let mut allow = if mode == "outside" || mode == "inside" { shape.finish_allow } else { 0.0 };
+        let mut allow = if !last && (mode == "outside" || mode == "inside") { shape.finish_allow } else { 0.0 };
         if allow > 0.0 && mode == "inside" && radius_final - allow <= 0.05 {
             allow = 0.0;
         }
@@ -902,7 +1026,7 @@ impl Gen<'_> {
             };
             let full = |zz: Option<f64>| format!("{cmd} X{} Y{}{} I0.000 J{}\n", f3(entry_x), f3(entry_y), zz.map_or(String::new(), |v| format!(" Z{}", f3(v))), f3(-radius_mm));
             for (i, &z) in passes.iter().enumerate() {
-                let z_top = if i > 0 { passes[i - 1] } else { 0.0 };
+                let z_top = if i > 0 { passes[i - 1] } else { self.pass_top };
                 let drop = z_top - z;
                 if let Some(pl) = &plan {
                     if !self.lead_begin(pl, z_top, z) {
@@ -1314,7 +1438,7 @@ impl Gen<'_> {
         self.safe();
     }
 
-    fn mill_polyline(&mut self, shape: &Shape, offset: f64) {
+    fn mill_polyline(&mut self, shape: &Shape, offset: f64, last: bool) {
         let mode = shape.mode.as_str();
         let mm: Vec<P> = shape.points.iter().map(|p| to_machine(p[0], p[1])).collect();
         // Konturen vor dem Fräsen vereinfachen (nur bei vielen Punkten)
@@ -1329,7 +1453,7 @@ impl Gen<'_> {
             return self.mill_path(&apply_cut(pts, shape.closed, shape), shape.closed);
         }
         // Schlichtgang: erst mit Aufmaß schruppen, danach die Kontur auf Maß
-        let mut allow = shape.finish_allow;
+        let mut allow = if last { 0.0 } else { shape.finish_allow };
         let sign = if offset > 0.0 { 1.0 } else if offset < 0.0 { -1.0 } else { 0.0 };
         let mut loops = offset_polygon(&pts, offset + sign * allow, 0.01);
         if allow > 0.0 && loops.is_empty() {
@@ -1417,7 +1541,7 @@ impl Gen<'_> {
                 let line = format!("G1 Z{} F{}\nG1 X{} Y{} F{}\n", f3(z), js_num(self.plunge), f3(start[0]), f3(start[1]), js_num(self.feed_xy));
                 self.push(&line);
             } else {
-                self.plunge_to(pts, closed, if i > 0 { passes[i - 1] } else { 0.0 }, z, f64::INFINITY);
+                self.plunge_to(pts, closed, if i > 0 { passes[i - 1] } else { self.pass_top }, z, f64::INFINITY);
             }
             for p in &pts[1..] {
                 self.g1(*p);
@@ -1797,7 +1921,7 @@ pub fn generate(job: &Job) -> Result<String, String> {
             return Err("shape names a tool that is not in the job".into());
         }
     }
-    let mut g = Gen { job, out: String::new(), tool_radius: 1.5, step_z: 1.5, feed_xy: 800.0, rpm: 12000.0, plunge: 300.0, ramp_tan: 0.0, passes: vec![], cur_lead: None, cur_shape: 0, reamer: false, tool: None, converted: false };
+    let mut g = Gen { job, out: String::new(), tool_radius: 1.5, step_z: 1.5, feed_xy: 800.0, rpm: 12000.0, plunge: 300.0, ramp_tan: 0.0, passes: vec![], cur_lead: None, cur_shape: 0, reamer: false, tool: None, converted: false, pass_top: 0.0, skin_depth: None };
 
     // ---- Kopf ----
     let head = format!("G21 {}\nG90 {}\nG0 Z{} {}\n", g.c("gc.unitMm", &[]), g.c("gc.absolute", &[]), f2(SAFE_Z), g.c("gc.safeZ", &[]));
@@ -1815,49 +1939,14 @@ pub fn generate(job: &Job) -> Result<String, String> {
     }
 
     let mut form_counter = 0usize;
+    let mut skin_jobs: Vec<SkinJob> = Vec::new();
     let mut chained: HashSet<String> = HashSet::new();
     let mut order_from: P = [0.0, 0.0];
     // Reihenfolge der Formen je Werkzeug zuerst für alle Werkzeuge (der Startpunkt wird von Werkzeug zu Werkzeug weitergetragen)
     let ordered: Vec<Vec<usize>> = groups.iter().map(|grp| order(&job.shapes, grp.1.clone(), &mut order_from)).collect();
 
     for (gi, grp) in groups.iter().enumerate() {
-        // ---- Werkzeug-Werte ----
-        let tool = grp.0.map(|t| &job.tools[t]);
-        let dia = tool.map_or(3.0, |t| t.diameter);
-        g.tool_radius = dia / 2.0;
-        g.step_z = tool.map_or(1.5, |t| mx(0.05, t.step_z.abs()));
-        g.feed_xy = tool.map_or(800.0, |t| t.feedrate);
-        g.rpm = tool.map_or(12000.0, |t| t.rpm);
-        g.plunge = tool.map_or(300.0, |t| t.plunge_feed);
-        g.ramp_tan = tool.map_or(0.0, |t| t.ramp_tan);
-        g.reamer = tool.is_some_and(|t| t.reamer);
-        g.tool = tool;
-
-        // ---- Werkzeug einsetzen (ab dem zweiten mit Werkzeugwechsel) und Spindel starten ----
-        let tool_name = name_of(grp.0);
-        let dial = tool.and_then(|t| t.dial.clone());
-        let change = gi > 0;
-        if change {
-            let shown = dial.as_ref().map_or(tool_name.clone(), |d| format!("{tool_name} - {d}"));
-            let comment = g.c("gc.toolChange", &[("i", (gi + 1).to_string()), ("name", shown), ("d", to_fixed(dia, 1))]);
-            let prefix = tool.map_or("M0 ".to_string(), |t| t.change.clone());
-            let line = format!("\nG0 Z{}\nM5 {}\n{prefix}{comment}\n", f2(SAFE_Z), g.c("gc.spindleOff", &[]));
-            g.push(&line);
-        }
-        let line = format!("\n{}\n", g.c("gc.tool", &[("name", tool_name), ("d", to_fixed(dia, 1))]));
-        g.push(&line);
-        if let Some(d) = dial {
-            let line = format!("({d})\n");
-            g.push(&line);
-        }
-        let line = format!("{} S{} {}\n", job.spindle, js_num(g.rpm), g.c("gc.spindleOn", &[("rpm", js_num(g.rpm))]));
-        g.push(&line);
-        if change {
-            let line = format!("G4 P2 {}\n", g.c("gc.spinUp", &[]));
-            g.push(&line);
-        }
-        let line = format!("F{} {}\n", js_num(g.feed_xy), g.c("gc.feed", &[("f", js_num(g.feed_xy))]));
-        g.push(&line);
+        g.start_tool(grp.0, gi, gi > 0);
 
         // Werte des Werkzeugs (ohne Material-Profil gelten sie)
         let (tool_feed, tool_rpm, tool_step, tool_plunge) = (g.feed_xy, g.rpm, g.step_z, g.plunge);
@@ -1914,6 +2003,20 @@ pub fn generate(job: &Job) -> Result<String, String> {
             form_counter += 1;
             g.passes = depth_passes(shape.depth, g.step_z);
             let mode = shape.mode.as_str();
+            // Zwiebelhaut: geschlossene Konturen außen/innen hören über dem Boden auf. Haut so dick wie die Frästiefe:
+            // nichts zu fräsen – die Form bleibt ganz
+            g.skin_depth = None;
+            let skin = match &shape.skin {
+                Some(set) => match skin_plan(shape.depth, g.step_z, set) {
+                    Ok(plan) => Some((plan, set.clone())),
+                    Err(()) => continue,
+                },
+                None => None,
+            };
+            if let Some((plan, _)) = &skin {
+                g.passes = plan.passes.clone();
+                g.skin_depth = Some(plan.through);
+            }
             g.cur_shape = k;
             // An-/Wegfahren nur an geschlossenen Konturen mit Seite (Kreis und geschlossener Linienzug)
             let sided_closed = (mode == "outside" || mode == "inside") && (shape.kind == "circle" || (shape.kind == "polyline" && shape.closed));
@@ -1973,6 +2076,11 @@ pub fn generate(job: &Job) -> Result<String, String> {
                 None => format!("\n{}\n", g.c("gc.shape", &[("n", form_counter.to_string()), ("type", shape.kind.to_uppercase()), ("mode", mode.to_string())])),
             };
             g.push(&line);
+            // die Simulation und das Einrichteblatt lesen aus diesem Hinweis die Materialdicke
+            if let Some((plan, _)) = &skin {
+                let line = format!("{}\n", g.c("gc.skin", &[("h", f2(plan.skin)), ("t", f2(plan.stock))]));
+                g.push(&line);
+            }
             if mode == "pocket" {
                 if let Some(outer) = closed_mm(shape) {
                     g.mill_pocket(k, &outer);
@@ -1981,10 +2089,86 @@ pub fn generate(job: &Job) -> Result<String, String> {
             }
             match shape.kind.as_str() {
                 "line" => g.mill_line(shape),
-                "circle" => g.mill_circle(shape, offset),
+                "circle" => g.mill_circle(shape, offset, false),
                 "arc" => g.mill_arc(shape),
-                _ => g.mill_polyline(shape, offset),
+                _ => g.mill_polyline(shape, offset, false),
             }
+            // den letzten Gang durch die Haut für das Ende des Programms vormerken (nur „am Ende durchfräsen“)
+            if let Some((plan, set)) = skin {
+                if !plan.last.is_empty() && (shape.kind == "circle" || shape.kind == "polyline") {
+                    skin_jobs.push(SkinJob {
+                        rank: if mode == "inside" { 0 } else { 1 },
+                        plan,
+                        set,
+                        shape: shape.clone(),
+                        k,
+                        gi,
+                        n: form_counter,
+                        tool: grp.0,
+                        dia: g.tool_radius * 2.0,
+                        step_z: g.step_z,
+                        feed: g.feed_xy,
+                        rpm: g.rpm,
+                        plunge: g.plunge,
+                        ramp_tan: g.ramp_tan,
+                        lead: g.cur_lead.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    // ---- Zwiebelhaut durchfräsen: ganz am Ende, zuerst der Abfall in den Löchern (innen), dann die Teile (außen) ----
+    if !skin_jobs.is_empty() {
+        // innerhalb „innen“ und „außen“ zuerst das Werkzeug, das gerade eingesetzt ist (spart Werkzeugwechsel)
+        let mut cur_tool: Option<usize> = groups.last().and_then(|grp| grp.0);
+        let mut in_use = cur_tool;
+        let mut order: Vec<usize> = Vec::new();
+        for rank in [0u8, 1] {
+            let mut rest: Vec<usize> = (0..skin_jobs.len()).filter(|&i| skin_jobs[i].rank == rank).collect();
+            while !rest.is_empty() {
+                let next = if rest.iter().any(|&i| skin_jobs[i].tool == in_use) { in_use } else { skin_jobs[rest[0]].tool };
+                order.extend(rest.iter().copied().filter(|&i| skin_jobs[i].tool == next));
+                in_use = next;
+                rest.retain(|&i| skin_jobs[i].tool != next);
+            }
+        }
+        let line = format!("\n{}\n", g.c("gc.skinCutAll", &[]));
+        g.push(&line);
+        for i in order {
+            let j = &skin_jobs[i];
+            // anderes Werkzeug als gerade eingesetzt: noch einmal wechseln
+            if j.tool != cur_tool {
+                g.start_tool(j.tool, j.gi, true);
+                cur_tool = j.tool;
+            }
+            g.tool_radius = j.dia / 2.0;
+            g.step_z = j.step_z;
+            g.ramp_tan = j.ramp_tan;
+            if j.rpm != g.rpm {
+                let line = format!("G0 Z{}\n{} S{} {}\nG4 P2 {}\n", f2(SAFE_Z), job.spindle, js_num(j.rpm), g.c("gc.spindleOn", &[("rpm", js_num(j.rpm))]), g.c("gc.spinUp", &[]));
+                g.push(&line);
+                g.rpm = j.rpm;
+            }
+            let f = skin_feed(&j.set, j.feed);
+            g.feed_xy = f;
+            g.plunge = mn(j.plunge, f);
+            let line = format!("\n{}\nG0 Z{}\nF{} {}\n", g.c("gc.skinCut", &[("n", j.n.to_string())]), f2(SAFE_Z), js_num(f), g.c("gc.feed", &[("f", js_num(f))]));
+            g.push(&line);
+            g.passes = j.plan.last.clone();
+            g.pass_top = j.plan.floor;
+            g.skin_depth = Some(j.plan.through);
+            g.cur_lead = j.lead.clone();
+            g.cur_shape = j.k;
+            g.converted = j.shape.converted;
+            let offset = if j.shape.mode == "inside" { -g.tool_radius } else { g.tool_radius };
+            if j.shape.kind == "circle" {
+                g.mill_circle(&j.shape, offset, true);
+            } else {
+                g.mill_polyline(&j.shape, offset, true);
+            }
+            g.pass_top = 0.0;
+            g.skin_depth = None;
         }
     }
 
