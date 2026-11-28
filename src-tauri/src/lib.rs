@@ -59,6 +59,7 @@ mod qrencode;
 mod vexport;
 mod longboard;
 mod magazine;
+mod twosided;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1409,6 +1410,17 @@ fn magazine_start(m: magazine::Magazine, text: String, first: String, ids: Vec<S
     serde_json::json!({ "nums": nums, "first": if first.is_empty() { None } else { at(&first) }, "slots": slots })
 }
 
+/// ZWEISEITIG (twosided.rs): Einrichtung, Hindernisse, Schnitte beider Seiten. Das Fenster vergleicht die Antwort mit
+/// twoSided.ts (twoSidedJob.ts); Warnungen und Tiefen kommen weiter aus dem Fenster.
+#[tauri::command(async)]
+fn two_sided(job: twosided::Job) -> serde_json::Value {
+    twosided::run(&job)
+}
+#[tauri::command(async)]
+fn two_sided_clean(raw: serde_json::Value) -> Option<twosided::Setup> {
+    twosided::clean_setup(&raw)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1618,6 +1630,8 @@ pub fn run() {
             magazine_check,
             magazine_forget,
             magazine_start,
+            two_sided,
+            two_sided_clean,
             lathe_generate,
             gamepad_read,
             list_ports,

@@ -17,10 +17,11 @@ import { offsetPolygon } from "./polyOffset";
 import { toolForShape, cutDiameter, getTool, activeTool, type MillingTool } from "./toolLibrary";
 import { MM_TO_PIXEL, shapeBounds, shapeToPaths } from "./shapeTransform";
 import {
-  depthIssues, mirrorPoint, otherSideDepth, pinCut, pinIssues, throughDepth,
+  defaultPins, depthIssues, mirrorPoint, otherSideDepth, pinCut, pinIssues, throughDepth,
   type PinObstacle, type Pt, type Removal, type Side, type TwoSidedSetup,
 } from "./twoSided";
 import { skinPlan, skinRole, skinSettings, type SkinSettings } from "./onionSkin";
+import { checkImport, importInApp } from "./importers/importRust";
 
 /** Setup of the active bed when two-sided milling applies (router only, no rotary axis) */
 export function activeSetup(): TwoSidedSetup | null {
@@ -202,6 +203,17 @@ export interface TwoSidedJob {
   warnings: string[];
 }
 
+/** The same checks in Rust (twosided.rs), in the background; warnings and depths in use stay the TypeScript ones */
+function rustCheck(s: TwoSidedSetup, cuts: Cut[]) {
+  const obstacles = obstaclesOf(sideShapes("front"), sideShapes("back"), s), bed = bedSizeMm(), removals = withSkin(cuts, s.thickness), all = cuts.map(c => c.removal);
+  const parts = partBoxes(s), tool = pinTool(s), toolDia = tool ? cutDiameter(tool) : 3, toolDrill = tool?.type === "drill";
+  const other = all.map(r => otherSideDepth(r, all));
+  checkImport("two_sided", { job: { setup: s, obstacles, bed, removals, all, parts, toolDia, toolDrill } }, {
+    pins: pinIssues(s, obstacles, bed), depth: depthIssues(removals, s.thickness), other, through: other.map(o => throughDepth(s.thickness, o)),
+    defaults: defaultPins(s, parts), pinCut: pinCut(s.pinDia, toolDia, toolDrill), mirrored: s.pins.map(p => mirrorPoint(p, s))
+  });
+}
+
 /** What the program of one side is made of. null = two-sided milling is not in use (G-code as always) */
 export function twoSidedJob(viewShapes: any[], side?: Side): TwoSidedJob | null {
   const s = activeSetup();
@@ -224,5 +236,6 @@ export function twoSidedJob(viewShapes: any[], side?: Side): TwoSidedJob | null 
   }
   header += c(s.zRef === "spoil" ? "two.gc.zSpoil" : "two.gc.zTop", { t: s.thickness });
   const cuts = cutsOf(sideShapes("front"), sideShapes("back"), s);
+  if (importInApp()) rustCheck(s, cuts);
   return { side: sd, shapes, stockUnder: stockUnder(cuts, sd, s.thickness), pins, header, warnings: [...pinWarnings(s), ...depthWarnings(s, cuts)] };
 }

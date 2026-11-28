@@ -26,6 +26,7 @@ import { tracePath } from "../render";
 import { updateDimensionInputs } from "../uiInputs";
 import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
 import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
+import { checkImport, importInApp } from "../importers/importRust";
 import { cleanSplit, type SplitSetup } from "../seamSplit";
 import { cleanLinks, refreshLinks, shapeIndex, stripLinks } from "../linkedCopies";
 
@@ -428,6 +429,8 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
       for (const s of back) delete s.side;
       const sheet: Sheet = { name: typeof b.name === "string" ? b.name.slice(0, 40) : "", done: b.done === true, shapes: front };
       const two = cleanSetup(b.twoSided);
+      // the same in Rust (twosided.rs), in the background; the setup in use stays the TypeScript one
+      if (importInApp() && b.twoSided !== undefined) checkImport("two_sided_clean", { raw: b.twoSided }, two ? structuredClone(two) : null);
       if (two) sheet.two = two;
       if (back.length) sheet.other = back;
       // Großes Teil teilen: Fugen des Originals bzw. zu welcher Aufteilung ein Stück gehört
