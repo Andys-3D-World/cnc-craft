@@ -25,6 +25,7 @@
 import { app, options, screenDist, toScreen } from "./editorState";
 import { MM_TO_PIXEL, Pt, arcGeometry, convertToPolyline, makeRectPoints, shapeBounds, updatePolylineBounds } from "../shapeTransform";
 import { CirRef, GCon, PtRef, SegRef, Shapes, circumcircle, freedom, idsOf, satisfied, solve } from "./sketchSolve";
+import { checkImport, importInApp } from "../importers/importRust";
 import { syncPoints } from "./bezier";
 import { toolLog } from "./trimTool";
 import { t } from "../i18n/i18n";
@@ -163,7 +164,13 @@ function solveAndApply(ids: string[], extra: Stored[], weight: (id: string, i: n
   if (!comp.cons.length) return true;
   const shapes: Shapes = new Map([...comp.shapes].map(id => [id, vec(map.get(id))]));
   // Kreise verschieben sich lieber, als ihre Größe zu ändern
-  const r = solve(shapes, comp.cons, (id, i) => weight(id, i) * (i === 1 && isCircle(map.get(id)) ? 1e4 : 1));
+  const wt = (id: string, i: number) => weight(id, i) * (i === 1 && isCircle(map.get(id)) ? 1e4 : 1);
+  const r = solve(shapes, comp.cons, wt);
+  // the same in Rust (sketchsolve.rs), in the background; what is written into the drawing stays the TypeScript result
+  if (importInApp()) {
+    const weights = Object.fromEntries([...shapes].map(([id, pts]) => [id, pts.map((_, i) => wt(id, i))]));
+    checkImport("sketch_solve", { shapes: [...shapes], cons: comp.cons, weights }, { ok: r.ok, shapes: [...r.shapes], iterations: r.iterations });
+  }
   if (!r.ok) return false;
   for (const [id, pts] of r.shapes) {
     const before = shapes.get(id)!;
@@ -485,6 +492,7 @@ function drawFreedom(ctx: CanvasRenderingContext2D, list: { owner: any; idx: num
     let free = freeCache.get(sig);
     if (free === undefined) {
       free = freedom(shapes, g.cons, circles);
+      if (importInApp()) checkImport("sketch_freedom", { shapes: [...shapes], cons: g.cons, circles: [...circles] }, free);
       if (freeCache.size > 200) freeCache.clear();
       freeCache.set(sig, free);
     }

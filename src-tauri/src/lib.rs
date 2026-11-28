@@ -60,6 +60,7 @@ mod vexport;
 mod longboard;
 mod magazine;
 mod twosided;
+mod sketchsolve;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1421,6 +1422,17 @@ fn two_sided_clean(raw: serde_json::Value) -> Option<twosided::Setup> {
     twosided::clean_setup(&raw)
 }
 
+/// SKIZZEN-BEDINGUNGEN (sketchsolve.rs): Formen, Bedingungen, Gewichte. Das Fenster vergleicht die Antwort mit
+/// sketchSolve.ts (constrainTool.ts); in die Zeichnung geschrieben wird weiter das Ergebnis des Fensters.
+#[tauri::command(async)]
+fn sketch_solve(shapes: sketchsolve::Shapes, cons: Vec<sketchsolve::GCon>, weights: std::collections::HashMap<String, Vec<f64>>) -> sketchsolve::SolveResult {
+    sketchsolve::solve(&shapes, &cons, &weights, 60)
+}
+#[tauri::command(async)]
+fn sketch_freedom(shapes: sketchsolve::Shapes, cons: Vec<sketchsolve::GCon>, circles: Vec<String>) -> usize {
+    sketchsolve::freedom(&shapes, &cons, &circles)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1632,6 +1644,8 @@ pub fn run() {
             magazine_start,
             two_sided,
             two_sided_clean,
+            sketch_solve,
+            sketch_freedom,
             lathe_generate,
             gamepad_read,
             list_ports,
