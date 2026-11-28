@@ -96,6 +96,7 @@ mod update;
 mod usb_k40;
 mod vfd;
 mod workshop;
+mod xyprobe;
 
 use controller::MachineController;
 use machine::{Emit, Machine};
@@ -1526,6 +1527,13 @@ async fn rotary3d_check(request: tauri::ipc::Request<'_>) -> Result<serde_json::
     .map_err(|e| e.to_string())?
 }
 
+/// X/Y ANTASTEN (xyprobe.rs): Ablauf und aufgezeichnete Aufrufe an die Maschine (xyProbeRec.ts). Rust fährt nichts, es spielt
+/// den Ablauf mit den Antworten nach; das Fenster vergleicht (xyProbePanel.ts).
+#[tauri::command(async)]
+fn xy_probe_check(job: xyprobe::Job, log: Option<Vec<xyprobe::Call>>) -> serde_json::Value {
+    xyprobe::run(&job, &log.unwrap_or_default())
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1748,6 +1756,7 @@ pub fn run() {
             test_card,
             snap_check,
             rotary3d_check,
+            xy_probe_check,
             lathe_generate,
             gamepad_read,
             list_ports,

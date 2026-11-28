@@ -9,8 +9,27 @@ import { machine, MACHINE_EVENT } from "../machine";
 import { guard, step, xyIO, abortProbe, settled, freshStatus } from "../probe";
 import { holdSupported } from "../holdJogLogic";
 import {
-  cleanXY, Corner, probeEdge, probeHole, probeInnerCorner, probeOuterCorner, Sides, sidesCentre, SIDE_OF, XYDir, XYFail, XYOpts, XY_LIMITS, zeroLine,
+  cleanXY, Corner, probeEdge, probeHole, probeInnerCorner, probeOuterCorner, Sides, sidesCentre, SIDE_OF, XYDir, XYFail, XYIO, XYOpts, XY_LIMITS, zeroLine,
 } from "../xyProbe";
+import { recordXY } from "../xyProbeRec";
+import { checkImport, importInApp } from "../importers/importRust";
+
+/**
+ * Antasten mit Aufzeichnung: jeder Aufruf geht unverändert an die Maschine. Danach spielt Rust den Ablauf mit den
+ * Antworten nach (xyprobe.rs) und vergleicht Fahrten und Ergebnis – nur Vergleich, Rust fährt nichts
+ */
+async function checked<T>(job: Record<string, unknown>, run: (io: XYIO) => Promise<T>): Promise<T> {
+  if (!importInApp()) return run(xyIO);
+  const rec = recordXY(xyIO);
+  try {
+    const r = await run(rec.io);
+    checkImport("xy_probe_check", { job, log: rec.log }, { ok: r });
+    return r;
+  } catch (e) {
+    checkImport("xy_probe_check", { job, log: rec.log }, { err: e instanceof XYFail ? e.code : "error" });
+    throw e;
+  }
+}
 
 const KEY = "cnc_craft_xyprobe";
 type Kind = "outer" | "inner" | "edge" | "hole" | "part";
@@ -21,6 +40,7 @@ const o: XYOpts & { kind: Kind; corner: Corner; dir: XYDir; vx: number; vy: numb
 try {
   const s = JSON.parse(localStorage.getItem(KEY) || "{}");
   Object.assign(o, cleanXY(s));
+  if (importInApp()) checkImport("xy_probe_check", { job: { kind: "clean", o: s ?? null } }, cleanXY(s));
   if (KINDS.includes(s.kind)) o.kind = s.kind;
   for (const k of ["vx", "vy"] as const) if (Number.isFinite(s[k]) && Math.abs(s[k]) < 10000) o[k] = s[k];
 } catch { /* Standard */ }
@@ -142,7 +162,9 @@ export function initXyProbe(h: XYHost): () => void {
   const setZero = async (found: { x?: number; y?: number }, val: { x: number; y: number }): Promise<boolean> => {
     if (!await settled()) return false;
     await freshStatus();
-    const line = zeroLine({ x: machine.status.mpos[0], y: machine.status.mpos[1] }, found, val);
+    const pos = { x: machine.status.mpos[0], y: machine.status.mpos[1] };
+    const line = zeroLine(pos, found, val);
+    if (importInApp()) checkImport("xy_probe_check", { job: { kind: "zero", pos, found, val } }, line);
     return !!line && await step("G21") && await step(line);
   };
 
@@ -150,15 +172,17 @@ export function initXyProbe(h: XYHost): () => void {
     const val = { x: o.vx, y: o.vy };
     const opts: XYOpts = { tip: o.tip, side: o.side, search: o.search, along: o.along };
     if (o.kind === "outer" || o.kind === "inner") {
-      const r = o.kind === "outer" ? await probeOuterCorner(xyIO, o.corner, opts) : await probeInnerCorner(xyIO, o.corner, opts);
+      const corner = { ...o.corner }, kind = o.kind;
+      const r = await checked({ kind, corner, opts }, io => kind === "outer" ? probeOuterCorner(io, corner, opts) : probeInnerCorner(io, corner, opts));
       if (!await setZero(r, val)) return false;
       result = t("xyp.doneCorner", { x: n(o.vx), y: n(o.vy) });
     } else if (o.kind === "hole") {
-      const r = await probeHole(xyIO, opts);
+      const r = await checked({ kind: "hole", opts }, io => probeHole(io, opts));
       if (!await setZero(r, val)) return false;
       result = t("xyp.doneHole", { w: n(r.w), h: n(r.h), x: n(o.vx), y: n(o.vy) });
     } else {
-      const e = await probeEdge(xyIO, o.dir, opts);
+      const dir = o.dir;
+      const e = await checked({ kind: "edge", dir, opts }, io => probeEdge(io, dir, opts));
       const isX = o.dir[0] === "x";
       if (o.kind === "edge") {
         if (!await setZero(isX ? { x: e } : { y: e }, val)) return false;
@@ -169,6 +193,7 @@ export function initXyProbe(h: XYHost): () => void {
         homeAt = machine.homeState;
         sides[SIDE_OF[o.dir]] = e;
         const c = sidesCentre(sides);
+        if (importInApp()) checkImport("xy_probe_check", { job: { kind: "sides", s: { ...sides } } }, c);
         // sobald zwei gegenüberliegende Seiten da sind, ist diese Achse fertig
         const done = isX ? c.x : c.y;
         if (done !== undefined && !await setZero(isX ? { x: c.x } : { y: c.y }, val)) return false;
