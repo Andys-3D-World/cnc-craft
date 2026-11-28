@@ -227,7 +227,12 @@ function farPoint(loop: Pt[], i: number, step: 1 | -1, dist: number): Pt {
   return loop[((i + step) % n + n) % n];
 }
 
-/** Index der schärfsten Ecke (Richtungsänderung > 30°), sonst 0 */
+/** Ecken, deren Knick sich um weniger unterscheidet (rad, ~0,0000001°), zählen als gleich scharf: dann bleibt die
+ *  frühere. Sonst entschiede die letzte Stelle der Rechnung (z. B. bei regelmäßigen Vielecken) – und die kann in
+ *  Rust oder auf einem anderen Rechner anders gerundet sein. Andreas, 28.11.2026: „Yes, first corner“ */
+export const CORNER_TIE = 1e-9;
+
+/** Index der schärfsten Ecke (Richtungsänderung > 30°), sonst 0; bei gleich scharfen Ecken die erste */
 export function cornerIndex(loop: Pt[]): number {
   let best = 0, bestTurn = 0.52; // ~30°
   const n = loop.length;
@@ -238,7 +243,7 @@ export function cornerIndex(loop: Pt[]): number {
     const lu = Math.hypot(ux, uy), lv = Math.hypot(vx, vy);
     if (lu < 1e-6 || lv < 1e-6) continue;
     const turn = Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy) / (lu * lv))));
-    if (turn > bestTurn) { bestTurn = turn; best = i; }
+    if (turn > bestTurn + CORNER_TIE) { bestTurn = turn; best = i; }
   }
   return best;
 }

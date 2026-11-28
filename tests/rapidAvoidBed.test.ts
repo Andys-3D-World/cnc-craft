@@ -226,14 +226,18 @@ async function cam() {
   const PCam = await import("../src/plasmaCam.ts");
   const { lintGcode } = await import("../src/gcodeLint.ts");
   const { createPolyline, MM_TO_PIXEL: PX } = await import("../src/shapeTransform.ts");
-  const box = (x0: number, y0: number, x1: number, y1: number, mode: string) =>
-    createPolyline(rect(x0, y0, x1, y1).map(p => ({ x: p.x * PX, y: p.y * PX })), true, mode, {});
+  /** rot: the rectangle's points start that many corners later (the cut starts at the first of equally sharp corners) */
+  const box = (x0: number, y0: number, x1: number, y1: number, mode: string, rot = 0) => {
+    const r = rect(x0, y0, x1, y1), pts = [...r.slice(rot), ...r.slice(0, rot)];
+    return createPolyline(pts.map(p => ({ x: p.x * PX, y: p.y * PX })), true, mode, {});
+  };
   return { LL, PC, LC, PCam, lintGcode, box };
 }
 
 // Plate 6…230 × 4…100 cut "outside" with the default cut (kerf 1.5 mm): the torch runs 0.75 mm outside,
 // so its path is 5.25…230.75 × 3.25…100.75. Detour corners (margin 5): x 0.25 / 235.75, y -1.75 / 105.75.
-// The cut ends at the upper right corner, at about (230.75, 99.6), then the torch parks at X0 Y0:
+// All four corners are equally sharp, so the cut starts at the first one: the points are given from the upper left,
+// which makes the cut start and end at the upper right corner, at about (230.75, 99.6); then the torch parks at X0 Y0:
 //   over the top: 7.9 + 235.5 + 105.75 = 349.2
 //   below:        √(5² + 101.3²) + √(235.75² + 1.75²) = 101.5 + 235.8 = 337.2   <- before: G0 X235.75 Y-1.75
 // On a 300 × 200 bed that corner moves to Y0 (3.25 mm left to the torch path, ≥ 2.5): G0 X235.75 Y0
@@ -241,7 +245,7 @@ test("plasma G-code: a plate near the lower bed edge gives no move outside the b
   const c = await cam();
   c.PC.initPlasmaCuts();
   c.PC.setPlasmaSettings({ avoidCut: true }, false);
-  const shapes = [c.box(6, 4, 230, 100, "outside")];
+  const shapes = [c.box(6, 4, 230, 100, "outside", 3)];
   const off = (gcode: string) => c.lintGcode(gcode, { kind: "plasma", bedW: BED.w, bedH: BED.h }).filter(i => i.rule === "off-bed");
 
   setBed(null);   // no page, no bed size: the planner is not limited (as before this change)
