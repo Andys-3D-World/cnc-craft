@@ -11,6 +11,7 @@ import { rotary } from "../rotary";
 import { isLathe, isPlasma } from "../machineMode";
 import { checkLimits, scanJobExtents, LimitOver } from "../softLimits";
 import { askChoice } from "./unsavedDialog";
+import { checkImport, importInApp } from "../importers/importRust";
 
 let asking = false;
 
@@ -32,17 +33,19 @@ function evaluate(lines: string[]) {
   const num = (k: string) => parseFloat(machine.settings.get(k) ?? "");
   const { mpos, wpos } = machine.status;
   const wco = [mpos[0] - wpos[0], mpos[1] - wpos[1], mpos[2] - wpos[2]];
-  const ext = scanJobExtents(lines, { wpos, wco, activeWcs: machine.wcs });
+  const start = { wpos, wco, activeWcs: machine.wcs };
+  const ext = scanJobExtents(lines, start);
   // Referenziert? $22 aus: Zählerstand ohne Bezug. Nach Alarm/$X auch nicht. Sonst ($22 an, kein Alarm seit Verbinden): ja.
   const homed = ((num("$22") | 0) & 1) === 1 && machine.homeState !== "lost";
   const skip = rotary.on && rotary.axis !== "a" && !isPlasma() && !isLathe() ? [rotary.along === "y" ? 0 : 1] : [];
-  const res = checkLimits(ext, {
+  const env = {
     travel: [num("$130"), num("$131"), num("$132")],
     homeDirMask: num("$23") | 0,
     pulloff: num("$27"),
     homed, mpos, wpos, skip
-  });
-  return { ext, res };
+  };
+  const res = checkLimits(ext, env);
+  return { ext, res, start, env };
 }
 
 export async function limitsAllowStart(lines: string[], log: (s: string) => void): Promise<boolean> {
@@ -51,7 +54,10 @@ export async function limitsAllowStart(lines: string[], log: (s: string) => void
   if (!machine.settings.has("$130") && machine.status.state === "Idle") {
     try { await sendAndWait("$$", 5000, true); } catch { /* unten: Warnung „Einstellungen fehlen“ */ }
   }
-  const { ext, res } = evaluate(lines);
+  const { ext, res, start, env } = evaluate(lines);
+  // the same in Rust (softlimits.rs), in the background; what is decided here stays the TypeScript result.
+  // Very long jobs are left out: handing them over would cost time just when the job starts.
+  if (importInApp() && lines.length <= 200_000) checkImport("soft_limits", { text: lines.join("\n"), start, env }, { ext, res });
 
   if (res.notHomed) log(`⚠ ${t("lim.notHomed")}`);
   if (res.noSettings.length) log(`⚠ ${t("lim.noSettings", { axes: res.noSettings.join(", ") })}`);

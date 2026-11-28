@@ -54,6 +54,7 @@ mod pcbiso;
 mod pcbparse;
 mod postproc;
 mod pathcheck;
+mod softlimits;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1339,6 +1340,20 @@ fn post_process(neutral: String, def: postproc::PostDef, o: postproc::PostOption
     out
 }
 
+/// MASCHINENGRENZEN (softlimits.rs): Job-Zeilen (mit \n verbunden), Startlage und Maschinenzustand beim Start. Das
+/// Fenster vergleicht die Antwort mit softLimits.ts (limitGuard.ts); ob gestartet werden darf, entscheidet weiter das Fenster.
+#[tauri::command(async)]
+fn soft_limits(text: String, start: softlimits::ScanStart, env: softlimits::LimitEnv) -> serde_json::Value {
+    let t0 = std::time::Instant::now();
+    let lines: Vec<String> = text.split('\n').map(String::from).collect();
+    let ext = softlimits::scan_job_extents(&lines, &start);
+    let res = softlimits::check_limits(&ext, &env);
+    if cfg!(debug_assertions) {
+        eprintln!("softlimits: {} line(s), {} over ({:.1} ms)", lines.len(), res.over.len(), t0.elapsed().as_secs_f64() * 1000.0);
+    }
+    serde_json::json!({ "ext": ext, "res": res })
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1540,6 +1555,7 @@ pub fn run() {
             pcb_isolate,
             pcb_parse,
             post_process,
+            soft_limits,
             lathe_generate,
             gamepad_read,
             list_ports,
