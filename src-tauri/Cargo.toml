@@ -40,6 +40,8 @@ tokio = { version = "1", features = ["net", "time", "io-util", "rt", "sync"] }
 # Winkelfunktionen wie im Fenster (jsmath.rs): reines Rust, auf jedem Rechner dieselben Zahlen – die Rechen-Zwillinge
 # (polyoffset.rs …) müssen bis zur letzten Stelle dasselbe liefern wie das TypeScript
 libm = "0.2"
+# DXF-Ebenennamen wie im Fenster (vexport.rs): Umlaute zerlegen (NFKD), damit „Fräsen“ zu „FRASEN“ wird
+unicode-normalization = "0.1"
 
 [dev-dependencies]
 # nur für die Tests: Kommazahlen aus den Vergleichsdateien genau einlesen (sonst bis zu eine letzte Stelle daneben)

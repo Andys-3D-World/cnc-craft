@@ -16,6 +16,7 @@ import { layerForShape } from "../laserLayers";
 import { isLaser, isPlasma } from "../machineMode";
 import { modeColor } from "../render";
 import { ExpItem, ExpResult, toSvg, toDxf, toPdf, toHpgl, curveItems } from "../vectorExport";
+import { checkImport, importInApp } from "../importers/importRust";
 
 export type ExportFormat = "svg" | "dxf" | "pdf" | "plt";
 export const EXPORT_FORMATS: ExportFormat[] = ["svg", "dxf", "pdf", "plt"];
@@ -63,12 +64,15 @@ export function formatLabel(f: ExportFormat): string {
 export async function exportDrawing(format: ExportFormat, all: boolean, log: (s: string) => void) {
   const sel = selectedShapes();
   const shapes = !all && sel.length ? sel : app().shapes;
-  const items = curveItems(shapesToItems(shapes));
+  const raw = shapesToItems(shapes);
+  const items = curveItems(raw);
   if (!items.length) { log(t("exp.empty")); return; }
   try {
     const p = await save({ title: t("exp.saveTitle", { fmt: NAMES[format] }), defaultPath: `cnc-craft.${format}`, filters: [{ name: NAMES[format], extensions: [format] }] });
     if (!p) return;
     const r = WRITERS[format](items);
+    // the same in Rust (vexport.rs), in the background; the file written is the TypeScript one
+    if (importInApp()) checkImport("vector_export", { items: raw, format }, r);
     await writeFile(String(p), new TextEncoder().encode(r.data));
     log(t("exp.saved", { n: shapes.length, p: String(p) }));
     if (r.skippedImages) log(t("exp.skippedImages", { n: r.skippedImages, fmt: NAMES[format] }));

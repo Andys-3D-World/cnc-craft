@@ -56,6 +56,7 @@ mod postproc;
 mod pathcheck;
 mod softlimits;
 mod qrencode;
+mod vexport;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1368,6 +1369,13 @@ fn qr_encode(text: String, ecc: String) -> serde_json::Value {
     }
 }
 
+/// VEKTOR-EXPORT (vexport.rs): neutrale Elemente (mm, Y oben) und Format (svg, dxf, pdf, plt). Das Fenster vergleicht die
+/// Antwort mit vectorExport.ts (exportMenu.ts); gespeichert wird weiter das TypeScript.
+#[tauri::command(async)]
+fn vector_export(items: Vec<vexport::Item>, format: String) -> Result<vexport::ExpResult, String> {
+    vexport::export(&items, &format).ok_or_else(|| format!("unknown format {format}"))
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1571,6 +1579,7 @@ pub fn run() {
             post_process,
             soft_limits,
             qr_encode,
+            vector_export,
             lathe_generate,
             gamepad_read,
             list_ports,
