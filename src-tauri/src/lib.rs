@@ -55,6 +55,7 @@ mod pcbparse;
 mod postproc;
 mod pathcheck;
 mod softlimits;
+mod qrencode;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1354,6 +1355,19 @@ fn soft_limits(text: String, start: softlimits::ScanStart, env: softlimits::Limi
     serde_json::json!({ "ext": ext, "res": res })
 }
 
+/// QR-CODE (qrencode.rs): Text und Fehlerkorrektur. Das Fenster vergleicht die Antwort mit qrcode.ts (qrTool.ts);
+/// eingefügt wird weiter das TypeScript.
+#[tauri::command(async)]
+fn qr_encode(text: String, ecc: String) -> serde_json::Value {
+    match qrencode::encode_qr(&text, &ecc) {
+        None => serde_json::Value::Null,
+        Some(q) => {
+            let outlines = qrencode::qr_outlines(&q.modules);
+            serde_json::json!({ "version": q.version, "size": q.size, "modules": q.modules, "outlines": outlines })
+        }
+    }
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1556,6 +1570,7 @@ pub fn run() {
             pcb_parse,
             post_process,
             soft_limits,
+            qr_encode,
             lathe_generate,
             gamepad_read,
             list_ports,

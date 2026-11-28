@@ -210,7 +210,7 @@ export function encodeQr(text: string, ecc: QrEcc = "M"): QrCode | null {
 }
 
 /** Strafpunkte nach der Norm (lange Reihen, 2×2-Blöcke, Sucher-ähnliche Muster, Hell/Dunkel-Verhältnis) */
-function penalty(m: boolean[][]): number {
+export function penalty(m: boolean[][]): number {
   const n = m.length;
   let p = 0, dark = 0;
   const line = (get: (i: number) => boolean) => {

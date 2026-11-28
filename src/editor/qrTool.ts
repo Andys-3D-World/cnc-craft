@@ -13,6 +13,7 @@ import { createPolyline, groupBounds, newId, MM_TO_PIXEL } from "../shapeTransfo
 import { encodeQr, qrOutlines, QrEcc } from "./qrcode";
 import { code128, ean13, type Bars } from "./barcode";
 import { t } from "../i18n/i18n";
+import { checkImport, importInApp } from "../importers/importRust";
 
 export type CodeKind = "qr" | "code128" | "ean13";
 const KINDS: CodeKind[] = ["qr", "code128", "ean13"];
@@ -49,9 +50,12 @@ export function qrShapes(d: QrData, x0: number, y0: number, extra: Record<string
     ));
   }
   const qr = encodeQr(d.text, d.ecc);
-  if (!qr) return null;
+  const loops = qr ? qrOutlines(qr.modules) : null;
+  // the same in Rust (qrencode.rs), in the background; what is inserted stays the TypeScript result
+  if (importInApp()) checkImport("qr_encode", { text: d.text, ecc: d.ecc }, qr ? { ...qr, outlines: loops } : null);
+  if (!qr || !loops) return null;
   const mod = (d.size / qr.size) * MM_TO_PIXEL;
-  return qrOutlines(qr.modules).map(loop => createPolyline(
+  return loops.map(loop => createPolyline(
     loop.map(q => ({ x: x0 + q.x * mod, y: y0 + (qr.size - q.y) * mod })), true, "on-line",
     { ...extra, groupId, qrData: { ...d }, source: "QR" }
   ));
