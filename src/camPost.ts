@@ -2,21 +2,25 @@
  * NACHBEARBEITUNG DES G-CODES IN RUST, MIT DEM TYPESCRIPT GEPRÜFT
  *
  * Nach dem G-Code der Formen laufen in cam.ts noch Schritte über den fertigen Text: Bogen-Glättung (arcFit.ts),
- * Sperrzonen (keepOut.ts), Drehachse (rotaryWrap.ts). Jeder hat einen Zwilling in Rust (src-tauri/src/…). Solange das
+ * Sperrzonen (keepOut.ts), Drehachse (rotaryWrap.ts). Jeder hat einen Zwilling in Rust (src-tauri/src/…).
+ * Auf demselben Weg wird der Laser-G-Code geprüft (laserCam.ts gegen lasergcode.rs, Auftrag aus laserJob.ts). Solange das
  * TypeScript daneben mitrechnet, gilt wie beim Fräs-G-Code: das Ergebnis aus Rust zählt nur, wenn es Zeichen für
  * Zeichen dasselbe ist. cam.ts merkt sich deshalb jeden Schritt (Eingabe, Einstellungen, Ergebnis), und checkPost()
  * lässt Rust dieselben Schritte rechnen. Weicht etwas ab, bleibt es beim Text aus dem TypeScript und ein Hinweis bittet
  * darum, das zu melden. Vorschau im Browser und Tests: ohne Rust, nichts wird geprüft.
  */
 
-export interface PostStep { cmd: string; args: Record<string, unknown>; result: unknown }
+/** adapt: Rusts Antwort in die Form bringen, in der das TypeScript sein Ergebnis hat (z. B. Hinweise als Text) */
+export interface PostStep { cmd: string; args: Record<string, unknown>; result: unknown; adapt?: (rust: any) => unknown }
 
 let rec: PostStep[] | null = null;
 
 /** Ab jetzt die Schritte merken (generateGcodeFull in cam.ts schaltet das um finish() herum ein) */
 export function recordPost() { rec = []; }
 /** Ein Schritt ist gelaufen: Befehl in Rust, seine Angaben, was das TypeScript ergeben hat */
-export function notePost(cmd: string, args: Record<string, unknown>, result: unknown) { rec?.push({ cmd, args, result }); }
+export function notePost(cmd: string, args: Record<string, unknown>, result: unknown, adapt?: (rust: any) => unknown) { rec?.push({ cmd, args, result, adapt }); }
+/** Wird gerade gemerkt? (wer für einen Schritt erst einen Auftrag bauen muss, spart sich das sonst) */
+export const recordingPost = () => rec !== null;
 /** Die gemerkten Schritte holen und das Merken beenden */
 export function takePost(): PostStep[] { const r = rec || []; rec = null; return r; }
 
@@ -90,7 +94,7 @@ export async function checkPost(steps: PostStep[]): Promise<string | null> {
   const { invoke } = await import("@tauri-apps/api/core");
   for (const s of steps) {
     let rust: unknown;
-    try { rust = await invoke(s.cmd, s.args); } catch (e) { lastPostSource = `TypeScript: ${s.cmd} failed (${String(e)})`; console.warn("post step:", lastPostSource); return null; }
+    try { rust = await invoke(s.cmd, s.args); if (s.adapt) rust = s.adapt(rust); } catch (e) { lastPostSource = `TypeScript: ${s.cmd} failed (${String(e)})`; console.warn("post step:", lastPostSource); return null; }
     if (!sameDeep(s.result, rust)) {
       const near = nearLines(s.result, rust), d = `${s.cmd} – ${firstDiff(s.result, rust)}`;
       lastPostSource = "TypeScript: " + (near ? `${near} line(s) differ in the last digit – ` : "") + d;

@@ -276,7 +276,7 @@ const openLoop = (pts: Pt[]) => (pts.length > 2 && Math.hypot(pts[0].x - lastOf(
  * "len" mm daneben im Abfall. Liegt die Kontur in einer ungeraden Anzahl anderer Konturen, ist sie
  * ein Loch -> Einstich im Loch, sonst außerhalb des Teils.
  */
-function withLeadIn(pts: Pt[], all: Pt[][], len: number, fixedStart = false): { pts: Pt[]; lead: Pt | null } {
+export function withLeadIn(pts: Pt[], all: Pt[][], len: number, fixedStart = false): { pts: Pt[]; lead: Pt | null } {
   if (!(len > 0) || pts.length < 3) return { pts, lead: null };
   let loop = pts;
   const a = loop[0], z = loop[loop.length - 1];

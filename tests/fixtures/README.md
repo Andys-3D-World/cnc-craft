@@ -36,3 +36,9 @@ cases, real router programs taken from `millgcode-cases.json.gz`, random program
 what the TypeScript gives in the `-expected` file (`UPDATE_FIXTURES=1 npm test` writes it again), `cargo test keepout`
 and `cargo test rotarywrap` compare the Rust result with it line by line. The rotary `-expected` file also holds the job
 the Rust side gets for each case (`wrapJob` in `src/rotaryRust.ts`).
+
+`lasergcode-cases.json.gz` holds, for 60 small laser drawings, the job for the Rust laser G-code (`src/laserJob.ts`), the
+G-code and the warnings that `src/laserCam.ts` gives for it. `cargo test lasergcode` checks that
+`src-tauri/src/lasergcode.rs` gives the same G-code line by line and the same warnings. Like the mill cases it is made in
+the preview, with `lasergcode-make.js` (steps at the top of that file). Make it again whenever `laserCam.ts` or
+`laserJob.ts` changes.

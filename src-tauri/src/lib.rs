@@ -39,6 +39,7 @@ mod milllead;
 mod millgcode;
 mod feedadapt;
 mod keepout;
+mod lasergcode;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1112,6 +1113,18 @@ fn post_keepouts(gcode: String, zones: Vec<keepout::Zone>, radius: f64, note: St
     r
 }
 
+/// LASER-G-CODE (lasergcode.rs): Linien und Füllen aus dem Auftrag des Fensters (laserJob.ts). Das Fenster vergleicht
+/// die Antwort mit dem G-Code aus laserCam.ts (checkPost in camPost.ts).
+#[tauri::command(async)]
+fn laser_generate(job: lasergcode::Job) -> Result<lasergcode::Output, String> {
+    let start = std::time::Instant::now();
+    let out = lasergcode::generate(&job)?;
+    if cfg!(debug_assertions) {
+        eprintln!("lasergcode: {} layer(s), {} lines, {} warning(s) ({:.1} ms)", job.layers.len(), out.gcode.split('\n').count(), out.warnings.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(out)
+}
+
 /// BOGEN-GLÄTTUNG (arcfit.rs): derselbe Schritt, den das Fenster über den fertigen Fräs-G-Code laufen lässt (fitArcs in
 /// arcFit.ts): G1-Ketten, die auf einem Bogen liegen, werden zu G2/G3.
 #[tauri::command(async)]
@@ -1287,6 +1300,7 @@ pub fn run() {
             post_keepouts,
             post_rotary,
             post_arcfit,
+            laser_generate,
             gamepad_read,
             list_ports,
             port_scan,
