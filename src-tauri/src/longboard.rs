@@ -908,16 +908,43 @@ mod tests {
         let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../tests/fixtures");
         let mut text = String::new();
         flate2::read::GzDecoder::new(std::fs::File::open(dir.join("longboard-cases.json.gz")).unwrap()).read_to_string(&mut text).unwrap();
-        let cases: Value = serde_json::from_str(&text).unwrap();
-        let cases = cases.as_array().unwrap();
+        let all: Value = serde_json::from_str(&text).unwrap();
+        for o in all["odd"].as_array().unwrap() {
+            let l = o["line"].as_str().unwrap();
+            assert_eq!(serde_json::to_value(unsupported(&[l.to_string()])).unwrap(), o["want"], "unsupported({l:?})");
+        }
+        let cases = all["cases"].as_array().unwrap();
         assert!(cases.len() >= 30, "only {} cases", cases.len());
         for c in cases {
             let name = c["name"].as_str().unwrap();
-            let job: Job = serde_json::from_value(c["job"].clone()).unwrap();
-            let got = run(&job);
+            let mut jv = c["job"].clone();
+            jv["text"] = all["programs"][c["program"].as_str().unwrap()].clone();
+            let job: Job = serde_json::from_value(jv).unwrap();
+            let mut got = run(&job);
+            // die Spur als Länge und Prüfsumme (auf 6 Stellen gerundet), wie im Test des Fensters
+            for p in got["parts"].as_array_mut().unwrap() {
+                let tr = p["trace"].as_array().unwrap();
+                let r6 = |v: &Value| to_fixed(v.as_f64().unwrap(), 6);
+                let text = tr.iter().map(|q| format!("{},{},{}", r6(&q["x"]), r6(&q["y"]), r6(&q["z"]))).collect::<Vec<_>>().join(";");
+                let mut h: u32 = 0x811c9dc5;
+                for b in text.bytes() {
+                    h = (h ^ b as u32).wrapping_mul(0x01000193);
+                }
+                p["trace"] = serde_json::json!({ "n": tr.len(), "hash": h });
+            }
+            if c["program"].as_str().unwrap().starts_with("random") {
+                for p in got["parts"].as_array_mut().unwrap() {
+                    let l: Vec<&str> = p["lines"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect();
+                    let mut h: u32 = 0x811c9dc5;
+                    for b in l.join("\n").bytes() {
+                        h = (h ^ b as u32).wrapping_mul(0x01000193);
+                    }
+                    p["lines"] = serde_json::json!({ "n": l.len(), "hash": h });
+                }
+            }
             // erst die Zeilen, damit ein Unterschied lesbar gemeldet wird
             for (k, (g, w)) in got["parts"].as_array().unwrap().iter().zip(c["want"]["parts"].as_array().unwrap()).enumerate() {
-                let (gl, wl) = (g["lines"].as_array().unwrap(), w["lines"].as_array().unwrap());
+                let (Some(gl), Some(wl)) = (g["lines"].as_array(), w["lines"].as_array()) else { continue };
                 if let Some(i) = gl.iter().zip(wl).position(|(a, b)| a != b) {
                     panic!("{name}: section {}: line {}: {} vs {}", k + 1, i + 1, gl[i], wl[i]);
                 }

@@ -25,6 +25,37 @@ const programs: { name: string; lines: string[]; prefix: string; along: "x" | "y
   { name: "odd spellings", lines: ["g21", "g90", "G00 z5", "(Werkzeug: Bohrer 3)", "M03 S1000", "f500", "G0X10Y20", "G01Z-1", "G1 X10 Y480 ; long cut", "G4 P0.5", "G1 X30.5Y480.25 F750", "G02 X40 Y470 I0 J-10", "G0 Z5", "M05", "M30"], prefix: "Werkzeug:", along: "y" },
   { name: "drilling and dwell", lines: [...HEAD, ...T1, ...[100, 260, 420].flatMap(y => ["G0 X40 Y" + y, "G0 Z0.5", "G1 Z-3 F200", "G4 P1", "G0 Z5.00"]), ...END], prefix: "Werkzeug:", along: "y" },
 ];
+// random programs with every kind of line the splitter has to sort: moves above and below the safe height, arcs (also
+// full circles) across the borders, tool and spindle groups, coolant, pauses, comments, feeds alone, ends
+let seed = 17;
+const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const pick = <T,>(a: T[]) => a[Math.floor(rnd() * a.length)];
+const f = (v: number) => v.toFixed(3);
+for (let k = 0; k < 14; k++) {
+  const along = k % 2 ? "x" : "y", L = 300 + rnd() * 700, W = 40 + rnd() * 200;
+  const P = (t: number, c: number) => (along === "x" ? `X${f(t)} Y${f(c)}` : `X${f(c)} Y${f(t)}`);
+  const lines = ["G21 (mm)", "G90", "G17", "G0 Z5.000", "(Werkzeug: Fraeser 6, Durchmesser 6.0 mm)", pick(["M3 S12000", "M03 S9000", "M4 S8000 (left)"]), "F1000"];
+  let t = rnd() * 50, c = rnd() * W;
+  for (let i = 0; i < 70; i++) {
+    const r = rnd();
+    if (r < 0.06) lines.push(...pick([["G0 Z5.000", "M5", "M0 (WERKZEUGWECHSEL 2)", "", "(Werkzeug: Fraeser 3, Durchmesser 3.0 mm)", "M3 S18000", "G4 P2", "F800"],
+      ["G0 Z5.000", "M5 (aus)", "M6 T3 (TOOL 3)", "(Werkzeug: Bohrer 4)", "M3 S10000"], ["M8 (coolant)"], ["M9"], ["M7", "M8"], ["M1 (stop)"], ["(--- Form ---)"], ["(a)", "(b)"], ["F1500"], ["F 750.5"], ["G4 P0.5"], ["; note"], [""]]));
+    else if (r < 0.22) { t = rnd() * L; c = rnd() * W; lines.push(`G0 ${P(t, c)}`, pick(["G0 Z0.500", "G0 Z5.000", "G0 Z2", "G0 Z-0.5"])); }
+    else if (r < 0.32) lines.push(`G1 Z${f(-rnd() * 6)} F${pick(["300", "250.555", "123.456"])}`);
+    else if (r < 0.37) lines.push(pick(["G0 Z5.000", "G0 Z10", "G1 Z5.000"]));
+    else if (r < 0.75) { t = Math.max(0, t + (rnd() - 0.45) * 250); c = Math.max(0, Math.min(W, c + (rnd() - 0.5) * 40)); lines.push(`${pick(["G1", "", "G01"])} ${P(t, c)}${rnd() < 0.2 ? ` Z${f(-rnd() * 6)}` : ""}${rnd() < 0.2 ? " F" + pick(["900", "1200.25", "650.004"]) : ""}${rnd() < 0.05 ? " M8" : ""}`.trim()); }
+    else {
+      const rr = 5 + rnd() * 120, full = rnd() < 0.15, g = rnd() < 0.5 ? "G2" : "G3";
+      const a0 = rnd() * Math.PI * 2, ct = t - rr * Math.cos(a0), cc = c - rr * Math.sin(a0), a1 = a0 + (g === "G3" ? 1 : -1) * (0.3 + rnd() * 2.5);
+      const et = full ? t : ct + rr * Math.cos(a1), ec = full ? c : cc + rr * Math.sin(a1);
+      const off = along === "x" ? `I${f(ct - t)} J${f(cc - c)}` : `I${f(cc - c)} J${f(ct - t)}`;
+      lines.push(`${g} ${P(et, ec)}${rnd() < 0.2 ? ` Z${f(-rnd() * 6)}` : ""} ${off}${rnd() < 0.3 ? " F777" : ""}`);
+      t = et; c = ec;
+    }
+  }
+  lines.push("G0 Z5.000", "M5", "G0 X0 Y0", pick(["M30", "M2", "M02 (end)", "M30 ; end"]));
+  programs.push({ name: `random ${k + 1}`, lines, prefix: "Werkzeug:", along });
+}
 for (const name of ["post-drawing", "post-drawing-table"]) programs.push({ name, lines: readFileSync(new URL(`./fixtures/${name}.gcode`, import.meta.url), "utf8").split("\n"), prefix: "tool: ", along: "x" });
 
 const optsFor = (along: "x" | "y", b: { x0: number; y0: number; x1: number; y1: number }): LongOpts[] => {
@@ -42,28 +73,43 @@ const optsFor = (along: "x" | "y", b: { x0: number; y0: number; x1: number; y1: 
 };
 const tools: HoleTool[] = [{ drill: true, diameter: 6, feed: 800, plunge: 300, stepZ: 2 }, { drill: false, diameter: 3, feed: 1200, plunge: 250.6, stepZ: 1.5 }, { drill: false, diameter: 5.95, feed: 900, plunge: 200, stepZ: 0.05 }];
 
+/** FNV-1a, 32 bit, over the characters (all ASCII here) */
+const fnv = (t: string) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i++) h = Math.imul(h ^ t.charCodeAt(i), 0x01000193) >>> 0; return h; };
+const oddLines = ["G0 X1", "G91 G0 X5", "G091 X1", "G0091", "G910", "G9.1", "XG91", "G 20", "G20.5", "G21", "G18", "G190", "G38.2 Z-1", "G380", "G43 H1", "G43.1 Z2", "G53 G0 Z0", "G5", "G59.1", "G540", "G68 R5",
+  "G73 X1", "G80", "G81 X1", "G89", "G90", "G28", "G28.1", "G30", "G10 L2", "G100", "G92.1", "M3 A5", "B-1", "A.5", "XA1", " B+2", "TAB 1", "(G91) G0 X1", "G0 X1 ; G91", "G41 D1", "G42", "G 91", "1G91", "g91"];
+
 test("long board: pinned result for Rust (longboard-cases.json.gz)", () => {
   const cases = [];
   for (const p of programs) {
     const bad = unsupported(p.lines), bounds = cutBounds(p.lines);
     assert.equal(bad, null, p.name);
+    if (!bounds) continue;
     for (const [oi, o] of optsFor(p.along, bounds!).entries()) for (const keepM6 of [false, true]) {
-      if (keepM6 && oi > 1) continue;
+      if ((keepM6 && oi > 1) || (p.name.startsWith("random") && oi > 2)) continue;
       const min = o.axis === "x" ? bounds!.x0 : bounds!.y0, max = o.axis === "x" ? bounds!.x1 : bounds!.y1;
       const errs = checkLong(o, min, max), secs = errs.includes("shift") ? [] : sections(o, max);
       const parts = secs.map(s => splitProgram(p.lines, o.axis, s, 5, p.prefix, keepM6));
       const keep = o.pinD / 2 + 3 + 1, holes = o.pins.map(q => (o.axis === "x" ? { x: q.x + o.shift, y: q.y } : { x: q.x, y: q.y + o.shift }));
       const hits = parts.map(s => ({ pins: pinHits(s.trace, o.pins, keep), holes: pinHits(s.trace, holes, keep) }));
       const holeTool = tools[(oi + (keepM6 ? 1 : 0)) % tools.length];
-      const job = { text: p.lines.join("\n"), opts: o, min, max, safeZ: 5, toolPrefix: p.prefix, keepM6, keep, holes, holeTool, holeDepth: 18.5 };
-      cases.push({ name: `${p.name} / options ${oi}${keepM6 ? " / M6 kept" : ""}`, job, want: { bad, bounds, errs, secs, parts, hits, holeLines: holeLines(holes, o.pinD, 18.5, holeTool, 5) } });
+      const job = { opts: o, min, max, safeZ: 5, toolPrefix: p.prefix, keepM6, keep, holes, holeTool, holeDepth: 18.5 };
+      // the trace (every point of every cut) as length and hash: arcs make it long. Rounded to 6 decimals first: sine and
+      // cosine may differ in the last bit between the window and Rust
+      const r6 = (v: number) => v.toFixed(6);
+      // random programs: the section lines as length and hash too (cuts across borders make thousands of them)
+      const short = p.name.startsWith("random");
+      const slim = parts.map(sp => ({ ...sp, lines: short ? { n: sp.lines.length, hash: fnv(sp.lines.join("\n")) } : sp.lines, trace: { n: sp.trace.length, hash: fnv(sp.trace.map(q => `${r6(q.x)},${r6(q.y)},${r6(q.z)}`).join(";")) } }));
+      cases.push({ name: `${p.name} / options ${oi}${keepM6 ? " / M6 kept" : ""}`, program: p.name, job, want: { bad, bounds, errs, secs, parts: slim, hits, holeLines: holeLines(holes, o.pinD, 18.5, holeTool, 5) } });
     }
   }
   // there are cuts across borders, several sections, pin hits and errors among the cases
-  assert.ok(cases.some(c => c.want.parts.length >= 3) && cases.some(c => c.want.parts.some(s => s.entries > 1)));
+  assert.ok(cases.some(c => c.want.parts.length >= 3) && cases.some(c => c.want.parts.some(s => s.entries > 1)) && cases.some(c => c.want.parts.some(s => s.trace.n > 1000)));
   assert.ok(cases.some(c => c.want.errs.length) && cases.some(c => c.want.hits.some(h => h.pins.length || h.holes.length)));
   assert.equal(unsupported(["G0 X1", "G91 G0 X5"]), "G91");
-  const text = JSON.stringify(cases) + "\n";
+  const odd = oddLines.map(l => ({ line: l, want: unsupported([l]) }));
+  assert.ok(odd.some(o => o.want === null) && odd.some(o => o.want === "A/B"));
+  const texts = Object.fromEntries(programs.map(p => [p.name, p.lines.join("\n")]));
+  const text = JSON.stringify({ programs: texts, cases, odd }) + "\n";
   if (process.env.UPDATE_FIXTURES) writeFileSync(file, gzipSync(text, { level: 9 }));
   assert.equal(gunzipSync(readFileSync(file)).toString(), text, "fixture differs – run UPDATE_FIXTURES=1 npm test after a wanted change");
 });
