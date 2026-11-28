@@ -64,6 +64,40 @@ pub fn js_num(v: f64) -> String {
 /// Zahl mit `digits` Nachkommastellen wie `toFixed` in JavaScript. Unterschied zu Rust: liegt die Zahl genau auf
 /// der Hälfte (z. B. 0,125 bei zwei Stellen), rundet JavaScript vom Nullpunkt weg, Rust zur geraden Ziffer.
 pub fn to_fixed(v: f64, digits: usize) -> String {
+    // schneller Weg (G-Code schreibt Millionen Zahlen): v · 10^digits gerundet als Ziffern. Nur, wo das Ergebnis eindeutig
+    // ist – nicht nahe an einer Hälfte (dort entscheidet die genaue Dezimalzahl) und nicht bei sehr großen Zahlen. Sonst
+    // der genaue Weg. Dass beide dasselbe schreiben, prüft `fast_to_fixed_is_the_exact_one` mit Millionen Werten.
+    if digits <= 6 {
+        let scale = [1.0, 10.0, 100.0, 1000.0, 1e4, 1e5, 1e6][digits];
+        let s = v.abs() * scale;
+        if s < 1e9 {
+            let f = s.floor();
+            let frac = s - f;
+            if (frac - 0.5).abs() >= 1e-4 {
+                let k = (if frac > 0.5 { f + 1.0 } else { f }) as u64;
+                let mut out = String::with_capacity(digits + 12);
+                if v < 0.0 {
+                    out.push('-');
+                }
+                let p = [1u64, 10, 100, 1000, 10_000, 100_000, 1_000_000][digits];
+                out.push_str(&(k / p).to_string());
+                if digits > 0 {
+                    out.push('.');
+                    let r = (k % p).to_string();
+                    for _ in r.len()..digits {
+                        out.push('0');
+                    }
+                    out.push_str(&r);
+                }
+                return out;
+            }
+        }
+    }
+    to_fixed_exact(v, digits)
+}
+
+/// Der genaue, langsame Weg von `to_fixed` (über die lange Dezimalschreibweise)
+pub fn to_fixed_exact(v: f64, digits: usize) -> String {
     if v.is_nan() {
         return "NaN".into();
     }
@@ -108,6 +142,47 @@ pub fn to_fixed(v: f64, digits: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    /// Der schnelle Weg von to_fixed schreibt genau dasselbe wie der genaue: Zufallswerte aller Größen und Vorzeichen,
+    /// jede halbe letzte Stelle in einem Bereich mit winzigen Abweichungen, kleine negative Zahlen („-0.000“), Ränder
+    #[test]
+    fn fast_to_fixed_is_the_exact_one() {
+        let mut seed = 0x2545F4914F6CDD1Du64;
+        let mut next = || {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            seed
+        };
+        let mut count = 0usize;
+        let mut check = |v: f64, d: usize| {
+            assert_eq!(to_fixed(v, d), to_fixed_exact(v, d), "{v:?} with {d} digits");
+            count += 1;
+        };
+        for _ in 0..600_000 {
+            let r = next();
+            let v = ((r >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * [1e-3, 1.0, 10.0, 700.0, 2500.0, 1e6, 1e9][(r % 7) as usize];
+            check(v, (r >> 3) as usize % 7);
+        }
+        for d in 0..=6usize {
+            let step = 10f64.powi(-(d as i32)) / 2.0;
+            for k in -3000i64..=3000 {
+                let v = k as f64 * step;
+                for e in [0.0, 1e-13, -1e-13, 1e-9, -1e-9, 3e-6, -3e-6] {
+                    check(v + e, d);
+                    check((v + e) * 37.0 + 123.0, d);
+                }
+            }
+        }
+        for v in [0.0, -0.0, -0.0004, -0.00049, 0.0005, -0.0005, 1.005, 2.675, 0.125, -0.125, 999999.9995, 1e8 + 0.25, 4.35, 1.45, 8.345, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 5e-324, -5e-324] {
+            for d in 0..=6 {
+                check(v, d);
+            }
+        }
+        assert!(count > 1_000_000);
+    }
+
+    use super::{to_fixed, to_fixed_exact};
     use serde_json::Value;
 
     fn bits(v: &Value) -> f64 {

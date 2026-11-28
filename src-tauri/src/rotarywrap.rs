@@ -923,6 +923,17 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
+    /// Zeit für ein großes Programm (nicht im normalen Lauf): ROTARY_SPEED=<G-Code-Datei> cargo test --lib rotarywrap -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn speed_on_a_large_program() {
+        let Ok(path) = std::env::var("ROTARY_SPEED") else { return };
+        let src: Vec<String> = std::fs::read_to_string(path).unwrap().split('\n').map(|l| l.to_string()).collect();
+        let start = std::time::Instant::now();
+        let out = wrap_gcode(&src, &round("a", 80.0)).unwrap();
+        println!("{} lines -> {} lines in {:.0} ms", src.len(), out.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+
     fn lines(s: &[&str]) -> Vec<String> {
         s.iter().map(|l| l.to_string()).collect()
     }

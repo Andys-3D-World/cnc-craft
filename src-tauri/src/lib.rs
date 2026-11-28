@@ -40,6 +40,7 @@ mod millgcode;
 mod feedadapt;
 mod keepout;
 mod lasergcode;
+mod lathe;
 mod plasmagcode;
 mod rotarywrap;
 mod controller;
@@ -1157,6 +1158,18 @@ fn plasma_generate(job: plasmagcode::Job) -> Result<plasmagcode::Output, String>
     Ok(out)
 }
 
+/// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
+/// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
+#[tauri::command(async)]
+fn lathe_generate(job: lathe::Job) -> Result<lathe::Output, String> {
+    let start = std::time::Instant::now();
+    let out = lathe::generate(&job)?;
+    if cfg!(debug_assertions) {
+        eprintln!("lathe: {} run(s), {} lines, {} message(s) ({:.1} ms)", out.runs, out.gcode.as_ref().map_or(0, |g| g.split('\n').count()), out.issues.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(out)
+}
+
 /// BOGEN-GLÄTTUNG (arcfit.rs): derselbe Schritt, den das Fenster über den fertigen Fräs-G-Code laufen lässt (fitArcs in
 /// arcFit.ts): G1-Ketten, die auf einem Bogen liegen, werden zu G2/G3.
 #[tauri::command(async)]
@@ -1335,6 +1348,7 @@ pub fn run() {
             post_arcfit,
             laser_generate,
             plasma_generate,
+            lathe_generate,
             gamepad_read,
             list_ports,
             port_scan,

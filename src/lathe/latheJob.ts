@@ -4,6 +4,8 @@
  */
 import { t, ascii, tMm } from "../i18n/i18n";
 import { MM_TO_PIXEL, shapeToPaths } from "../shapeTransform";
+import { recordingPost, postInApp, notePost } from "../camPost";
+import { latheRustJob } from "./latheRust";
 import { DEFAULT_LATHE_TOOLS, latheGcode, planLathe, type LatheJob, type LatheOp, type LatheOut, type LathePlan, type LatheTool, type Pt } from "./turn";
 
 const KEY = "cnc_craft_lathe", KEY_TOOLS = "cnc_craft_lathe_tools";
@@ -122,7 +124,19 @@ export function gcodeFromPlan(plan: LathePlan, s = latheSettings): string {
 }
 export function latheGcodeFromDesign(shapes: any[]): { gcode: string | null; warnings: string[]; notes: string[] } {
   const plan = planFromDesign(shapes), m = issueTexts(plan);
-  if (m.hard.length) return { gcode: null, warnings: m.hard, notes: [] };
-  if (!plan.runs.length) return { gcode: null, warnings: [t("lathe.nothing")], notes: [] };
-  return { gcode: gcodeFromPlan(plan), warnings: m.soft, notes: [] };
+  const res = m.hard.length ? { gcode: null, warnings: m.hard, notes: [] }
+    : !plan.runs.length ? { gcode: null, warnings: [t("lathe.nothing")], notes: [] }
+    : { gcode: gcodeFromPlan(plan), warnings: m.soft, notes: [] };
+  // in der App rechnet Rust dieselben Bahnen und denselben G-Code daneben und vergleicht (lathe.rs, camPost.ts)
+  if (recordingPost() && postInApp()) {
+    const s = latheSettings;
+    const job = latheRustJob(s.job, latheTools, profileFromShapes(shapes, s), s.out, k => tMm("lathe.gc." + k), ascii);
+    notePost("lathe_generate", { job }, { gcode: res.gcode, warnings: res.warnings },
+      (r: { gcode: string | null; issues: { code: string; op: number; v?: number | null; hard: boolean }[]; runs: number }) => {
+        const issues = r.issues.map(i => ({ ...i, v: i.v ?? undefined }));
+        const txt = issueTexts({ issues } as unknown as LathePlan, s), hard = issues.some(i => i.hard);
+        return { gcode: r.gcode, warnings: hard ? txt.hard : !r.runs ? [t("lathe.nothing")] : txt.soft };
+      });
+  }
+  return res;
 }

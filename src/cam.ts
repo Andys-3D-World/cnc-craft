@@ -225,7 +225,14 @@ export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; 
   let run: ReturnType<typeof gcodeRun>, pre: PostStep[];
   try { run = gcodeRun(allShapes, opts); } finally { setChecking(false); pre = takePost(); }
   lastGcodeSource = "cam.ts";
-  if ("done" in run) return result(run.done);
+  if ("done" in run) {
+    // Drehbank: fertig – geprüft wird, was dabei gemerkt wurde (lathe.rs)
+    const res = result(run.done);
+    if (opts.preview) { void backgroundCheck(null, pre); return res; }
+    const diff = await checkPost(pre);
+    if (diff) { console.warn("post step: Rust differs from the TypeScript, the TypeScript result is used –", diff); res.notes.push(t("gcw.rustDiff")); }
+    return res;
+  }
   if (opts.preview) {
     // Vorschau: sofort antworten (derselbe Text, den die Prüfung bestätigt oder verwirft), prüfen im Hintergrund.
     // rustChecked baut seinen Auftrag sofort (vor dem ersten Warten) – also bevor die nächste Rechnung lastInner ändert
