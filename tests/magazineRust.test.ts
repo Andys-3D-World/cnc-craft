@@ -24,6 +24,9 @@ const raws: unknown[] = [
       { n: 8, x: 1, y: 2, z: 3, set: true, okGet: "true", toolId: "x".repeat(61) }, null, 12, slot(99, -20000, 20000, 0), slot(100, 0, 0, 0)], inSpindle: 2.7 },
   { kind: "rack", open: "M64 P0", close: "M65 P1", slots: Array.from({ length: 30 }, (_, i) => slot(30 - i, i * 40, 0, -50)), inSpindle: 25 },
   { kind: "off", slots: [slot(1, 1, 1, 1)], inSpindle: -1 },
+  { kind: "rack", entry: "fork", dir: "x-", top: -20, open: "M64 P4", close: "M65 P4", zClear: 0, slots: [slot(1, 100, 0, -60, { okPut: true }), slot(3, 160, 0, -60, { okPut: true })], inSpindle: 3.5, auto: false },
+  { kind: "rack", open: "M64 P5", close: "M65 P5", zClear: 0, slots: [slot(1, 0, 0, -60, { toolId: "same" }), slot(2, 50, 0, -60, { toolId: "same" })], inSpindle: 0 },
+  { kind: "rack", open: "M64 P5", close: "M65 P5", zClear: 0, slots: [slot(1, 0, 0, -60), slot(2, 50, 0, -60)], inSpindle: 0 },
 ];
 const envs = [
   { grbl: true, firmware: "grblHAL", homed: true, inches: false, sensor: true },
@@ -36,6 +39,7 @@ const envs = [
 const programs = [
   ["G21", "M6 T2 (TOOL 2)", "G0 X1", "T5", "M6", "M06 T7", "M6 T2", "(M6 T9)", "M60", "M600", "; M6 T3", "T 12 M6", "M006", "M6T4"],
   ["G0 X1", "M6 (no number)", "TOOL T3 M6", "t8 m6", "M16", "M6 T99999999999999999999"],
+  ["T2 T5 M6", "T8", "M60", "M6", "T 3", "M 6", "M0006"],
 ];
 
 test("tool magazine: pinned result for Rust (magazine-cases.json.gz)", () => {
