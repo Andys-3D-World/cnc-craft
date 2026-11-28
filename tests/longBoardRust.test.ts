@@ -61,16 +61,20 @@ const targeted = [
   "G21", "G90", "G0 Z5.000", "(Werkzeug: Fraeser 6)", "M3 S12000", "F600",
   "G0 X10 Y10", "G1 Z-1 F200", "G1 X300 Y10 F500", "G1 X200 Y10",            // leaves the window and comes back at the border
   "G1 X10(c)5 Y12", "G1 AX5 Y14", "G0.5 X40 Y14", "G4 P0.2 X44", "G0 G1 X50 Y16",  // spellings the reader must not misread
-  "G2 X60.0000001 Y16 I5 J0",                                                   // nearly a full circle
+  "G2 X50.0000001 Y16 I5 J0",                                                   // nearly a full circle
   "N5M8", "G1 X70 Y16",
   "G0 Z5.000", "M1 (check)", "G0 X60 Y60", "M8", "G1 Z-1 F100", "G1 X80 Y60",   // two groups before the next cut
-  "G0 Z5.000", "M6 T4 (next)", "G0 X10 Y30", "(about to start)", "G0 X12 Y30", "G90", "G17", "(Werkzeug: Bohrer 4)", "M3 S9000", "G1 Z-1 F150", "G1 X30 Y30",
+  "G0 Z5.000", "M6 T4 (next)", "G0 X10 Y30", "(about to start)", "G0 X12 Y30", "M3 S9000", "G1 Z-1 F150", "G1 X30 Y30",
   "G0 Z5.000", "(old note)", "(Werkzeug: Fraeser 3)", "M3 S18000", "G1 Z-2 F150", "G1 X40 Y30",   // comments only, then a spindle group
   "G0 Z5.000", "G0 X900 Y10", "G0 X40 Y30", "G0 Z0.5", "G1 Z-1", "G1 X50 Y30",  // a rapid out of the window and back
+  "G1 Z-1 F100", "G1 X40 Y40", "G0 X900 Y40", "G0 X40 Y40", "G1 X50 Y40",          // rapid out at depth and back to the same point
+  "G0 Z5.000", "G0 X200 Y50", "G1 Z-1", "G1 X275 Y50", "G1 X300 Y50", "G1 X250 Y50",  // a cut ends right on the border, out and back in
   "M02", "G1 X60 Y30", "G1 X260 Y30", "G1 X290 Y30", "G1 X600 Y30",
   "G0 Z5.000", "M5", "M30",
 ];
 programs.push({ name: "targeted", lines: targeted, prefix: "Werkzeug:", along: "x" });
+// the first cut of a section after a tool group with G90/G17/G21 behind the tool comment
+programs.push({ name: "targeted 2", lines: ["G21", "G90", "G0 Z5", "M6 T1", "(Werkzeug: A)", "G90", "G17", "G21", "M3 S1000", "G0 X10 Y10", "G1 Z-1 F100", "G1 X20 Y10", "G0 Z5", "M5", "M30"], prefix: "Werkzeug:", along: "x" });
 for (const name of ["post-drawing", "post-drawing-table"]) programs.push({ name, lines: readFileSync(new URL(`./fixtures/${name}.gcode`, import.meta.url), "utf8").split("\n"), prefix: "tool: ", along: "x" });
 
 const targetedOpts = (max: number): LongOpts[] => {
