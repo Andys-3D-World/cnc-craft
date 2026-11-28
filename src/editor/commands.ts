@@ -37,6 +37,7 @@ import { toImageUV, splitImage } from "../raster/imageShape";
 import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor, pick } from "./tools";
 import { offsetOpenPath, sideOf } from "./offsetOpen";
+import { checkImport, importInApp } from "../importers/importRust";
 import { explodePath, joinOpen } from "./joinExplode";
 import { runCommand } from "./cmdLine";
 import { options, saveOptions } from "./editorState";
@@ -632,8 +633,11 @@ function makeOpenOffsets(open: any[], d: number, at: Pt | null, deleteOriginal: 
     const pts = shapeToPaths(s)[0]?.pts;
     if (!pts || pts.length < 2) continue;
     const sides = at ? [sideOf(pts, at)] : [1, -1];
-    for (const k of sides) for (const line of offsetOpenPath(pts, d * k, 0.01 * MM_TO_PIXEL)) {
-      created.push(createPolyline(line, false, "on-line", { groupId: gid }));
+    for (const k of sides) {
+      const lines = offsetOpenPath(pts, d * k, 0.01 * MM_TO_PIXEL);
+      // the same in Rust (offsetopen.rs), in the background; what is created stays the TypeScript result
+      if (importInApp()) checkImport("offset_open", { pts, d: d * k, tol: 0.01 * MM_TO_PIXEL, at }, { lines, side: at ? k : null });
+      for (const line of lines) created.push(createPolyline(line, false, "on-line", { groupId: gid }));
     }
   }
   if (deleteOriginal) {

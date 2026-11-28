@@ -61,6 +61,7 @@ mod longboard;
 mod magazine;
 mod twosided;
 mod sketchsolve;
+mod offsetopen;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1433,6 +1434,13 @@ fn sketch_freedom(shapes: sketchsolve::Shapes, cons: Vec<sketchsolve::GCon>, cir
     sketchsolve::freedom(&shapes, &cons, &circles)
 }
 
+/// VERSATZ OFFENER LINIEN (offsetopen.rs): Punkte, Abstand, Toleranz, angeklickte Stelle. Das Fenster vergleicht die
+/// Antwort mit offsetOpen.ts (commands.ts); erzeugt wird weiter das Ergebnis des Fensters.
+#[tauri::command(async)]
+fn offset_open(pts: Vec<offsetopen::P>, d: f64, tol: f64, at: Option<offsetopen::P>) -> serde_json::Value {
+    serde_json::json!({ "lines": offsetopen::offset_open_path(&pts, d, tol), "side": at.map(|p| offsetopen::side_of(&pts, p)) })
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1646,6 +1654,7 @@ pub fn run() {
             two_sided_clean,
             sketch_solve,
             sketch_freedom,
+            offset_open,
             lathe_generate,
             gamepad_read,
             list_ports,
