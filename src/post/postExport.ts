@@ -9,6 +9,7 @@ import { postCtx } from "./postContext";
 import { activePost, type ActivePost } from "./postSetting";
 import { postProcess } from "./postProcess";
 import { samePath } from "./pathCompare";
+import { checkImport, importInApp } from "../importers/importRust";
 
 export const currentPost = (): ActivePost => activePost(isMill());
 
@@ -46,12 +47,17 @@ export function postedText(neutral: string, log: (s: string) => void): string | 
   if (p.def.rewrite) info.push(note(p.toolTable ? "post.gc.table" : "post.gc.pause"));
   for (const k of p.def.fileNotes) info.push(note(k));
 
-  const r = postProcess(neutral, p.def, { inch: p.inch, toolTable: p.toolTable, info, inchNote: note("post.gc.unitInch") });
+  const opts = { inch: p.inch, toolTable: p.toolTable, info, inchNote: note("post.gc.unitInch") };
+  const r = postProcess(neutral, p.def, opts);
+  // the same in Rust (postproc.rs + pathcheck.rs), in the background; the file stays the TypeScript one
+  const rust = (ts: unknown) => { if (importInApp()) checkImport("post_process", { neutral, def: p.def, o: opts }, ts); };
   if (r.error) {
+    rust(r);
     log(`${t("log.error")} ${t("post.err." + r.error.code, { name: p.def.name, line: r.error.line, text: r.error.text })}`);
     return null;
   }
   const chk = samePath(neutral, r.gcode, p.inch);
+  rust({ ...r, check: chk });
   if (!chk.ok) {
     log(`${t("log.error")} ${t("post.verifyFail", { name: p.def.name, why: chk.why, line: chk.line, file: t(chk.inPosted ? "post.inPosted" : "post.inNeutral") })}`);
     return null;

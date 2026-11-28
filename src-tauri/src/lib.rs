@@ -52,6 +52,8 @@ mod meshimport;
 mod cutplan;
 mod pcbiso;
 mod pcbparse;
+mod postproc;
+mod pathcheck;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1321,6 +1323,22 @@ fn pcb_parse(kind: String, text: String) -> Result<serde_json::Value, String> {
     Ok(out)
 }
 
+/// POSTPROZESSOR (postproc.rs): neutrales Programm + Steuerung (posts.ts) + Optionen; ohne Fehler auch die Rückprüfung
+/// (pathcheck.rs, wie samePath). Das Fenster vergleicht die Antwort mit dem, was postProcess.ts und pathCompare.ts
+/// ergeben haben (postExport.ts); gespeichert wird weiter das TypeScript.
+#[tauri::command(async)]
+fn post_process(neutral: String, def: postproc::PostDef, o: postproc::PostOptions) -> postproc::PostResult {
+    let start = std::time::Instant::now();
+    let mut out = postproc::post_process(&neutral, &def, &o);
+    if out.error.is_none() {
+        out.check = Some(pathcheck::same_path(&neutral, &out.gcode, o.inch, 0.02));
+    }
+    if cfg!(debug_assertions) {
+        eprintln!("postproc: {} bytes in, {} bytes out ({:.1} ms)", neutral.len(), out.gcode.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    out
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1521,6 +1539,7 @@ pub fn run() {
             plan_check,
             pcb_isolate,
             pcb_parse,
+            post_process,
             lathe_generate,
             gamepad_read,
             list_ports,
