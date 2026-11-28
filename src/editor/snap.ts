@@ -6,7 +6,8 @@
  */
 import { app, options, screenDist } from "./editorState";
 import { MM_TO_PIXEL, Pt, shapeBounds, arcGeometry } from "../shapeTransform";
-import { allIntersections, perpFeet, primsNear, quadrants, tangentPts } from "./snapGeom";
+import { allIntersections, perpFeet, primXY, primsNear, quadrants, tangentPts, type Prim } from "./snapGeom";
+import { checkImport, importInApp } from "../importers/importRust";
 
 export type SnapKind = "none" | "point" | "mid" | "center" | "quad" | "int" | "perp" | "tan" | "grid";
 
@@ -69,12 +70,14 @@ export function snapPoint(wx: number, wy: number, exclude?: Set<string>, extra: 
 
     // Viertelpunkte von Bögen, Schnittpunkte, Lot und Tangente: nur Bausteine nahe der Maus
     const prims = primsNear(app().shapes, { x: wx, y: wy }, radius, exclude, MAX_POINTS_PER_SHAPE);
-    for (const p of prims) if (p.k === "circ" && p.sweep !== undefined) for (const q of quadrants(p)) consider(q.x, q.y, "quad");
-    for (const q of allIntersections(prims)) consider(q.x, q.y, "int");
-    if (from) {
-      for (const q of perpFeet(prims, from)) consider(q.x, q.y, "perp");
-      for (const q of tangentPts(prims, from)) consider(q.x, q.y, "tan");
-    }
+    const quads = prims.flatMap(p => p.k === "circ" && p.sweep !== undefined ? quadrants(p) : []);
+    const ints = allIntersections(prims);
+    const perp = from ? perpFeet(prims, from) : [], tan = from ? tangentPts(prims, from) : [];
+    for (const q of quads) consider(q.x, q.y, "quad");
+    for (const q of ints) consider(q.x, q.y, "int");
+    for (const q of perp) consider(q.x, q.y, "perp");
+    for (const q of tan) consider(q.x, q.y, "tan");
+    rustCheck(prims, from, { quads, ints, perp, tan });
   }
 
   if (best.kind === "none" && options.snapGrid) {
@@ -85,6 +88,18 @@ export function snapPoint(wx: number, wy: number, exclude?: Set<string>, extra: 
 }
 
 /** Richtung auf 15°-Schritte einrasten (für Shift beim Zeichnen) */
+// Rust rechnet die Fangpunkte nach (snapgeom.rs) – nur Vergleich. Die Maus bewegt sich oft: höchstens alle 2 s einmal
+let lastRust = 0;
+function rustCheck(prims: Prim[], from: Pt | undefined, ts: { quads: Pt[]; ints: Pt[]; perp: Pt[]; tan: Pt[] }) {
+  if (!importInApp() || !prims.length || prims.length > 2000) return;
+  const now = performance.now();
+  if (now - lastRust < 2000) return;
+  lastRust = now;
+  const xy = (ps: Pt[]) => ps.map(q => ({ x: q.x, y: q.y }));
+  checkImport("snap_check", { job: { kind: "snap", prims: prims.map(primXY), ...(from ? { from: { x: from.x, y: from.y } } : {}) } },
+    { quads: xy(ts.quads), ints: xy(ts.ints), perp: xy(ts.perp), tan: xy(ts.tan) });
+}
+
 export function snapAngle(fromX: number, fromY: number, x: number, y: number, stepDeg = 15): Pt {
   const dx = x - fromX, dy = y - fromY;
   const len = Math.hypot(dx, dy);

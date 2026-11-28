@@ -10,10 +10,11 @@ import { app, options, screenDist } from "./editorState";
 import { hitTest } from "./selection";
 import { MM_TO_PIXEL, Pt, convertToPolyline, makeRectPoints, updatePolylineBounds } from "../shapeTransform";
 import { extendTo, filletCorner, nearestCorner } from "./cornerOps";
-import { primsNear } from "./snapGeom";
+import { primXY, primsNear } from "./snapGeom";
 import { toolLog } from "./trimTool";
 import { t } from "../i18n/i18n";
 import { fmtLenU } from "../units";
+import { checkImport, importInApp } from "../importers/importRust";
 
 export const cornerHover = {
   corner: null as Pt | null,      // Ecke unter der Maus
@@ -31,16 +32,24 @@ function cornerPoints(s: any): { pts: Pt[]; closed: boolean } | null {
   return null;
 }
 
-function pickCorner(world: Pt) {
+function pickCorner(world: Pt, rust = false) {
   const hit = hitTest(world.x, world.y, CORNER_PX);
   if (!hit || hit.textData || hit.type === "image") return null;
   const cp = cornerPoints(hit);
   if (!cp) return null;
-  const i = nearestCorner(cp.pts, cp.closed, world, screenDist(CORNER_PX));
-  if (i < 0) return null;
-  const res = filletCorner(cp.pts, cp.closed, i, options.cornerSize * MM_TO_PIXEL, options.cornerChamfer, 0.01 * MM_TO_PIXEL);
+  const tol = screenDist(CORNER_PX), r = options.cornerSize * MM_TO_PIXEL, arcTol = 0.01 * MM_TO_PIXEL;
+  const i = nearestCorner(cp.pts, cp.closed, world, tol);
+  const res = i < 0 ? null : filletCorner(cp.pts, cp.closed, i, r, options.cornerChamfer, arcTol);
+  // beim Klick rechnet Rust dasselbe nach (snapgeom.rs) – nur Vergleich
+  if (rust && importInApp())
+    checkImport("snap_check", { job: { kind: "corner", pts: xy(cp.pts), closed: cp.closed, at: { x: world.x, y: world.y }, tol, r, chamfer: options.cornerChamfer, arcTol } },
+      res ? { i, res: { ...res, pts: xy(res.pts), ...(res.arc ? { arc: xy(res.arc) } : {}) } } : { i });
+  if (!res) return null;
   return { hit, cp, i, res };
 }
+
+/** nur x und y (Punkte der Formen können mehr tragen) */
+const xy = (ps: Pt[]) => ps.map(q => ({ x: q.x, y: q.y }));
 
 export function cornerMove(world: Pt) {
   cornerHover.corner = null; cornerHover.piece = null;
@@ -52,7 +61,7 @@ export function cornerMove(world: Pt) {
 
 /** true = es wurde etwas geändert */
 export function cornerClick(world: Pt): boolean {
-  const p = pickCorner(world);
+  const p = pickCorner(world, true);
   if (!p) { toolLog(t("corner.none")); return false; }
   if (p.res.error === "tooBig") { toolLog(t("corner.tooBig", { r: fmtLenU(options.cornerSize) })); return false; }
   if (p.res.error) { toolLog(t("corner.straight")); return false; }
@@ -73,7 +82,7 @@ export function cornerClick(world: Pt): boolean {
 // Verlängern
 // ---------------------------------------------------------------------
 
-function pickEnd(world: Pt) {
+function pickEnd(world: Pt, rust = false) {
   const hit = hitTest(world.x, world.y);
   if (!hit) return null;
   let pts: Pt[];
@@ -86,6 +95,9 @@ function pickEnd(world: Pt) {
   const targets = primsNear(app().shapes, world, Infinity, undefined, 4000)
     .filter(p => !(p.id === hit.id && p.k === "seg" && p.i === own) && !(p.id === hit.id && hit.type === "line"));
   const to = extendTo(pts, end, targets, MAX_REACH);
+  // beim Klick rechnet Rust dasselbe nach (snapgeom.rs) – nur Vergleich, nicht bei riesigen Zeichnungen
+  if (rust && importInApp() && targets.length <= 20000)
+    checkImport("snap_check", { job: { kind: "extend", pts: xy(pts), end, targets: targets.map(primXY), maxLen: MAX_REACH } }, to ? { x: to.x, y: to.y } : null);
   return { hit, pts, end, to };
 }
 
@@ -97,7 +109,7 @@ export function extendMove(world: Pt) {
 }
 
 export function extendClick(world: Pt): boolean {
-  const p = pickEnd(world);
+  const p = pickEnd(world, true);
   if (!p) return false;
   if (!("to" in p)) { toolLog(t(p.why === "curve" ? "extend.curve" : "extend.closed")); return false; }
   if (!p.to) { toolLog(t("extend.nothing")); return false; }

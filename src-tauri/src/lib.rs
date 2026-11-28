@@ -88,6 +88,7 @@ mod recent;
 mod camfetch;
 mod ruida;
 mod serial;
+mod snapgeom;
 mod store;
 mod testcard;
 mod update;
@@ -1503,6 +1504,13 @@ fn test_card(o: testcard::CardOptions, tr: std::collections::HashMap<String, Str
     testcard::build_card(&o, &tr)
 }
 
+/// FANGPUNKTE, ECKE, VERLÄNGERN (snapgeom.rs): Auftrag des Fensters mit den Bausteinen der Formen nahe der Maus. Das
+/// Fenster vergleicht die Antwort mit snapGeom.ts/cornerOps.ts (cornerTool.ts, snap.ts); es fängt und ändert weiter selbst.
+#[tauri::command(async)]
+fn snap_check(job: snapgeom::Job) -> serde_json::Value {
+    snapgeom::run(&job)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1723,6 +1731,7 @@ pub fn run() {
             relief_check,
             box_check,
             test_card,
+            snap_check,
             lathe_generate,
             gamepad_read,
             list_ports,

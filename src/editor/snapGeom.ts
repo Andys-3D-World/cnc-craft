@@ -61,6 +61,12 @@ export function primsNear(shapes: any[], at: Pt, radius: number, exclude?: Set<s
   return out;
 }
 
+/** Baustein nur mit den Zahlen, die die Rechnung braucht (für den Vergleich mit Rust: Punkte der Formen können mehr tragen) */
+export function primXY(p: Prim): Prim {
+  if (p.k === "seg") return { k: "seg", a: { x: p.a.x, y: p.a.y }, b: { x: p.b.x, y: p.b.y }, id: p.id, i: p.i };
+  return { ...p, c: { x: p.c.x, y: p.c.y } };
+}
+
 /** Liegt der Winkel-Punkt pt auf dem Bogen? (volle Kreise: immer) */
 export function onCirc(c: Circ, pt: Pt, tol = 1e-6): boolean {
   if (c.sweep === undefined || c.a0 === undefined || Math.abs(c.sweep) >= Math.PI * 2 - 1e-9) return true;
