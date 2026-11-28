@@ -50,6 +50,8 @@ const fields = [
   makeField("deep", 20, 36, 10, (i) => (i % 5 === 0 ? 1 : 9.95)),
   makeField("shifted", 16, 37, 8, (i, j) => 8 - (((i + j) % 7) / 2)),
   makeField("coarse", 9, 36, 20, (i, j) => 20 - ((i * 3 + j) % 11)),
+  makeField("near air", 12, 36, 10, () => Math.fround(10 - 9.54e-7)),        // just under R (within 1e-6): no level
+  makeField("on a layer", 12, 36, 10, (i) => (i % 3 ? 10.5 : 4.9999995)),     // the bottom sits just under a layer
 ];
 
 test("rotary 3D: pinned result for Rust (rotary3d-cases.json.gz)", () => {
@@ -64,13 +66,13 @@ test("rotary 3D: pinned result for Rust (rotary3d-cases.json.gz)", () => {
   });
 
   const wraps: unknown[] = [], previews: unknown[] = [];
-  const rough = [{ stepDown: 1, core: 0, tol: 0.01 }, { stepDown: 2.5, core: 3, tol: 0.01 }, { stepDown: 0.02, core: 9, tol: 0.05 }, { stepDown: 4, core: 0, tol: 0 }];
+  const rough = [{ stepDown: 1, core: 0, tol: 0.01 }, { stepDown: 2.5, core: 3, tol: 0.01 }, { stepDown: 0.02, core: 9, tol: 0.05 }, { stepDown: 4, core: 0, tol: 0 }, { stepDown: 1, core: 4.9999995, tol: 0.01 }];
   const finish = [{ dir: "x", stepOver: 0.5, tol: 0.01, levelStep: 0 }, { dir: "around", stepOver: 0.5, tol: 0.01, levelStep: 0 },
     { dir: "around", stepOver: 1.7, tol: 0.02, levelStep: 2 }, { dir: "x", stepOver: 0.3, tol: 0.005, levelStep: 1.5 }, { dir: "around", stepOver: 0.001, tol: 0.1, levelStep: -1 }];
   for (const fd of fields) {
     const head = (f: RField) => ({ x0: f.x0, dx: f.dx, nx: f.nx, nt: f.nt });
-    for (let k = 0; k < 5; k++) {
-      const ro = k < 4 ? rough[k] : null, fi = k > 0 ? finish[k % finish.length] : null;
+    for (let k = 0; k < 6; k++) {
+      const ro = k < 4 ? rough[k] : k === 5 ? rough[4] : null, fi = k > 0 && k < 5 ? finish[k % finish.length] : null;
       const out = [];
       if (ro) out.push(...roughRotary(fd.f, fd.R, ro.stepDown, ro.core, ro.tol));
       if (fi) out.push(...finishRotary(fd.f, fd.R, fi.dir as "x" | "around", fi.stepOver, fi.tol, fi.levelStep));
@@ -90,6 +92,9 @@ test("rotary 3D: pinned result for Rust (rotary3d-cases.json.gz)", () => {
     const tol = [0.01, 0.001, 0.5, 0][k % 4];
     thins.push({ pts, tol, out: thin3(pts, tol) });
   }
+  // zurück und quer: Punkte, deren Fußpunkt vor dem Anfang oder hinter dem Ende liegt
+  for (const tol of [0.01, 0.3]) thins.push({ pts: [[0, 0, 0], [-0.2, 0.001, 0], [1, 0, 0], [3, 0.002, 0], [2.5, 0, 0.001], [5, 0, 0], [5.4, 0.05, 0], [5.2, 0, 0]], tol, out: [] });
+  for (const t of thins.slice(-2)) t.out = thin3(t.pts, t.tol);
   const long = Array.from({ length: 1000 }, (_, i) => [i * 0.1, 0, 0]);
   thins.push({ pts: long, tol: 0.01, out: thin3(long, 0.01) });   // more than 400 in a row: a point is kept anyway
 

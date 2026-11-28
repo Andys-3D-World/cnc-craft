@@ -22,6 +22,9 @@ class Fake implements XYIO {
   glitchAt: number[] = [];
   n = 0;
   rejectJogAt = -1; throwJogAt = -1; throwStatusAt = -1; throwCancel = false;
+  round3 = false;                         // Lage wie GRBL mit 3 Nachkommastellen melden
+  pause: [number, number] | null = null;  // in dieser Zeit (ms) steht die Maschine (Vorschub angehalten)
+  short = 1;                              // fährt nur diesen Teil jeder Strecke (verlorene Schritte)
   constructor(o: { x: number; y: number; solids?: Box[]; hole?: Box; tip?: number; latency?: number }) {
     this.x = o.x; this.y = o.y; this.solids = o.solids ?? []; this.hole = o.hole ?? null; this.tip = o.tip ?? 3; this.latency = o.latency ?? 30;
   }
@@ -39,7 +42,7 @@ class Fake implements XYIO {
     const end = this.t + ms;
     while (this.t < end) {
       const dt = Math.min(2, end - this.t); this.t += dt;
-      let left = dt / 1000;
+      let left = this.pause && this.t > this.pause[0] && this.t <= this.pause[1] ? 0 : dt / 1000;
       while (left > 1e-12 && this.queue.length) {
         const q = this.queue[0], s = Math.min(q.left, q.v * left);
         this.x += q.dx * s; this.y += q.dy * s; q.left -= s; left -= s / q.v;
@@ -53,7 +56,7 @@ class Fake implements XYIO {
     if (this.jogs === this.throwJogAt) throw new Error("port closed");
     if (this.alarm || this.jogs === this.rejectJogAt) return false;
     const l = Math.hypot(dx, dy);
-    this.queue.push({ dx: dx / l, dy: dy / l, left: l, v: feed / 60 });
+    this.queue.push({ dx: dx / l, dy: dy / l, left: l * this.short, v: feed / 60 });
     return true;
   }
   async status() {
@@ -61,7 +64,8 @@ class Fake implements XYIO {
     this.onStatus?.(this);
     if (this.n === this.throwStatusAt) throw new Error("port closed");
     if (this.dead) return null;
-    return { x: this.x, y: this.y, contact: this.depthIn() > 0 || this.glitchAt.includes(this.n), state: this.alarm ? "Alarm:1" : this.busy ? "Run" : this.queue.length ? "Jog" : "Idle" };
+    const r3 = (v: number) => this.round3 ? Math.round(v * 1000) / 1000 : v;
+    return { x: r3(this.x), y: r3(this.y), contact: this.depthIn() > 0 || this.glitchAt.includes(this.n), state: this.alarm ? "Alarm:1" : this.busy ? "Run" : this.queue.length ? "Jog" : "Idle" };
   }
   async cancel() { if (this.throwCancel) throw new Error("port closed"); this.queue = []; }
   aborted() { return this.stop; }
@@ -105,6 +109,21 @@ add("cancel throws after contact", () => { const f = new Fake({ x: 92, y: 80, so
 add("never idle", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.onStatus = g => { if (g.n === 25) g.busy = true; }; return f; }, { kind: "edge", dir: "xp", opts: O });
 add("never idle at start", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.busy = true; return f; }, { kind: "hole", opts: O });
 add("already touching", () => new Fake({ x: 99, y: 80, solids: [part] }), { kind: "edge", dir: "xp", opts: O });
+add("GRBL rounding: edge", () => { const f = new Fake({ x: 92.0004, y: 80, solids: [part] }); f.round3 = true; return f; }, { kind: "edge", dir: "xp", opts: O });
+add("GRBL rounding: outer corner", () => { const f = new Fake({ x: 94.0006, y: 43.9997, solids: [part] }); f.round3 = true; return f; }, { kind: "outer", corner: { cx: -1, cy: -1 }, opts: O });
+add("GRBL rounding: hole", () => { const f = new Fake({ x: 41.0003, y: 48.0008, hole }); f.round3 = true; return f; }, { kind: "hole", opts: { ...O, search: 40 } });
+add("paused 20 s while searching", () => { const f = new Fake({ x: 85, y: 80, solids: [part] }); f.pause = [2000, 22000]; return f; }, { kind: "edge", dir: "xp", opts: O });
+add("paused 60 s while searching", () => { const f = new Fake({ x: 85, y: 80, solids: [part] }); f.pause = [2000, 62000]; return f; }, { kind: "edge", dir: "xp", opts: O });
+add("moves short", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.short = 0.98; return f; }, { kind: "edge", dir: "xp", opts: O });
+add("moves short, outer corner", () => { const f = new Fake({ x: 94, y: 44, solids: [part] }); f.short = 0.99; return f; }, { kind: "outer", corner: { cx: -1, cy: -1 }, opts: O });
+add("three-report pulse", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.glitchAt = [30, 31, 32]; return f; }, { kind: "edge", dir: "xp", opts: O });
+for (const [name, shift] of [["part pushed away 0.8 mm", 0.8], ["part pushed away 1.5 mm", 1.5], ["part moved toward the probe", -4]] as const)
+  add(name, () => {
+    const box = { ...part }, f = new Fake({ x: 92, y: 80, solids: [box] });
+    let touched = false, moved = false;
+    f.onStatus = g => { if (g.depthIn() > 0) touched = true; if (touched && !moved && g.depthIn() <= 0) { moved = true; box.x0 += shift; } };
+    return f;
+  }, { kind: "edge", dir: "xp", opts: O });
 add("lost on the way back", () => { const f = new Fake({ x: 50, y: 80 }); f.onStatus = g => { if (g.n === 140) g.dead = true; }; return f; }, { kind: "edge", dir: "xp", opts: O });
 
 const cleans: unknown[] = [{}, null, undefined, { tip: -1, side: "x", search: 9999, along: NaN }, { tip: "4.5mm", side: " 2", search: "1e1", along: [7] }, { tip: true, side: null, search: [], along: { a: 1 } },

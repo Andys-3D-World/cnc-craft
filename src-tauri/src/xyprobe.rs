@@ -614,6 +614,10 @@ mod tests {
         assert!(run(&job, &log)["replay"].as_str().unwrap().contains(&format!("call {k}:")));
         log.truncate(k);
         assert!(run(&job, &log)["replay"].is_string());
+        // der Fenster-Ablauf rief danach noch etwas auf: auch das meldet das Nachspielen
+        let mut log: Vec<Call> = serde_json::from_value(c["log"].clone()).unwrap();
+        log.push(Call::Aborted { r: false });
+        assert!(run(&job, &log)["replay"].as_str().unwrap().contains("Rust stops after"));
         println!("{} probing runs replayed the same as xyProbe.ts", cases.len());
     }
 }
