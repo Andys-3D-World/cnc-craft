@@ -14,6 +14,7 @@ import { loadImage, toGray } from "../importers/imageTrace";
 import { resampleGray } from "../relief/imageRelief.ts";
 import { withPost, postedText, postFileName, postExtensions } from "../post/postExport";
 import { coneDepth, photoLines, photoPlan, PhotoOpts, PhotoPlan, tooMuch, widthAtDepth } from "../photoVcarve.ts";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_photo_vcarve";
 const SAFE_Z = 5.0; // wie cam.ts
@@ -112,7 +113,19 @@ export async function openPhotoVcarve(name: string, bytes: Uint8Array, log: (s: 
     return { x0: o.x0, y0: o.y0, w: o.w, h: o.h, spacing: o.spacing, angle: tl.angle, tipDia: tl.tipDia, toolDia: tl.diameter, maxDepth: o.maxDepth, stepDown: o.stepDown, lines: o.lines };
   };
 
-  let plan: PhotoPlan | null = null;
+  let plan: PhotoPlan | null = null, grid: { g: Float32Array; nx: number; ny: number } | null = null;
+  /** the same in Rust (photovcarve.rs), in the background; the G-code used stays the TypeScript one */
+  const rustCheck = (pl: PhotoPlan, p: PhotoOpts) => {
+    if (!importInApp() || !grid) return;
+    const tl = tool(), feed = tl.feedrate || 800, plunge = tl.plungeFeed ?? DEFAULT_PLUNGE;
+    const head = new TextEncoder().encode(JSON.stringify({ opts: p, nx: grid.nx, ny: grid.ny, feed, plunge, safeZ: SAFE_Z }));
+    const body = new Uint8Array(4 + head.length + grid.g.length * 4);
+    new DataView(body.buffer).setUint32(0, head.length, true);
+    body.set(head, 4);
+    body.set(new Uint8Array(grid.g.buffer, grid.g.byteOffset, grid.g.length * 4), 4 + head.length);
+    const r = photoLines(pl, p, feed, plunge, SAFE_Z);
+    checkImport("photo_check", body, { plan: pl, lines: r.lines, cut: r.cut, air: r.air, width: widthAtDepth(pl.deepest, p) });
+  };
   const compute = () => {
     const p = opts();
     plan = null;
@@ -133,6 +146,7 @@ export async function openPhotoVcarve(name: string, bytes: Uint8Array, log: (s: 
       return (g[j * nx + i] * (1 - a) + g[j * nx + i + 1] * a) * (1 - b) + (g[(j + 1) * nx + i] * (1 - a) + g[(j + 1) * nx + i + 1] * a) * b;
     };
     plan = photoPlan(at, p);
+    grid = { g, nx, ny };
     draw(p, plan);
     const est = plan.segs.length ? photoGcode(plan, p, tool()) : null;
     $<HTMLElement>("pvc-info").textContent = est
@@ -195,6 +209,7 @@ export async function openPhotoVcarve(name: string, bytes: Uint8Array, log: (s: 
     compute();
     if (!plan?.segs.length) return;
     keep();
+    rustCheck(plan, opts());
     if (loadGcodeFromText(photoGcode(plan, opts(), tool()).gcode, t("pvc.jobName", { name }), log)) { log(t("pvc.loaded")); close(); }
   };
   $<HTMLButtonElement>("pvc-save").onclick = async () => {
@@ -202,6 +217,7 @@ export async function openPhotoVcarve(name: string, bytes: Uint8Array, log: (s: 
     const pl = plan;
     if (!pl?.segs.length) return;
     keep();
+    rustCheck(pl, opts());
     const text = postedText(withPost(() => photoGcode(pl, opts(), tool()).gcode), log);
     if (text === null) return;
     try {

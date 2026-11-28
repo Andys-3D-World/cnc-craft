@@ -64,6 +64,7 @@ mod sketchsolve;
 mod offsetopen;
 mod trim;
 mod generators;
+mod photovcarve;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1457,6 +1458,20 @@ fn gen_check(job: generators::Job) -> Result<serde_json::Value, String> {
     generators::run(&job)
 }
 
+/// FOTO MIT DEM V-STICHEL (photovcarve.rs): Einstellungen + aufbereitetes Raster als Rohdaten. Das Fenster vergleicht
+/// die Antwort mit photoVcarve.ts (photoVcarveDialog.ts); geladen bzw. gespeichert wird weiter der G-Code des Fensters.
+#[tauri::command]
+async fn photo_check(request: tauri::ipc::Request<'_>) -> Result<serde_json::Value, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the grid as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, g) = photovcarve::split_body(&body)?;
+        Ok(photovcarve::run(&head, &g))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1673,6 +1688,7 @@ pub fn run() {
             offset_open,
             trim_check,
             gen_check,
+            photo_check,
             lathe_generate,
             gamepad_read,
             list_ports,
