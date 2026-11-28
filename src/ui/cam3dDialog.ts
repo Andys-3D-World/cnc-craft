@@ -26,6 +26,9 @@ import { rotary, setRotary, applyRotary, rotaryCheck } from "../rotary";
 import { axesToMachine } from "../rotaryWrap";
 import { HeightField, detailLoss } from "../relief/heightField.ts";
 import { RField, meshForRotary, rotateX, roughRotary, finishRotary, chainRotary, fieldPreview } from "../rotary3d";
+import { meshSummary, pathSummary, previewSummary, rotaryBody } from "../rotary3dRust";
+import { f32Hash } from "../relief/reliefRust";
+import { checkImport, importInApp } from "../importers/importRust";
 import { withPost, postedText, postFileName, postExtensions } from "../post/postExport";
 
 const KEY = "cnc_craft_cam3d";
@@ -266,7 +269,12 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
   let rmCache: { key: string; m: ReturnType<typeof meshForRotary> } | null = null;
   const rotaryMesh = () => {
     const key = o.raxis + "|" + o.rlen;
-    if (rmCache?.key !== key) rmCache = { key, m: meshForRotary(pos, o.raxis, Math.max(0.1, o.rlen)) };
+    if (rmCache?.key !== key) {
+      const length = Math.max(0.1, o.rlen);
+      rmCache = { key, m: meshForRotary(pos, o.raxis, length) };
+      // Rust legt das Modell ebenso auf die Achse (rotary3d.rs) – nur Vergleich
+      if (importInApp()) checkImport("rotary3d_check", rotaryBody({ kind: "mesh", axis: o.raxis, length }, pos), meshSummary(rmCache.m));
+    }
     return rmCache.m;
   };
   const triMesh = (P: Float32Array, color: [number, number, number]): Mesh => {
@@ -310,7 +318,11 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     if (rot() !== "flat") {
       const m = MATERIALS.find(x => x.id === mat) || MATERIALS[0];
       // rundum: Fräsergebnis aus dem Höhenfeld auf dem Zylinder; mehrere Seiten: das Modell (wie es am Ende aussieht)
-      if (preview) viewer.setMeshes(cylinderCarveScene(fieldPreview(preview, rotary.diameter / 2), m, rotary.diameter), keepView);
+      if (preview) {
+        const pv = fieldPreview(preview, rotary.diameter / 2);
+        if (importInApp()) checkImport("rotary3d_check", rotaryBody({ kind: "preview", r: rotary.diameter / 2, x0: preview.x0, dx: preview.dx, nx: preview.nx, nt: preview.nt }, preview.h), previewSummary(pv));
+        viewer.setMeshes(cylinderCarveScene(pv, m, rotary.diameter), keepView);
+      }
       else viewer.setMeshes([triMesh(rotaryMesh().tris, [m.base[0] / 255, m.base[1] / 255, m.base[2] / 255])], keepView);
       const s = stats3d(paths!, job());
       info.textContent = t("c3d.result", { n: paths!.length, r: s.rough.toFixed(1), f: s.finish.toFixed(1), min: Math.max(1, Math.round(s.minutes)) });
@@ -360,19 +372,26 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     };
     const out: Path3D[] = [];
     let last: RField | null = null;
+    const head: Record<string, unknown> = { kind: "wrap", r: R }, data: Float32Array[] = [];   // für den Vergleich mit Rust
+    const fh = (f: RField) => ({ x0: f.x0, dx: f.dx, nx: f.nx, nt: f.nt });
     if (j.rough) {
       const f = await field(j.rough, Math.min(j.rough.stepOver, 0.9 * cutDiameter(j.rough.tool) / 2), j.rough.allowance, "c3d.progRough");
       if (closed || my !== run) return null;
       out.push(...roughRotary(f, R, j.rough.stepDown, core, 0.01));
+      head.rough = { ...fh(f), stepDown: j.rough.stepDown, core, tol: 0.01 }; data.push(f.h);
       last = f;
     }
     if (j.finish) {
       const f = await field(j.finish, o.rdir === "x" ? j.finish.stepOver : null, 0, "c3d.progFinish");
       if (closed || my !== run) return null;
-      out.push(...finishRotary(f, R, o.rdir, j.finish.stepOver, j.finish.tolerance, j.rough ? 0 : j.finish.stepDown));
+      const levelStep = j.rough ? 0 : j.finish.stepDown;
+      out.push(...finishRotary(f, R, o.rdir, j.finish.stepOver, j.finish.tolerance, levelStep));
+      head.finish = { ...fh(f), dir: o.rdir, stepOver: j.finish.stepOver, tol: j.finish.tolerance, levelStep }; data.push(f.h);
       last = f;
     }
     chainRotary(out, R);
+    // Rust rechnet dieselben Bahnen aus denselben Höhenfeldern (rotary3d.rs) – nur Vergleich, der G-Code bleibt dieser
+    if (importInApp()) checkImport("rotary3d_check", rotaryBody(head, ...data), pathSummary(out));
     const flat = gcode3d(out, j, { rotary: "wrap" });
     // Bahnen sind intern (Achse entlang X) – applyRotary dreht bei Achse entlang Y selbst auf die Maschine
     const res = applyRotary(flat, rotary, "internal");
@@ -385,9 +404,11 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
     const R = rotary.diameter / 2, core = Math.max(0, o.rcore / 2), n = Math.round(o.rsides);
     const base = rotaryMesh().tris;
     const rough: Path3D[] = [], fin: Path3D[] = [];
+    const degs: number[] = [], turned: number[] = [];   // für den Vergleich mit Rust
     for (let k = 0; k < n; k++) {
       const a = (k * 360) / n;
       const P = rotateX(base, a);
+      if (importInApp()) { degs.push(a); turned.push(f32Hash(P)); }
       const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
       for (let i = 0; i < P.length; i += 3) for (let q = 0; q < 3; q++) { lo[q] = Math.min(lo[q], P[i + q]); hi[q] = Math.max(hi[q], P[i + q]); }
       const top = hi[2];
@@ -413,6 +434,8 @@ export function openCam3D(name: string, pos: Float32Array, log: (s: string) => v
         (p.kind === 0 ? rough : fin).push(p);
       }
     }
+    // Rust dreht das Modell ebenso für jede Seite (rotary3d.rs) – nur Vergleich
+    if (importInApp() && degs.length) checkImport("rotary3d_check", rotaryBody({ kind: "rotate", degs }, base), turned);
     const all = [...rough, ...fin];
     let g = gcode3d(all, j, { rotary: "index" });
     // Achse entlang Y: X/Y um 90° auf die Maschine drehen (X = −Y intern, Y = X intern)

@@ -86,6 +86,7 @@ mod netscan;
 mod portscan;
 mod recent;
 mod camfetch;
+mod rotary3d;
 mod ruida;
 mod serial;
 mod snapgeom;
@@ -1511,6 +1512,20 @@ fn snap_check(job: snapgeom::Job) -> serde_json::Value {
     snapgeom::run(&job)
 }
 
+/// DREHACHSE + 3D-MODELL (rotary3d.rs): Auftrag des 3D-Dialogs als Rohdaten (Kopf als JSON, Modell oder Höhenfelder als
+/// f32). Das Fenster vergleicht die Zusammenfassung mit rotary3d.ts (cam3dDialog.ts); Bahnen und G-Code bleiben die des Fensters.
+#[tauri::command]
+async fn rotary3d_check(request: tauri::ipc::Request<'_>) -> Result<serde_json::Value, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the job as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, data) = rotary3d::split_body(&body)?;
+        rotary3d::run(&head, &data)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1732,6 +1747,7 @@ pub fn run() {
             box_check,
             test_card,
             snap_check,
+            rotary3d_check,
             lathe_generate,
             gamepad_read,
             list_ports,
