@@ -113,7 +113,7 @@ function hms(s: number): string {
 }
 
 export async function openCostDialog(shapes: any[], log: (s: string) => void) {
-  const res = await generateGcodeFull(shapes, { flat: true }), gcode = res.gcode;
+  const res = await generateGcodeFull(shapes, { flat: true, preview: true }), gcode = res.gcode;
   if (!gcode) { log(res.none); return; }
   const timeS = parseGcodeProgram(gcode.split("\n"), { motion: motionLimits() }).totalTime;
   // Fläche der Teile: Umriss aller Formen + 5 mm Rand ringsum

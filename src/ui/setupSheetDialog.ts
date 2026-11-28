@@ -106,7 +106,7 @@ async function twoSidedSheet(two: TwoSidedSetup, log: (s: string) => void): Prom
   const line = flipLine(two);
   let none = "";
   for (const side of ["front", "back"] as Side[]) {
-    const res = await generateGcodeFull(state.shapes, { side }), g = res.gcode;
+    const res = await generateGcodeFull(state.shapes, { side, preview: true }), g = res.gcode;
     none = res.none;
     const name = t(side === "front" ? "sheet.two.front" : "sheet.two.back", { turn });
     if (!g) { sides.push({ name, time: "–", partSize: "–", tools: [], ops: [], changes: [], warnings: [res.none], svg: "" }); continue; }
@@ -185,7 +185,7 @@ export async function openSetupSheet(log: (s: string) => void) {
   if (two) { lines = []; warnings = two.warnings; }
   else if (fromFile) lines = streamState.loadedLines;
   else {
-    const res = await generateGcodeFull(state.shapes), g = res.gcode;
+    const res = await generateGcodeFull(state.shapes, { preview: true }), g = res.gcode;
     if (!g) { log(res.none); return; }
     lines = g.split("\n");
     warnings = [...res.warnings, ...res.notes];

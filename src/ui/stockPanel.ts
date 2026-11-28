@@ -192,7 +192,7 @@ export function initStockPanel(redraw: () => void, log: (s: string) => void) {
   document.getElementById("stock-mark")?.addEventListener("click", async () => {
     const st = state();
     if (!st.shapes.length) { log(t("gcw.noObjects")); return; }
-    const res = await generateGcodeFull(st.shapes), g = res.gcode;
+    const res = await generateGcodeFull(st.shapes, { preview: true }), g = res.gcode;
     if (!g) { log(res.none); return; }
     const added = markFromGcode(g.split("\n"), t("stock.designLabel"), cutWidthFor(st.shapes));
     log(t("stock.marked", { p: added.toFixed(1), total: usedPercent().toFixed(1) }));

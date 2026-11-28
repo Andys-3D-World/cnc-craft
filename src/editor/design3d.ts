@@ -345,7 +345,7 @@ async function runCarve() {
   if (!shapes.some(s => !isKeepOut(s))) { carve3d = null; carveGcode = ""; blockKey = ""; info(""); redraw(); return; }
   const t0 = performance.now();
   let g: string | null = null, tools: Awaited<ReturnType<typeof generateGcodeFull>>["sectionTools"] = [];
-  try { const made = await generateGcodeFull(shapes, { flat: true }); g = made.gcode; tools = made.sectionTools; } catch { g = null; }
+  try { const made = await generateGcodeFull(shapes, { flat: true, preview: true }); g = made.gcode; tools = made.sectionTools; } catch { g = null; }
   if (my !== carveRun || !el) return;
   const gk = (g || "") + JSON.stringify(tools);
   if (gk === carveGcode) return;

@@ -96,7 +96,7 @@ export function openView3D(want: "auto" | Mode = "auto") {
       info.textContent = t("rot.info", { c: (Math.PI * rotary.diameter).toFixed(1), d: rotary.diameter }).replace(/ – .*$/, "");
     } else if (carving) {
       // G-Code wie für die Maschine (ohne Drehachse), Fräser je Abschnitt in derselben Reihenfolge wie im G-Code
-      const made = await generateGcodeFull(shapes, { flat: true }), g = made.gcode;
+      const made = await generateGcodeFull(shapes, { flat: true, preview: true }), g = made.gcode;
       if (my !== run || closed) return;
       if (!g) { viewer.setMeshes([], keepView); info.textContent = made.none; return; }
       // Fräser je Abschnitt, wie cam.ts sie eingesetzt hat (die Zwiebelhaut kann am Ende noch einmal ein früheres Werkzeug holen)

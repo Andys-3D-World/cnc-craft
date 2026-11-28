@@ -4,7 +4,7 @@ import { initMachine } from "./machine";
 import { initStreamEvents } from "./machineStream";
 import { initSettingsPage } from "./ui/settingsPage";
 import { initFlashPage } from "./ui/flashPage";
-import { exportGcodeToFile, generateGcodeFull } from "./cam";
+import { exportGcodeToFile, generateGcodeFull, RUST_DIFF_EVENT } from "./cam";
 import { initSimulation, setSimProgram } from "./sim/simulation";
 import { openCostDialog } from "./ui/costCalc";
 import { initOpsPanel, refreshOps } from "./ui/opsPanel";
@@ -344,7 +344,7 @@ window.addEventListener("DOMContentLoaded", async () => {
       // Eckig/Vieleck: die Simulation braucht den echten G-Code mit den Drehungen auf die Flächen
       const prism = rotary.on && !isPlasma() && !isLathe() && isPrism(rotary);
       // geprüfter Weg wie „Zur Maschine“ (in der App rechnet Rust, cam.ts daneben) – derselbe G-Code wie bisher
-      const res = await generateGcodeFull(state.shapes, { flat: !prism }), gcode = res.gcode;
+      const res = await generateGcodeFull(state.shapes, { flat: !prism, preview: true }), gcode = res.gcode;
       if (!gcode) { appendToConsole(res.none); return; }
       res.warnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
       res.notes.forEach(n => appendToConsole(n));
@@ -359,6 +359,8 @@ window.addEventListener("DOMContentLoaded", async () => {
       openSimTab();
     });
     window.addEventListener("cnc-language-changed", () => { renderToolTable(); relabelBeds(); redraw(); });
+    // eine Vorschau wurde im Hintergrund mit Rust verglichen und es gab einen Unterschied (cam.ts, generateGcodeFull)
+    window.addEventListener(RUST_DIFF_EVENT, () => appendToConsole(`${t("log.warning")} ${t("gcw.rustDiff")}`));
     initCollapsibleMenus();
     initCommandPalette();
     setTimeout(welcomeOnFirstStart, 800);

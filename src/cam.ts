@@ -192,8 +192,16 @@ export interface GcodeResult {
   gcode: string | null; warnings: string[]; notes: string[]; threads: ThreadInfo[]; sectionTools: (MillingTool | null)[]; none: string;
 }
 
-/** Wie generateGcodeChecked(), gibt aber Hinweise, Gewinde und Werkzeuge gleich mit zurück (für alle, die darauf warten) */
-export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; side?: Side } = {}): Promise<GcodeResult> {
+/** Name des Fenster-Ereignisses, wenn eine Prüfung im Hintergrund (preview) einen Unterschied findet – main.ts schreibt dann den Hinweis in die Konsole */
+export const RUST_DIFF_EVENT = "cnc-rust-diff";
+
+/**
+ * Wie generateGcodeChecked(), gibt aber Hinweise, Gewinde und Werkzeuge gleich mit zurück (für alle, die darauf warten).
+ * preview: true = für Vorschauen (Simulation, 3D-Ansicht, Kosten, Einrichteblatt …). Die Antwort kommt sofort mit dem
+ * G-Code aus dem TypeScript; der Vergleich mit Rust läuft danach im Hintergrund. Findet er einen Unterschied, kommt der
+ * Hinweis über das Ereignis RUST_DIFF_EVENT in die Konsole. Was an die Maschine oder in eine Datei geht, wartet weiter.
+ */
+export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; side?: Side; preview?: boolean } = {}): Promise<GcodeResult> {
   const result = (gcode: string | null): GcodeResult => ({
     gcode, warnings: lastGcodeWarnings.slice(), notes: lastGcodeNotes.slice(), threads: lastThreads.slice(),
     sectionTools: lastSectionTools.slice(), none: gcode ? "" : noGcodeMessage()
@@ -217,6 +225,16 @@ export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; 
   try { run = gcodeRun(allShapes, opts); } finally { setChecking(false); pre = takePost(); }
   lastGcodeSource = "cam.ts";
   if ("done" in run) return result(run.done);
+  if (opts.preview) {
+    // Vorschau: sofort antworten (derselbe Text, den die Prüfung bestätigt oder verwirft), prüfen im Hintergrund.
+    // rustChecked baut seinen Auftrag sofort (vor dem ersten Warten) – also bevor die nächste Rechnung lastInner ändert
+    const mill = run.inner && isMill() ? rustChecked(run.inner) : null;
+    recordPost();
+    let res: GcodeResult, steps: PostStep[];
+    try { res = result(run.finish(run.inner)); } finally { steps = [...pre, ...takePost()]; }
+    void backgroundCheck(mill, steps);
+    return res;
+  }
   if (!run.inner || !isMill()) return finished(run.finish, run.inner);
   // was cam.ts beim Fräs-G-Code gemeldet hat (Hinweise, Gewinde, Werkzeuge) – das await unten kann andere Aufrufe dazwischenlassen
   const mine = { warnings: lastGcodeWarnings, threads: lastThreads, tools: lastSectionTools };
@@ -233,6 +251,18 @@ export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; 
     if (r.differs) { console.warn("millgcode: Rust differs from cam.ts, cam.ts is used –", r.no); lastGcodeNotes.push(t("gcw.rustDiff")); }
   }
   return finished(run.finish, inner);
+}
+
+/** Prüfung einer Vorschau nach der Antwort: Fräs-G-Code (rustChecked) und die geprüften Schritte (camPost.ts) */
+async function backgroundCheck(mill: ReturnType<typeof rustChecked> | null, steps: PostStep[]) {
+  try {
+    const r = mill ? await mill : null;
+    let diff = r && !r.ok && r.differs ? "millgcode – " + r.no : null;
+    if (!diff) diff = await checkPost(steps);
+    if (!diff) return;
+    console.warn("Rust differs from the TypeScript (preview, the TypeScript result is shown) –", diff);
+    window.dispatchEvent(new CustomEvent(RUST_DIFF_EVENT, { detail: diff }));
+  } catch (e) { console.warn("background check failed", e); }
 }
 
 /**

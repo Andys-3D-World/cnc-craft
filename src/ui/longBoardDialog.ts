@@ -29,7 +29,7 @@ function wholeProgram(): Promise<GcodeResult> {
   const dr = probeSettings.drOn;
   probeSettings.drOn = 0;
   // die Einstellung gilt, solange der G-Code entsteht – das geschieht sofort (vor dem ersten Warten), die Antwort kommt später
-  try { return generateGcodeFull((state.shapes as any[]).filter(s => !s.keepOut)); } finally { probeSettings.drOn = dr; }
+  try { return generateGcodeFull((state.shapes as any[]).filter(s => !s.keepOut), { preview: true }); } finally { probeSettings.drOn = dr; }
 }
 
 /** dasselbe ohne Warten (cam.ts allein): beim Speichern für eine andere Steuerung, mitten in withPost() */
