@@ -56,8 +56,34 @@ for (let k = 0; k < 14; k++) {
   lines.push("G0 Z5.000", "M5", "G0 X0 Y0", pick(["M30", "M2", "M02 (end)", "M30 ; end"]));
   programs.push({ name: `random ${k + 1}`, lines, prefix: "Werkzeug:", along });
 }
+// one program made for the rare paths of the splitter (section borders at X 275 / 265 with the options below)
+const targeted = [
+  "G21", "G90", "G0 Z5.000", "(Werkzeug: Fraeser 6)", "M3 S12000", "F600",
+  "G0 X10 Y10", "G1 Z-1 F200", "G1 X300 Y10 F500", "G1 X200 Y10",            // leaves the window and comes back at the border
+  "G1 X10(c)5 Y12", "G1 AX5 Y14", "G0.5 X40 Y14", "G4 P0.2 X44", "G0 G1 X50 Y16",  // spellings the reader must not misread
+  "G2 X60.0000001 Y16 I5 J0",                                                   // nearly a full circle
+  "N5M8", "G1 X70 Y16",
+  "G0 Z5.000", "M1 (check)", "G0 X60 Y60", "M8", "G1 Z-1 F100", "G1 X80 Y60",   // two groups before the next cut
+  "G0 Z5.000", "M6 T4 (next)", "G0 X10 Y30", "(about to start)", "G0 X12 Y30", "G90", "G17", "(Werkzeug: Bohrer 4)", "M3 S9000", "G1 Z-1 F150", "G1 X30 Y30",
+  "G0 Z5.000", "(old note)", "(Werkzeug: Fraeser 3)", "M3 S18000", "G1 Z-2 F150", "G1 X40 Y30",   // comments only, then a spindle group
+  "G0 Z5.000", "G0 X900 Y10", "G0 X40 Y30", "G0 Z0.5", "G1 Z-1", "G1 X50 Y30",  // a rapid out of the window and back
+  "M02", "G1 X60 Y30", "G1 X260 Y30", "G1 X290 Y30", "G1 X600 Y30",
+  "G0 Z5.000", "M5", "M30",
+];
+programs.push({ name: "targeted", lines: targeted, prefix: "Werkzeug:", along: "x" });
 for (const name of ["post-drawing", "post-drawing-table"]) programs.push({ name, lines: readFileSync(new URL(`./fixtures/${name}.gcode`, import.meta.url), "utf8").split("\n"), prefix: "tool: ", along: "x" });
 
+const targetedOpts = (max: number): LongOpts[] => {
+  const base: LongOpts = { axis: "x", bed: 300, start: 20, shift: 250, overlap: 5, pins: [{ x: 10, y: 20 }, { x: 10, y: 80 }], pinD: 6 };
+  return [
+    base,
+    { ...base, shift: (max - 20) / 2 },                          // the last window ends exactly at the end of the cuts
+    { ...base, bed: 20 + 250 + 2.5 },                            // window: only the overlap sticks out
+    { ...base, bed: max - 500 + 20 },                            // the last section reaches just past the bed
+    { ...base, pins: [{ x: 10, y: 20 }, { x: 10, y: 29 }] },     // pins 1.5 Ø apart
+    { ...base, start: 4.9 },                                     // overlap reaches below 0
+  ];
+};
 const optsFor = (along: "x" | "y", b: { x0: number; y0: number; x1: number; y1: number }): LongOpts[] => {
   const len = along === "x" ? b.x1 : b.y1;
   const pins = (pa: number, c: number[]) => c.map(v => (along === "x" ? { x: pa, y: v } : { x: v, y: pa }));
@@ -84,7 +110,7 @@ test("long board: pinned result for Rust (longboard-cases.json.gz)", () => {
     const bad = unsupported(p.lines), bounds = cutBounds(p.lines);
     assert.equal(bad, null, p.name);
     if (!bounds) continue;
-    for (const [oi, o] of optsFor(p.along, bounds!).entries()) for (const keepM6 of [false, true]) {
+    for (const [oi, o] of (p.name === "targeted" ? targetedOpts(bounds.x1) : optsFor(p.along, bounds)).entries()) for (const keepM6 of [false, true]) {
       if ((keepM6 && oi > 1) || (p.name.startsWith("random") && oi > 2)) continue;
       const min = o.axis === "x" ? bounds!.x0 : bounds!.y0, max = o.axis === "x" ? bounds!.x1 : bounds!.y1;
       const errs = checkLong(o, min, max), secs = errs.includes("shift") ? [] : sections(o, max);
