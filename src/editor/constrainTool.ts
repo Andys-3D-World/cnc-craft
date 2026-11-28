@@ -23,8 +23,8 @@
  * bzw. wieder herstellen.
  */
 import { app, options, screenDist, toScreen } from "./editorState";
-import { MM_TO_PIXEL, Pt, arcGeometry, convertToPolyline, makeRectPoints, updatePolylineBounds } from "../shapeTransform";
-import { CirRef, GCon, PtRef, SegRef, Shapes, circumcircle, idsOf, satisfied, solve } from "./sketchSolve";
+import { MM_TO_PIXEL, Pt, arcGeometry, convertToPolyline, makeRectPoints, shapeBounds, updatePolylineBounds } from "../shapeTransform";
+import { CirRef, GCon, PtRef, SegRef, Shapes, circumcircle, freedom, idsOf, satisfied, solve } from "./sketchSolve";
 import { syncPoints } from "./bezier";
 import { toolLog } from "./trimTool";
 import { t } from "../i18n/i18n";
@@ -428,6 +428,7 @@ export function drawConstraints(ctx: CanvasRenderingContext2D, tool: string) {
         glyphs.push({ x: x - w / 2, y: y - h / 2, w, h, owner: e.owner.id, idx: e.idx });
       }
     }
+    drawFreedom(ctx, list, map);
     ctx.restore();
   }
 
@@ -450,6 +451,54 @@ export function drawConstraints(ctx: CanvasRenderingContext2D, tool: string) {
   }
   if (conTool.hover) draw(conTool.hover, "rgba(94, 200, 255, 0.9)");
   ctx.restore();
+}
+
+// ---------------------------------------------------------------------
+// Wie weit ist die Skizze bestimmt? (je Gruppe verbundener Formen)
+// ---------------------------------------------------------------------
+
+const freeCache = new Map<string, number>();
+
+function drawFreedom(ctx: CanvasRenderingContext2D, list: { owner: any; idx: number; c: Stored }[], map: Map<string, any>) {
+  // Gruppen: Formen, die über Bedingungen zusammenhängen
+  const parent = new Map<string, string>();
+  const find = (a: string): string => { while (parent.get(a) !== a) a = parent.get(a)!; return a; };
+  for (const e of list) { const ids = Object.keys(e.c.ns); for (const id of ids) if (!parent.has(id)) parent.set(id, id); for (const id of ids.slice(1)) parent.set(find(id), find(ids[0])); }
+  const groups = new Map<string, { ids: Set<string>; cons: Stored[] }>();
+  for (const e of list) {
+    const root = find(Object.keys(e.c.ns)[0]);
+    if (!groups.has(root)) groups.set(root, { ids: new Set(), cons: [] });
+    const g = groups.get(root)!;
+    Object.keys(e.c.ns).forEach(id => g.ids.add(id));
+    g.cons.push(e.c);
+  }
+  ctx.font = "bold 11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  for (const g of groups.values()) {
+    const shapes: Shapes = new Map([...g.ids].map(id => [id, vec(map.get(id))]));
+    const circles = new Set([...g.ids].filter(id => isCircle(map.get(id))));
+    // Merkmal für den Zwischenspeicher: Punkte (gerundet) und Bedingungen
+    let sig = "";
+    for (const [id, pts] of shapes) sig += id + ":" + pts.length + ":" + pts.reduce((a, q) => a + q.x * 1.3 + q.y * 0.7, 0).toFixed(4) + ";";
+    sig += JSON.stringify(g.cons.map(c => [c.k, (c as any).v ?? 0]));
+    let free = freeCache.get(sig);
+    if (free === undefined) {
+      free = freedom(shapes, g.cons, circles);
+      if (freeCache.size > 200) freeCache.clear();
+      freeCache.set(sig, free);
+    }
+    let x0 = Infinity, y1 = -Infinity;
+    for (const id of g.ids) { const b = shapeBounds(map.get(id)); if (b) { x0 = Math.min(x0, b.minX); y1 = Math.max(y1, b.maxY); } }
+    if (!isFinite(x0)) continue;
+    const p = toScreen(x0, y1);
+    const text = free <= 0 ? "✓ " + t("con.full") : t("con.free", { n: free });
+    const w = ctx.measureText(text).width + 10;
+    ctx.fillStyle = free <= 0 ? "rgba(30, 140, 80, 0.92)" : "rgba(190, 120, 20, 0.92)";
+    ctx.beginPath(); ctx.roundRect(p.x, p.y - 30, w, 16, 4); ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.fillText(text, p.x + 5, p.y - 18);
+  }
 }
 
 /** Text für die Statuszeile: was als Nächstes angeklickt wird */

@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} faza(y) frezem V „{tool}” – sprawdź szerokość i narzędzie.",
   "body.millChamferNoTool": "Utworzono {n} fazę(y), ale w bibliotece nie ma frezu V – przypisz frez V lub do faz, inaczej faza nie zostanie wyfrezowana.",
   "body.millRounds": "{n} zaokrąglenie(a) istnieją tylko w bryle i STL – jeszcze nie da się ich frezować (frez do zaokrągleń po konturze lub „Listwa”).",
-  "body.millEdgeLow": "{n} faza(y) nie leżą na górze i nie są frezowane (frez V fazuje tylko na wierzchu materiału)."
+  "body.millEdgeLow": "{n} faza(y) nie leżą na górze i nie są frezowane (frez V fazuje tylko na wierzchu materiału).",
+  "con.full": "w pełni określony",
+  "con.free": "jeszcze {n} swobodnych"
 }

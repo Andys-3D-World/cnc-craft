@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} chaflán(es) con la fresa en V «{tool}»: revisa ancho y herramienta.",
   "body.millChamferNoTool": "{n} chaflán(es) creado(s), pero no hay fresa en V en la biblioteca: asigna una fresa en V o de chaflán, si no, no se fresa.",
   "body.millRounds": "{n} redondeo(s) solo existen en el cuerpo y el STL: aún no se pueden fresar (fresa de redondeo por contorno o «Moldura»).",
-  "body.millEdgeLow": "{n} chaflán(es) no están en la cara superior y no se fresan (la fresa en V solo achaflana arriba del material)."
+  "body.millEdgeLow": "{n} chaflán(es) no están en la cara superior y no se fresan (la fresa en V solo achaflana arriba del material).",
+  "con.full": "totalmente restringido",
+  "con.free": "aún {n} libre(s)"
 }

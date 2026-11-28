@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} Fase(n) mit V-Fräser „{tool}“ – Breite und Fräser bitte prüfen.",
   "body.millChamferNoTool": "{n} Fase(n) angelegt, aber kein V-Fräser in der Bibliothek – bitte einen V- oder Fasenfräser zuweisen, sonst wird die Fase nicht gefräst.",
   "body.millRounds": "{n} Rundung(en) gibt es nur im Körper und im STL – fräsen geht damit noch nicht (Abrundfräser per Kontur oder „Zierleiste“).",
-  "body.millEdgeLow": "{n} Fase(n) liegen nicht an der Oberseite und werden nicht gefräst (der V-Fräser fast nur an der Material-Oberseite)."
+  "body.millEdgeLow": "{n} Fase(n) liegen nicht an der Oberseite und werden nicht gefräst (der V-Fräser fast nur an der Material-Oberseite).",
+  "con.full": "voll bestimmt",
+  "con.free": "noch {n} frei"
 }

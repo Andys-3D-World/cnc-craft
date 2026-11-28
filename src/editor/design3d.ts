@@ -42,6 +42,8 @@ import { updateDimensionInputs } from "../uiInputs";
 import { setPlaneMouse } from "../mouseEngine";
 import { openCanvasMenu } from "../ui/contextMenu";
 import { Design3dGl, type Mesh3 } from "./design3dGl";
+import { allFeatures, bodyNow } from "../ui/bodyDialog";
+import { shellMeshes, shellBounds } from "../view3d/solid";
 import { clampCam, cropGrid, distFor, dragDepth, frameRects, matrix, MAX_EL, onPlane, project, pxPerMm, zoomAt, type Box, type Cam, type View } from "./design3dMath";
 
 const KEY = "cnc_craft_design3d";
@@ -325,10 +327,10 @@ function buildBed(T: number) {
 let carve3d: CarveResult | null = null;
 let carveKey = "", carveGcode = "", carveTimer = 0, carveRun = 0, carveWait = 500;
 let blockKey = "";
-const wantCarve = () => showResult && isMill() && !machine.job.active;
+const wantCarve = () => showResult && isMill() && !machine.job.active && !bodyPreferred();
 
 function scheduleCarve() {
-  if (!wantCarve()) { if (carve3d) { carve3d = null; carveGcode = ""; } return; }
+  if (!wantCarve()) { if (carve3d) { carve3d = null; carveGcode = ""; blockKey = ""; wallsKey = ""; redraw(); } return; }
   clearTimeout(carveTimer);
   carveTimer = window.setTimeout(runCarve, carveWait);
 }
@@ -363,19 +365,41 @@ function info(s: string) { const i = ui?.querySelector("#d3-info"); if (i) i.tex
 
 function buildBlock(T: number) {
   const r = blockRect(), mat = materialView() || MATERIALS[0];
-  const key = JSON.stringify([r, T, mat.id, carve3d ? carveRun : 0, isLaser(), isPlasma()]);
+  const key = JSON.stringify([r, T, mat.id, carve3d ? carveRun : 0, isLaser(), isPlasma(), bodyShown()]);
   if (key === blockKey) return;
   blockKey = key;
   if (!r) { gl!.set("block", []); return; }
   const c: [number, number, number] = isPlasma() ? [0.55, 0.57, 0.6] : [mat.base[0] / 255, mat.base[1] / 255, mat.base[2] / 255];
   const crop = carve3d ? cropGrid(carve3d, r) : null;
-  if (!crop) { gl!.set("block", [box(r, -T, -0.02, c, carve3d || !wantCarve() ? 1 : 0.55)]); return; }
+  // 3D-Körper sichtbar: Material nur noch als Hauch, damit man den Körper darin sieht
+  if (!crop) { gl!.set("block", [box(r, -T, -0.02, c, bodyShown() ? 0.22 : carve3d || !wantCarve() ? 1 : 0.55)]); return; }
   const inner = { x0: crop.x0 + crop.cell / 2, y0: crop.y0 + crop.cell / 2, x1: crop.x0 + (crop.nx - 0.5) * crop.cell, y1: crop.y0 + (crop.ny - 0.5) * crop.cell };
   gl!.set("block", [
     ...carveScene(crop, mat, T).map(m => ({ ...m, offset: [0, 0, -T] as [number, number, number] })),
     // Rest des Rohteils um das gerechnete Stück; Farbe wie die Oberseite dort (nur angedeutete Maserung)
     ...frameRects(r, inner).map(f => box(f, -T, 0, c))
   ]);
+}
+
+/**
+ * 3D-KÖRPER (Fenster „3D-Körper“) im Entwurf: Oberkante des Körpers auf Z 0 (Material-Oberseite) – genau so, wie
+ * „Fräsformen erzeugen“ ihn fräsen würde. Nicht zusammen mit dem gerechneten Fräsergebnis (das zeigt dann schon das Ergebnis).
+ */
+let bodyKey = "";
+const hasBody = () => isMill() && allFeatures().some(e => !e.f.off);
+/** Körper da, aber noch keine Fräsformen daraus: dann ist das Fräsergebnis der Skizze sinnlos – der Körper wird gezeigt */
+function bodyPreferred(): boolean { return hasBody() && !app().shapes.some((s: any) => s.from3d); }
+const bodyShown = () => hasBody() && (bodyPreferred() || !carve3d);
+function buildBody() {
+  if (!bodyShown()) { if (bodyKey) { bodyKey = ""; gl!.set("body", []); } return; }
+  const st = app();
+  const ids = new Set(allFeatures().flatMap(e => e.f.profile));
+  const key = JSON.stringify([allFeatures().map(e => e.f), st.shapes.filter((s: any) => ids.has(s.id)).map((s: any) => [s.id, s.x, s.y, s.w, s.h, s.midX, s.midY, s.points?.length, s.points?.[0], s.points?.[s.points.length >> 1]])]);
+  if (key === bodyKey) return;
+  bodyKey = key;
+  const shells = bodyNow(), b = shellBounds(shells);
+  if (!b) { gl!.set("body", []); return; }
+  gl!.set("body", shellMeshes(shells).map(m => ({ ...m, color: [0.45, 0.66, 0.9] as [number, number, number], offset: [0, 0, -b.z1] as [number, number, number] })));
 }
 
 let wallsKey = "";
@@ -456,7 +480,7 @@ export function paintDesign3d(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasE
   const W = Math.round(v.w * dpr), H = Math.round(v.h * dpr);
   if (el.width !== W || el.height !== H) { el.width = W; el.height = H; }
   const T = thickness();
-  buildBed(T); buildBlock(T); buildWalls(T);
+  buildBed(T); buildBlock(T); buildWalls(T); buildBody();
   // Kamera bewegt sich: das alte Bild der Zeichnung behalten und erst beim Stehenbleiben neu malen
   const at = JSON.stringify([cam, v]);
   clearTimeout(sheetTimer);

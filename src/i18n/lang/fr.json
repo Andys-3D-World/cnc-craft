@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} chanfrein(s) avec la fraise en V « {tool} » – vérifiez largeur et outil.",
   "body.millChamferNoTool": "{n} chanfrein(s) créé(s), mais aucune fraise en V dans la bibliothèque – attribuez une fraise en V ou à chanfreiner, sinon le chanfrein n’est pas usiné.",
   "body.millRounds": "{n} arrondi(s) n’existent que dans le corps et le STL – pas encore usinables (fraise à arrondir sur un contour ou « Moulure »).",
-  "body.millEdgeLow": "{n} chanfrein(s) ne sont pas sur le dessus et ne sont pas usinés (la fraise en V ne chanfreine qu’au-dessus du matériau)."
+  "body.millEdgeLow": "{n} chanfrein(s) ne sont pas sur le dessus et ne sont pas usinés (la fraise en V ne chanfreine qu’au-dessus du matériau).",
+  "con.full": "entièrement contraint",
+  "con.free": "encore {n} libre(s)"
 }

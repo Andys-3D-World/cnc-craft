@@ -210,3 +210,24 @@ test("Linie tangential an einen Bogen", () => {
   const v = r.shapes.get("arc")!, k = circumcircle(v[0], v[1], v[2])!, l = r.shapes.get("l")!;
   near(Math.abs(l[0].y - k.c.y), k.r, 1e-6);
 });
+
+// ---- Freiheiten (voll bestimmt?) ----
+import { freedom } from "../src/editor/sketchSolve.ts";
+
+test("Freiheiten: Rechteck wird Schritt für Schritt voll bestimmt", () => {
+  const sh: Shapes = new Map([["q", [P(0, 0), P(50, 0), P(50, 30), P(0, 30)]]]);
+  const s = (i: number, j: number) => ({ id: "q", i, j });
+  const rect: GCon[] = [{ k: "h", a: s(0, 1) }, { k: "perp", a: s(0, 1), b: s(1, 2) }, { k: "perp", a: s(1, 2), b: s(2, 3) }, { k: "perp", a: s(2, 3), b: s(3, 0) }];
+  assert.equal(freedom(sh, []), 8);
+  assert.equal(freedom(sh, rect), 4);                                       // Lage x/y, Breite, Höhe
+  const sized = [...rect, { k: "len", a: s(0, 1), v: 50 } as GCon, { k: "len", a: s(1, 2), v: 30 } as GCon];
+  assert.equal(freedom(sh, sized), 2);                                      // nur noch verschieben
+  assert.equal(freedom(sh, [...sized, { k: "fix", p: { id: "q", i: 0 }, at: P(0, 0) }]), 0);
+});
+
+test("Freiheiten: doppelte Bedingung zählt nur einmal, Kreis hat drei", () => {
+  const sh: Shapes = new Map([["a", [P(0, 0), P(10, 0)]], ["c", [P(20, 20), P(5, 0)]]]);
+  const h: GCon = { k: "h", a: { id: "a", i: 0, j: 1 } };
+  assert.equal(freedom(sh, [h, h], new Set(["c"])), 4 + 3 - 1);
+  assert.equal(freedom(sh, [{ k: "rad", c: { id: "c" }, v: 5 }, { k: "fix", p: { id: "c", i: 0 }, at: P(20, 20) }], new Set(["c"])), 4);
+});

@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} chamfer(s) with V-bit “{tool}” – please check width and tool.",
   "body.millChamferNoTool": "{n} chamfer(s) made, but there is no V-bit in the library – please assign a V-bit or chamfer mill, otherwise the chamfer is not milled.",
   "body.millRounds": "{n} round(s) only exist in the body and the STL – they can't be milled yet (round-over bit on a contour or “Moulding”).",
-  "body.millEdgeLow": "{n} chamfer(s) are not on the top side and are not milled (the V-bit only chamfers at the top of the material)."
+  "body.millEdgeLow": "{n} chamfer(s) are not on the top side and are not milled (the V-bit only chamfers at the top of the material).",
+  "con.full": "fully constrained",
+  "con.free": "{n} still free"
 }

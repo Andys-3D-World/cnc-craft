@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} afschuining(en) met V-frees „{tool}” – controleer breedte en gereedschap.",
   "body.millChamferNoTool": "{n} afschuining(en) gemaakt, maar er is geen V-frees in de bibliotheek – wijs een V- of afschuinfrees toe, anders wordt er niet gefreesd.",
   "body.millRounds": "{n} afronding(en) bestaan alleen in het lichaam en de STL – frezen kan nog niet (afrondfrees langs een contour of „Lijstwerk”).",
-  "body.millEdgeLow": "{n} afschuining(en) liggen niet aan de bovenkant en worden niet gefreesd (de V-frees schuint alleen bovenaan het materiaal af)."
+  "body.millEdgeLow": "{n} afschuining(en) liggen niet aan de bovenkant en worden niet gefreesd (de V-frees schuint alleen bovenaan het materiaal af).",
+  "con.full": "volledig bepaald",
+  "con.free": "nog {n} vrij"
 }

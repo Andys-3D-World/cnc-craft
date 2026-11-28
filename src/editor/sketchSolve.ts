@@ -242,3 +242,60 @@ function gauss(A: Float64Array[], b: number[]): number[] | null {
   }
   return y;
 }
+
+/**
+ * Wie viele Freiheiten bleiben? (0 = voll bestimmt, wie „Skizze vollständig bestimmt“ in CAD-Programmen)
+ * Unbekannte: alle Koordinaten der Formen; bei Kreisen zählt vom zweiten „Punkt“ nur x (der Radius).
+ * Freiheiten = Unbekannte − Rang der Jacobi-Matrix (doppelte Bedingungen zählen nur einmal).
+ */
+export function freedom(shapes: Shapes, cons: GCon[], circles: Set<string> = new Set()): number {
+  const use = cons.filter(c => valid(c, shapes));
+  const cols = new Map<string, number>(); // "id#i#x|y" -> Spalte
+  for (const [id, pts] of shapes) pts.forEach((_, i) => {
+    cols.set(`${id}#${i}#x`, cols.size);
+    if (!(circles.has(id) && i === 1)) cols.set(`${id}#${i}#y`, cols.size);
+  });
+  const n = cols.size;
+  if (!use.length) return n;
+  const x = new Map<string, P[]>([...shapes].map(([id, pts]) => [id, pts.map(p => ({ ...p }))]));
+  const get = (id: string, i: number) => x.get(id)![i];
+  const rows: number[][] = [];
+  for (const c of use) {
+    const base = residual(c, get);
+    const local = base.map(() => new Array(n).fill(0));
+    for (const r of refsOf(c)) for (const ax of ["x", "y"] as const) {
+      const col = cols.get(`${r.id}#${r.i}#${ax}`);
+      if (col === undefined) continue;
+      const p = x.get(r.id)![r.i], old = p[ax], h = 1e-6 * Math.max(1, Math.abs(old));
+      p[ax] = old + h; const fp = residual(c, get);
+      p[ax] = old - h; const fm = residual(c, get);
+      p[ax] = old;
+      fp.forEach((v, q) => { local[q][col] = (v - fm[q]) / (2 * h); });
+    }
+    rows.push(...local);
+  }
+  return n - rank(rows);
+}
+
+/** Rang einer Matrix (Gauß mit relativer Toleranz) */
+function rank(m: number[][]): number {
+  const a = m.map(r => r.slice());
+  const rowsN = a.length, colsN = rowsN ? a[0].length : 0;
+  let scale = 0;
+  for (const r of a) for (const v of r) scale = Math.max(scale, Math.abs(v));
+  const tol = 1e-7 * Math.max(1, scale);
+  let rk = 0;
+  for (let c = 0; c < colsN && rk < rowsN; c++) {
+    let piv = rk;
+    for (let r = rk + 1; r < rowsN; r++) if (Math.abs(a[r][c]) > Math.abs(a[piv][c])) piv = r;
+    if (Math.abs(a[piv][c]) <= tol) continue;
+    [a[rk], a[piv]] = [a[piv], a[rk]];
+    for (let r = rk + 1; r < rowsN; r++) {
+      const f = a[r][c] / a[rk][c];
+      if (f === 0) continue;
+      for (let k = c; k < colsN; k++) a[r][k] -= f * a[rk][k];
+    }
+    rk++;
+  }
+  return rk;
+}

@@ -7875,5 +7875,7 @@
   "body.millChamfer": "{n} smusso/i con la fresa a V «{tool}» – controlla larghezza e utensile.",
   "body.millChamferNoTool": "{n} smusso/i creati, ma nella libreria non c’è una fresa a V – assegna una fresa a V o per smussi, altrimenti lo smusso non viene fresato.",
   "body.millRounds": "{n} raccordo/i esistono solo nel corpo e nell’STL – non ancora fresabili (fresa a raggio su un contorno o «Modanatura»).",
-  "body.millEdgeLow": "{n} smusso/i non sono sul lato superiore e non vengono fresati (la fresa a V smussa solo sopra il materiale)."
+  "body.millEdgeLow": "{n} smusso/i non sono sul lato superiore e non vengono fresati (la fresa a V smussa solo sopra il materiale).",
+  "con.full": "completamente vincolato",
+  "con.free": "ancora {n} libero/i"
 }
