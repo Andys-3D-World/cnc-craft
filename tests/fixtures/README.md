@@ -43,3 +43,8 @@ G-code and the warnings that `src/laserCam.ts` gives for it; drawings with pictu
 `src-tauri/src/lasergcode.rs` gives the same G-code line by line and the same warnings. Like the mill cases it is made in
 the preview, with `lasergcode-make.js` (steps at the top of that file). Make it again whenever `laserCam.ts` or
 `laserJob.ts` changes.
+
+`plasmagcode-cases.json.gz` holds, for 43 small plasma drawings, the job for the Rust plasma G-code (`src/plasmaJob.ts`),
+the G-code and the warnings that `src/plasmaCam.ts` gives for it. `cargo test plasmagcode` checks that
+`src-tauri/src/plasmagcode.rs` gives the same. Made in the preview with `plasmagcode-make.js` (steps at the top of that
+file); make it again whenever `plasmaCam.ts` or `plasmaJob.ts` changes.

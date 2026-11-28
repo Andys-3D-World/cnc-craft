@@ -40,6 +40,7 @@ mod millgcode;
 mod feedadapt;
 mod keepout;
 mod lasergcode;
+mod plasmagcode;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1144,6 +1145,18 @@ async fn laser_generate(request: tauri::ipc::Request<'_>) -> Result<lasergcode::
     .map_err(|e| e.to_string())?
 }
 
+/// PLASMA-G-CODE (plasmagcode.rs) aus dem Auftrag des Fensters (plasmaJob.ts). Das Fenster vergleicht die Antwort mit
+/// dem G-Code aus plasmaCam.ts (checkPost in camPost.ts).
+#[tauri::command(async)]
+fn plasma_generate(job: plasmagcode::Job) -> Result<plasmagcode::Output, String> {
+    let start = std::time::Instant::now();
+    let out = plasmagcode::generate(&job)?;
+    if cfg!(debug_assertions) {
+        eprintln!("plasmagcode: {} cut setting(s), {} lines, {} warning(s) ({:.1} ms)", job.cuts.len(), out.gcode.as_ref().map_or(0, |g| g.split('\n').count()), out.warnings.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(out)
+}
+
 /// BOGEN-GLÄTTUNG (arcfit.rs): derselbe Schritt, den das Fenster über den fertigen Fräs-G-Code laufen lässt (fitArcs in
 /// arcFit.ts): G1-Ketten, die auf einem Bogen liegen, werden zu G2/G3.
 #[tauri::command(async)]
@@ -1321,6 +1334,7 @@ pub fn run() {
             post_rotary,
             post_arcfit,
             laser_generate,
+            plasma_generate,
             gamepad_read,
             list_ports,
             port_scan,

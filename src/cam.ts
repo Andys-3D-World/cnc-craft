@@ -46,6 +46,7 @@ import { withPost, postedText, postFileName, postExtensions } from "./post/postE
 import { shadowMill, rustChecked, setChecking } from "./camJob";
 import { recordPost, notePost, takePost, checkPost, recordingPost, postInApp, type PostStep } from "./camPost";
 import { laserJob, laserBody } from "./laserJob";
+import { plasmaJob } from "./plasmaJob";
 import { isInch } from "./units";
 
 const MM_TO_PIXEL = 2;
@@ -420,6 +421,14 @@ const generateGcodeInner = (shapes: any): string | null => {
   if (isPlasma()) {
     const res = generatePlasmaGcode(shapes);
     lastGcodeWarnings = res.warnings;
+    // in der App rechnet Rust denselben Plasma-G-Code daneben und vergleicht (plasmaJob.ts, plasmagcode.rs, camPost.ts)
+    if (recordingPost() && postInApp()) {
+      let job: ReturnType<typeof plasmaJob>;
+      try { job = plasmaJob(shapes); } catch (e) { job = { no: "job failed: " + String(e) }; }
+      const mine = res.warnings.slice();
+      if (!("no" in job)) notePost("plasma_generate", { job }, { gcode: res.gcode, warnings: mine },
+        (r: { gcode: string | null; warnings: { key: string; p: [string, string][] }[] }) => ({ gcode: r.gcode, warnings: isInch() ? mine : r.warnings.map(w => t(w.key, Object.fromEntries(w.p))) }));
+    }
     imageNote();
     return res.gcode;
   }

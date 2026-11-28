@@ -183,7 +183,7 @@ pub struct Output {
 }
 
 /// Zahl mit höchstens drei Nachkommastellen: `String(+v.toFixed(3))`
-fn n(v: f64) -> String {
+pub(crate) fn n(v: f64) -> String {
     let mut out = String::with_capacity(12);
     push_n(&mut out, v);
     out
