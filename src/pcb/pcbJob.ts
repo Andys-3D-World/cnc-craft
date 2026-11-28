@@ -8,6 +8,7 @@ import { gerberBox, looksLikeGerber, parseGerber, type Box, type GerberFile, typ
 import { looksLikeExcellon, parseExcellon, type DrillFile, type Hole, type Slot } from "./excellon.ts";
 import type { IsoLine } from "./field.ts";
 import { polygonArea, type P } from "../polyOffset.ts";
+import { checkImport, importInApp } from "../importers/importRust.ts";
 
 export type Role = "top" | "bottom" | "outline" | "drill" | "ignore";
 export interface PcbFile { name: string; role: Role; gerber?: GerberFile; drill?: DrillFile }
@@ -31,8 +32,9 @@ export function guessRole(name: string, func: string): Role {
 
 /** Datei lesen; null = weder Gerber noch Bohrdatei */
 export function readPcbFile(name: string, text: string): PcbFile | null {
-  if (looksLikeExcellon(text)) { const drill = parseExcellon(text); if (drill.holes.length || drill.slots.length) return { name, role: "drill", drill }; return null; }
-  if (looksLikeGerber(text)) { const gerber = parseGerber(text); return { name, role: guessRole(name, gerber.func), gerber }; }
+  // Rust (pcbparse.rs) liest dieselbe Datei im Hintergrund noch einmal und vergleicht (nur in der App)
+  if (looksLikeExcellon(text)) { const drill = parseExcellon(text); if (importInApp()) checkImport("pcb_parse", { kind: "drill", text }, structuredClone(drill)); if (drill.holes.length || drill.slots.length) return { name, role: "drill", drill }; return null; }
+  if (looksLikeGerber(text)) { const gerber = parseGerber(text); if (importInApp()) checkImport("pcb_parse", { kind: "gerber", text }, structuredClone(gerber)); return { name, role: guessRole(name, gerber.func), gerber }; }
   return null;
 }
 

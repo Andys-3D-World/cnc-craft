@@ -51,6 +51,7 @@ mod stlslice;
 mod meshimport;
 mod cutplan;
 mod pcbiso;
+mod pcbparse;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1308,6 +1309,18 @@ fn pcb_isolate(job: pcbiso::IsoJob) -> pcbiso::IsoResult {
     out
 }
 
+/// GERBER/EXCELLON LESEN (pcbparse.rs): Text einer Platinen-Datei. Das Fenster vergleicht die Antwort mit dem, was
+/// gerber.ts/excellon.ts gelesen haben (importRust.ts); verwendet wird weiter das TypeScript.
+#[tauri::command(async)]
+fn pcb_parse(kind: String, text: String) -> Result<serde_json::Value, String> {
+    let start = std::time::Instant::now();
+    let out = if kind == "gerber" { serde_json::to_value(pcbparse::parse_gerber(&text)?) } else { serde_json::to_value(pcbparse::parse_excellon(&text)?) }.map_err(|e| e.to_string())?;
+    if cfg!(debug_assertions) {
+        eprintln!("pcbparse: {kind}, {} bytes ({:.1} ms)", text.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(out)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1507,6 +1520,7 @@ pub fn run() {
             import_mesh,
             plan_check,
             pcb_isolate,
+            pcb_parse,
             lathe_generate,
             gamepad_read,
             list_ports,
