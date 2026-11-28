@@ -7,6 +7,7 @@ import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
 import { boxPanels, outerSize, diceMinHeight, diceAngle, BOX_TYPES, BOX_GROUPS, LIDDED, isFlex, type BoxOptions, type BoxType, type Panel } from "../box";
+import { checkImport, importInApp } from "../importers/importRust";
 import { Box3DView } from "./box3d";
 import { asLength } from "../units";
 
@@ -199,6 +200,8 @@ export function openBoxDialog(log: (s: string) => void, done: () => void) {
     saveSettings(KEY, b);
     close();
     const ps = boxPanels(b);
+    // the same in Rust (boxgen.rs), in the background; the panels inserted stay the TypeScript ones
+    if (importInApp()) checkImport("box_check", { o: b }, structuredClone(ps));
     panelsToBed(ps, t("box.title"));
     log(t("box.done", { n: ps.length }));
     done();

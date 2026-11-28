@@ -66,6 +66,7 @@ mod trim;
 mod generators;
 mod photovcarve;
 mod relief;
+mod boxgen;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1487,6 +1488,13 @@ async fn relief_check(request: tauri::ipc::Request<'_>) -> Result<Option<relief:
     .map_err(|e| e.to_string())?
 }
 
+/// BOX-GENERATOR (boxgen.rs): Einstellungen des Dialogs. Das Fenster vergleicht die Antwort mit box.ts (boxGen.ts);
+/// eingefügt werden weiter die Platten des Fensters.
+#[tauri::command(async)]
+fn box_check(o: boxgen::BoxOptions) -> Vec<boxgen::Panel> {
+    boxgen::box_panels(&o)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1705,6 +1713,7 @@ pub fn run() {
             gen_check,
             photo_check,
             relief_check,
+            box_check,
             lathe_generate,
             gamepad_read,
             list_ports,
