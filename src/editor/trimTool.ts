@@ -6,6 +6,7 @@
 import { app } from "./editorState";
 import { hitTest } from "./selection";
 import { intersections, nearestStation, pathLength, remainingSpans, slicePath, trimSpan, trimTargetPath, piecesFromSpans } from "./trim";
+import { checkImport, importInApp } from "../importers/importRust";
 import { Path, Pt, shapeToPaths } from "../shapeTransform";
 import { t } from "../i18n/i18n";
 
@@ -16,7 +17,7 @@ export const toolLog = (s: string) => log(s);
 
 export const trimHover = { removed: null as Pt[] | null };
 
-let cache: { id: string; shapes: any; sel: string; path: Path; cuts: number[] } | null = null;
+let cache: { id: string; shapes: any; sel: string; path: Path; cutters: Path[]; cuts: number[] } | null = null;
 
 function target(shape: any) {
   const st = app();
@@ -26,7 +27,7 @@ function target(shape: any) {
   if (!path) return null;
   const others = st.selectedShapeIds.length ? st.shapes.filter((s: any) => st.selectedShapeIds.includes(s.id)) : st.shapes;
   const cutters = others.filter((s: any) => s.id !== shape.id).flatMap((s: any) => shapeToPaths(s));
-  cache = { id: shape.id, shapes: st.shapes, sel, path, cuts: intersections(path, cutters) };
+  cache = { id: shape.id, shapes: st.shapes, sel, path, cutters, cuts: intersections(path, cutters) };
   return cache;
 }
 
@@ -47,8 +48,15 @@ export function trimClick(world: Pt): boolean {
   if (hit.type === "image") { log(t("trim.noImage")); return false; }
   const c = target(hit);
   if (!c) return false;
-  const len = pathLength(c.path);
-  const span = trimSpan(len, c.path.closed, c.cuts, nearestStation(c.path, world).s);
+  const len = pathLength(c.path), s0 = nearestStation(c.path, world).s;
+  const span = trimSpan(len, c.path.closed, c.cuts, s0);
+  // the same in Rust (trim.rs), in the background; what is changed in the drawing stays the TypeScript result
+  if (importInApp()) {
+    const rem = span ? remainingSpans(len, c.path.closed, span) : null;
+    checkImport("trim_check", { path: c.path, cutters: c.cutters, at: world }, {
+      cuts: c.cuts, s: s0, span, removed: span ? slicePath(c.path, span) : null, remaining: rem, pieces: rem ? rem.map(sp => slicePath(c.path, sp)) : null
+    });
+  }
   if (!span) { log(t("trim.noCut")); return false; }
   const pieces = piecesFromSpans(hit, c.path, remainingSpans(len, c.path.closed, span));
   const st = app();

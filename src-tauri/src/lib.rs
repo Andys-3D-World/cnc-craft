@@ -62,6 +62,7 @@ mod magazine;
 mod twosided;
 mod sketchsolve;
 mod offsetopen;
+mod trim;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1441,6 +1442,13 @@ fn offset_open(pts: Vec<offsetopen::P>, d: f64, tol: f64, at: Option<offsetopen:
     serde_json::json!({ "lines": offsetopen::offset_open_path(&pts, d, tol), "side": at.map(|p| offsetopen::side_of(&pts, p)) })
 }
 
+/// TRIMMEN (trim.rs): Kontur, schneidende Konturen, Klickpunkt. Das Fenster vergleicht die Antwort mit trim.ts
+/// (trimTool.ts); was in die Zeichnung kommt, bestimmt weiter das Fenster.
+#[tauri::command(async)]
+fn trim_check(path: trim::Path, cutters: Vec<trim::Path>, at: trim::Pt) -> serde_json::Value {
+    trim::check(&path, &cutters, at)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1655,6 +1663,7 @@ pub fn run() {
             sketch_solve,
             sketch_freedom,
             offset_open,
+            trim_check,
             lathe_generate,
             gamepad_read,
             list_ports,
