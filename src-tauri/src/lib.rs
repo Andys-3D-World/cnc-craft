@@ -47,6 +47,7 @@ mod importdxf;
 mod importsvg;
 mod importpdf;
 mod imagetrace;
+mod stlslice;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1242,6 +1243,25 @@ async fn import_trace(request: tauri::ipc::Request<'_>) -> Result<imagetrace::Ou
     .map_err(|e| e.to_string())?
 }
 
+/// STL EINLESEN UND SCHNEIDEN (stlslice.rs): Datei bzw. Dreiecksliste, Ansicht und Höhe als Rohdaten (stlBody in
+/// stlMesh.ts). Das Fenster vergleicht die Antwort mit seinem Schnitt (importRust.ts); eingefügt wird weiter das TypeScript.
+#[tauri::command]
+async fn import_stl(request: tauri::ipc::Request<'_>) -> Result<stlslice::Output, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the model as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, data) = stlslice::split_body(&body)?;
+        let start = std::time::Instant::now();
+        let out = stlslice::run(&head, data)?;
+        if cfg!(debug_assertions) {
+            eprintln!("stlslice: {} triangle(s), {} vertices, {} loop(s), best height {:.3} ({:.1} ms)", out.triangles, out.vertices, out.slice.loops.len(), out.best, start.elapsed().as_secs_f64() * 1000.0);
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1437,6 +1457,7 @@ pub fn run() {
             import_svg,
             import_pdf,
             import_trace,
+            import_stl,
             lathe_generate,
             gamepad_read,
             list_ports,

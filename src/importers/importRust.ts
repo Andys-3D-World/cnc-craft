@@ -14,8 +14,8 @@ export const importInApp = () => IN_TAURI;
 
 /** Erste Stelle, an der a und b verschieden sind ("" = gleich); Zahlen dürfen um TOL abweichen */
 export function importDiff(a: unknown, b: unknown, at = ""): string {
-  // keine Zahl (NaN) kommt aus Rust als null an
-  if (typeof a === "number" && Number.isNaN(a) && b === null) return "";
+  // keine Zahl (NaN) und ±Unendlich kommen aus Rust als null an
+  if (typeof a === "number" && !Number.isFinite(a) && b === null) return "";
   if (typeof a === "number" && typeof b === "number") return a === b || Math.abs(a - b) <= TOL ? "" : `${at}: ${a} vs ${b}`;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return `${at}: ${a.length} vs ${b.length} entries`;

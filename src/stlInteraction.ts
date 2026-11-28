@@ -6,9 +6,10 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
-  parseStl, weldMesh, viewCoords, sliceMesh, findBestHeight,
-  StlView, WeldedMesh, ViewCoords, SliceResult
+  parseStl, weldMesh, viewCoords, sliceMesh, findBestHeight, stlBody,
+  StlView, StlMesh, WeldedMesh, ViewCoords, SliceResult
 } from "./stlLoader";
+import { checkImport, importInApp } from "./importers/importRust";
 import { Mesh3DPreview, render2D } from "./stlPreview";
 import { createPolyline, MM_TO_PIXEL, newId } from "./shapeTransform";
 import { applyPt, type Mat } from "./linkedCopies";
@@ -83,8 +84,15 @@ export async function openStlFromBytes(
   appendToConsole(
     t("stl.loaded", { n: mesh.triangleCount, fmt: mesh.format === "ascii" ? t("stl.ascii") : mesh.format === "binary" ? t("stl.binary") : mesh.format.toUpperCase(), x: size[0], y: size[1], z: size[2] })
   );
-  showStlDialog(fileName, welded, size, state, redraw, appendToConsole, re);
+  // Vergleich mit Rust beim Einfügen: STL-Datei selbst, sonst die Dreiecksliste (nur mit endlichen Zahlen)
+  const rust: RustSource | undefined = !importInApp() || !mesh.positions.every(Number.isFinite) ? undefined
+    : mesh.format === "binary" || mesh.format === "ascii" ? { mesh, source: "stl", data: binary }
+    : { mesh, source: "positions", data: mesh.positions };
+  showStlDialog(fileName, welded, size, state, redraw, appendToConsole, re, rust);
 }
+
+/** Woraus Rust (stlslice.rs) das Modell nachrechnet */
+interface RustSource { mesh: StlMesh; source: "stl" | "positions"; data: Uint8Array | Float32Array }
 
 const VIEW_LABELS = (v: StlView) => t(`stl.view.${v}`);
 const VIEWS: StlView[] = ["top", "front", "left", "bottom", "back", "right"];
@@ -96,7 +104,8 @@ function showStlDialog(
   state: any,
   redraw: () => void,
   appendToConsole: (t: string) => void,
-  re?: ReimportTarget
+  re?: ReimportTarget,
+  rust?: RustSource
 ) {
   document.getElementById("stl-dialog-overlay")?.remove();
 
@@ -276,11 +285,13 @@ function showStlDialog(
     requestAnimationFrame(update);
   };
 
+  let best = NaN; // automatische Höhe der aktuellen Ansicht (für den Vergleich mit Rust)
   const applyView = (v: StlView) => {
     view = v;
     vc = viewCoords(mesh, view);
     preview3d.setView(vc);
-    setSliderToHeight(findBestHeight(mesh, vc));
+    best = findBestHeight(mesh, vc);
+    setSliderToHeight(best);
     update();
   };
 
@@ -338,6 +349,11 @@ function showStlDialog(
       return;
     }
     if (!slice || slice.loops.length === 0) return;
+    if (rust) {
+      const m = rust.mesh;
+      checkImport("import_stl", stlBody(rust.source, rust.data, view, slice.height),
+        { triangles: m.triangleCount, min: m.min, max: m.max, vertices: mesh.vertexCount, best, slice: structuredClone(slice) });
+    }
     const pct = parseFloat(scaleInput.value) || 100;
     const cut: MeshCut = { v: view, h: slice.height - vc.minW, p: pct, holes: holesCheck.checked, feat: false };
     if (re) { close(); re.take(sliceToShapes(slice, pct / 100, holesCheck.checked, fileName, "file", cut, true)); return; }
