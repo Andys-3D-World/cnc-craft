@@ -65,6 +65,7 @@ mod offsetopen;
 mod trim;
 mod generators;
 mod photovcarve;
+mod relief;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1472,6 +1473,20 @@ async fn photo_check(request: tauri::ipc::Request<'_>) -> Result<serde_json::Val
     .map_err(|e| e.to_string())?
 }
 
+/// RELIEF (relief.rs): Auftrag des Relief-Dialogs als Rohdaten (Kopf als JSON, Grauwerte als f32). Das Fenster vergleicht
+/// die Zusammenfassung mit reliefBuild.ts (reliefDialog.ts); in den 3D-Dialog geht weiter das Relief des Fensters.
+#[tauri::command]
+async fn relief_check(request: tauri::ipc::Request<'_>) -> Result<Option<relief::Summary>, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the job as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, gray) = relief::split_body(&body)?;
+        relief::build(&head, &gray)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1689,6 +1704,7 @@ pub fn run() {
             trim_check,
             gen_check,
             photo_check,
+            relief_check,
             lathe_generate,
             gamepad_read,
             list_ports,

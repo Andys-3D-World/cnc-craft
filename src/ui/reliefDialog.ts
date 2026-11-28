@@ -15,6 +15,8 @@ import { HeightField, fieldPreviewTris, fieldRange, gridFor } from "../relief/he
 import { grayToField, resampleGray, DEFAULT_IMAGE_RELIEF } from "../relief/imageRelief.ts";
 import { VPt, loopBounds, loopsToField, ReliefProfile } from "../relief/vectorRelief.ts";
 import { ReliefBuilt, ReliefJob, buildRelief } from "../relief/reliefBuild.ts";
+import { reliefBody, reliefSummary } from "../relief/reliefRust.ts";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_relief";
 const PREVIEW_CELLS = 240;
@@ -203,7 +205,9 @@ function openDialog(src: Source, log: (s: string) => void) {
     btn.disabled = true;
     btn.textContent = t("rlf.building");
     try {
-      const r = await runFull(src.full(o), w => { worker = w; });
+      const job = src.full(o), r = await runFull(job, w => { worker = w; });
+      // the same in Rust (relief.rs), in the background; the relief used stays the TypeScript one
+      if (r && importInApp()) checkImport("relief_check", reliefBody(job), reliefSummary(r));
       if (closed || !r) return;
       const p = src.preview(o);
       const thick = fieldRange(r.field) + o.base;
