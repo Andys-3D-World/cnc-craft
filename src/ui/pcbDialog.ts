@@ -16,6 +16,7 @@ import { boardOf, buildDescs, holeMode, holesOff, PcbFile, pickHoleTool, placer,
 import { bySize } from "../pcb/excellon";
 import { gerberBox } from "../pcb/gerber";
 import { cutWidth, isolate, IsoJob, IsoResult } from "../pcb/field";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_pcb";
 const ZIP_MAX = 32 * 1024 * 1024, TEXT_MAX = 60 * 1024 * 1024;
@@ -131,6 +132,7 @@ function show(first: PcbFile[], log: (s: string) => void, redraw: () => void) {
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch { /* egal */ } };
 
   let board: Board | null = null, iso: IsoResult | null = null, isoErr = "", busy = false, worker: Worker | null = null, run = 0;
+  let isoJob: IsoJob | null = null; // womit iso gerechnet wurde (Vergleich mit Rust beim Einfügen)
   const copperFile = () => files.filter(f => f.role === o.side && f.gerber);
   const copperObjs = () => copperFile().flatMap(f => f.gerber!.objs);
 
@@ -175,7 +177,7 @@ function show(first: PcbFile[], log: (s: string) => void, redraw: () => void) {
     if ((box.x1 - box.x0) > 1200 || (box.y1 - box.y0) > 1200) { isoErr = t("pcb.tooBig"); busy = false; refresh(); return; }
     const job: IsoJob = { objs, box, width: w, passes: o.passes, overlap: o.overlap / 100 };
     busy = true; refresh();
-    const done = (r: IsoResult | null, err = "") => { if (my !== run || !ov.isConnected) return; stopWorker(); iso = r; isoErr = err; busy = false; refresh(); };
+    const done = (r: IsoResult | null, err = "") => { if (my !== run || !ov.isConnected) return; stopWorker(); iso = r; isoJob = r ? job : null; isoErr = err; busy = false; refresh(); };
     try {
       worker = new Worker(new URL("../pcb/pcbWorker.ts", import.meta.url), { type: "module" });
       worker.onmessage = ev => (ev.data.ok ? done(ev.data.r) : done(null, ev.data.error));
@@ -316,6 +318,8 @@ function show(first: PcbFile[], log: (s: string) => void, redraw: () => void) {
     const holeFor = (d: number) => { const k = key(d); return made.get(k) ?? tool(holeTool.get(k) || ""); };
     const mirror = o.side === "bottom", place = placer(board.box, { x: o.x, y: o.y }, mirror);
     const it = tool(o.isoTool), ot = tool(o.outTool);
+    // Rust (pcbiso.rs) rechnet die eingefügten Isolationsbahnen im Hintergrund nach und vergleicht
+    if (o.isoOn && iso && isoJob && importInApp()) checkImport("pcb_isolate", { job: isoJob }, structuredClone(iso));
     const { descs, skipped } = buildDescs(board, {
       place, mirror,
       iso: o.isoOn && iso && it ? { lines: iso.lines, toolId: it.id, depth: o.isoDepth } : null,

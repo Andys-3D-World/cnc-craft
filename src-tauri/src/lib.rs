@@ -50,6 +50,7 @@ mod imagetrace;
 mod stlslice;
 mod meshimport;
 mod cutplan;
+mod pcbiso;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1295,6 +1296,18 @@ fn plan_check(job: cutplan::Job) -> cutplan::Output {
     out
 }
 
+/// ISOLATIONSBAHNEN (pcbiso.rs): dieselbe Rechnung wie der Hintergrund-Thread des Platinen-Dialogs (field.ts). Das
+/// Fenster vergleicht die Antwort (importRust.ts); verwendet wird weiter das Ergebnis aus dem TypeScript.
+#[tauri::command(async)]
+fn pcb_isolate(job: pcbiso::IsoJob) -> pcbiso::IsoResult {
+    let start = std::time::Instant::now();
+    let out = pcbiso::isolate(&job);
+    if cfg!(debug_assertions) {
+        eprintln!("pcbiso: {} object(s), {} line(s), {} net(s), grid {:.3} mm ({:.1} ms)", job.objs.len(), out.lines.len(), out.nets, out.h, start.elapsed().as_secs_f64() * 1000.0);
+    }
+    out
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1493,6 +1506,7 @@ pub fn run() {
             import_stl,
             import_mesh,
             plan_check,
+            pcb_isolate,
             lathe_generate,
             gamepad_read,
             list_ports,
