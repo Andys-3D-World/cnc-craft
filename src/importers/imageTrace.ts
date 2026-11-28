@@ -6,19 +6,13 @@
  * Im Dialog: Schwelle, Umkehren, Weichzeichnen, Glätten, kleine Flecken ignorieren, Breite in mm.
  * „Mittellinie“: statt der Umrisse eine einzige Linie in der Mitte jedes Strichs (Handschrift, Skizzen – centerline.ts).
  */
-import { ImportResult, emptyResult, Pt } from "./common";
-import { marchingSquares, simplifyClosed } from "../traceUtil";
-import { pathArea } from "../shapeTransform";
+import { ImportResult, emptyResult } from "./common";
 import { t } from "../i18n/i18n";
-import { centerlines } from "../centerline";
+import { otsu, traceAll, traceBody, type TraceOpts, type TracePath } from "./traceCalc";
+import { checkImport } from "./importRust";
 
 const MAX_SIDE = 2000;
 
-interface TraceOpts { threshold: number; invert: boolean; blur: number; smooth: number; minArea: number; widthMm: number; center: boolean; }
-/** Ein Ergebnis: Umriss (geschlossen) oder Mittellinie (meist offen) */
-interface TracePath { pts: Pt[]; closed: boolean }
-/** Mittellinie wird auf höchstens so viele Pixel verkleinert gerechnet (Ausdünnen ist bei großen Bildern langsam) */
-const CENTER_SIDE = 900;
 
 export async function openImageTraceDialog(fileName: string, bytes: Uint8Array): Promise<ImportResult | null> {
   const img = await loadImage(fileName, bytes);
@@ -88,6 +82,7 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
     });
 
     let loops: TracePath[] = [];
+    let used: TraceOpts | null = null; // womit loops gerechnet wurde (für den Vergleich mit Rust)
     let timer = 0;
     const update = () => {
       const o = read();
@@ -95,7 +90,8 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
       $("trc-blur-val").textContent = String(o.blur);
       $("trc-smooth-val").textContent = o.smooth.toFixed(1);
       $("trc-min-val").textContent = String(o.minArea);
-      loops = o.center ? traceCenter(gray, W, H, o) : trace(gray, W, H, o).map(l => ({ pts: l, closed: true }));
+      loops = traceAll(gray, W, H, o);
+      used = o;
       drawPreview($<HTMLCanvasElement>("trc-preview"), img, W, H, loops, !o.center);
       const pts = loops.reduce((n, l) => n + l.pts.length, 0);
       const hMm = (o.widthMm * H) / W;
@@ -114,6 +110,7 @@ export async function openImageTraceDialog(fileName: string, bytes: Uint8Array):
       const res = emptyResult();
       res.paths = loops.map(l => ({ pts: l.pts.map(q => ({ x: q.x * s, y: (H - q.y) * s })), closed: l.closed }));
       res.info = t("trace.info", { n: loops.length, w: o.widthMm.toFixed(1) });
+      if (used) checkImport("import_trace", traceBody(gray, W, H, used), { otsu: auto, paths: loops });
       finish(res);
     });
     update();
@@ -148,80 +145,6 @@ export function toGray(img: CanvasImageSource & { width: number; height: number 
   const gray = new Float32Array(W * H);
   for (let i = 0; i < W * H; i++) gray[i] = 0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2];
   return { gray, W, H };
-}
-
-/** Automatische Schwelle (Otsu-Verfahren) */
-function otsu(gray: Float32Array): number {
-  const hist = new Array(256).fill(0);
-  for (const g of gray) hist[Math.max(0, Math.min(255, Math.round(g)))]++;
-  const total = gray.length;
-  let sum = 0;
-  for (let i = 0; i < 256; i++) sum += i * hist[i];
-  let sumB = 0, wB = 0, best = -1, first = 128, last = 128;
-  for (let t = 0; t < 256; t++) {
-    wB += hist[t]; if (!wB) continue;
-    const wF = total - wB; if (!wF) break;
-    sumB += t * hist[t];
-    const mB = sumB / wB, mF = (sum - sumB) / wF;
-    const between = wB * wF * (mB - mF) ** 2;
-    if (between > best * (1 + 1e-9)) { best = between; first = last = t; }
-    else if (between >= best * (1 - 1e-9)) last = t;
-  }
-  // Bei reinen Schwarz/Weiß-Bildern ist jeder Wert dazwischen gleich gut -> Mitte nehmen
-  return Math.max(1, Math.min(254, Math.round((first + last) / 2) + 1));
-}
-
-function boxBlur(src: Float32Array, W: number, H: number, r: number): Float32Array {
-  if (r <= 0) return src;
-  const tmp = new Float32Array(W * H), out = new Float32Array(W * H);
-  for (let y = 0; y < H; y++) {
-    let acc = 0;
-    for (let x = -r; x <= r; x++) acc += src[y * W + Math.min(W - 1, Math.max(0, x))];
-    for (let x = 0; x < W; x++) {
-      tmp[y * W + x] = acc / (2 * r + 1);
-      acc += src[y * W + Math.min(W - 1, x + r + 1)] - src[y * W + Math.max(0, x - r)];
-    }
-  }
-  for (let x = 0; x < W; x++) {
-    let acc = 0;
-    for (let y = -r; y <= r; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
-    for (let y = 0; y < H; y++) {
-      out[y * W + x] = acc / (2 * r + 1);
-      acc += tmp[Math.min(H - 1, y + r + 1) * W + x] - tmp[Math.max(0, y - r) * W + x];
-    }
-  }
-  return out;
-}
-
-function trace(gray: Float32Array, W: number, H: number, o: TraceOpts): Pt[][] {
-  const g = boxBlur(gray, W, H, o.blur);
-  // Rand von 1 Pixel "außen", damit sich alle Konturen schließen
-  const PW = W + 2, PH = H + 2;
-  const v = new Float32Array(PW * PH);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
-    const val = g[y * W + x];
-    v[(y + 1) * PW + x + 1] = o.invert ? val : 255 - val; // "innen" = dunkel (bzw. hell bei Umkehren)
-  }
-  const iso = o.invert ? o.threshold : 255 - o.threshold;
-  return marchingSquares(v, PW, PH, iso)
-    .map(l => simplifyClosed(l.map(p => ({ x: p.x - 1, y: p.y - 1 })), o.smooth * 0.5))
-    .filter(l => l.length >= 3 && Math.abs(pathArea(l)) >= Math.max(1, o.minArea));
-}
-
-/** Mittellinien: Maske wie beim Umriss (dunkel = Strich), dann ausdünnen und nachfahren */
-function traceCenter(gray: Float32Array, W: number, H: number, o: TraceOpts): TracePath[] {
-  const g = boxBlur(gray, W, H, o.blur);
-  const k = Math.min(1, CENTER_SIDE / Math.max(W, H));
-  const w = Math.max(1, Math.round(W * k)), h = Math.max(1, Math.round(H * k));
-  const mask = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const v = g[Math.min(H - 1, Math.floor(y / k)) * W + Math.min(W - 1, Math.floor(x / k))];
-    mask[y * w + x] = (o.invert ? v >= o.threshold : v < o.threshold) ? 1 : 0;
-  }
-  // Mindestlänge aus „Flecken ignorieren“ (Fläche → Seitenlänge), Vereinfachung aus „Glätten“
-  const minLen = Math.max(3, Math.sqrt(o.minArea) * k);
-  return centerlines(mask, w, h, minLen, Math.max(0.3, o.smooth * 0.6))
-    .map(p => ({ pts: p.pts.map(q => ({ x: q.x / k, y: q.y / k })), closed: p.closed }));
 }
 
 function drawPreview(canvas: HTMLCanvasElement, img: CanvasImageSource, W: number, H: number, loops: TracePath[], fill: boolean) {

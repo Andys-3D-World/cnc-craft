@@ -46,6 +46,7 @@ mod importplt;
 mod importdxf;
 mod importsvg;
 mod importpdf;
+mod imagetrace;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1221,6 +1222,26 @@ async fn import_pdf(request: tauri::ipc::Request<'_>) -> Result<importpdf::Parse
     .map_err(|e| e.to_string())
 }
 
+/// BILD NACHZEICHNEN (imagetrace.rs): Graustufenbild und Einstellungen als Rohdaten (traceBody in traceCalc.ts). Das
+/// Fenster vergleicht die Antwort mit dem, was der Dialog eingefügt hat (importRust.ts); eingefügt wird weiter das TypeScript.
+#[tauri::command]
+async fn import_trace(request: tauri::ipc::Request<'_>) -> Result<imagetrace::Output, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the image as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (o, gray) = imagetrace::split_body(&body)?;
+        let start = std::time::Instant::now();
+        let out = imagetrace::run(&gray, &o);
+        if cfg!(debug_assertions) {
+            let pts: usize = out.paths.iter().map(|p| p.pts.len()).sum();
+            eprintln!("imagetrace: {} x {} px, {} path(s), {pts} point(s) ({:.1} ms)", o.w, o.h, out.paths.len(), start.elapsed().as_secs_f64() * 1000.0);
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1415,6 +1436,7 @@ pub fn run() {
             import_dxf,
             import_svg,
             import_pdf,
+            import_trace,
             lathe_generate,
             gamepad_read,
             list_ports,

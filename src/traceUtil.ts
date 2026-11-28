@@ -1,7 +1,7 @@
 /**
  * KONTUREN AUS BILDERN GEWINNEN (für Text-Werkzeug und Bild-Nachzeichnen)
  */
-import { Pt } from "./shapeTransform";
+import type { Pt } from "./shapeTransform";
 
 /**
  * Marching Squares: findet die Kante (Schwelle "iso") im Graustufenbild.
