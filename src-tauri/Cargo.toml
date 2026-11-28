@@ -26,8 +26,10 @@ flate2 = "1"
 ttf-parser = "0.25"
 serde = { version = "1", features = ["derive"] }
 # float_roundtrip: Kommazahlen aus dem Fenster genau einlesen (sonst bis zu eine letzte Stelle daneben) – die
-# Rechen-Zwillinge müssen mit genau denselben Zahlen rechnen wie das TypeScript
-serde_json = { version = "1", features = ["float_roundtrip"] }
+# Rechen-Zwillinge müssen mit genau denselben Zahlen rechnen wie das TypeScript.
+# preserve_order: Felder eines Objekts bleiben in der Reihenfolge wie im Fenster (verknüpfte Kopien vergleichen Formen
+# als JSON-Text, dort zählt die Reihenfolge). Gleichheit (==) achtet weiter nicht auf die Reihenfolge
+serde_json = { version = "1", features = ["float_roundtrip", "preserve_order"] }
 serialport = "4"
 # Gamepad lesen (gamepad.rs): das Fenster meldet Controller auf dem Mac nicht zuverlässig
 gilrs = "0.11"
@@ -45,7 +47,7 @@ unicode-normalization = "0.1"
 
 [dev-dependencies]
 # nur für die Tests: Kommazahlen aus den Vergleichsdateien genau einlesen (sonst bis zu eine letzte Stelle daneben)
-serde_json = { version = "1", features = ["float_roundtrip"] }
+serde_json = { version = "1", features = ["float_roundtrip", "preserve_order"] }
 
 # Entwicklungs-Build (tauri dev): nur den eigenen Code optimieren. Ohne das rechnen die Rechen-Module (Bildgravur,
 # G-Code lesen, 3D-Fraesen ...) im Entwicklungs-Build 10- bis 15-mal langsamer als in der fertigen App.

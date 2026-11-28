@@ -58,6 +58,11 @@ pub fn js_num(v: f64) -> String {
     if v.is_infinite() {
         return if v > 0.0 { "Infinity".into() } else { "-Infinity".into() };
     }
+    // sehr klein oder sehr groß: JavaScript schreibt mit Exponent (1e-7, 1.5e+21)
+    if v.abs() < 1e-6 || v.abs() >= 1e21 {
+        let e = format!("{v:e}");
+        return if e.contains("e-") { e } else { e.replace('e', "e+") };
+    }
     format!("{v}")
 }
 
@@ -225,6 +230,9 @@ mod tests {
     fn numbers_as_text_like_javascript() {
         use super::{js_num, to_fixed};
         assert_eq!((js_num(840.0), js_num(1.5), js_num(-0.0), js_num(0.1 + 0.2)), ("840".into(), "1.5".into(), "0".into(), "0.30000000000000004".into()));
+        // mit Exponent wie String(v) in JavaScript (node: 1e-7 1.5e-7 -2.5e-9 1e+21 1.234e+22 -1e+300 5e-324 0.000001 123456789012345680000)
+        let got: Vec<String> = [1e-7, 1.5e-7, -2.5e-9, 1e21, 1.234e22, -1e300, 5e-324, 0.000001, 123456789012345680000.0].iter().map(|v| js_num(*v)).collect();
+        assert_eq!(got, ["1e-7", "1.5e-7", "-2.5e-9", "1e+21", "1.234e+22", "-1e+300", "5e-324", "0.000001", "123456789012345680000"]);
         assert_eq!(to_fixed(0.0625, 3), "0.063"); // genau die Hälfte: weg von null
         assert_eq!(to_fixed(-0.0625, 3), "-0.063");
         assert_eq!(to_fixed(0.125, 2), "0.13");

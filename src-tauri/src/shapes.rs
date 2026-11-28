@@ -407,8 +407,8 @@ pub fn convert_to_polyline(s: &mut Value) {
         m.insert("type".into(), json!("polyline"));
         m.insert("points".into(), Value::Array(pts));
         m.insert("closed".into(), json!(closed));
-        m.remove("midX");
-        m.remove("midY");
+        m.shift_remove("midX");
+        m.shift_remove("midY");
     }
     update_polyline_bounds(s);
 }
@@ -600,7 +600,7 @@ pub fn shape_bounds_json(s: &Value) -> Value {
             for (k, f) in [("minX", "x"), ("minY", "y")] {
                 match s.get(f) {
                     Some(v) => m.insert(k.into(), v.clone()),
-                    None => m.remove(k),
+                    None => m.shift_remove(k),
                 };
             }
         }
