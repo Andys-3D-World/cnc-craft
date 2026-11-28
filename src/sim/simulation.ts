@@ -37,7 +37,9 @@ import { skinInfo } from "../skinNotes";
 import { machine, setOverride, MACHINE_EVENT } from "../machine";
 import { bedSizeMm } from "../editor/editorState";
 import { openResumeDialog } from "../ui/resumeDialog";
-import { wrapSimProgram } from "./rotarySim";
+import { wrapSimProgram, type WrapSimOpts } from "./rotarySim";
+import { rotarySimBody, rotarySimSummary } from "./rotarySimRust";
+import { checkImport, importInApp } from "../importers/importRust";
 import { rotary } from "../rotary";
 import { refRadius } from "../rotaryStock";
 import { LiveCarve, toolSections, type WarnKind, type CarveKind } from "./simCarve";
@@ -541,9 +543,17 @@ function finishSim(p: SimProgram, src: Source): SimProgram {
   if (!(R > 0)) return p;
   // Rollen-Drehachse (Laser): A dreht die Rolle, das Teil dreht im Verhältnis der Durchmesser
   const o = { along: rotary.along, reverse: rotary.reverse, stock: rotary };
-  if (p.a0) return wrapSimProgram(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() && rotary.shape === "round" ? rotary.rollerDia / rotary.diameter : 1 });
-  if (src === "design" && rotary.on && !isPlasma() && !isLathe()) return wrapSimProgram(p, R, "surface", o);
+  if (p.a0) return wrapChecked(p, R, "a", { ...o, aScale: rotary.kind === "roller" && isLaser() && rotary.shape === "round" ? rotary.rollerDia / rotary.diameter : 1 });
+  if (src === "design" && rotary.on && !isPlasma() && !isLathe()) return wrapChecked(p, R, "surface", o);
   return p;
+}
+
+/** Wickeln; in der App rechnet Rust dasselbe nach (rotarysim.rs) – nur Vergleich, angezeigt wird dieses Ergebnis */
+function wrapChecked(p: SimProgram, R: number, mode: "surface" | "a", o: WrapSimOpts): SimProgram {
+  const w = wrapSimProgram(p, R, mode, o);
+  // nicht bei riesigen Programmen: die Prüfsummen kosten Zeit im Fenster
+  if (importInApp() && w.n <= 1_000_000) { const body = rotarySimBody(p, R, mode, o); if (body) checkImport("rotary_sim_check", body, rotarySimSummary(w)); }
+  return w;
 }
 
 /**

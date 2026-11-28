@@ -87,6 +87,8 @@ mod portscan;
 mod recent;
 mod camfetch;
 mod rotary3d;
+mod rotarysim;
+mod rotarystock;
 mod ruida;
 mod serial;
 mod snapgeom;
@@ -1534,6 +1536,20 @@ fn xy_probe_check(job: xyprobe::Job, log: Option<Vec<xyprobe::Call>>) -> serde_j
     xyprobe::run(&job, &log.unwrap_or_default())
 }
 
+/// SIMULATION MIT DREHACHSE (rotarysim.rs): das gelesene Programm als Rohdaten (rotarySimRust.ts). Das Fenster vergleicht
+/// die Zusammenfassung mit rotarySim.ts (simulation.ts); angezeigt wird weiter das Ergebnis des Fensters.
+#[tauri::command]
+async fn rotary_sim_check(request: tauri::ipc::Request<'_>) -> Result<serde_json::Value, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the program as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, p) = rotarysim::split_body(&body)?;
+        Ok(rotarysim::run(&head, &p))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1757,6 +1773,7 @@ pub fn run() {
             snap_check,
             rotary3d_check,
             xy_probe_check,
+            rotary_sim_check,
             lathe_generate,
             gamepad_read,
             list_ports,
