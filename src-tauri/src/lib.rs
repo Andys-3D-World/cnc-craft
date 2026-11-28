@@ -86,6 +86,7 @@ mod netscan;
 mod portscan;
 mod recent;
 mod camfetch;
+mod linkedcopies;
 mod rotary3d;
 mod rotarysim;
 mod rotarystock;
@@ -1558,6 +1559,13 @@ fn shape_check(job: serde_json::Value) -> Result<serde_json::Value, String> {
     shapes::run(&job)
 }
 
+/// VERKNÜPFTE KOPIEN (linkedcopies.rs): Abgleich nach einer Aktion, Auffrischen, Generator neu, Projektdatei säubern. Das
+/// Fenster vergleicht die Antwort mit linkedCopies.ts (linked.ts, beds.ts); die Kopien baut weiter das Fenster.
+#[tauri::command(async)]
+fn link_check(job: serde_json::Value) -> Result<serde_json::Value, String> {
+    linkedcopies::run(&job)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1783,6 +1791,7 @@ pub fn run() {
             xy_probe_check,
             rotary_sim_check,
             shape_check,
+            link_check,
             lathe_generate,
             gamepad_read,
             list_ports,

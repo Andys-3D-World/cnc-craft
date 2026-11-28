@@ -28,7 +28,8 @@ import { setStockBed, removeStockBed, hasUsedArea, newPlate } from "../stock";
 import { cleanSetup, type Side, type TwoSidedSetup } from "../twoSided";
 import { checkImport, importInApp } from "../importers/importRust";
 import { cleanSplit, type SplitSetup } from "../seamSplit";
-import { cleanLinks, refreshLinks, shapeIndex, stripLinks } from "../linkedCopies";
+import { stripLinks } from "../linkedCopies";
+import { cleanChecked, refreshChecked } from "./linkRust";
 
 /**
  * Zweiseitig fräsen (twoSided.ts): `shapes` ist immer die Seite, die gerade gezeigt wird, `other` die verdeckte.
@@ -152,7 +153,7 @@ function moveTagged(tag: string, dir: "undo" | "redo") {
 function freshLinks(list: any[], hist?: HistoryState | null) {
   if (!list.some((s: any) => s?.link)) return;
   const was = hist ? JSON.stringify(list) : "";
-  if (refreshLinks(list, shapeIndex(linkLists())) && hist && hist.committed === was) hist.committed = JSON.stringify(list);
+  if (refreshChecked(list, linkLists()) && hist && hist.committed === was) hist.committed = JSON.stringify(list);
 }
 
 // ---------------------------------------------------------------------
@@ -415,7 +416,7 @@ export function bedsForSave(): { name: string; done: boolean; n: number; twoSide
 
 /** Projekt geladen: Formen nach den Angaben in `list` auf die Betten verteilen (ohne Angaben: ein Bett) */
 export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
-  cleanLinks(shapes);
+  cleanChecked(shapes);
   const ok = Array.isArray(list) && list.length > 0 && list.every((b: any) => Number.isInteger(b?.n) && b.n >= 0)
     && list.reduce((n: number, b: any) => n + b.n, 0) === shapes.length;
   if (ok) {
@@ -446,8 +447,9 @@ export function loadBeds(shapes: any[], list?: any, activeIdx?: any) {
   st.shapes = beds[active].shapes;
   st.selectedShapeIds = [];
   // Linked copies: original changed in an older version → rebuild the copies
-  const lists = linkLists(), index = shapeIndex(lists);
-  for (const l of lists) refreshLinks(l, index);
+  // (je Liste derselbe Index: er zeigt auf dieselben Formen, die sich beim Auffrischen nur ändern)
+  const lists = linkLists();
+  for (const l of lists) refreshChecked(l, lists);
   putHistory(null);
   changed();
 }

@@ -8,9 +8,8 @@ import { setLinkHooks } from "./history";
 import { linkLists, otherLists, bedName } from "./beds";
 import { t } from "../i18n/i18n";
 import { groupBounds, newId, shapeToPaths } from "../shapeTransform";
-import {
-  isLinked, linkClones, referencedIds, refreshLinks, shapeIndex, syncLinks, unlinkShapes, relinkRun, stripLinks
-} from "../linkedCopies";
+import { isLinked, linkClones, referencedIds, unlinkShapes, stripLinks } from "../linkedCopies";
+import { refreshChecked, relinkChecked, syncChecked } from "./linkRust";
 
 let log: (s: string) => void = () => {};
 
@@ -24,7 +23,7 @@ function syncAfterAction(before: string): boolean {
   const st = app();
   const others = otherLists();
   if (!st.shapes.some((s: any) => s.link || s.linkFrame) && !others.some(l => l.some(isLinked))) return false;
-  const r = syncLinks(st.shapes, JSON.parse(before), others);
+  const r = syncChecked(st.shapes, before, others);
   if (r.blocked) log(t("link.blocked"));
   if (r.orphaned) log(t("link.orphaned", { n: r.orphaned }));
   return r.changed;
@@ -34,7 +33,7 @@ function syncAfterAction(before: string): boolean {
 function refreshShown(): boolean {
   const st = app();
   if (!st.shapes.some(isLinked)) return false;
-  return refreshLinks(st.shapes, shapeIndex(linkLists()));
+  return refreshChecked(st.shapes, linkLists());
 }
 
 /**
@@ -112,7 +111,7 @@ export function linkState(sel: any[]): { copies: number; originals: number } {
 /** Generator made again: copies that showed the old parts now show the new ones (all beds) */
 export function relinkGenerated(oldParts: any[], made: any[]) {
   if (!linkLists().some(l => l.some(isLinked))) return;
-  relinkRun(linkLists(), oldParts, made, newId);
+  relinkChecked(linkLists(), oldParts, made, newId);
 }
 
 /** Shapes leave the drawing in another form (other side of a two-sided job): no link data on them */
