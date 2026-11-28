@@ -38,6 +38,8 @@ mod arcfit;
 mod milllead;
 mod millgcode;
 mod feedadapt;
+mod keepout;
+mod rotarywrap;
 mod controller;
 mod cycles;
 mod elfimg;
@@ -1098,6 +1100,48 @@ fn millgcode_shadow(job: millgcode::Job, expected: String, side: Option<serde_js
     })
 }
 
+/// SPERRZONEN (keepout.rs): derselbe Schritt, den das Fenster über den fertigen G-Code laufen lässt (applyKeepOuts in
+/// keepOut.ts). Das Fenster vergleicht die Antwort mit seinem eigenen Ergebnis (checkPost in camPost.ts).
+#[tauri::command(async)]
+fn post_keepouts(gcode: String, zones: Vec<keepout::Zone>, radius: f64, note: String) -> keepout::KeepResult {
+    let start = std::time::Instant::now();
+    let r = keepout::apply_keep_outs(&gcode, &zones, radius, &note);
+    if cfg!(debug_assertions) {
+        eprintln!("keepout: {} zone(s), {} lines, {} lift(s), {} report(s) ({:.1} ms)", zones.len(), gcode.split('\n').count(), r.raised, r.hits.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    r
+}
+
+/// BOGEN-GLÄTTUNG (arcfit.rs): derselbe Schritt, den das Fenster über den fertigen Fräs-G-Code laufen lässt (fitArcs in
+/// arcFit.ts): G1-Ketten, die auf einem Bogen liegen, werden zu G2/G3.
+#[tauri::command(async)]
+fn post_arcfit(gcode: String, tol: f64) -> serde_json::Value {
+    let start = std::time::Instant::now();
+    let r = arcfit::fit_arcs(&gcode, tol);
+    if cfg!(debug_assertions) {
+        eprintln!("arcfit: {} lines -> {} lines, {} arc(s) ({:.1} ms)", r.before, r.after, r.arcs, start.elapsed().as_secs_f64() * 1000.0);
+    }
+    serde_json::json!({ "gcode": r.gcode, "before": r.before, "after": r.after, "arcs": r.arcs })
+}
+
+/// DREHACHSE (rotarywrap.rs): derselbe Schritt, den das Fenster über den fertigen G-Code laufen lässt (wrapGcode in
+/// rotaryWrap.ts). Antwort wie dort: { ok: true, lines } oder { ok: false, error, line }.
+#[tauri::command(async)]
+fn post_rotary(lines: Vec<String>, options: rotarywrap::Options) -> serde_json::Value {
+    let start = std::time::Instant::now();
+    let r = rotarywrap::wrap_gcode(&lines, &options);
+    if cfg!(debug_assertions) {
+        match &r {
+            Ok(out) => eprintln!("rotarywrap: {} lines -> {} lines ({:.1} ms)", lines.len(), out.len(), start.elapsed().as_secs_f64() * 1000.0),
+            Err((error, line)) => eprintln!("rotarywrap: refused ({error}, line {line})"),
+        }
+    }
+    match r {
+        Ok(out) => serde_json::json!({ "ok": true, "lines": out }),
+        Err((error, line)) => serde_json::json!({ "ok": false, "error": error, "line": line }),
+    }
+}
+
 /// FRÄS-G-CODE FÜR DIE MASCHINE UND DIE DATEI: rechnet den Auftrag in Rust und vergleicht mit dem G-Code aus cam.ts
 /// (`expected`) samt Hinweisen, Gewinden und Werkzeugen (`side`). Antwort: der G-Code aus Rust und das Ergebnis des
 /// Vergleichs – das Fenster nimmt ihn nur, wenn alles gleich ist (rustChecked in camJob.ts), sonst bleibt es bei cam.ts.
@@ -1240,6 +1284,9 @@ pub fn run() {
             imgraster_run,
             millgcode_shadow,
             millgcode_generate,
+            post_keepouts,
+            post_rotary,
+            post_arcfit,
             gamepad_read,
             list_ports,
             port_scan,

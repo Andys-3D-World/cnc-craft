@@ -16,6 +16,8 @@
  * Fräse: Z = 0 oben auf dem Teil, der Fräser steht über der Mitte der Drehachse; Tiefe = in den Zylinder hinein.
  * Die Umrechnung selbst (Bögen zerlegen, Vorschub) steht in rotaryWrap.ts.
  */
+import { notePost } from "./camPost";
+import { wrapJob } from "./rotaryRust";
 import { MM_TO_PIXEL } from "./shapeTransform";
 import { t, ascii, tMm } from "./i18n/i18n";
 import { machine } from "./machine";
@@ -123,7 +125,10 @@ export function wrapOptions(s: RotarySettings = rotary): WrapOptions {
  * Oberfläche. Gibt bei Code, der sich nicht sicher umrechnen lässt, eine Meldung statt G-Code zurück.
  */
 export function applyRotary(gcode: string, s: RotarySettings = rotary, input: "machine" | "internal" = "machine"): { gcode: string } | { error: string } {
-  const r = wrapGcode(gcode.split("\n"), { ...wrapOptions(s), input });
+  const src = gcode.split("\n"), opts = { ...wrapOptions(s), input };
+  const r = wrapGcode(src, opts);
+  // in der App rechnet Rust denselben Schritt daneben und vergleicht (camPost.ts)
+  notePost("post_rotary", { lines: src, options: wrapJob(opts) }, r);
   if (!r.ok) return { error: t("rot.err." + r.error, { n: r.line }) };
   const port = s.axis === "a" ? "A" : s.along === "y" ? "X" : "Y";
   const head = [`(${ascii(tMm("rot.gcHeader", { d: +(refRadius(s) * 2).toFixed(2), axis: port, kind: t("rot.kind." + kindOf(s)).replace(/\s*\(.*\)\s*/, "") }))})`];

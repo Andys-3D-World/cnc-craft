@@ -44,6 +44,7 @@ import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan,
 import { postCtx } from "./post/postContext";
 import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
 import { shadowMill, rustChecked, setChecking } from "./camJob";
+import { recordPost, notePost, takePost, checkPost, type PostStep } from "./camPost";
 
 const MM_TO_PIXEL = 2;
 const SAFE_Z = 5.0;       // Sicherheitsabstand über dem Werkstück
@@ -195,12 +196,24 @@ export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; 
     gcode, warnings: lastGcodeWarnings.slice(), notes: lastGcodeNotes.slice(), threads: lastThreads.slice(),
     sectionTools: lastSectionTools.slice(), none: gcode ? "" : noGcodeMessage()
   });
+  /**
+   * Die Schritte nach dem G-Code der Formen (Bogen-Glättung, Sperrzonen, Drehachse): das TypeScript rechnet sie wie
+   * immer, Rust rechnet dieselben daneben (camPost.ts). Der Text ist derselbe; weicht Rust ab, kommt ein Hinweis dazu.
+   */
+  const finished = async (finish: (g: string | null) => string | null, g: string | null): Promise<GcodeResult> => {
+    recordPost();
+    let res: GcodeResult, steps: PostStep[];
+    try { res = result(finish(g)); } finally { steps = takePost(); }
+    const diff = await checkPost(steps);
+    if (diff) { console.warn("post step: Rust differs from the TypeScript, the TypeScript result is used –", diff); res.notes.push(t("gcw.rustDiff")); }
+    return res;
+  };
   setChecking(true);
   let run: ReturnType<typeof gcodeRun>;
   try { run = gcodeRun(allShapes, opts); } finally { setChecking(false); }
   lastGcodeSource = "cam.ts";
   if ("done" in run) return result(run.done);
-  if (!run.inner || !isMill()) return result(run.finish(run.inner));
+  if (!run.inner || !isMill()) return finished(run.finish, run.inner);
   // was cam.ts beim Fräs-G-Code gemeldet hat (Hinweise, Gewinde, Werkzeuge) – das await unten kann andere Aufrufe dazwischenlassen
   const mine = { warnings: lastGcodeWarnings, threads: lastThreads, tools: lastSectionTools };
   const r = await rustChecked(run.inner);
@@ -215,7 +228,7 @@ export async function generateGcodeFull(allShapes: any, opts: { flat?: boolean; 
     lastGcodeSource = "cam.ts: " + r.no;
     if (r.differs) { console.warn("millgcode: Rust differs from cam.ts, cam.ts is used –", r.no); lastGcodeNotes.push(t("gcw.rustDiff")); }
   }
-  return result(run.finish(inner));
+  return finished(run.finish, inner);
 }
 
 /**
@@ -254,6 +267,7 @@ function gcodeRun(allShapes: any, opts: { flat?: boolean; side?: Side }): { done
   // Arc Fitting: nach Vorschub-Anpassung und Nachmess-Punkten, nur Fräse, nicht mit Drehachse (arcFit.ts)
   if (g && arcFit.on && isMill() && !rotary.on) {
     const r = fitArcs(g, arcFit.tol);
+    notePost("post_arcfit", { gcode: g, tol: arcFit.tol }, r);
     g = r.gcode;
     if (r.arcs) lastGcodeNotes.push(t("arc.result", { before: r.before, after: r.after, arcs: r.arcs, pct: Math.round((1 - r.after / r.before) * 100) }));
   }
@@ -291,7 +305,9 @@ function applyZones(g: string, used: any[]): string {
   if (!zones.length) return g;
   if (rotary.on) { lastGcodeWarnings.push(t("ko.rotary")); return g; }
   const dia = Math.max(0, ...used.map((s: any) => { const tl = toolForShape(s); return tl ? cutDiameter(tl) : 3; }));
-  const r = applyKeepOuts(g, zones, { radius: dia / 2, note: `(${ascii(tMm("gc.keepOut"))})` });
+  const note = `(${ascii(tMm("gc.keepOut"))})`;
+  const r = applyKeepOuts(g, zones, { radius: dia / 2, note });
+  notePost("post_keepouts", { gcode: g, zones, radius: dia / 2, note }, r);
   if (r.raised) lastGcodeNotes.push(t("ko.raised", { n: r.raised }));
   if (r.unsure) lastGcodeWarnings.push(t("ko.unsure"));
   for (const h of r.hits) {
@@ -1557,10 +1573,6 @@ const generateGcodeInner = (shapes: any): string | null => {
   return gcode;
 };
 
-function showWarnings(appendToConsole: (t: string) => void) {
-  lastGcodeWarnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
-  lastGcodeNotes.forEach(n => appendToConsole(n));
-}
 
 /**
  * G-Code erzeugen und in der Konsole anzeigen.
@@ -1572,9 +1584,10 @@ export async function exportGcodeToFile(shapes: any, appendToConsole: (t: string
   // Post-Prozessor (post/): nur die Datei. GRBL in mm liefert genau den Text von generateGcode()
   // die Einstellungen des Post-Prozessors gelten nur, solange cam.ts rechnet und der Auftrag für Rust entsteht – beides
   // geschieht sofort (vor dem ersten Warten); withPost setzt sie danach gleich zurück, die Antwort kommt später
-  const neutral = await withPost(() => generateGcodeChecked(shapes));
-  if (!neutral) { appendToConsole(noGcodeMessage()); return; }
-  showWarnings(appendToConsole);
+  const made = await withPost(() => generateGcodeFull(shapes)), neutral = made.gcode;
+  if (!neutral) { appendToConsole(made.none); return; }
+  made.warnings.forEach(w => appendToConsole(`${t("log.warning")} ${w}`));
+  made.notes.forEach(n => appendToConsole(n));
   const gcode = postedText(neutral, appendToConsole);
   if (gcode === null) return;
   fileName = postFileName(fileName);

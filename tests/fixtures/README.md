@@ -27,3 +27,12 @@ top of that file; the text is 7 MB, so let the page post it to a small local rec
 A tool-less job ("Standard") cannot be made in the preview, the library always keeps one tool: that case is a hand-written
 test in `millgcode.rs`. Make it again whenever `cam.ts` changes something in the parts the Rust version covers – otherwise
 the test compares against an old `cam.ts`.
+
+`keepout-cases.json` / `keepout-expected.json` (keep-out zones for clamps) and `rotarywrap-cases.json.gz` /
+`rotarywrap-expected.json.gz` (rotary axis; packed, because arcs become many short lines) are shared cases for a
+TypeScript module and its Rust twin: `src/keepOut.ts` and `src-tauri/src/keepout.rs`, `src/rotaryWrap.ts` and
+`src-tauri/src/rotarywrap.rs`. The cases are written by `keepout-make.py` and `rotarywrap-make.py` (hand-written edge
+cases, real router programs taken from `millgcode-cases.json.gz`, random programs with a fixed seed). `npm test` pins
+what the TypeScript gives in the `-expected` file (`UPDATE_FIXTURES=1 npm test` writes it again), `cargo test keepout`
+and `cargo test rotarywrap` compare the Rust result with it line by line. The rotary `-expected` file also holds the job
+the Rust side gets for each case (`wrapJob` in `src/rotaryRust.ts`).
