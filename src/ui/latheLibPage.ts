@@ -6,23 +6,51 @@ import { t } from "../i18n/i18n";
 import { latheSettings, latheTools, setLatheTools } from "../lathe/latheJob";
 import { LATHE_PRESETS, type LathePreset } from "../lathe/lathePresets";
 import { rpmFor, type LatheTool } from "../lathe/turn";
+import { toolImageTag } from "../toolRender";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
 const f2 = (v: number) => String(Math.round(v * 100) / 100);
 
+// Farben für das Bild: Stahl (Teil, von oben beleuchtet), Halter (dunkel brüniert), Platte (goldfarben beschichtet)
+const DEFS = `<defs>
+  <linearGradient id="ltgPart" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8590a2"/><stop offset="0.22" stop-color="#d9dee6"/><stop offset="0.6" stop-color="#9ba6b7"/><stop offset="1" stop-color="#788395"/></linearGradient>
+  <linearGradient id="ltgHold" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#2b2f37"/><stop offset="0.35" stop-color="#656d7a"/><stop offset="0.6" stop-color="#454b56"/><stop offset="1" stop-color="#23262d"/></linearGradient>
+  <linearGradient id="ltgIns" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#fbe391"/><stop offset="0.45" stop-color="#d9a93a"/><stop offset="1" stop-color="#8f6717"/></linearGradient>
+  <radialGradient id="ltgScrew" cx="0.35" cy="0.3" r="0.9"><stop offset="0" stop-color="#8b93a0"/><stop offset="0.6" stop-color="#3a3f48"/><stop offset="1" stop-color="#16181d"/></radialGradient>
+</defs>`;
+const AXIS = (W: number, H: number) => `<path d="M14 ${H - 14} H${W - 14}" stroke="#fff6" stroke-dasharray="9 4 2 4"/>`;
+/** Schraube mit Sternprofil (Torx) */
+function screw(cx: number, cy: number, r: number): string {
+  let star = "";
+  for (let k = 0; k < 12; k++) { const a = k * Math.PI / 6, q = r * (k % 2 ? 0.3 : 0.55); star += `${k ? "L" : "M"}${(cx + q * Math.cos(a)).toFixed(1)} ${(cy + q * Math.sin(a)).toFixed(1)}`; }
+  return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r}" fill="url(#ltgScrew)" stroke="#0c0d10"/><path d="${star}z" fill="#0c0d10"/>`;
+}
+
 /** Schneide am Teil: oben das Werkzeug, darunter das Material (Z waagerecht, Futter links) */
 export function latheToolSvg(x: LatheTool, W = 260, H = 190): string {
   const px = W / 2, base = H - 52, py = x.type === "turn" ? base + 14 : base, n = (v: number) => v.toFixed(1);
-  const part = `${x.hand === "N" ? "" : `<rect x="14" y="${base}" width="${px - 14}" height="15" fill="#8f9bb0"/>`}<rect x="14" y="${base + 14}" width="${W - 28}" height="${H - base - 28}" fill="#8f9bb0"/><path d="M14 ${H - 14} H${W - 14}" stroke="#fff6" stroke-dasharray="9 4 2 4"/>`;
+  const part = `${x.hand === "N" ? "" : `<rect x="14" y="${base}" width="${px - 14}" height="15" fill="url(#ltgPart)"/>`}<rect x="14" y="${base + 14}" width="${W - 28}" height="${H - base - 28}" fill="url(#ltgPart)"/>${AXIS(W, H)}`;
   let tool = "";
   if (x.type === "drill") {
-    const d = Math.max(8, Math.min(36, x.dia * 3));
-    tool = `<rect x="14" y="${py}" width="${W - 90}" height="${H - py - 14}" fill="#8f9bb0"/><path d="M${px - 20} ${H - 14} l14 -${d / 2} H${W - 20} V${H - 14} z" fill="#ffd23c" stroke="#8a6d00"/><path d="M14 ${H - 14} H${W - 14}" stroke="#fff6" stroke-dasharray="9 4 2 4"/>`;
+    // Spiralbohrer als gerechnetes Bild (wie in der Fräser-Bibliothek), liegend: Spitze links, Achse auf der Mittellinie
+    const d = Math.max(8, Math.min(36, x.dia * 3)), len = W / 2, mm = Math.max(0.3, x.dia), L = len / d * mm, tipX = px - 20;
+    const g = { type: "drill" as const, diameter: mm, shankDia: mm, fluteLen: L * 0.72, length: L, flutes: 2, helix: "up" as const, angle: 118, tipDia: 0, cornerR: 0 };
+    const h = (mm / 2) / Math.tan(59 * Math.PI / 180);
+    const img = toolImageTag({ g, cut: [[0, 0], [mm / 2, h], [mm / 2, g.fluteLen]], rest: [[mm / 2, g.fluteLen], [mm / 2, L]] }, "side", { x0: -mm / 2, x1: mm / 2, y0: 0, y1: L }, d, len,
+      `x="${n(-d / 2)}" y="${n(-len)}" width="${n(d)}" height="${n(len)}" preserveAspectRatio="none"`);
+    const drill = img
+      ? `<g transform="translate(${n(tipX)} ${H - 14}) rotate(90)">${img}</g>`
+      : `<path d="M${tipX} ${H - 14} l14 -${d / 2} H${W - 20} V${H - 14} z" fill="url(#ltgIns)" stroke="#6b4d0c"/>`;
+    tool = `<rect x="14" y="${py}" width="${W - 90}" height="${H - py - 14}" fill="url(#ltgPart)"/>${drill}${AXIS(W, H)}`;
     return svg(W, H, tool);
   }
   if (x.type === "groove") {
-    const w = Math.max(8, Math.min(50, x.width * 9));
-    return svg(W, H, `<path d="M14 ${py} H${px - w / 2} V${py + 24} H${px + w / 2} V${py} H${W - 14} V${H - 14} H14 z" fill="#8f9bb0"/><rect x="${n(px - w / 2)}" y="24" width="${n(w)}" height="${py + 24 - 24}" fill="#ffd23c" stroke="#8a6d00"/><path d="M14 ${H - 14} H${W - 14}" stroke="#fff6" stroke-dasharray="9 4 2 4"/>`);
+    // Stechschwert (Halter) mit goldfarbener Stechplatte unten
+    const w = Math.max(8, Math.min(50, x.width * 9)), x0 = px - w / 2, tip = Math.min(26, w * 1.6);
+    return svg(W, H, `<path d="M14 ${py} H${n(x0)} V${py + 24} H${n(x0 + w)} V${py} H${W - 14} V${H - 14} H14 z" fill="url(#ltgPart)"/>`
+      + `<rect x="${n(x0 + 1)}" y="14" width="${n(w - 2)}" height="${n(py + 24 - tip - 14)}" fill="url(#ltgHold)" stroke="#14161a"/>`
+      + `<path d="M${n(x0 + 1)} ${n(py + 24 - tip)} L${n(x0)} ${py + 24} H${n(x0 + w)} L${n(x0 + w - 1)} ${n(py + 24 - tip)} z" fill="url(#ltgIns)" stroke="#6b4d0c" stroke-linejoin="round"/>`
+      + `<path d="M${n(x0 + 2)} ${n(py + 24 - tip * 0.45)} H${n(x0 + w - 2)}" stroke="#fff5"/>${AXIS(W, H)}`);
   }
   // Kanten ab der Spitze: Hauptschneide unter kappa, Nebenschneide eps weiter (bei L gespiegelt)
   const eps = Math.max(10, x.eps), k = x.hand === "N" ? (180 - eps) / 2 : x.kappa, m = x.hand === "L" ? -1 : 1, L = 74;
@@ -31,10 +59,15 @@ export function latheToolSvg(x: LatheTool, W = 260, H = 190): string {
   const A = { x: px + a.x * L, y: py + a.y * L }, B = { x: px + b.x * L, y: py + b.y * L }, C = { x: A.x + b.x * L, y: A.y + b.y * L };
   const p = `M${n(A.x)} ${n(A.y)} L${n(px + a.x * q)} ${n(py + a.y * q)} ${rn > 0.5 ? `A${n(rn)} ${n(rn)} 0 0 ${m > 0 ? 0 : 1} ${n(px + b.x * q)} ${n(py + b.y * q)}` : ""} L${n(B.x)} ${n(B.y)} L${n(C.x)} ${n(C.y)} z`;
   const cx = (A.x + B.x) / 2, cy = (A.y + B.y) / 2;
-  tool = `<path d="${p}" fill="#ffd23c" stroke="#8a6d00" stroke-linejoin="round"/><circle cx="${n(cx)}" cy="${n(cy)}" r="7" fill="#121218" stroke="#8a6d00"/>`;
+  // Halter: Schaft nach oben aus dem Bild, unten folgt er der Platte (etwas kleiner, damit die Schneiden frei stehen)
+  const hw = 30, seat = `M${n(cx - hw)} 2 V${n(cy - 6)} L${n(cx + (A.x - cx) * 0.8)} ${n(cy + (A.y - cy) * 0.8)} L${n(cx + (px - cx) * 0.62)} ${n(cy + (py - cy) * 0.62)} L${n(cx + (B.x - cx) * 0.8)} ${n(cy + (B.y - cy) * 0.8)} L${n(cx + hw)} ${n(cy - 6)} V2 z`;
+  tool = `<path d="${seat}" fill="url(#ltgHold)" stroke="#14161a" stroke-linejoin="round"/>`
+    + `<path d="${p}" fill="url(#ltgIns)" stroke="#6b4d0c" stroke-linejoin="round"/>`
+    + `<path d="${p}" transform="translate(${n(cx)} ${n(cy)}) scale(0.7) translate(${n(-cx)} ${n(-cy)})" fill="#ffffff14" stroke="#fff6" stroke-width="1.4" stroke-linejoin="round"/>`
+    + screw(cx, cy, 8);
   return svg(W, H, (m > 0 ? part : `<g transform="translate(${W} 0) scale(-1 1)">${part}</g>`) + tool);
 }
-const svg = (W: number, H: number, inner: string) => `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="12" fill="#121218" stroke="rgba(255,255,255,0.08)"/>${inner}</svg>`;
+const svg = (W: number, H: number, inner: string) => `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="max-width:100%" xmlns="http://www.w3.org/2000/svg">${DEFS}<clipPath id="ltgClip"><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="12"/></clipPath><rect x="1" y="1" width="${W - 2}" height="${H - 2}" rx="12" fill="#121218" stroke="rgba(255,255,255,0.08)"/><g clip-path="url(#ltgClip)">${inner}</g></svg>`;
 
 const info = (x: LatheTool) => [t("lathe.type." + x.type), x.type === "turn" ? `${t("lathe.hand." + x.hand)} · κ ${f2(x.kappa)}° ε ${f2(x.eps)}° R ${f2(x.nose)}` : x.type === "groove" ? `${f2(x.width)} mm` : `Ø ${f2(x.dia)} mm`].join(" · ");
 

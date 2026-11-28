@@ -25,6 +25,7 @@
 
 mod awake;
 mod cam3d;
+mod toolmesh;
 mod gcodesim;
 mod carvesim;
 mod cutorder;
@@ -953,6 +954,26 @@ async fn flash_zip(app: AppHandle, port: String, path: String, baud: u32, usb_jt
     .map_err(|e| e.to_string())?
 }
 
+// ---- Werkzeug-Bilder (toolmesh.rs): Fräser mit Spannuten für Simulation und Bibliothek ----
+
+/// Fräser, Schaft, Spannmutter und Spindelnase als Dreiecke (Aufbau siehe toolmesh::mill_bytes)
+#[tauri::command(async)]
+fn toolmesh_mill(job: toolmesh::MillJob) -> tauri::ipc::Response {
+    tauri::ipc::Response::new(toolmesh::mill_bytes(&job))
+}
+
+/// Nur der Schneidenteil als Dreiecke (Bohrer an der Drehbank)
+#[tauri::command(async)]
+fn toolmesh_cutter(job: toolmesh::CutterJob) -> tauri::ipc::Response {
+    tauri::ipc::Response::new(toolmesh::cutter_bytes(&job))
+}
+
+/// Bild eines Fräsers für die Werkzeug-Bibliothek: RGBA-Bytes, w × h
+#[tauri::command(async)]
+fn toolmesh_picture(job: toolmesh::PictureJob) -> Result<tauri::ipc::Response, String> {
+    toolmesh::picture(&job).map(tauri::ipc::Response::new)
+}
+
 // ---- G-Code für die Simulation lesen (gcodesim.rs) ----
 
 /// G-Code-Text (Bytes) lesen: Bewegungen, Zeiten, Hinweise. Einstellungen als JSON im Kopf "opts".
@@ -1210,6 +1231,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            toolmesh_mill,
+            toolmesh_cutter,
+            toolmesh_picture,
             gcodesim_parse,
             carvesim_run,
             carvesim_cancel,

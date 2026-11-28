@@ -10,7 +10,7 @@
  * „Material zeigen“: statt der Bahnen das Rohteil, wie es bis hierher abgetragen ist (simCarve.ts), mit Fräser,
  * Spannmutter und Spindel (simCarveGl.ts). Das Raster rechnet in jedem Bild ein paar Millisekunden weiter.
  */
-import { SimProgram, MOVE_CUT, MOVE_RAPID } from "./gcodeParser";
+import { SimProgram, MOVE_CUT, MOVE_RAPID, MOVE_TRAVEL } from "./gcodeParser";
 import { PathRenderer } from "./simGl";
 import { sectionAt, cornerRadius, isPrism, type RotaryStock } from "../rotaryStock";
 import type { LiveCarve } from "./simCarve";
@@ -161,6 +161,8 @@ export class SimView {
   }
 
   setProgress(i: number, frac: number, x: number, y: number, z: number) {
+    // läuft die Simulation (oder ein Job) gerade weiter? Dann dreht sich der Fräser im Bild
+    if (i !== this.curIdx || frac !== this.frac) this.movedAt = performance.now();
     this.curIdx = i;
     this.frac = frac;
     this.tool = { x, y, z };
@@ -168,6 +170,7 @@ export class SimView {
     this.invalidate();
   }
   private frac = 0;
+  private movedAt = 0;
 
   /** Materialabtrag bis zur aktuellen Stelle (noch nicht gestartet / live ohne Stelle: alles bzw. nichts) */
   syncMaterial() {
@@ -595,6 +598,7 @@ export class SimView {
   /** Rohteil mit Fräser über die Grafikkarte; false = geht nicht (dann Bahnen wie bisher) */
   private drawMaterial(): boolean {
     const m = this.material!;
+    this.matGpu.onReady ??= () => this.invalidate();
     const W = this.canvas.width, H = this.canvas.height;
     const at = Math.max(0, Math.min(m.program.n - 1, this.curIdx));
     const img = this.matGpu.render(m, {
@@ -603,7 +607,8 @@ export class SimView {
       env: this.showMachine ? { bedW: this.bedW, bedH: this.bedH, zones: this.zones, rollerDia: this.rollerDia } : null,
       tool: this.curIdx >= 0 ? {
         ...this.tool, kind: m.kind, geom: m.toolOf(at), holder: m.holderOf(at),
-        on: this.curIdx < m.program.n && m.program.type[this.curIdx] === MOVE_CUT
+        on: this.curIdx < m.program.n && m.program.type[this.curIdx] === MOVE_CUT,
+        spin: performance.now() - this.movedAt < 200 && this.curIdx < m.program.n && m.program.type[this.curIdx] !== MOVE_TRAVEL
       } : null
     });
     if (!img) { this.materialFailed = true; this.onChange(); return false; }

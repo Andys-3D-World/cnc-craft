@@ -2,6 +2,7 @@
  * DREHEN SIMULIEREN – Material nach einer beliebigen Stelle des Programms und die 3D-Körper dazu. Ohne Oberfläche (Tests: tests/latheSim.test.ts).
  * Welt der 3D-Ansicht: x = Drehachse (rechts = Reitstock), −y = vorne beim Bediener, z = oben.
  */
+import { cutterMesh } from "../sim/toolMesh.ts";
 import { dilate, makeGrid, refDz, shapeOf, sweep, type Grid, type LathePlan, type LatheTool } from "./turn.ts";
 
 export interface TurnMove { z0: number; r0: number; z1: number; r1: number; rapid: boolean; tool: LatheTool | null; line: number }
@@ -138,6 +139,11 @@ class Builder {
       this.poly([[a[0], a[1], z0], [b[0], b[1], z0], [b[0], b[1], z1], [a[0], a[1], z1]], [(b[1] - a[1]) / l, -(b[0] - a[0]) / l, 0]);
     }
   }
+  /** Dreiecke aus sim/toolMesh.ts (je Ecke 10 Zahlen, Achse entlang z) übernehmen – hier liegt die Achse entlang x */
+  swept(v: ArrayLike<number>) {
+    const o = this.d.length / 8;
+    for (let i = 0; i < v.length; i += 10) { this.d.push(v[i + 2], v[i], v[i + 1], v[i + 5], v[i + 3], v[i + 4], 0, 0); this.ix.push(o + i / 10); }
+  }
   done(): Tri { return { data: new Float32Array(this.d), index: new Uint32Array(this.ix) }; }
 }
 
@@ -229,18 +235,36 @@ export function insertOutline(t: LatheTool, size = 9): [number, number][] {
   out.push(tb, B, [A[0] + b[0] * L, A[1] + b[1] * L]);
   return out;
 }
-/** Werkzeug: Schneide und Halter, Ursprung = programmierte Spitze. side −1 = vorne, +1 = hinten */
-export function toolMeshes(t: LatheTool, side: -1 | 1): { insert: Tri; holder: Tri } {
+/** Spiralbohrer: Umriss (Spitze 118°) und Nuten – für toolMeshes und für die Rechnung in Rust */
+export function drillSpec(t: LatheTool): { outline: [number, number][]; look: { flutes: number; core: number; rate: number; split: number }; R: number; len: number } {
+  const R = t.dia / 2, l = R / Math.tan(59 * Math.PI / 180), len = l + Math.max(30, t.dia * 5);
+  return { outline: [[0, 0], [R, l], [R, len]], look: { flutes: 2, core: 0.34, rate: Math.tan(28 * Math.PI / 180) / Math.max(0.05, R), split: Infinity }, R, len };
+}
+/**
+ * Werkzeug: Schneide und Halter, Ursprung = programmierte Spitze. side −1 = vorne, +1 = hinten.
+ * Nur Bild: Wendeplatte mit erhöhter Mitte und Schraube, Bohrer als Spiralbohrer – die Schneidkante selbst ist insertOutline.
+ */
+export function toolMeshes(t: LatheTool, side: -1 | 1, drill?: ArrayLike<number>): { insert: Tri; holder: Tri } {
   const ins = new Builder(), hol = new Builder();
   if (t.type === "drill") {
-    const R = t.dia / 2, l = R / Math.tan(59 * Math.PI / 180);
-    ins.turn(0, 0, l, R, 32); ins.turn(l, R, l + Math.max(30, t.dia * 5), R, 32);
-    const x = l + Math.max(30, t.dia * 5); hol.turn(x, 0, x, R + 8, 40); hol.turn(x, R + 8, x + 34, R + 8, 40);
+    // drill = fertig gerechneter Bohrer (in der App aus Rust), sonst hier rechnen
+    const d = drillSpec(t), v: number[] = [];
+    if (!drill) cutterMesh(v, d.outline, d.look, [1, 1, 1], 1);
+    ins.swept(drill ?? v);
+    const x = d.len; hol.turn(x, 0, x, d.R + 8, 40); hol.turn(x, d.R + 8, x + 34, d.R + 8, 40);
     return { insert: ins.done(), holder: hol.done() };
   }
   const o = insertOutline(t), P = o.map(p => [p[0], side * p[1]] as [number, number]);
   ins.prism(P, -3, 0);
   const z0 = Math.min(...o.map(p => p[0])), z1 = Math.max(...o.map(p => p[0])), r1 = Math.max(...o.map(p => p[1])), r0 = t.type === "groove" ? 16 : Math.max(t.nose + 2, r1 * 0.45);
+  if (t.type === "turn") {
+    // Mitte der Platte (zwischen den beiden äußeren Ecken): erhöhte Fläche hinter der Spanleitstufe, darin die Schraube
+    const A = P[0], B = P[P.length - 2], c: [number, number] = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2];
+    ins.prism(P.map(q => [c[0] + (q[0] - c[0]) * 0.7, c[1] + (q[1] - c[1]) * 0.7] as [number, number]), 0, 0.3);
+    const rs = Math.max(0.8, Math.min(2.2, Math.hypot(A[0] - B[0], A[1] - B[1]) * 0.16)), ring: [number, number][] = [];
+    for (let k = 0; k < 18; k++) ring.push([c[0] + rs * Math.cos(k * Math.PI / 9), c[1] + rs * Math.sin(k * Math.PI / 9)]);
+    hol.prism(ring, 0.3, 0.75);
+  }
   const w = Math.max(t.type === "groove" ? t.width + 6 : 11, z1 - z0), x0 = t.type === "groove" ? z0 - 1 : t.hand === "L" ? z1 - w : t.hand === "N" ? (z0 + z1) / 2 - w / 2 : z0, yA = side * r0, yB = side * (r1 + 38);
   hol.box(x0 + 0.4, x0 + w, Math.min(yA, yB), Math.max(yA, yB), -14, -3);
   hol.box(x0 + 0.4, x0 + w, Math.min(side * (r1 + 2), yB), Math.max(side * (r1 + 2), yB), -3, 1.5);

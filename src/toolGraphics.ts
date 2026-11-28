@@ -3,15 +3,20 @@
  *
  *   toolSideSvg  – Seitenansicht maßstäblich: Schaft, Schneiden mit Spiral-Richtung,
  *                  Spitze je nach Art (flach, Kugel, Eckenradius, V, Bohrerspitze …),
- *                  auf Wunsch mit Bemaßung (Ø, Schneidenlänge, Winkel, Schaft)
+ *                  auf Wunsch mit Bemaßung (Ø, Schneidenlänge, Winkel, Schaft).
+ *                  Der Fräser selbst ist ein gerechnetes Bild wie ein Foto (toolRender.ts: Spannuten, blankes Metall,
+ *                  Farbe der Beschichtung); die Werkzeug-Farbe (accent) erscheint als Ring am Schaft.
+ *                  Ohne Bildschirm (Tests) wird er wie früher mit Linien gezeichnet.
  *   toolEndSvg   – Draufsicht von unten: man sieht, wie viele Schneiden der Fräser hat
  *   toolIconSvg  – kleines Bild für Listen und Knöpfe
  *
- * Alles ohne Bibliothek, nur SVG-Text – funktioniert in der App und im Test-Browser.
+ * Alles ohne Bibliothek – funktioniert in der App und im Test-Browser.
  */
 
 export type ToolType = "endmill" | "ball" | "bullnose" | "vbit" | "chamfer" | "countersink" | "drill" | "spotdrill" | "reamer" | "facemill" | "threadmill" | "taper";
 export type Helix = "up" | "down" | "compression" | "straight";
+import type { Coating } from "./toolCoating";
+import { toolImageTag, type PictureSpec } from "./toolRender.ts";
 
 /** Die Maße, die man zum Zeichnen braucht (Teil von MillingTool) */
 export interface ToolGeom {
@@ -28,6 +33,7 @@ export interface ToolGeom {
   pitch?: number;     // Steigung (Gewindefräser), z. B. 1 für M6
   threadSingle?: boolean; // Einzahn-Gewindefräser: ein Zahn unten, schneidet jede Steigung
   neckDia?: number;   // Hals-Ø hinter dem Zahn (Einzahn), fluteLen = Schulterlänge (Ausladung)
+  coating?: Coating;  // Beschichtung – nur für die Farbe im Bild
 }
 
 type P = [number, number];
@@ -150,6 +156,18 @@ function mirror(half: P[]): P[] {
   return [...start, ...right, ...left];
 }
 
+const hexRgb = (hex?: string): [number, number, number] | undefined => {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || "");
+  return m ? [parseInt(m[1], 16) / 255, parseInt(m[2], 16) / 255, parseInt(m[3], 16) / 255] : undefined;
+};
+/** Was das Bild zeigt: Schneiden bis oben an die Nuten, dann der Rest bis zum Schaftende, auf Wunsch der Farbring */
+function photoSpec(g: ToolGeom, ring?: string): PictureSpec {
+  const { cut, all, top } = fullProfile(g);
+  const last = cut[cut.length - 1];
+  const cutter: P[] = Math.abs(last[1] - top) > 1e-9 ? [...cut, [last[0], top]] : cut;
+  return { g, cut: cutter, rest: [cutter[cutter.length - 1], ...all.slice(cut.length)], ring: hexRgb(ring) };
+}
+
 export interface SideOpts { w: number; h: number; dims?: boolean; accent?: string; t?: (k: string) => string }
 
 /** Seitenansicht. Spitze unten, Schaft oben. */
@@ -234,16 +252,23 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
     }
   }
 
+  // Bild wie ein Foto (genau der Bereich −maxR…maxR × 0…Gesamtlänge); ohne Zeichenfläche die Linien-Zeichnung
+  const wI = 2 * maxR * s, hI = total * s;
+  const photo = toolImageTag(photoSpec(g, o.accent), "side", { x0: -maxR, x1: maxR, y0: 0, y1: total }, wI, hI,
+    `x="${n(X(-maxR))}" y="${n(Y(total))}" width="${n(wI)}" height="${n(hI)}" preserveAspectRatio="none"`);
+  const drawn = photo
+    ? photo
+    : `<path d="${body}" fill="url(#${id}s)" stroke="#2b3036" stroke-width="0.8"/>
+    <path d="${cutPoly}" fill="url(#${id}c)" stroke="#2b3036" stroke-width="0.8"/>
+    <g clip-path="url(#${id}k)" stroke="rgba(30,25,15,0.7)" stroke-width="${o.dims ? 1.6 : 0.9}">${stripes}</g>`;
   return `<svg class="tool-svg" viewBox="0 0 ${o.w} ${o.h}" width="${o.w}" height="${o.h}" xmlns="http://www.w3.org/2000/svg">
     <defs>
-      <linearGradient id="${id}s" x1="0" x2="1"><stop offset="0" stop-color="#6b737d"/><stop offset="0.45" stop-color="#d6dce3"/><stop offset="1" stop-color="#5a616a"/></linearGradient>
+      ${photo ? "" : `<linearGradient id="${id}s" x1="0" x2="1"><stop offset="0" stop-color="#6b737d"/><stop offset="0.45" stop-color="#d6dce3"/><stop offset="1" stop-color="#5a616a"/></linearGradient>
       <linearGradient id="${id}c" x1="0" x2="1"><stop offset="0" stop-color="#7d6a45"/><stop offset="0.45" stop-color="${accent}"/><stop offset="1" stop-color="#6e5a33"/></linearGradient>
-      <clipPath id="${id}k"><path d="${cutPoly}"/></clipPath>
+      <clipPath id="${id}k"><path d="${cutPoly}"/></clipPath>`}
       <marker id="${id}a" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="currentColor"/></marker>
     </defs>
-    <path d="${body}" fill="url(#${id}s)" stroke="#2b3036" stroke-width="0.8"/>
-    <path d="${cutPoly}" fill="url(#${id}c)" stroke="#2b3036" stroke-width="0.8"/>
-    <g clip-path="url(#${id}k)" stroke="rgba(30,25,15,0.7)" stroke-width="${o.dims ? 1.6 : 0.9}">${stripes}</g>
+    ${drawn}
     ${o.dims ? `<g class="tg-dims">${dims}</g>` : ""}
   </svg>`;
 }
@@ -251,6 +276,10 @@ export function toolSideSvg(g: ToolGeom, o: SideOpts): string {
 /** Ansicht von unten: Kreis mit N Schneiden */
 export function toolEndSvg(g: ToolGeom, size: number, accent = "#ffb547"): string {
   const c = size / 2, R = size / 2 - 4;
+  // Bild wie ein Foto: Blick von unten auf die Spitze, der größte Ø füllt den Kreis
+  const rm = Math.max(g.diameter, 0.1) / 2;
+  const photo = toolImageTag(photoSpec(g), "end", { x0: -rm, x1: rm, y0: -rm, y1: rm }, 2 * R, 2 * R, `x="${n(c - R)}" y="${n(c - R)}" width="${n(2 * R)}" height="${n(2 * R)}"`);
+  if (photo) return `<svg class="tool-svg tool-end" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">${photo}</svg>`;
   const fl = Math.max(1, Math.min(12, Math.round(g.flutes)));
   let parts = "";
   for (let i = 0; i < fl; i++) {

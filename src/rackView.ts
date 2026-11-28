@@ -12,8 +12,9 @@ import { rotary } from "./rotary";
 import { isLight } from "./theme";
 import { fmtLenU } from "./units";
 import { MM_TO_PIXEL, createPolyline, makeRectPoints } from "./shapeTransform";
+import { fluteSection } from "./sim/toolMesh.ts";
 
-export interface RackPart { n: number; x: number; y: number; size: number; top: number; dia: number; color: string; inSpindle: boolean }
+export interface RackPart { n: number; x: number; y: number; size: number; top: number; dia: number; color: string; inSpindle: boolean; flutes?: number }
 
 /** Plätze in Zeichnungs-Koordinaten (leer = Magazin aus oder Nullpunkt unbekannt) */
 export function rackParts(): RackPart[] {
@@ -22,8 +23,25 @@ export function rackParts(): RackPart[] {
   if (!z) return [];
   return m.slots.filter(s => s.set).map(s => {
     const tl = s.toolId ? getTool(s.toolId) : null, out = m.inSpindle === s.n;
-    return { n: s.n, ...slotInDrawing(s, z), size: m.size, top: m.top, dia: tl?.diameter || 0, color: tl && !out ? toolColor(tl) : "", inSpindle: out };
+    return { n: s.n, ...slotInDrawing(s, z), size: m.size, top: m.top, dia: tl?.diameter || 0, color: tl && !out ? toolColor(tl) : "", inSpindle: out, flutes: tl?.flutes };
   });
+}
+
+/** Fräser von oben im Platz: Querschnitt mit Spannuten (gleiche Form wie in Simulation und Bibliothek), Ø maßstäblich */
+function drawCutterEnd(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, flutes: number) {
+  const n = Math.max(1, Math.min(8, Math.round(flutes)));
+  ctx.beginPath();
+  if (r < 3) ctx.arc(x, y, r, 0, 2 * Math.PI);
+  else for (let i = 0; i <= 72; i++) {
+    const a = (i / 72) * 2 * Math.PI, q = r * fluteSection(a / (2 * Math.PI / n), Math.min(0.74, 0.445 + 0.056 * n));
+    if (i) ctx.lineTo(x + q * Math.cos(a), y - q * Math.sin(a)); else ctx.moveTo(x + q, y);
+  }
+  ctx.closePath();
+  const g = ctx.createLinearGradient(x - r, y - r, x + r, y + r);
+  g.addColorStop(0, "#f4f6f8"); g.addColorStop(0.5, "#aab2bd"); g.addColorStop(1, "#6a727e");
+  ctx.fillStyle = "rgba(15,17,21,0.55)"; ctx.fill("nonzero");
+  ctx.fillStyle = g; ctx.fill();
+  ctx.strokeStyle = "rgba(20,22,26,0.7)"; ctx.lineWidth = 0.8; ctx.stroke();
 }
 
 export function drawRack(ctx: CanvasRenderingContext2D, sx: (x: number) => number, sy: (y: number) => number) {
@@ -42,10 +60,20 @@ export function drawRack(ctx: CanvasRenderingContext2D, sx: (x: number) => numbe
   for (const p of parts) {
     const x = X(p.x), y = Y(p.y), r = Math.max(3, (p.size / 2) * k * 0.8);
     ctx.beginPath(); ctx.arc(x, y, r, 0, 2 * Math.PI);
-    ctx.fillStyle = p.color ? p.color + "55" : "rgba(120,130,145,0.15)"; ctx.fill();
-    ctx.strokeStyle = p.color || line; ctx.lineWidth = 1.6;
-    ctx.setLineDash(p.color ? [] : [3, 3]); ctx.stroke(); ctx.setLineDash([]);
-    if (p.dia > 0 && p.color) { ctx.beginPath(); ctx.arc(x, y, Math.max(1, (p.dia / 2) * k), 0, 2 * Math.PI); ctx.strokeStyle = p.color; ctx.lineWidth = 1; ctx.stroke(); }
+    if (p.color) {
+      // belegter Platz von oben: Spannmutter als blankes Metall, außen der Ring in der Farbe des Werkzeugs
+      const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+      g.addColorStop(0, "#e3e7ec"); g.addColorStop(0.55, "#8a93a1"); g.addColorStop(1, "#4b525d");
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = p.color; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(x, y, r * 0.78, 0, 2 * Math.PI); ctx.strokeStyle = "rgba(20,22,26,0.45)"; ctx.lineWidth = 1; ctx.stroke();
+      const rc = Math.min(r * 0.7, Math.max(1, (p.dia / 2) * k));
+      if (p.dia > 0) drawCutterEnd(ctx, x, y, rc, p.flutes || 2);
+    } else {
+      ctx.fillStyle = "rgba(120,130,145,0.15)"; ctx.fill();
+      ctx.strokeStyle = line; ctx.lineWidth = 1.6;
+      ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
+    }
     if (m.entry === "fork") {
       // Pfeil: von hier fährt die Spindel ein
       const s = m.slots.find(q => q.n === p.n)!, o = slotInDrawing({ ...s, ...before(m, s) }, z);
@@ -53,6 +81,8 @@ export function drawRack(ctx: CanvasRenderingContext2D, sx: (x: number) => numbe
     }
     ctx.fillStyle = isLight() ? "#22262c" : "#f0f2f5";
     ctx.font = `700 ${Math.max(9, Math.min(15, r * 0.8))}px sans-serif`;
+    // Nummer mit dunklem Rand, damit sie auch auf dem hellen Metall lesbar bleibt
+    if (p.color) { ctx.lineWidth = 3; ctx.lineJoin = "round"; ctx.strokeStyle = isLight() ? "rgba(255,255,255,0.85)" : "rgba(15,17,21,0.85)"; ctx.strokeText(String(p.n), x, y); }
     ctx.fillText(String(p.n), x, y);
   }
   ctx.font = "600 12px sans-serif"; ctx.textAlign = "left"; ctx.textBaseline = "bottom"; ctx.fillStyle = line;

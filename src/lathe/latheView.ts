@@ -1,6 +1,7 @@
 /** DREHTEIL IN 3D: Material mit Abtrag, Futter, Meißel, Reitstock und Bahnen. Für die Simulation und das Dreh-Fenster. */
 import { Viewer3D, type Mesh } from "../view3d/viewer3d";
-import { chuckMeshes, LatheReplay, partMeshes, pathLines, tailMesh, toolMeshes, type Tri, type TurnMove, type TurnStock } from "./latheSim";
+import { rustCutter } from "../toolRust";
+import { chuckMeshes, drillSpec, LatheReplay, partMeshes, pathLines, tailMesh, toolMeshes, type Tri, type TurnMove, type TurnStock } from "./latheSim";
 import type { LatheSettings } from "./latheJob";
 import type { LatheTool } from "./turn";
 
@@ -49,7 +50,13 @@ export class LatheView {
     const m = this.i >= 0 ? r.moves[Math.min(this.i, r.moves.length - 1)] : undefined, t = m?.tool ?? null;
     if (t !== this.tool) {
       this.tool = t;
-      const q = t ? toolMeshes(t, s.side) : { insert: EMPTY, holder: EMPTY };
+      // Bohrer: in der App rechnet Rust die Nuten – bis die Antwort da ist, fehlt er kurz, dann wird neu gezeichnet
+      let drill: Float32Array | undefined;
+      if (t?.type === "drill") {
+        const d = drillSpec(t), r = rustCutter(d.outline, d.look, () => { this.tool = null; this.update(false); });
+        drill = r === "wait" ? new Float32Array(0) : r ?? undefined;
+      }
+      const q = t ? toolMeshes(t, s.side, drill) : { insert: EMPTY, holder: EMPTY };
       this.v.replace(IX.insert, q.insert.data, q.insert.index); this.v.replace(IX.holder, q.holder.data, q.holder.index);
     }
     if (m && t) {

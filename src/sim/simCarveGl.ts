@@ -24,6 +24,8 @@ import { CHUNK, ChunkGrid } from "./carveChunks.ts";
 import { cornerRadius, faces, perimeter } from "../rotaryStock";
 import { bedMesh, carriageMesh, clampMesh, gantryMesh, rollers, rotaryChuck, rotaryFixed } from "./machineMesh";
 import type { ToolGeom } from "../toolGraphics";
+import { millToolMesh } from "./toolMesh.ts";
+import { rustMillMesh } from "../toolRust.ts";
 
 type GL = WebGL2RenderingContext;
 
@@ -172,30 +174,53 @@ in vec3 a_p; in vec3 a_n; in vec4 a_c;
 uniform vec3 u_at;
 uniform vec2 u_zmap;        // z = x + z · y (Strahl/Lichtbogen auf Länge ziehen; sonst 0, 1)
 uniform vec3 u_turn;        // Drehachse: cos, sin des Winkels, 1 = Achse entlang Y
+uniform float u_spinA;      // Fräser dreht sich um seine Achse (rad), sonst 0
 ${CAM}
-out vec3 v_n; out vec4 v_c;
+out vec3 v_n; out vec4 v_c; out vec3 v_v;
 vec3 turn(vec3 p) {
   // um die Achse (intern entlang X) drehen, dann wie gezeigt legen
   vec3 q = vec3(p.x, p.y * u_turn.x + p.z * u_turn.y, -p.y * u_turn.y + p.z * u_turn.x);
   return u_turn.z > 0.5 ? vec3(-q.y, q.x, q.z) : q;
 }
 void main() {
-  vec3 p = vec3(a_p.xy, u_zmap.x + a_p.z * u_zmap.y);
-  gl_Position = project(turn(p) + u_at); v_n = turn(a_n); v_c = a_c;
+  float cs = cos(u_spinA), sn = sin(u_spinA);
+  mat2 R = mat2(cs, sn, -sn, cs);
+  vec3 p = vec3(R * a_p.xy, u_zmap.x + a_p.z * u_zmap.y);
+  gl_Position = project(turn(p) + u_at); v_n = turn(vec3(R * a_n.xy, a_n.z)); v_c = a_c;
+  // Richtung zum Betrachter (die Kamera schaut überall gleich: keine Perspektive)
+  v_v = vec3(-u_rot.y * u_rot.w, -u_rot.x * u_rot.w, u_rot.z);
 }`;
 
 const MESH_FS = `#version 300 es
 precision highp float;
-in vec3 v_n; in vec4 v_c;
+in vec3 v_n; in vec4 v_c; in vec3 v_v;
 out vec4 o;
 const vec3 LIGHT = normalize(vec3(-0.45, -0.6, 0.75));
+const vec3 KEY = normalize(vec3(-0.55, -0.75, 0.2));
+const vec3 RIM = normalize(vec3(0.85, 0.35, 0.1));
 void main() {
   vec3 n = normalize(v_n);
+  // Farbe über 1 = leuchtet (Strahl, Lichtbogen): ohne Licht
+  if (v_c.r > 1.0) { o = vec4((v_c.rgb - 1.0) * v_c.a, v_c.a); return; }
+  if (v_c.a > 1.0) {
+    // Deckkraft über 1 = blankes Metall (Fräser, Schaft, Spannmutter): spiegelt zwei helle Flächen und den Himmel
+    float a = v_c.a - 1.0;
+    vec3 V = normalize(v_v);
+    if (dot(n, V) < 0.0) n = -n;
+    vec3 r = reflect(-V, n);
+    vec3 rh = normalize(vec3(r.xy, r.z * 0.4));
+    float key = pow(max(dot(rh, KEY), 0.0), 3.0);
+    float rim = pow(max(dot(rh, RIM), 0.0), 14.0);
+    float sky = smoothstep(-0.95, 0.7, r.z);
+    float diff = 0.5 + 0.5 * max(dot(n, LIGHT), 0.0);
+    float fres = pow(1.0 - max(dot(n, V), 0.0), 3.0);
+    vec3 c = v_c.rgb * (0.22 + 0.34 * diff + 0.4 * sky + 0.75 * key) + vec3(pow(key, 3.0) * 0.5 + rim * 0.45 + fres * 0.15);
+    o = vec4(c * a, a);
+    return;
+  }
   float l = 0.45 + 0.55 * abs(dot(n, LIGHT));
   float spec = pow(max(dot(reflect(-LIGHT, n), vec3(0.0, 0.0, 1.0)), 0.0), 18.0) * 0.35;
-  // Farbe über 1 = leuchtet (Strahl, Lichtbogen): ohne Licht
-  vec3 c = v_c.r > 1.0 ? v_c.rgb - 1.0 : v_c.rgb * l + spec;
-  o = vec4(c * v_c.a, v_c.a);
+  o = vec4((v_c.rgb * l + spec) * v_c.a, v_c.a);
 }`;
 
 export interface MaterialView {
@@ -205,17 +230,13 @@ export interface MaterialView {
   yaw: number; pitch: number; scale: number;
   /** Aussehen des Rohteils (materialView.ts) */
   look: Material;
-  /** Werkzeug zeigen (Spitze / Fokus bei x, y, z) – null = keins; on = Laser/Plasma an */
-  tool: { x: number; y: number; z: number; kind: "mill" | "laser" | "plasma"; geom: ToolGeom | null; holder: ToolHolder; on: boolean } | null;
+  /** Werkzeug zeigen (Spitze / Fokus bei x, y, z) – null = keins; on = Laser/Plasma an; spin = Fräser dreht sich gerade */
+  tool: { x: number; y: number; z: number; kind: "mill" | "laser" | "plasma"; geom: ToolGeom | null; holder: ToolHolder; on: boolean; spin?: boolean } | null;
   /** Maschine drumherum zeigen – null = nur Material und Werkzeug */
   env?: MachineEnv | null;
 }
 export interface MachineEnv { bedW: number; bedH: number; zones: { pts: { x: number; y: number }[]; height: number }[]; rollerDia: number | null }
 
-const CUTTER: [number, number, number] = [0.86, 0.72, 0.4];
-const SHANK: [number, number, number] = [0.78, 0.8, 0.84];
-const NUT: [number, number, number] = [0.55, 0.58, 0.64];
-const SPINDLE: [number, number, number] = [0.32, 0.36, 0.45];
 
 /** Drehkörper aus einem Umriss (r, z) – Dreiecke mit Normalen und Farbe: je Punkt 10 Zahlen */
 function lathe(out: number[], pts: [number, number][], col: [number, number, number], alpha: number, seg = 36) {
@@ -265,21 +286,22 @@ function beamMesh(kind: "laser" | "plasma"): Float32Array {
   return new Float32Array(out);
 }
 
-/** Fräser + Schaft (undurchsichtig) und Spannmutter + Spindel (halb durchsichtig), Spitze bei 0 */
-function toolMesh(tl: ToolGeom | null, hd: ToolHolder): { solid: Float32Array; ghost: Float32Array } {
+/**
+ * Fräser mit Nuten, Schaft, Spannmutter und Spindel; der Umriss ist derselbe, mit dem gefräst wird.
+ * In der App rechnet Rust (toolmesh.rs) – bis die Antwort da ist, fehlt der Fräser für einen Augenblick, dann ruft
+ * es `ready`. Im Browser rechnet toolMesh.ts sofort.
+ */
+function toolMesh(tl: ToolGeom | null, hd: ToolHolder, ready: () => void): { solid: Float32Array; ghost: Float32Array } {
   const f = profile(tl), R = hd.R;
-  const tip: [number, number][] = [];
+  const outline: [number, number][] = [];
   for (let k = 0; k <= 14; k++) {
     const r = (k / 14) * R, z = f(r);
-    tip.push([r, Number.isFinite(z) ? Math.min(z, hd.fluteLen) : 0]);
+    outline.push([r, Number.isFinite(z) ? Math.min(z, hd.fluteLen) : 0]);
   }
-  const solid: number[] = [], ghost: number[] = [];
-  lathe(solid, [[0, tip[0][1]], ...tip.slice(1), [R, hd.fluteLen]], CUTTER, 1);
-  lathe(solid, [[R, hd.fluteLen], [hd.shankR, hd.fluteLen], [hd.shankR, hd.stickout + 1]], SHANK, 1);
-  const zt = hd.stickout, zs = zt + hd.holderH;
-  lathe(ghost, [[hd.shankR, zt], [hd.holderR * 0.82, zt], [hd.holderR, zt + 3], [hd.holderR, zs]], NUT, 0.55);
-  lathe(ghost, [[hd.holderR, zs], [hd.spindleR, zs], [hd.spindleR, zs + hd.spindleH], [0, zs + hd.spindleH]], SPINDLE, 0.4);
-  return { solid: new Float32Array(solid), ghost: new Float32Array(ghost) };
+  outline.push([R, hd.fluteLen]);
+  const fast = rustMillMesh(tl, hd, outline, ready);
+  if (fast === "wait") return { solid: new Float32Array(0), ghost: new Float32Array(0) };
+  return fast ?? millToolMesh(tl, hd, outline);
 }
 
 export class MaterialRenderer {
@@ -294,6 +316,10 @@ export class MaterialRenderer {
   private meshVao: WebGLVertexArrayObject | null = null;
   private meshBuf: WebGLBuffer | null = null;
   private meshKey: unknown = null;
+  /** wird gerufen, wenn ein später geliefertes Werkzeug-Bild da ist: bitte neu zeichnen */
+  onReady: (() => void) | null = null;
+  private spinA = 0;
+  private spinAt = 0;
   private meshCounts = { solid: 0, ghost: 0, beam: 0 };
   private envVao: WebGLVertexArrayObject | null = null;
   private envBuf: WebGLBuffer | null = null;
@@ -336,7 +362,7 @@ export class MaterialRenderer {
       const cam = ["u_size", "u_origin", "u_center", "u_rot", "u_scale", "u_dscale"];
       for (const n of [...cam, "u_h", "u_n", "u_grid", "u_T", "u_side", "u_kind", "u_cyl", "u_body", "u_rev", "u_face", "u_nf", "u_per", "u_burn", "u_cut", "u_plasma", "u_cylR", "u_spin",
         "u_tex", "u_base", "u_core", "u_layers", "u_ply", "u_darken", "u_gloss", "u_view"]) this.sloc[n] = g.getUniformLocation(this.stockProg, n);
-      for (const n of [...cam, "u_at", "u_zmap", "u_turn"]) this.mloc[n] = g.getUniformLocation(this.meshProg, n);
+      for (const n of [...cam, "u_at", "u_zmap", "u_turn", "u_spinA"]) this.mloc[n] = g.getUniformLocation(this.meshProg, n);
       this.vao = g.createVertexArray();
       this.canvas.addEventListener("webglcontextlost", e => { e.preventDefault(); this.gl = null; this.texFor = null; this.broken = true; });
       this.gl = g;
@@ -583,7 +609,7 @@ export class MaterialRenderer {
         const tk = tool.kind;
         const key = tk === "mill" ? tool.holder : tk;
         if (this.meshKey !== key || !this.meshBuf) {
-          const m = tk === "mill" ? toolMesh(tool.geom, tool.holder) : headMesh(tk);
+          const m = tk === "mill" ? toolMesh(tool.geom, tool.holder, () => { this.meshKey = null; this.onReady?.(); }) : headMesh(tk);
           const beam = tk === "mill" ? new Float32Array(0) : beamMesh(tk);
           const all = new Float32Array(m.solid.length + m.ghost.length + beam.length);
           all.set(m.solid); all.set(m.ghost, m.solid.length); all.set(beam, m.solid.length + m.ghost.length);
@@ -609,7 +635,13 @@ export class MaterialRenderer {
         g.uniform3f(M.u_at, tool.x, tool.y, tool.z);
         g.uniform3f(M.u_turn, 1, 0, 0);
         g.uniform2f(M.u_zmap, 0, 1);
+        // Fräser dreht sich, solange die Simulation läuft: nur fürs Auge, gut 1 Umdrehung je Sekunde, rechts herum (M3)
+        const now = performance.now();
+        if (tk === "mill" && tool.spin) this.spinA = (this.spinA - Math.min(0.1, (now - this.spinAt) / 1000) * 2 * Math.PI * 1.2) % (2 * Math.PI);
+        this.spinAt = now;
+        g.uniform1f(M.u_spinA, tk === "mill" ? this.spinA : 0);
         g.drawArrays(g.TRIANGLES, 0, this.meshCounts.solid);
+        g.uniform1f(M.u_spinA, 0);
         // durchsichtige Teile: über alles Feste, ohne in den Tiefenpuffer zu schreiben
         g.enable(g.BLEND);
         g.blendFunc(g.ONE, g.ONE_MINUS_SRC_ALPHA);
