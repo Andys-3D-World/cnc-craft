@@ -49,6 +49,7 @@ mod importpdf;
 mod imagetrace;
 mod stlslice;
 mod meshimport;
+mod cutplan;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1282,6 +1283,18 @@ async fn import_mesh(request: tauri::ipc::Request<'_>) -> Result<meshimport::Sum
     .map_err(|e| e.to_string())?
 }
 
+/// PLANUNG JE FORM (cutplan.rs): was plasmaCam.ts/laserCam.ts beim Erzeugen des G-Codes geplant haben (Start, Richtung,
+/// Anfahrt, Haltestege, Überlauf). Das Fenster vergleicht die Antwort (planRust.ts); verwendet wird weiter das TypeScript.
+#[tauri::command(async)]
+fn plan_check(job: cutplan::Job) -> cutplan::Output {
+    let start = std::time::Instant::now();
+    let out = cutplan::run(&job);
+    if cfg!(debug_assertions) {
+        eprintln!("cutplan: {} plasma shape(s), {} laser layer(s) ({:.1} ms)", job.plasma.len(), job.laser.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    out
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1479,6 +1492,7 @@ pub fn run() {
             import_trace,
             import_stl,
             import_mesh,
+            plan_check,
             lathe_generate,
             gamepad_read,
             list_ports,

@@ -35,6 +35,7 @@ import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, CutItem } from "./cutOrder";
 import { applyCut, cutDirOf, cutStartMm, cutStartOf, orientClosed, rotateLoopTo } from "./cutSetting";
 import { boxOf, nearestOrder, resolveOp } from "./plasmaSpot";
+import { finishPlanRecord, notePlasmaPlan, plain, planRecording, shapeCutData, startPlanRecord } from "./planRust";
 import { spreadOrder } from "./heatSpread";
 
 const Z_FEED = 600;  // mm/min für Z-Bewegungen unter Last
@@ -70,7 +71,7 @@ export function shapeOp(shape: any): { op: "cut" | "skip" } | { op: "spot"; at: 
 // Planung (mit Zwischenspeicher – wird auch fürs Zeichnen benutzt)
 // ---------------------------------------------------------------------
 
-const cache = new WeakMap<object, { sig: string; plan: ShapePlan }>();
+const cache = new WeakMap<object, { sig: string; plan: ShapePlan; input: unknown }>();
 
 function sigOf(shape: any, cut: PlasmaCut): string {
   let a = 0, b = 0;
@@ -83,21 +84,29 @@ function sigOf(shape: any, cut: PlasmaCut): string {
 
 export function planShape(shape: any, cut: PlasmaCut): ShapePlan {
   const sig = sigOf(shape, cut);
-  const c = cache.get(shape);
-  if (c && c.sig === sig) return c.plan;
-  const plan = computePlan(shape, cut);
-  cache.set(shape, { sig, plan });
-  return plan;
+  let c = cache.get(shape);
+  if (!c || c.sig !== sig) {
+    const { plan, input } = computePlan(shape, cut);
+    c = { sig, plan, input };
+    cache.set(shape, c);
+  }
+  // beim Erzeugen des G-Codes: für den Vergleich mit Rust merken (planRust.ts)
+  if (planRecording()) notePlasmaPlan(c.input, c.plan);
+  return c.plan;
 }
 
-function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
+function computePlan(shape: any, cut: PlasmaCut): { plan: ShapePlan; input: unknown } {
   const res: ShapePlan = { plans: [], tooSmall: false, leadShort: false };
   const mode = shape.millingMode || "outside";
+  // womit geplant wird – Rust (cutplan.rs) rechnet daraus dasselbe nach
+  const paths: { closed: boolean; pts: Pt[]; loops: Pt[][] | null }[] = [];
+  const input = { cut: shapeCutData(shape), mode, kerf: cut.kerf, leadIn: cut.leadIn, leadOut: cut.leadOut, overcut: plasmaSettings.overcut, smallHole: plasmaSettings.smallHole, paths };
   for (const path of shapeToPaths(shape)) {
     if (path.pts.length < 2) continue;
     const pts = path.pts.map(p => ({ x: p.x / MM_TO_PIXEL, y: p.y / MM_TO_PIXEL }));
 
     if (!path.closed || mode === "on-line") {
+      paths.push({ closed: path.closed, pts: plain(pts), loops: null });
       res.plans.push({ pts: applyCut(pts, path.closed, shape), closed: path.closed, lead: null, over: [], out: null, area: 0, hole: false, size: extent(pts), runs: null });
       continue;
     }
@@ -106,6 +115,7 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
     if (cut.kerf > 0) {
       try { loops = offsetPolygon(pts, (outside ? 1 : -1) * (cut.kerf / 2), 0.02); } catch { loops = []; }
     }
+    paths.push({ closed: true, pts: plain(pts), loops: loops.map(plain) });
     if (!loops.length) { res.tooSmall = true; continue; }
 
     for (let loop of loops) {
@@ -140,7 +150,7 @@ function computePlan(shape: any, cut: PlasmaCut): ShapePlan {
       res.plans.push(plan);
     }
   }
-  return res;
+  return { plan: res, input };
 }
 
 const lastOf = (pts: Pt[]) => pts[pts.length - 1];
@@ -295,6 +305,11 @@ export function overcutPoints(loop: Pt[], len: number): Pt[] {
 // ---------------------------------------------------------------------
 
 export function generatePlasmaGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
+  startPlanRecord();
+  try { return plasmaGcode(shapes); } finally { finishPlanRecord(); }
+}
+
+function plasmaGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
   const warnings: string[] = [];
   // Faltlinien aus der Faltschachtel: Plasma schneidet immer durch – also nicht mitnehmen
   const noFolds = shapes.filter(s => !s.foldLine);

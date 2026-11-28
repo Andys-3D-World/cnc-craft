@@ -25,6 +25,7 @@ import { RapidPlanner } from "./rapidAvoid";
 import { bedSizeMm } from "./editor/editorState";
 import { optimizeCutOrder, travelLength, orientPts, CutItem } from "./cutOrder";
 import { applyCutClosed, applyCutOpen, cutDirOf, cutStartOf } from "./cutSetting";
+import { finishPlanRecord, noteLaserLayer, plain, planRecording, shapeCutData, startPlanRecord } from "./planRust";
 import {
   getLayers, effectiveLayer, laserSettings, layerHasFill, layerHasLine, LaserLayer
 } from "./laserLayers";
@@ -38,6 +39,11 @@ const MAX_SCANLINES = 40000; // Schutz vor riesigen Dateien
 export const AVOID_MARGIN = 3; // mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
 
 export function generateLaserGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
+  startPlanRecord();
+  try { return laserGcode(shapes); } finally { finishPlanRecord(); }
+}
+
+function laserGcode(shapes: any[]): { gcode: string | null; warnings: string[] } {
   const warnings: string[] = [];
   if (!shapes.length) return { gcode: null, warnings };
 
@@ -118,10 +124,16 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     const closedShape = new Map<Pt[], any>(); // zu welcher Form gehört die Kontur (für Haltestege)
     const open: Pt[][] = [];
     const fixedOpen = new Set<Pt[]>(); // offene Linien mit Richtung von Hand: die Optimierung dreht sie nicht um (cutSetting.ts)
+    // für den Vergleich mit Rust (planRust.ts): die rohen Pfade mit dem, was an ihrer Form gesetzt ist
+    const rustClosed: unknown[] = [], rustOpen: unknown[] = [];
     for (const s of list) {
       for (const p of shapeToPaths(s)) {
         if (p.pts.length < 2) continue;
         const raw = p.pts.map(q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }));
+        if (planRecording()) {
+          if (p.closed) rustClosed.push({ pts: plain(raw), cut: shapeCutData(s) });
+          else rustOpen.push([plain(raw), cutDirOf(s)]);
+        }
         const pts = p.closed ? applyCutClosed(raw, s) : applyCutOpen(raw, s);
         (p.closed ? closed : open).push(pts);
         if (p.closed) closedShape.set(pts, s);
@@ -170,15 +182,19 @@ export function generateLaserGcode(shapes: any[]): { gcode: string | null; warni
     if (layerHasLine(layer)) {
       // kleine (innere) Konturen zuerst, offene Linien ganz am Anfang
       // Haltestege: Kontur in Stücke, dazwischen Laser aus (das Teil bleibt im Blech hängen)
+      let startInTab = 0;
+      const closedPlans = closed.map(pts => {
+        const shape = closedShape.get(pts);
+        const lp = withLeadIn(pts, closed, layer.leadIn, cutStartOf(shape) !== null);
+        const tr = shape ? tabRuns(shape, lp.pts, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), Number(shape.tabLen) || 0) : null;
+        if (tr?.rotated && cutStartOf(shape) !== null) { warnings.push(t("cut.startInTab")); startInTab++; }
+        return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)), shape };
+      });
+      if (planRecording()) noteLaserLayer({ leadIn: layer.leadIn, closed: rustClosed, open: rustOpen },
+        { closed: closedPlans.map(p => ({ pts: p.pts, lead: p.lead, runs: p.runs })), open, startInTab });
       const paths: { pts: Pt[]; closed: boolean; area: number; lead: Pt | null; runs: Pt[][] | null; shape?: any }[] = [
         ...open.map(pts => ({ pts, closed: false, area: 0, lead: null, runs: null })),
-        ...closed.map(pts => {
-          const shape = closedShape.get(pts);
-          const lp = withLeadIn(pts, closed, layer.leadIn, cutStartOf(shape) !== null);
-          const tr = shape ? tabRuns(shape, lp.pts, q => ({ x: q.x / MM_TO_PIXEL, y: q.y / MM_TO_PIXEL }), Number(shape.tabLen) || 0) : null;
-          if (tr?.rotated && cutStartOf(shape) !== null) warnings.push(t("cut.startInTab"));
-          return { ...lp, lead: tr?.rotated ? null : lp.lead, runs: tr ? tr.runs : null, closed: true, area: Math.abs(polygonArea(pts)), shape };
-        }).sort((a, b) => a.area - b.area)
+        ...closedPlans.sort((a, b) => a.area - b.area)
       ];
       // kürzeste Leerfahrten (Löcher bleiben vor ihrem Teil, siehe cutOrder.ts)
       if (laserSettings.optimizeOrder && paths.length > 1) {
