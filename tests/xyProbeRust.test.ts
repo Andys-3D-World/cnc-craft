@@ -116,6 +116,7 @@ add("paused 20 s while searching", () => { const f = new Fake({ x: 85, y: 80, so
 add("paused 60 s while searching", () => { const f = new Fake({ x: 85, y: 80, solids: [part] }); f.pause = [2000, 62000]; return f; }, { kind: "edge", dir: "xp", opts: O });
 add("moves short", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.short = 0.98; return f; }, { kind: "edge", dir: "xp", opts: O });
 add("moves short, outer corner", () => { const f = new Fake({ x: 94, y: 44, solids: [part] }); f.short = 0.99; return f; }, { kind: "outer", corner: { cx: -1, cy: -1 }, opts: O });
+add("five-report pulse", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.glitchAt = [30, 31, 32, 33, 34]; return f; }, { kind: "edge", dir: "xp", opts: O });
 add("three-report pulse", () => { const f = new Fake({ x: 92, y: 80, solids: [part] }); f.glitchAt = [30, 31, 32]; return f; }, { kind: "edge", dir: "xp", opts: O });
 for (const [name, shift] of [["part pushed away 0.8 mm", 0.8], ["part pushed away 1.5 mm", 1.5], ["part moved toward the probe", -4]] as const)
   add(name, () => {

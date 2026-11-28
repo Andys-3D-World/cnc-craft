@@ -34,6 +34,9 @@ const programs: { name: string; lines: string[]; motion?: boolean }[] = [
   { name: "A axis", lines: ["G90 G0 X0 Y0 Z0 A0", "G1 A90 F600", "G1 X10 A180", "G1 Z-1", "G1 X30 A-45 F300", "G0 Z3", "G0 A720", "G1 X50 Y2 A721 Z-0.4 F500"] },
   { name: "A axis, side moves", lines: ["G90 G0 X0 Y5 Z0 A0", "G1 Y-5 Z-1 F400", "G0 Z2 A90", "G1 Z-1", "G1 Y5", "G0 Z2 A180", "G1 Z-1 Y-5", "G0 Z5 A270", "G1 Z-0.5 X40"], motion: true },
   { name: "indexing faces", lines: ["G90 G0 X0 Y-10 Z1 A0", "G1 Z-0.5 F300", "G1 X60", "G0 Z5", "G0 A60", "G1 Z-0.5", "G1 X0", "G0 Z5 A120", "G1 Z-0.5", "G1 X60", "G0 A90", "G1 Z-1 X30"] },
+  { name: "A steps", lines: ["G90 G0 X0 Y0 Z0 A0", ...Array.from({ length: 40 }, (_, k) => `G1 A${(k + 1) * (k + 2) / 2} X${k} F900`)] },
+  { name: "A near a face", lines: ["G90 G0 X0 Y-5 Z0 A0", "G1 Z-0.5 F300", "G0 A60.005", "G1 X20", "G0 A119.996", "G1 X0", "G0 A180.02", "G1 X10", "G0 A239.9995", "G1 X30"] },
+  { name: "spindle off moves", lines: ["G90 G0 X0 Y0 Z1", "M3 S1000", "G1 Z-1 F200", "G1 X30 Y20 F600", "M5", "G1 X40 Y40", "G1 X0 Y60", "M3", "G1 X10 Y10"] },
   { name: "empty", lines: ["G21", "G90"] },
   { name: "rapids only", lines: ["G0 X10 Y10", "G0 X20 Y40 Z3", "G0 X0 Y0"] },
 ];
@@ -47,7 +50,7 @@ test("rotary simulation: pinned result for Rust (rotarysim-cases.json.gz)", () =
   for (const pr of programs) {
     const p = parseGcodeProgram(pr.lines, pr.motion ? { motion } : {});
     for (const st of stocks) for (const { o, name } of optsList) for (const mode of (p.a0 ? ["a", "surface"] : ["surface"]) as ("a" | "surface")[]) {
-      if (st !== ROUND && name !== "plain" && name !== "along y" && pr.name !== "A axis") continue;   // die Formen mit zwei Lagen reichen
+      if (st !== ROUND && name !== "plain" && name !== "along y" && pr.name !== "A axis" && pr.name !== "A near a face") continue;   // die Formen mit zwei Lagen reichen
       const R = refRadius(st);
       const opts: WrapSimOpts = { ...o, stock: st };
       const w = wrapSimProgram(p, R, mode, opts);
