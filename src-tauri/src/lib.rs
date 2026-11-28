@@ -1101,6 +1101,17 @@ fn millgcode_shadow(job: millgcode::Job, expected: String, side: Option<serde_js
     })
 }
 
+/// Nur beim Entwickeln: eine Zeile des Fensters im Terminal zeigen (Zeiten der geprüften Schritte, camPost.ts).
+/// In der fertigen App tut der Befehl nichts.
+#[tauri::command]
+fn dev_log(text: String) {
+    if cfg!(debug_assertions) {
+        // nur druckbare Zeichen, eine Zeile, begrenzte Länge
+        let line: String = text.chars().filter(|c| !c.is_control()).take(300).collect();
+        eprintln!("{line}");
+    }
+}
+
 /// SPERRZONEN (keepout.rs): derselbe Schritt, den das Fenster über den fertigen G-Code laufen lässt (applyKeepOuts in
 /// keepOut.ts). Das Fenster vergleicht die Antwort mit seinem eigenen Ergebnis (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1113,16 +1124,24 @@ fn post_keepouts(gcode: String, zones: Vec<keepout::Zone>, radius: f64, note: St
     r
 }
 
-/// LASER-G-CODE (lasergcode.rs): Linien und Füllen aus dem Auftrag des Fensters (laserJob.ts). Das Fenster vergleicht
-/// die Antwort mit dem G-Code aus laserCam.ts (checkPost in camPost.ts).
-#[tauri::command(async)]
-fn laser_generate(job: lasergcode::Job) -> Result<lasergcode::Output, String> {
-    let start = std::time::Instant::now();
-    let out = lasergcode::generate(&job)?;
-    if cfg!(debug_assertions) {
-        eprintln!("lasergcode: {} layer(s), {} lines, {} warning(s) ({:.1} ms)", job.layers.len(), out.gcode.split('\n').count(), out.warnings.len(), start.elapsed().as_secs_f64() * 1000.0);
-    }
-    Ok(out)
+/// LASER-G-CODE (lasergcode.rs) aus dem Auftrag des Fensters (laserJob.ts). Rohdaten: 4 Bytes Länge des Auftrags
+/// (little endian), der Auftrag als JSON, danach die Bildpunkte aller Bilder (Bildgravur). Das Fenster vergleicht die
+/// Antwort mit dem G-Code aus laserCam.ts (checkPost in camPost.ts).
+#[tauri::command]
+async fn laser_generate(request: tauri::ipc::Request<'_>) -> Result<lasergcode::Output, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the job as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (job, data) = lasergcode::split_body(&body)?;
+        let start = std::time::Instant::now();
+        let out = lasergcode::generate(&job, data)?;
+        if cfg!(debug_assertions) {
+            eprintln!("lasergcode: {} layer(s), {} image(s), {} lines, {} warning(s) ({:.1} ms)", job.layers.len(), job.layers.iter().map(|l| l.images.len()).sum::<usize>(), out.gcode.split('\n').count(), out.warnings.len(), start.elapsed().as_secs_f64() * 1000.0);
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// BOGEN-GLÄTTUNG (arcfit.rs): derselbe Schritt, den das Fenster über den fertigen Fräs-G-Code laufen lässt (fitArcs in
@@ -1297,6 +1316,7 @@ pub fn run() {
             imgraster_run,
             millgcode_shadow,
             millgcode_generate,
+            dev_log,
             post_keepouts,
             post_rotary,
             post_arcfit,

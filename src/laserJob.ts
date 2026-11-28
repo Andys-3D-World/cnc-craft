@@ -1,12 +1,13 @@
 /**
- * LASER-AUFTRAG FÜR RUST (src-tauri/src/lasergcode.rs) – Linien und Füllen
+ * LASER-AUFTRAG FÜR RUST (src-tauri/src/lasergcode.rs) – Linien, Füllen und Bildgravur
  *
  * laserCam.ts liest beim Erzeugen aus Ebenen, Einstellungen, Sprachdatei und den Formen. laserJob() sammelt das für
  * eine Liste von Formen in EIN Objekt, das sich als JSON verschicken lässt – in derselben Reihenfolge und mit denselben
  * Regeln wie generateLaserGcode() (Ebenen ordnen, Bahnen der Formen, Startpunkt/Richtung von Hand, Freischnitt,
  * Haltestege: das hängt an den Formen und bleibt hier). Rust rechnet daraus alles Weitere: Füll-Linien, Ringe,
  * Reihenfolge, Umwege um ausgeschnittene Teile, Ecken-Leistung, Überlauf, Z je Durchgang und den G-Code-Text.
- * Was Rust noch nicht kann (Bildgravur), gibt { no: Grund }.
+ * Bildgravur: die gerasterten Bildpunkte (processed in raster/imageShape.ts) gehen als Rohdaten mit (laserBody).
+ * Ein Bild, das noch lädt, gibt { no: Grund } – dann rechnet nur laserCam.ts.
  *
  * WICHTIG: wer in laserCam.ts etwas an der Reihenfolge der Ebenen oder an den Bahnen ändert, ändert es auch hier –
  * der Vergleich (tests/fixtures/lasergcode-cases.json.gz, in der App checkPost) merkt es sonst als Abweichung.
@@ -22,9 +23,13 @@ import { t, ascii, tMm } from "./i18n/i18n";
 import { scanOffsetAt } from "./scanOffset";
 import { orderByStage } from "./testCard";
 import { withLeadIn } from "./laserCam";
+import { processed } from "./raster/imageShape";
 
 /** gleiche Zahl wie JOB_VERSION in lasergcode.rs – ändern, wenn sich der Auftrag ändert */
-export const LASER_JOB_VERSION = 1;
+export const LASER_JOB_VERSION = 2;
+
+/** Bildpunkte der Bilder eines Auftrags, in der Reihenfolge ihrer `offset`-Angaben */
+const jobBlobs = new WeakMap<object, Uint8Array[]>();
 
 const TEXTS = ["gc.unitMm", "gc.absolute", "lgc.header", "lgc.m4", "lgc.m3", "lgc.zUp", "lgc.airOn", "lgc.pass", "lgc.fill", "gc.orderOpt",
   "lgc.zDown", "lgc.leadIn", "gc.tab", "lgc.zBack", "lgc.airOff", "lgc.laserOff", "gc.park", "gc.end", "gc.avoid"];
@@ -50,9 +55,32 @@ export function laserJob(shapes: any[]): Record<string, unknown> | { no: string 
   const order = orderByStage(foldLayersFirst(sorted, l => foldIds.has(l.id)));
 
   const layers: unknown[] = [];
+  const blobs: Uint8Array[] = [];
+  let offset = 0;
   for (let li = 0; li < order.length; li++) {
     const layer = order[li], list = byLayer.get(layer.id)!;
-    if (list.some(s => s.type === "image")) return { no: "image engraving" };
+    // ---- Bilder (Bildgravur): Lage in mm und die gerasterten Punkte (wie imageGcode in raster/imageShape.ts) ----
+    const images: unknown[] = [];
+    for (const s of list) {
+      if (s.type !== "image") continue;
+      const r = processed(s, s.img, false);
+      if (!r) return { no: "an image is not loaded yet" };
+      const [p0, p1, , p3] = s.points as Pt[];
+      const gray = s.img.raster.method === "gray";
+      // Graustufen: die Helligkeit je Punkt als 32-Bit-Zahl; sonst ein Byte je Punkt (Laser an = 1)
+      // (eine einfache Schleife: bei 12 Millionen Punkten ist Uint8Array.from mit einer Funktion zehnmal langsamer)
+      let blob: Uint8Array;
+      if (gray) blob = new Uint8Array(r.burn.buffer, r.burn.byteOffset, r.burn.byteLength);
+      else { const burn = r.burn, n = burn.length; blob = new Uint8Array(n); for (let i = 0; i < n; i++) if (burn[i] >= 0.5) blob[i] = 1; }
+      images.push({
+        comment: `(${ascii(tMm("lgc.image", { name: s.source || "", rows: "{rows}" }))})`,
+        o: [p0.x / MM_TO_PIXEL, p0.y / MM_TO_PIXEL],
+        ex: [(p1.x - p0.x) / MM_TO_PIXEL, (p1.y - p0.y) / MM_TO_PIXEL], ey: [(p3.x - p0.x) / MM_TO_PIXEL, (p3.y - p0.y) / MM_TO_PIXEL],
+        overscan: fin(s.img.overscan), minPower: fin(s.img.minPower), gray, gw: r.gw, gh: r.gh, offset,
+      });
+      blobs.push(blob);
+      offset += blob.length;
+    }
     const both = layer.mode === "fill+line";
     const fillF = both ? layer.fillSpeed : layer.speed;
     // ---- Bahnen in mm, Startpunkt/Richtung von Hand ----
@@ -95,7 +123,7 @@ export function laserJob(shapes: any[]): Record<string, unknown> | { no: string 
       // Winkel der Füll-Linien: Kosinus/Sinus wie in hatch() gerechnet (Rusts letzte Stelle kann abweichen); +90° für „über Kreuz“
       ca: Math.cos(rad(layer.angle)), sa: Math.sin(rad(layer.angle)), ca90: Math.cos(rad(layer.angle + 90)), sa90: Math.sin(rad(layer.angle + 90)),
       overcut: fin(layer.overcut), zStep: fin(Number(layer.zStep)), thickness: fin(layer.thickness),
-      closed: closed.map(l => l.map(xy)), open: open.length,
+      images, closed: closed.map(l => l.map(xy)), open: open.length,
       paths: paths.map(({ area: _area, ...p }) => p), startInTab,
     });
   }
@@ -115,5 +143,18 @@ export function laserJob(shapes: any[]): Record<string, unknown> | { no: string 
   // nur Zahlen, die JSON unverändert überträgt
   let ok = true;
   JSON.stringify(job, (_k, v) => { if (typeof v === "number" && !Number.isFinite(v)) ok = false; return v; });
-  return ok ? job : { no: "a value is not a number" };
+  if (!ok) return { no: "a value is not a number" };
+  jobBlobs.set(job, blobs);
+  return job;
+}
+
+/** Der Auftrag als Rohdaten für den Befehl laser_generate: 4 Bytes Länge, der Auftrag als JSON, dann die Bildpunkte */
+export function laserBody(job: Record<string, unknown>): Uint8Array {
+  const json = new TextEncoder().encode(JSON.stringify(job)), blobs = jobBlobs.get(job) ?? [];
+  const out = new Uint8Array(4 + json.length + blobs.reduce((n, b) => n + b.length, 0));
+  new DataView(out.buffer).setUint32(0, json.length, true);
+  out.set(json, 4);
+  let at = 4 + json.length;
+  for (const b of blobs) { out.set(b, at); at += b.length; }
+  return out;
 }

@@ -44,8 +44,8 @@ import { depthPasses, skinFeed, skinPlan, skinRole, skinSettings, type SkinPlan,
 import { postCtx } from "./post/postContext";
 import { withPost, postedText, postFileName, postExtensions } from "./post/postExport";
 import { shadowMill, rustChecked, setChecking } from "./camJob";
-import { recordPost, notePost, takePost, checkPost, recordingPost, type PostStep } from "./camPost";
-import { laserJob } from "./laserJob";
+import { recordPost, notePost, takePost, checkPost, recordingPost, postInApp, type PostStep } from "./camPost";
+import { laserJob, laserBody } from "./laserJob";
 import { isInch } from "./units";
 
 const MM_TO_PIXEL = 2;
@@ -368,12 +368,12 @@ const generateGcodeInner = (shapes: any): string | null => {
     const res = generateLaserGcode(shapes);
     lastGcodeWarnings = res.warnings;
     // in der App rechnet Rust denselben Laser-G-Code daneben und vergleicht (laserJob.ts, lasergcode.rs, camPost.ts)
-    if (recordingPost() && res.gcode) {
+    if (recordingPost() && postInApp() && res.gcode) {
       let job: ReturnType<typeof laserJob>;
       try { job = laserJob(shapes); } catch (e) { job = { no: "job failed: " + String(e) }; }
       const mine = res.warnings.slice();
       // Hinweise kommen aus Rust als Schlüssel + Werte: hier in den Text der Oberfläche (bei Zoll rechnet t() um – dann nur der G-Code)
-      if (!("no" in job)) notePost("laser_generate", { job }, { gcode: res.gcode, warnings: mine },
+      if (!("no" in job)) notePost("laser_generate", laserBody(job), { gcode: res.gcode, warnings: mine },
         (r: { gcode: string; warnings: { key: string; p: [string, string][] }[] }) => ({ gcode: r.gcode, warnings: isInch() ? mine : r.warnings.map(w => t(w.key, Object.fromEntries(w.p))) }));
     }
     return res.gcode;

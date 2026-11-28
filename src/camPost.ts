@@ -11,20 +11,23 @@
  */
 
 /** adapt: Rusts Antwort in die Form bringen, in der das TypeScript sein Ergebnis hat (z. B. Hinweise als Text) */
-export interface PostStep { cmd: string; args: Record<string, unknown>; result: unknown; adapt?: (rust: any) => unknown }
+/** args: die Angaben als Objekt – oder Rohdaten (Uint8Array), wenn der Befehl in Rust solche erwartet */
+export interface PostStep { cmd: string; args: Record<string, unknown> | Uint8Array; result: unknown; adapt?: (rust: any) => unknown }
 
 let rec: PostStep[] | null = null;
 
 /** Ab jetzt die Schritte merken (generateGcodeFull in cam.ts schaltet das um finish() herum ein) */
 export function recordPost() { rec = []; }
 /** Ein Schritt ist gelaufen: Befehl in Rust, seine Angaben, was das TypeScript ergeben hat */
-export function notePost(cmd: string, args: Record<string, unknown>, result: unknown, adapt?: (rust: any) => unknown) { rec?.push({ cmd, args, result, adapt }); }
+export function notePost(cmd: string, args: Record<string, unknown> | Uint8Array, result: unknown, adapt?: (rust: any) => unknown) { rec?.push({ cmd, args, result, adapt }); }
 /** Wird gerade gemerkt? (wer für einen Schritt erst einen Auftrag bauen muss, spart sich das sonst) */
 export const recordingPost = () => rec !== null;
 /** Die gemerkten Schritte holen und das Merken beenden */
 export function takePost(): PostStep[] { const r = rec || []; rec = null; return r; }
 
 const IN_TAURI = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+/** Gibt es Rust überhaupt (die App, nicht die Vorschau im Browser)? Wer für einen Schritt viel vorbereiten muss, fragt vorher */
+export const postInApp = () => IN_TAURI;
 
 /** Gleich bis in jedes Feld (Reihenfolge der Felder egal; fehlendes Feld = undefined) */
 export function sameDeep(a: unknown, b: unknown): boolean {
@@ -92,10 +95,19 @@ export async function checkPost(steps: PostStep[]): Promise<string | null> {
   if (!steps.length) return null;
   if (!IN_TAURI) { lastPostSource = "TypeScript: not in the app"; return null; }
   const { invoke } = await import("@tauri-apps/api/core");
+  const dev = !!(import.meta as any).env?.DEV;
   for (const s of steps) {
     let rust: unknown;
-    try { rust = await invoke(s.cmd, s.args); if (s.adapt) rust = s.adapt(rust); } catch (e) { lastPostSource = `TypeScript: ${s.cmd} failed (${String(e)})`; console.warn("post step:", lastPostSource); return null; }
-    if (!sameDeep(s.result, rust)) {
+    const t0 = performance.now();
+    try {
+      rust = await invoke(s.cmd, s.args);
+      // beim Entwickeln: im Terminal sehen, wie lange der ganze Weg dauert (hin, rechnen, zurück) – Rust selbst nennt nur seine Rechenzeit
+      if (dev) void invoke("dev_log", { text: `post step ${s.cmd}: ${Math.round(performance.now() - t0)} ms there and back${s.args instanceof Uint8Array ? `, ${(s.args.length / 1e6).toFixed(1)} MB sent` : ""}` }).catch(() => {});
+      if (s.adapt) rust = s.adapt(rust);
+    } catch (e) { lastPostSource = `TypeScript: ${s.cmd} failed (${String(e)})`; console.warn("post step:", lastPostSource); return null; }
+    const same = sameDeep(s.result, rust);
+    if (dev) void invoke("dev_log", { text: `post step ${s.cmd}: ${same ? "same as the TypeScript" : "DIFFERENT from the TypeScript"} (${Math.round(performance.now() - t0)} ms with the comparison)` }).catch(() => {});
+    if (!same) {
       const near = nearLines(s.result, rust), d = `${s.cmd} – ${firstDiff(s.result, rust)}`;
       lastPostSource = "TypeScript: " + (near ? `${near} line(s) differ in the last digit – ` : "") + d;
       if (near) { console.info("post step:", lastPostSource); return null; }

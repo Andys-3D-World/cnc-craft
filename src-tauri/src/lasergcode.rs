@@ -1,4 +1,6 @@
-//! LASER-G-CODE (Linien und Füllen) – Zwilling von `generateLaserGcode` in `src/laserCam.ts`, ohne Bildgravur.
+//! LASER-G-CODE – Zwilling von `generateLaserGcode` in `src/laserCam.ts` samt der Bildgravur (`imageGcode` in
+//! `src/raster/imageShape.ts`: Zeile für Zeile, abwechselnd hin und zurück). Die gerasterten Bildpunkte kommen als
+//! Rohdaten neben dem Auftrag (ein Byte je Punkt für an/aus, vier Bytes je Punkt für Graustufen).
 //!
 //! Der Auftrag kommt fertig gesammelt aus dem Fenster (`src/laserJob.ts`): Ebenen in ihrer Reihenfolge, die Bahnen der
 //! Formen in mm (mit Startpunkt/Richtung von Hand, Freischnitt und Haltestegen – das hängt an den Formen und wird dort
@@ -21,7 +23,7 @@ use std::collections::HashMap;
 type P = [f64; 2];
 
 /// Das Format, das diese Datei versteht (gleiche Zahl wie LASER_JOB_VERSION in laserJob.ts)
-pub const JOB_VERSION: u32 = 1;
+pub const JOB_VERSION: u32 = 2;
 
 const MAX_SCANLINES: f64 = 40000.0;
 /// mm Abstand der Leerfahrt-Umwege zu ausgeschnittenen Teilen
@@ -45,6 +47,29 @@ pub struct LinePath {
     /// geschlossen ohne Startpunkt von Hand: der Start darf wandern
     #[serde(default)]
     pub free_start: bool,
+}
+
+/// Ein Bild der Ebene (Bildgravur): Lage in mm, Raster, wo seine Punkte in den Rohdaten stehen
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Image {
+    /// Kommentar über dem Bild, fertig in Klammern; `{rows}` wird hier eingesetzt
+    pub comment: String,
+    /// Ecke unten links und die beiden Kanten (unten, links) in mm
+    pub o: P,
+    pub ex: P,
+    pub ey: P,
+    /// über den Rand hinaus fahren (mm), Mindest-Leistung in % (nur Graustufen)
+    #[serde(default)]
+    pub overscan: f64,
+    #[serde(default)]
+    pub min_power: f64,
+    /// Graustufen (Leistung folgt der Helligkeit) statt an/aus
+    pub gray: bool,
+    pub gw: usize,
+    pub gh: usize,
+    /// Anfang der Bildpunkte in den Rohdaten (Zeile 0 = oben): 1 Byte je Punkt, bei Graustufen 4 Bytes (f32)
+    pub offset: usize,
 }
 
 #[derive(Deserialize, Clone, Debug)]
@@ -85,6 +110,9 @@ pub struct Layer {
     pub z_step: f64,
     #[serde(default)]
     pub thickness: f64,
+    /// Bilder der Ebene (werden zuerst graviert)
+    #[serde(default)]
+    pub images: Vec<Image>,
     /// geschlossene Konturen der Ebene (für das Füllen)
     pub closed: Vec<Vec<P>>,
     /// Anzahl offener Linien (lassen sich nicht füllen)
@@ -156,11 +184,183 @@ pub struct Output {
 
 /// Zahl mit höchstens drei Nachkommastellen: `String(+v.toFixed(3))`
 fn n(v: f64) -> String {
+    let mut out = String::with_capacity(12);
+    push_n(&mut out, v);
+    out
+}
+
+/// Der genaue, langsame Weg (so rechnet JavaScript nachweislich): runden wie toFixed, als Zahl lesen, kürzeste Schreibweise
+fn n_exact(v: f64) -> String {
     js_num(to_fixed(v, 3).parse().unwrap_or(f64::NAN))
+}
+
+/// `n(v)` an einen Text anhängen – schnell: Millionen Koordinaten einer Bildgravur gehen hier durch.
+/// Tausendstel = v · 1000 gerundet. Liegt v · 1000 nicht nahe an einer Hälfte (dort entscheidet toFixed nach der genauen
+/// Dezimalzahl), ist das Ergebnis eindeutig und wird direkt als Ziffern geschrieben; sonst – und bei sehr großen Zahlen –
+/// der genaue Weg. Dass beide Wege dasselbe schreiben, prüft ein Test mit Millionen Werten.
+fn push_n(out: &mut String, v: f64) {
+    let s = v * 1000.0;
+    if !(s.abs() < 1e9) {
+        out.push_str(&n_exact(v));
+        return;
+    }
+    let f = s.floor();
+    let frac = s - f;
+    if (frac - 0.5).abs() < 1e-4 {
+        out.push_str(&n_exact(v));
+        return;
+    }
+    let k = (if frac > 0.5 { f + 1.0 } else { f }) as i64;
+    if k == 0 {
+        out.push('0');
+        return;
+    }
+    if k < 0 {
+        out.push('-');
+    }
+    let (whole, mut rest) = (k.unsigned_abs() / 1000, k.unsigned_abs() % 1000);
+    let mut buf = [0u8; 20];
+    let mut i = buf.len();
+    let mut w = whole;
+    loop {
+        i -= 1;
+        buf[i] = b'0' + (w % 10) as u8;
+        w /= 10;
+        if w == 0 {
+            break;
+        }
+    }
+    out.push_str(std::str::from_utf8(&buf[i..]).unwrap_or("0"));
+    if rest > 0 {
+        out.push('.');
+        let mut digits = [b'0' + (rest / 100) as u8, b'0' + (rest / 10 % 10) as u8, b'0' + (rest % 10) as u8];
+        let mut len = 3;
+        while rest % 10 == 0 {
+            rest /= 10;
+            len -= 1;
+        }
+        digits[len..].fill(b'0');
+        out.push_str(std::str::from_utf8(&digits[..len]).unwrap_or(""));
+    }
 }
 
 fn dist(a: P, b: P) -> f64 {
     hypot2(b[0] - a[0], b[1] - a[1])
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Bildgravur (imageGcode in raster/imageShape.ts)
+// ---------------------------------------------------------------------------------------------------------------
+
+/// Bildzeilen als G-Code: (Text, Zahl der Zeilen mit Laser). Zeilen laufen entlang der unteren Bildkante; leere
+/// Ränder werden übersprungen, vor und nach jeder Zeile wird um „overscan“ mit Laser aus weitergefahren.
+/// `scan_mm`: Versatz hin/zurück – jede Zeile um die Hälfte entgegen ihrer Fahrtrichtung. `max_s`: S bei voller Leistung
+fn image_rows(im: &Image, data: &[u8], max_s: f64, scan_mm: f64) -> Result<(String, usize), String> {
+    let (gw, gh) = (im.gw, im.gh);
+    let cells = gw.checked_mul(gh).ok_or("image too large")?;
+    let bytes = if im.gray { cells.checked_mul(4).ok_or("image too large")? } else { cells };
+    let end = im.offset.checked_add(bytes).ok_or("image data")?;
+    let px = data.get(im.offset..end).ok_or("image data is shorter than the job says")?;
+    let (o, ex, ey) = (im.o, im.ex, im.ey);
+    let pt = |u: f64, v: f64| -> P { [o[0] + u * ex[0] + v * ey[0], o[1] + u * ex[1] + v * ey[1]] };
+    let hyp = hypot2(ex[0], ex[1]);
+    let width_mm = if hyp == 0.0 || hyp.is_nan() { 1.0 } else { hyp };
+    let over = mx(0.0, im.overscan) / width_mm; // in Bildbreiten
+    let du = scan_mm / 2.0 / width_mm; // halber Versatz in Bildbreiten
+    let min_s = js_round((mx(0.0, mn(100.0, im.min_power)) / 100.0) * max_s);
+    let power = |i: usize| -> f64 {
+        if im.gray {
+            let b = f32::from_le_bytes([px[4 * i], px[4 * i + 1], px[4 * i + 2], px[4 * i + 3]]) as f64;
+            if b < 0.004 {
+                0.0
+            } else {
+                js_round(min_s + b * (max_s - min_s))
+            }
+        } else if px[i] != 0 {
+            max_s
+        } else {
+            0.0
+        }
+    };
+    let mut g = String::new();
+    let mut rows = 0usize;
+    let (mut lx, mut ly) = (String::new(), String::new());
+    let (mut x, mut y) = (String::new(), String::new());
+    // S-Werte sind ganze Zahlen (gerundet): als Text nur einmal je Wert rechnen
+    let (s_max_text, mut s_last, mut s_text) = (js_num(max_s), f64::NAN, String::new());
+    let mut mv = |cmd: &str, q: P, s: f64, g: &mut String| {
+        x.clear();
+        y.clear();
+        push_n(&mut x, q[0]);
+        push_n(&mut y, q[1]);
+        g.push_str(cmd);
+        if x != lx {
+            g.push_str(" X");
+            g.push_str(&x);
+        }
+        if y != ly {
+            g.push_str(" Y");
+            g.push_str(&y);
+        }
+        g.push_str(" S");
+        if s == 0.0 {
+            g.push('0');
+        } else if s == max_s {
+            g.push_str(&s_max_text);
+        } else {
+            if s != s_last {
+                s_text = js_num(s);
+                s_last = s;
+            }
+            g.push_str(&s_text);
+        }
+        g.push('\n');
+        std::mem::swap(&mut lx, &mut x);
+        std::mem::swap(&mut ly, &mut y);
+    };
+    let gwf = gw as f64;
+    for row in 0..gh {
+        let v = 1.0 - (row as f64 + 0.5) / gh as f64;
+        let base = row * gw;
+        let (mut a, mut z): (Option<usize>, usize) = (None, 0);
+        for x in 0..gw {
+            if power(base + x) > 0.0 {
+                if a.is_none() {
+                    a = Some(x);
+                }
+                z = x;
+            }
+        }
+        let Some(a) = a else { continue };
+        let rtl = rows % 2 == 1;
+        rows += 1;
+        // Läufe gleicher Leistung von a bis z (Kanten der Bildpunkte bei x / gw)
+        let mut runs: Vec<(f64, f64, f64)> = Vec::new();
+        for x in a..=z {
+            let s = power(base + x);
+            match runs.last_mut() {
+                Some(last) if last.2 == s => last.1 = (x as f64 + 1.0) / gwf,
+                _ => runs.push((x as f64 / gwf, (x as f64 + 1.0) / gwf, s)),
+            }
+        }
+        let (u0, u1) = (a as f64 / gwf, (z as f64 + 1.0) / gwf);
+        if !rtl {
+            mv("G0", pt(u0 - over - du, v), 0.0, &mut g);
+            mv("G1", pt(u0 - du, v), 0.0, &mut g);
+            for rn in &runs {
+                mv("G1", pt(rn.1 - du, v), rn.2, &mut g);
+            }
+            mv("G1", pt(u1 + over - du, v), 0.0, &mut g);
+        } else {
+            mv("G0", pt(u1 + over + du, v), 0.0, &mut g);
+            mv("G1", pt(u1 + du, v), 0.0, &mut g);
+            for rn in runs.iter().rev() {
+                mv("G1", pt(rn.0 + du, v), rn.2, &mut g);
+            }
+            mv("G1", pt(u0 - over + du, v), 0.0, &mut g);
+        }
+    }
+    Ok((g, rows))
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -795,8 +995,18 @@ fn orient_pts(p: &LinePath, st: &cutorder::Step, free_start: bool) -> Vec<P> {
     }
 }
 
-/// G-Code und Hinweise für den Auftrag. Err = der Auftrag passt nicht zu dieser Datei
-pub fn generate(job: &Job) -> Result<Output, String> {
+/// Rohdaten des Befehls laser_generate zerlegen (laserBody in laserJob.ts): 4 Bytes Länge des Auftrags (little endian),
+/// der Auftrag als JSON, danach die Bildpunkte aller Bilder
+pub fn split_body(body: &[u8]) -> Result<(Job, &[u8]), String> {
+    let len = body.get(..4).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]]) as usize).ok_or("no job")?;
+    let json = body.get(4..4usize.saturating_add(len)).ok_or("the job is shorter than its length says")?;
+    let job: Job = serde_json::from_slice(json).map_err(|e| e.to_string())?;
+    Ok((job, &body[4 + len..]))
+}
+
+/// G-Code und Hinweise für den Auftrag; `data` = die Bildpunkte aller Bilder (leer ohne Bildgravur).
+/// Err = der Auftrag passt nicht zu dieser Datei
+pub fn generate(job: &Job, data: &[u8]) -> Result<Output, String> {
     if job.version != JOB_VERSION {
         return Err(format!("job version {} (this build understands {})", job.version, JOB_VERSION));
     }
@@ -842,6 +1052,28 @@ pub fn generate(job: &Job) -> Result<Output, String> {
             x.g.push_str(&l);
         }
         x.g.push_str(&format!("F{}\n", n(layer.speed)));
+
+        // ---- BILDER (zuerst gravieren, dann schneiden) ----
+        for im in &layer.images {
+            let (rows_g, rows) = image_rows(im, data, s_line, scan_mm)?;
+            if rows == 0 {
+                continue;
+            }
+            let mut pass = 0.0;
+            while pass < layer.passes {
+                x.g.push_str(&im.comment.replace("{rows}", &rows.to_string()));
+                x.g.push('\n');
+                if both {
+                    x.g.push_str(&format!("F{}\n", n(fill_f)));
+                }
+                x.g.push_str(&rows_g);
+                pass += 1.0;
+            }
+            x.pos = None; // Position nach dem Bild unbekannt -> nächste Leerfahrt gerade
+            if both {
+                x.g.push_str(&format!("F{}\n", n(layer.speed)));
+            }
+        }
         let closed = &layer.closed;
 
         // ---- FÜLLEN ----
@@ -1063,6 +1295,122 @@ mod tests {
     use super::*;
     use serde_json::Value;
 
+    fn base64(s: &str) -> Vec<u8> {
+        let val = |c: u8| -> u32 {
+            match c {
+                b'A'..=b'Z' => (c - b'A') as u32,
+                b'a'..=b'z' => (c - b'a') as u32 + 26,
+                b'0'..=b'9' => (c - b'0') as u32 + 52,
+                b'+' => 62,
+                _ => 63,
+            }
+        };
+        let bytes: Vec<u8> = s.bytes().filter(|&c| c != b'=').collect();
+        let mut out = Vec::with_capacity(bytes.len() * 3 / 4);
+        for ch in bytes.chunks(4) {
+            let v = ch.iter().fold(0u32, |a, &c| (a << 6) | val(c)) << (6 * (4 - ch.len()));
+            out.extend_from_slice(&[(v >> 16) as u8, (v >> 8) as u8, v as u8][..ch.len() - 1]);
+        }
+        out
+    }
+
+    /// von Hand: Bild 4 × 2 Punkte, 4 mm breit und 2 mm hoch bei (10, 20), an/aus. Obere Zeile: Punkte 1 und 2 an →
+    /// von links nach rechts bei y = 21,5: Anlauf 2 mm vor x = 11, Laser an bis x = 13, Auslauf bis x = 15.
+    /// Untere Zeile: nur Punkt 3 an → von rechts nach links bei y = 20,5.
+    #[test]
+    fn image_rows_run_back_and_forth_and_skip_empty_edges() {
+        let im = Image { comment: String::new(), o: [10.0, 20.0], ex: [4.0, 0.0], ey: [0.0, 2.0], overscan: 2.0, min_power: 0.0, gray: false, gw: 4, gh: 2, offset: 1 };
+        let data = [9u8, 0, 1, 1, 0, 0, 0, 0, 1];
+        let (g, rows) = image_rows(&im, &data, 500.0, 0.0).unwrap();
+        assert_eq!(rows, 2);
+        assert_eq!(g, "G0 X9 Y21.5 S0\nG1 X11 S0\nG1 X13 S500\nG1 X15 S0\nG0 X16 Y20.5 S0\nG1 X14 S0\nG1 X13 S500\nG1 X11 S0\n");
+        // Graustufen: 0,5 → halbe Leistung über der Mindest-Leistung (10 % von 500 = 50): 50 + 0,5 · 450 = 275
+        let gray = Image { gray: true, min_power: 10.0, gw: 2, gh: 1, offset: 0, ..im.clone() };
+        let px: Vec<u8> = [0.5f32, 0.001].iter().flat_map(|v| v.to_le_bytes()).collect();
+        let (g, rows) = image_rows(&gray, &px, 500.0, 0.0).unwrap();
+        assert_eq!((rows, g.as_str()), (1, "G0 X8 Y21 S0\nG1 X10 S0\nG1 X12 S275\nG1 X14 S0\n"));
+        assert!(image_rows(&gray, &px[..7], 500.0, 0.0).is_err(), "too little data is refused");
+    }
+
+    /// Zeit für ein großes Foto (nicht im normalen Lauf):  cargo test --lib lasergcode -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn speed_of_a_large_picture() {
+        let (gw, gh) = (3067usize, 3851usize);
+        // Muster wie ein gerastertes Foto: etwa 40 % der Punkte an, kurze Läufe
+        let mut seed = 12345u32;
+        let data: Vec<u8> = (0..gw * gh).map(|_| { seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; (seed % 5 < 2) as u8 }).collect();
+        let im = Image { comment: String::new(), o: [10.0, 10.0], ex: [306.7, 0.0], ey: [0.0, 385.1], overscan: 2.0, min_power: 0.0, gray: false, gw, gh, offset: 0 };
+        let start = std::time::Instant::now();
+        let (g, rows) = image_rows(&im, &data, 1000.0, 0.0).unwrap();
+        println!("{gw} x {gh}: {rows} rows, {} lines, {} MB in {:.0} ms", g.matches('\n').count(), g.len() / 1_000_000, start.elapsed().as_secs_f64() * 1000.0);
+    }
+
+    /// Der schnelle Weg, Zahlen zu schreiben, gibt dasselbe wie der genaue: viele Zufallswerte, alle Tausendstel und
+    /// halben Tausendstel in einem Bereich, Werte dicht an den Hälften, große, kleine, negative Zahlen
+    #[test]
+    fn fast_number_text_is_the_exact_one() {
+        let mut seed = 0x9E3779B97F4A7C15u64;
+        let mut next = || { seed ^= seed << 13; seed ^= seed >> 7; seed ^= seed << 17; seed };
+        let mut count = 0usize;
+        let mut check = |v: f64| { assert_eq!(n(v), n_exact(v), "{v:?}"); count += 1; };
+        for _ in 0..1_000_000 {
+            let r = next();
+            let v = ((r >> 11) as f64 / (1u64 << 53) as f64 - 0.5) * [1.0, 10.0, 700.0, 2500.0, 1e6][(r % 5) as usize];
+            check(v);
+        }
+        for k in -20_000i64..=20_000 {
+            let v = k as f64 / 2000.0; // jedes halbe Tausendstel zwischen −10 und 10
+            for d in [0.0, 1e-13, -1e-13, 1e-9, -1e-9, 2e-5, -2e-5] {
+                check(v + d);
+                check((v + d) * 37.0 + 123.0);
+            }
+        }
+        for v in [0.0, -0.0, 0.0004, -0.0004, 0.0005, -0.0005, 0.9995, 0.99949999, 999999.9995, -999999.9995, 1e6, 1e6 + 0.0005, 123456789.0625, 1e15, -1e15, 1e21, f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 5e-324, 1.0005, 2.5, 1.0000000000000002] {
+            check(v);
+        }
+        assert!(count > 1_500_000);
+    }
+
+    /// Eigene Projekte (nicht im Repository): Ordner mit body.bin (laserBody aus der Vorschau) und gcode.txt (laserCam.ts)
+    /// LASER_COMPARE=<Ordner> cargo test --lib lasergcode -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn same_gcode_as_laser_cam_ts_on_local_files() {
+        let Ok(dir) = std::env::var("LASER_COMPARE") else { return };
+        let dir = std::path::Path::new(&dir);
+        let body = std::fs::read(dir.join("body.bin")).unwrap();
+        let want = std::fs::read_to_string(dir.join("gcode.txt")).unwrap();
+        let start = std::time::Instant::now();
+        let (job, data) = split_body(&body).unwrap();
+        let parsed = start.elapsed().as_secs_f64() * 1000.0;
+        let start = std::time::Instant::now();
+        let out = generate(&job, data).unwrap();
+        let ms = start.elapsed().as_secs_f64() * 1000.0;
+        let same = out.gcode == want;
+        if !same {
+            let first = out.gcode.split('\n').zip(want.split('\n')).position(|(a, b)| a != b);
+            panic!("different at line {:?} ({} / {} lines)", first.map(|i| i + 1), out.gcode.split('\n').count(), want.split('\n').count());
+        }
+        println!("{} MB of data, job read in {parsed:.0} ms; {} lines, {} MB of G-code in {ms:.0} ms – the same as laserCam.ts", body.len() / 1_000_000, want.split('\n').count(), want.len() / 1_000_000);
+    }
+
+    /// Rohdaten wie aus laserBody(): Länge, Auftrag, Bildpunkte – und was nicht passt, wird abgelehnt statt falsch gelesen
+    #[test]
+    fn body_is_split_into_job_and_image_points() {
+        let json = br#"{"version":2,"sMax":1000,"dynamic":true,"layers":[],"texts":{}}"#;
+        let mut body = (json.len() as u32).to_le_bytes().to_vec();
+        body.extend_from_slice(json);
+        body.extend_from_slice(&[1, 0, 1]);
+        let (job, data) = split_body(&body).unwrap();
+        assert_eq!((job.version, job.s_max, data), (2, 1000.0, &[1u8, 0, 1][..]));
+        assert!(split_body(&body[..3]).is_err());
+        assert!(split_body(&body[..20]).is_err(), "length says more than there is");
+        let mut wrong = body.clone();
+        wrong[0] = wrong[0].wrapping_sub(2);
+        assert!(split_body(&wrong).is_err(), "cut-off JSON");
+    }
+
     fn square(x0: f64, y0: f64, x1: f64, y1: f64) -> Vec<P> {
         vec![[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
     }
@@ -1110,11 +1458,21 @@ mod tests {
         let cases: Value = serde_json::from_reader(flate2::read::GzDecoder::new(file)).unwrap();
         let cases = cases.as_array().unwrap();
         assert!(cases.len() >= 40, "only {} cases", cases.len());
-        let (mut lines, mut warnings) = (0usize, 0usize);
+        let (mut lines, mut warnings, mut images) = (0usize, 0usize, 0usize);
         for c in cases {
             let name = c["name"].as_str().unwrap();
             let job: Job = serde_json::from_value(c["job"].clone()).unwrap_or_else(|e| panic!("{name}: {e}"));
-            let out = generate(&job).unwrap_or_else(|e| panic!("{name}: {e}"));
+            // Bildpunkte der Bilder (wenn der Fall welche hat): gepackt und als Text abgelegt
+            let data = match c["data"].as_str() {
+                Some(b64) => {
+                    let mut bytes = Vec::new();
+                    std::io::Read::read_to_end(&mut flate2::read::ZlibDecoder::new(&base64(b64)[..]), &mut bytes).unwrap();
+                    images += job.layers.iter().map(|l| l.images.len()).sum::<usize>();
+                    bytes
+                }
+                None => Vec::new(),
+            };
+            let out = generate(&job, &data).unwrap_or_else(|e| panic!("{name}: {e}"));
             let want: Vec<&str> = c["gcode"].as_str().unwrap().split('\n').collect();
             let got: Vec<&str> = out.gcode.split('\n').collect();
             for (k, (a, b)) in got.iter().zip(&want).enumerate() {
@@ -1127,6 +1485,7 @@ mod tests {
             lines += want.len();
             warnings += want_w.len();
         }
-        println!("{} cases, {lines} G-code lines and {warnings} warnings the same as laserCam.ts", cases.len());
+        assert!(images >= 10, "only {images} images in the cases");
+        println!("{} cases, {lines} G-code lines and {warnings} warnings the same as laserCam.ts ({images} engraved images)", cases.len());
     }
 }

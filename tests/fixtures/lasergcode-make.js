@@ -125,16 +125,70 @@ export async function make() {
   add("detours: an open line that was cut is no obstacle", [poly(cut, [[40, 40], [60, 60], [80, 40]], false), rect(cut, 50, 30, 52, 32), rect(cut, 70, 55, 73, 58)], set({ avoidCut: true, optimizeOrder: false }));
   add("order: parts with holding tabs end where their last piece ends", [...Array.from({ length: 6 }, (_, i) => rect(cut, i * 35, (i % 2) * 50, i * 35 + 28, (i % 2) * 50 + 22, { tabLen: 3, tabH: 1, tabN: 2 + (i % 3) })), circle(cut, 100, 100, 10), rect(cut, 0, 110, 20, 125)]);
   add("order: the next layer starts from the end of an open line", [line(cut, 0, 0, 100, 0), rect(cut2, 95, 5, 105, 12), rect(cut2, 0, 5, 10, 12), rect(cut2, 50, 5, 60, 12)]);
+  // ---- image engraving (raster/imageShape.ts): small pictures drawn here, rastered by the program ----
+  const im = await import("/src/raster/imageShape.ts");
+  const picture = async (name, w, h, draw) => {
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, w, h);
+    draw(ctx, w, h);
+    const blob = await new Promise(r => cv.toBlob(r, "image/png"));
+    return { name, bytes: new Uint8Array(await blob.arrayBuffer()) };
+  };
+  const grad = await picture("gradient.png", 48, 32, (c, w, h) => { const g = c.createLinearGradient(0, 0, w, h); g.addColorStop(0, "#000"); g.addColorStop(1, "#fff"); c.fillStyle = g; c.fillRect(0, 0, w, h); });
+  const shapesPic = await picture("Schöne Formen (1).png", 60, 40, (c, w, h) => { c.fillStyle = "#000"; c.fillRect(6, 6, 14, 10); c.beginPath(); c.arc(40, 20, 11, 0, 7); c.fill(); c.fillStyle = "#888"; c.fillRect(8, 26, 30, 8); c.fillStyle = "#fff"; c.beginPath(); c.arc(40, 20, 4, 0, 7); c.fill(); });
+  const white = await picture("white.png", 20, 12, () => {});
+  const dots = await picture("dots.png", 30, 20, (c, w, h) => { c.fillStyle = "#000"; for (let y = 1; y < h; y += 3) for (let x = (y % 2) * 2; x < w; x += 5) c.fillRect(x, y, 2, 1); });
+  // image shape on a layer: width in mm at x0/y0, with its settings changed by `img`, turned by `deg` round its corner
+  const image = async (layer, pic, width, x0, y0, img = {}, deg = 0) => {
+    const s = await im.createImageShape(pic.name, pic.bytes, width, x0, y0);
+    s.id = "s" + ++id;
+    s.laserLayerId = layer.id;
+    s.img = { ...s.img, ...img, raster: { ...s.img.raster, ...(img.raster || {}) } };
+    if (deg) { const a = deg * Math.PI / 180, o = s.points[0]; s.points = s.points.map(p => ({ x: o.x + (p.x - o.x) * Math.cos(a) - (p.y - o.y) * Math.sin(a), y: o.y + (p.x - o.x) * Math.sin(a) + (p.y - o.y) * Math.cos(a) })); }
+    return s;
+  };
+  const m = method => ({ raster: { method } });
+  add("image: black and white by threshold", [await image(fill, shapesPic, 30, 10, 10, { ...m("threshold"), interval: 0.5 })]);
+  add("image: photo raster (Jarvis), no overscan", [await image(fill, grad, 24, 0, 0, { ...m("jarvis"), interval: 0.4, overscan: 0 })]);
+  add("image: graphic raster (Atkinson), wide overscan", [await image(fill, grad, 24, 5, 5, { ...m("atkinson"), interval: 0.6, overscan: 5.5 })]);
+  add("image: grey scale, power follows the brightness", [await image(fill, grad, 24, 0, 0, { ...m("gray"), interval: 0.5, minPower: 0 })]);
+  add("image: grey scale with a minimum power, S max 255", [await image(fill, grad, 20, 3, 4, { ...m("gray"), interval: 0.4, minPower: 12.5 }), await image(fill, shapesPic, 20, 30, 4, { ...m("gray"), interval: 0.7, minPower: 250 })], set({ sMax: 255 }));
+  add("image: an empty picture gives nothing", [await image(fill, white, 10, 0, 0, { ...m("threshold"), interval: 0.5 }), rect(fill, 20, 0, 30, 6)]);
+  add("image: single dots, many short runs", [await image(fill, dots, 15, 0, 0, { ...m("threshold"), interval: 0.5, overscan: 1 })]);
+  add("image turned by 30 degrees and by -90 degrees", [await image(fill, shapesPic, 24, 40, 10, { ...m("threshold"), interval: 0.6 }, 30), await image(fill, grad, 16, 10, 60, { ...m("jarvis"), interval: 0.5 }, -90)]);
+  add("image with the back-and-forth offset", [await image(fill, shapesPic, 24, 0, 0, { ...m("threshold"), interval: 0.5 }), await image(fill45, dots, 12, 40, 0, { ...m("threshold"), interval: 0.4 })], set({ scanOffsets: [{ speed: 1000, mm: 0.05 }, { speed: 3000, mm: 0.2 }, { speed: 6000, mm: 0.35 }] }));
+  add("image on a layer with two passes; image on a line layer", [await image(fill45, shapesPic, 18, 0, 0, { ...m("threshold"), interval: 0.6 }), await image(cut, dots, 12, 30, 0, { ...m("threshold"), interval: 0.5 })]);
+  add("image on a fill + line layer: own feed for the picture, then the shapes", [await image(both, shapesPic, 18, 0, 0, { ...m("atkinson"), interval: 0.6 }), rect(both, 30, 0, 44, 10), circle(both, 60, 6, 5)]);
+  add("images and cuts together: detours start fresh after a picture", [await image(fill, shapesPic, 18, 0, 0, { ...m("threshold"), interval: 0.6 }), rect(cut, 40, 40, 60, 60), rect(cut, 0, 45, 10, 55), rect(cut, 90, 45, 100, 55), await image(lead, dots, 10, 70, 0, { ...m("threshold"), interval: 0.5 }), rect(lead, 45, 70, 55, 80), rect(lead, 45, 20, 55, 30)], set({ avoidCut: true, optimizeOrder: false }));
+  add("image with a mask: only inside the contour", [await image(fill, grad, 24, 0, 0, { ...m("threshold"), interval: 0.5, mask: [[{ u: 0.2, v: 0.2 }, { u: 0.8, v: 0.2 }, { u: 0.5, v: 0.9 }]] })]);
+  add("image with M3 and the test-card focus ladder on another shape", [await image(fill, shapesPic, 18, 0, 0, { ...m("gray"), interval: 0.6, minPower: 5 }), rect(cut, 30, 0, 40, 8, { laserOverride: { power: 50, speed: 500, zOff: 1.5 } })], set({ dynamic: false }));
+
+  add("image: a negative overscan counts as none", [await image(fill, shapesPic, 18, 0, 0, { ...m("threshold"), interval: 0.6, overscan: -3 })]);
+
+  const { laserBody } = await import("/src/laserJob.ts");
+  // image points of a case, packed (zlib) and as base64 text
+  const packed = async job => {
+    const body = laserBody(job), len = new DataView(body.buffer).getUint32(0, true), data = body.slice(4 + len);
+    if (!data.length) return null;
+    const z = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new CompressionStream("deflate"))).arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < z.length; i += 0x8000) bin += String.fromCharCode(...z.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
   const out = [];
   try {
     for (const c of cases) {
       const undo = c.prep ? c.prep() : null;
       try {
-        const job = laserJob(c.shapes);
-        if (job.no) throw new Error(`${c.name}: no job (${job.no})`);
+        // first the G-code (it rasters the pictures), then the job with the same points
         const res = generateLaserGcode(c.shapes);
         if (!res.gcode) throw new Error(`${c.name}: no G-code`);
-        out.push({ name: c.name, job, gcode: res.gcode, warnings: res.warnings });
+        const job = laserJob(c.shapes);
+        if (job.no) throw new Error(`${c.name}: no job (${job.no})`);
+        const data = await packed(job);
+        out.push({ name: c.name, job, gcode: res.gcode, warnings: res.warnings, ...(data ? { data } : {}) });
       } finally { if (undo) undo(); }
     }
   } finally { added.forEach(a => ll.removeLayer(a)); }
