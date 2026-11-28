@@ -144,7 +144,7 @@ fn js_round(x: f64) -> f64 {
     }
 }
 /// `x | 0`
-fn to_int32(x: f64) -> i32 {
+pub(crate) fn to_int32(x: f64) -> i32 {
     if !x.is_finite() {
         return 0;
     }

@@ -42,6 +42,10 @@ mod keepout;
 mod lasergcode;
 mod lathe;
 mod plasmagcode;
+mod importplt;
+mod importdxf;
+mod importsvg;
+mod importpdf;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1158,6 +1162,65 @@ fn plasma_generate(job: plasmagcode::Job) -> Result<plasmagcode::Output, String>
     Ok(out)
 }
 
+/// HPGL/PLT- UND G-CODE-IMPORT (importplt.rs): liest den Text der Datei. Das Fenster vergleicht die Antwort mit dem,
+/// was plotParse.ts gelesen hat (importRust.ts); eingefügt wird weiter das Ergebnis aus dem TypeScript.
+#[tauri::command(async)]
+fn import_plt(kind: String, text: String) -> importplt::Parsed {
+    let start = std::time::Instant::now();
+    let out = if kind == "hpgl" { importplt::parse_hpgl(&text) } else { importplt::parse_gcode(&text) };
+    if cfg!(debug_assertions) {
+        let pts: usize = out.paths.iter().map(|p| p.pts.len()).sum();
+        eprintln!("importplt: {kind}, {} path(s), {pts} point(s), {} circle(s) ({:.1} ms)", out.paths.len(), out.circles.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    out
+}
+
+/// DXF-IMPORT (importdxf.rs): liest den Text der Datei. Das Fenster vergleicht die Antwort mit dem, was dxfParse.ts
+/// gelesen hat (importRust.ts); eingefügt wird weiter das Ergebnis aus dem TypeScript.
+#[tauri::command(async)]
+fn import_dxf(text: String) -> Result<importdxf::Parsed, String> {
+    let start = std::time::Instant::now();
+    let out = importdxf::parse_dxf(&text)?;
+    if cfg!(debug_assertions) {
+        let pts: usize = out.paths.iter().map(|p| p.pts.len()).sum();
+        eprintln!("importdxf: {} path(s), {pts} point(s), {} circle(s), {} text(s) ({:.1} ms)", out.paths.len(), out.circles.len(), out.texts.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    Ok(out)
+}
+
+/// SVG-PFADE (importsvg.rs): Pfad-Daten und transform-Angaben, die svgImport.ts beim Lesen einer SVG gesammelt hat. Das
+/// Fenster vergleicht die Antwort mit dem, was svgPath.ts daraus gemacht hat (importRust.ts); eingefügt wird weiter das TypeScript.
+#[tauri::command(async)]
+fn import_svg(paths: Vec<(String, f64)>, transforms: Vec<String>) -> importsvg::Output {
+    let start = std::time::Instant::now();
+    let job = importsvg::Job { paths, transforms };
+    let out = importsvg::run(&job);
+    if cfg!(debug_assertions) {
+        let pts: usize = out.paths.iter().flatten().map(|s| s.pts.len()).sum();
+        eprintln!("importsvg: {} path(s), {pts} point(s), {} transform(s) ({:.1} ms)", job.paths.len(), job.transforms.len(), start.elapsed().as_secs_f64() * 1000.0);
+    }
+    out
+}
+
+/// PDF/AI-IMPORT (importpdf.rs): liest die Datei (als Rohdaten). Das Fenster vergleicht die Antwort mit dem, was
+/// pdfParse.ts gelesen hat (importRust.ts); eingefügt wird weiter das Ergebnis aus dem TypeScript.
+#[tauri::command]
+async fn import_pdf(request: tauri::ipc::Request<'_>) -> Result<importpdf::Parsed, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the file as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        let out = importpdf::parse_pdf(&body);
+        if cfg!(debug_assertions) {
+            let pts: usize = out.paths.iter().map(|p| p.pts.len()).sum();
+            eprintln!("importpdf: {} content stream(s), {} path(s), {pts} point(s) ({:.1} ms)", out.contents, out.paths.len(), start.elapsed().as_secs_f64() * 1000.0);
+        }
+        out
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1348,6 +1411,10 @@ pub fn run() {
             post_arcfit,
             laser_generate,
             plasma_generate,
+            import_plt,
+            import_dxf,
+            import_svg,
+            import_pdf,
             lathe_generate,
             gamepad_read,
             list_ports,
