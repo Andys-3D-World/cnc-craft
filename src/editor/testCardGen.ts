@@ -13,6 +13,7 @@ import { machine } from "../machine";
 import { t } from "../i18n/i18n";
 import { buildCard, DEFAULT_CARD, LASER_TYPES, PANEL_IDS, type CardResult, type Role, type TestCardOptions } from "../testCard";
 import { helpHtml, openTestCardRead, latestCardOnBed } from "./testCardRead";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_test_card";
 
@@ -211,7 +212,9 @@ export function openTestCardDialog(log: (s: string) => void, done: () => void) {
   $<HTMLElement>("tc-ok").onclick = async () => {
     const m = read();
     if (!validCard(m)) return;
-    const card = buildCard(m, t);
+    const said: Record<string, string> = {};   // übersetzte Texte, die die Karte braucht – Rust bekommt dieselben
+    const card = buildCard(m, k => (said[k] = t(k)));
+    if (importInApp()) checkImport("test_card", { o: m, tr: said }, structuredClone(card));
     saveSettings(KEY, m);
     close();
     try {

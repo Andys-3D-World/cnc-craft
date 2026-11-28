@@ -89,6 +89,7 @@ mod camfetch;
 mod ruida;
 mod serial;
 mod store;
+mod testcard;
 mod update;
 mod usb_k40;
 mod vfd;
@@ -1495,6 +1496,13 @@ fn box_check(o: boxgen::BoxOptions) -> Vec<boxgen::Panel> {
     boxgen::box_panels(&o)
 }
 
+/// LASER-TESTKARTE (testcard.rs): Einstellungen und übersetzte Texte (Schlüssel → Text) des Dialogs. Das Fenster
+/// vergleicht die Antwort mit testCard.ts (testCardGen.ts); eingefügt wird weiter die Karte des Fensters.
+#[tauri::command(async)]
+fn test_card(o: testcard::CardOptions, tr: std::collections::HashMap<String, String>) -> testcard::CardResult {
+    testcard::build_card(&o, &tr)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1714,6 +1722,7 @@ pub fn run() {
             photo_check,
             relief_check,
             box_check,
+            test_card,
             lathe_generate,
             gamepad_read,
             list_ports,

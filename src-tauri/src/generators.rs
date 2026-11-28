@@ -56,9 +56,7 @@ pub struct HingeResult {
     pub warnings: Vec<String>,
 }
 
-/// Vorschlag für Abstand, Schnittlänge und Steg aus der Materialdicke (im Fenster nur ein Vorschlag im Dialog: nur vom
-/// Test verglichen)
-#[allow(dead_code)]
+/// Vorschlag für Abstand, Schnittlänge und Steg aus der Materialdicke (Scharnier-Feld der Laser-Testkarte, testcard.rs)
 pub fn suggest_for_thickness(t: f64) -> serde_json::Value {
     let th = mx(0.5, t);
     let r1 = |v: f64| js_round(v * 10.0) / 10.0;
