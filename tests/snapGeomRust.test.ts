@@ -57,6 +57,7 @@ corner([P(0, 0), P(10, 0), P(10, 10)], true, P(10, 0), 2, false, 1e9);
 corner([P(0, 0), P(10, 0), P(10, 10)], true, P(10, 0), 2000, false, 1e9);
 corner([P(0, 0), P(1e4, 0), P(1e4, 1e4)], true, P(1e4, 0), 2000, false, 10);            // big radius: many points
 corner([P(0, 0), P(10, 0), P(NaN, 5), P(10, 10)], true, P(10, 0), 2, false);
+jobs.push({ kind: "corner", pts: [P(0, 0), P(10, 0), P(10, 10)], closed: true, at: P(10, 0), tol: 5, r: 2, chamfer: false, arcTol: NaN }); // no arc steps: only the second touch point is left
 for (let k = 0; k < 120; k++) {
   const n = 3 + Math.floor(rnd() * 7), closed = rnd() < 0.6, pts: P[] = [];
   for (let i = 0; i < n; i++) pts.push(P(+R(-200, 200).toFixed(rnd() < 0.5 ? 0 : 3), +R(-200, 200).toFixed(rnd() < 0.5 ? 0 : 3)));
@@ -105,6 +106,13 @@ const fixedSnaps: Prim[][] = [
   [seg(P(0, 0), P(0, 0), "z"), seg(P(-1, 0), P(1, 0), "s")],
   [seg(P(NaN, 0), P(10, 10), "n"), seg(P(0, 10), P(10, 0), "s"), circ(P(5, 5), 3)],
   [],
+  [circ(P(0, 0), 10, 0, Math.PI / 2), seg(P(-20, -5e-6), P(20, -5e-6), "s")],             // just below the arc start: outside
+  [circ(P(0, 0), 10, 0, Math.PI / 2), seg(P(-20, -5e-8), P(20, -5e-8), "s")],             // within the angle tolerance: on it
+  [circ(P(0, 0), 0.5, 0, Math.PI / 2), seg(P(-2, -1.5e-6), P(2, -1.5e-6), "s")],          // small radius: wider angle
+  [circ(P(0, 0), 10), circ(P(20.5, 0), 10, undefined, undefined, "d")],                     // half a mm apart: no point
+  [circ(P(0, 0), 10), circ(P(20 + 2e-10, 0), 10, undefined, undefined, "d")],               // within 1e-9: touching
+  [seg(P(0, 0), P(10, 0), "w", 0), seg(P(0, 0), P(0, 10), "w", 1), seg(P(10, 0), P(10, 10), "w", 2), seg(P(0, 10), P(10, 10), "w", 3)], // same shape, ends meet both ways
+  [circ(P(-0.43, -3.78), 4.43), seg(P(-9.29, 0.6499999999999999), P(12.86, 0.6499999999999999), "t")],     // tangent, discriminant just below 0
 ];
 for (const prims of fixedSnaps) for (const from of [undefined, P(30, 40), P(0, 0), P(-15, 2), P(0, 30)]) jobs.push({ kind: "snap", prims, ...(from ? { from } : {}) });
 for (let k = 0; k < 80; k++) {
