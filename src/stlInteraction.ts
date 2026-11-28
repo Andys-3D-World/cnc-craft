@@ -6,7 +6,7 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { readFile } from "@tauri-apps/plugin-fs";
 import {
-  parseStl, weldMesh, viewCoords, sliceMesh, findBestHeight, stlBody,
+  parseStl, weldMesh, viewCoords, sliceMesh, findBestHeight, stlBody, meshBody, meshSummary,
   StlView, StlMesh, WeldedMesh, ViewCoords, SliceResult
 } from "./stlLoader";
 import { checkImport, importInApp } from "./importers/importRust";
@@ -79,6 +79,8 @@ export async function openStlFromBytes(
     const buffer = binary.buffer.slice(binary.byteOffset, binary.byteOffset + binary.byteLength) as ArrayBuffer;
     mesh = parseStl(buffer);
   }
+  // 3MF/OBJ: Rust liest dieselbe Datei im Hintergrund und vergleicht Anzahl, Größe und Prüfsumme der Dreiecke
+  if ((ext === "3mf" || ext === "obj") && importInApp()) checkImport("import_mesh", meshBody(ext, binary), meshSummary(mesh));
   const welded = weldMesh(mesh);
   const size = mesh.max.map((m, i) => (m - mesh.min[i]).toFixed(1));
   appendToConsole(

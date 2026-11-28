@@ -610,3 +610,22 @@ export function stlCheck(mesh: StlMesh, view: StlView, height: number) {
     best: findBestHeight(welded, vc), slice: sliceMesh(welded, vc, height),
   };
 }
+
+/** Kurzfassung einer Dreiecksliste für den Vergleich mit Rust (meshimport.rs): Anzahl, Größe, Prüfsumme (FNV-1a über die f32-Bits) */
+export function meshSummary(mesh: StlMesh) {
+  const p = mesh.positions;
+  const bits = new Uint32Array(p.buffer, p.byteOffset, p.length);
+  let h = 2166136261;
+  for (let i = 0; i < bits.length; i++) h = Math.imul(h ^ bits[i], 16777619) >>> 0;
+  return { triangles: mesh.triangleCount, min: mesh.min, max: mesh.max, hash: h };
+}
+
+/** Auftrag für Rust (import_mesh): 4 Bytes Länge, JSON mit der Art ("3mf" oder "obj"), dann die Datei */
+export function meshBody(kind: "3mf" | "obj", file: Uint8Array): Uint8Array {
+  const head = new TextEncoder().encode(JSON.stringify({ kind }));
+  const out = new Uint8Array(4 + head.length + file.length);
+  new DataView(out.buffer).setUint32(0, head.length, true);
+  out.set(head, 4);
+  out.set(file, 4 + head.length);
+  return out;
+}

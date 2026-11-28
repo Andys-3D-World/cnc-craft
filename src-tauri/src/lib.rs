@@ -48,6 +48,7 @@ mod importsvg;
 mod importpdf;
 mod imagetrace;
 mod stlslice;
+mod meshimport;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1262,6 +1263,25 @@ async fn import_stl(request: tauri::ipc::Request<'_>) -> Result<stlslice::Output
     .map_err(|e| e.to_string())?
 }
 
+/// 3MF- UND OBJ-IMPORT (meshimport.rs): Datei als Rohdaten (meshBody in stlMesh.ts). Das Fenster vergleicht Anzahl,
+/// Größe und Prüfsumme der Dreiecke mit dem, was meshImport.ts gelesen hat (importRust.ts).
+#[tauri::command]
+async fn import_mesh(request: tauri::ipc::Request<'_>) -> Result<meshimport::Summary, String> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else { return Err("expected the model as raw data".into()) };
+    let body = body.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let (head, data) = meshimport::split_body(&body)?;
+        let start = std::time::Instant::now();
+        let out = meshimport::run(&head, data)?;
+        if cfg!(debug_assertions) {
+            eprintln!("meshimport: {}, {} triangle(s) ({:.1} ms)", head.kind, out.triangles, start.elapsed().as_secs_f64() * 1000.0);
+        }
+        Ok(out)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1458,6 +1478,7 @@ pub fn run() {
             import_pdf,
             import_trace,
             import_stl,
+            import_mesh,
             lathe_generate,
             gamepad_read,
             list_ports,
