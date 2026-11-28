@@ -61,6 +61,12 @@ test("QR code: penalty points pinned for Rust (qrpenalty-cases.json.gz)", () => 
     add(m);
     add(m.map((r, y) => r.map((_, x) => m[x][y])));
   }
+  // finder pattern right at the end with something dark in front: only the light modules behind it count
+  for (const n of [21, 25]) {
+    const m = Array.from({ length: n }, (_, y) => Array.from({ length: n }, (_, x) => (y === 3 && x >= n - 11 && x < n - 4 ? finder[x - (n - 11)] : y === 3 && x === n - 12)));
+    add(m);
+    add(m.map((r, y) => r.map((_, x) => m[x][y])));
+  }
   for (let k = 0; k <= 21 * 21; k += 37) add(Array.from({ length: 21 }, (_, y) => Array.from({ length: 21 }, (_, x) => y * 21 + x < k)));
   const cases = mats.map(rows => ({ rows, want: penalty(rows.map(r => [...r].map(c => c === "1"))) }));
   const text = JSON.stringify(cases) + "\n";
