@@ -38,6 +38,7 @@ import { selectedShapes, selectionBounds } from "./selection";
 import { setTool, onToolKey, live, updateCursor, pick } from "./tools";
 import { offsetOpenPath, sideOf } from "./offsetOpen";
 import { checkImport, importInApp } from "../importers/importRust";
+import { shapeInfo } from "./shapeRust";
 import { explodePath, joinOpen } from "./joinExplode";
 import { runCommand } from "./cmdLine";
 import { options, saveOptions } from "./editorState";
@@ -219,10 +220,10 @@ export const commands: Record<string, () => void> = {
     done();
   },
 
-  mirrorH: () => transformSelection((s, c) => scaleShape(s, c.x, c.y, -1, 1)),
-  mirrorV: () => transformSelection((s, c) => scaleShape(s, c.x, c.y, 1, -1)),
-  rotateLeft: () => transformSelection((s, c) => rotateShape(s, c.x, c.y, Math.PI / 2)),
-  rotateRight: () => transformSelection((s, c) => rotateShape(s, c.x, c.y, -Math.PI / 2)),
+  mirrorH: () => transformSelection((s, c) => scaleShape(s, c.x, c.y, -1, 1), c => ({ kind: "scale", ox: c.x, oy: c.y, sx: -1, sy: 1 })),
+  mirrorV: () => transformSelection((s, c) => scaleShape(s, c.x, c.y, 1, -1), c => ({ kind: "scale", ox: c.x, oy: c.y, sx: 1, sy: -1 })),
+  rotateLeft: () => transformSelection((s, c) => rotateShape(s, c.x, c.y, Math.PI / 2), c => ({ kind: "rotate", cx: c.x, cy: c.y, angle: Math.PI / 2 })),
+  rotateRight: () => transformSelection((s, c) => rotateShape(s, c.x, c.y, -Math.PI / 2), c => ({ kind: "rotate", cx: c.x, cy: c.y, angle: -Math.PI / 2 })),
 
   alignLeft: () => align("left"),
   alignCenterH: () => align("centerH"),
@@ -389,11 +390,19 @@ function insertCopies(source: any[], offsetPx: number, linked = false) {
   done();
 }
 
-function transformSelection(fn: (s: any, center: { x: number; y: number }) => void) {
+function transformSelection(fn: (s: any, center: { x: number; y: number }) => void, op?: (c: { x: number; y: number }) => Record<string, unknown>) {
   const b = selectionBounds();
   if (!b) return;
   const c = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
-  selectedShapes().forEach(s => fn(s, c));
+  const sel = selectedShapes();
+  // Rust ändert dieselben Formen ebenso (shapes.rs) – nur Vergleich; nicht bei sehr großen Auswahlen (Bilder, viele Punkte)
+  const before = op && importInApp() ? JSON.stringify(sel) : "";
+  sel.forEach(s => fn(s, c));
+  if (op && before && before.length <= 5_000_000) {
+    const old = JSON.parse(before);
+    checkImport("shape_check", { job: { kind: "info", shapes: old, x: c.x, y: c.y } }, shapeInfo(old, c.x, c.y));
+    checkImport("shape_check", { job: { kind: "transform", op: op(c), shapes: old } }, JSON.parse(JSON.stringify(sel)));
+  }
   done();
 }
 
