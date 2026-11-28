@@ -3,6 +3,7 @@ import { t } from "../i18n/i18n";
 import { machine, MACHINE_EVENT } from "../machine";
 import { getTools, toolLabel } from "../toolLibrary";
 import { slotForTool, slotOf, toolNumbersIn } from "../magazine";
+import { checkImport, importInApp } from "../importers/importRust";
 import { magazine, rackOn, setInSpindle } from "../magazineStore";
 import { atcBlocked, atcManual } from "../toolChange";
 import { askChoice } from "./unsavedDialog";
@@ -40,6 +41,11 @@ export async function magazineAllowsStart(lines: string[], firstTool: string, re
   if (!rackOn() || machine.protocol !== "grbl") return true;
   const m = magazine(), nums = toolNumbersIn(lines), tools = getTools();
   const first = !resume && firstTool ? slotForTool(m, firstTool) : null;
+  // the same in Rust (magazine.rs), in the background (not for very long programs); the decision stays here
+  if (importInApp() && lines.length <= 200_000) {
+    const ids = tools.map(x => x.id), find = !resume && firstTool ? firstTool : "";
+    checkImport("magazine_start", { m, text: lines.join("\n"), first: find, ids }, { nums, first: first?.n ?? null, slots: nums.map(n => slotForTool(m, ids[n - 1] || "")?.n ?? null) });
+  }
   if (!nums.length && (!first || first.n === m.inSpindle)) return true;
   const hand = async (text: string) => (await askChoice(t("mag.title"), text, [
     { key: "no", label: t("dlg.cancel"), cancel: true, primary: true }, { key: "hand", label: t("mag.byHand") }

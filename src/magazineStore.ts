@@ -1,6 +1,7 @@
 /** WERKZEUGMAGAZIN: Speicher (je Maschinen-Profil) – Rechnung in magazine.ts */
 import { machineKey } from "./placesStore";
 import { cleanMagazine, slotForTool, type Magazine } from "./magazine";
+import { checkImport, importInApp } from "./importers/importRust";
 import { isMill } from "./machineMode";
 
 const KEY = "cnc_craft_magazine";
@@ -11,7 +12,12 @@ const readAll = (): Record<string, any> => { try { const o = JSON.parse(localSto
 
 export function magazine(): Magazine {
   const key = machineKey();
-  if (cache?.key !== key) { const all = readAll(); cache = { key, m: cleanMagazine(Object.prototype.hasOwnProperty.call(all, key) ? all[key] : null) }; }
+  if (cache?.key !== key) {
+    const all = readAll(), raw = Object.prototype.hasOwnProperty.call(all, key) ? all[key] : null;
+    cache = { key, m: cleanMagazine(raw) };
+    // the same in Rust (magazine.rs), in the background; the magazine in use stays the TypeScript one
+    if (importInApp()) checkImport("magazine_clean", { raw }, structuredClone(cache.m));
+  }
   return cache.m;
 }
 

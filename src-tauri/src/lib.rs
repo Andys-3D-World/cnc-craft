@@ -58,6 +58,7 @@ mod softlimits;
 mod qrencode;
 mod vexport;
 mod longboard;
+mod magazine;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1384,6 +1385,30 @@ fn long_board(job: longboard::Job) -> serde_json::Value {
     longboard::run(&job)
 }
 
+/// WERKZEUGMAGAZIN (magazine.rs): gespeichertes Magazin bereinigen bzw. die Schritte für Holen/Ablegen/Anfahren eines
+/// Platzes. Das Fenster vergleicht die Antwort mit magazine.ts; gefahren werden weiter die Schritte des Fensters.
+#[tauri::command(async)]
+fn magazine_clean(raw: serde_json::Value) -> magazine::Magazine {
+    magazine::clean_magazine(&raw)
+}
+#[tauri::command(async)]
+fn magazine_check(m: magazine::Magazine, slot: magazine::Slot, what: String, env: magazine::RackEnv) -> serde_json::Value {
+    let need = magazine::needs_steps(&m, &slot, if what == "put" { "put" } else { "get" });
+    serde_json::json!({ "steps": magazine::steps(&m, &slot, &what), "blocked": magazine::rack_blocked(&m, &env), "need": need, "runs": magazine::runs_on(&m, &slot) })
+}
+#[tauri::command(async)]
+fn magazine_forget(prev: magazine::Magazine, raw: serde_json::Value) -> magazine::Magazine {
+    magazine::forget_tests(&prev, &magazine::clean_magazine(&raw))
+}
+#[tauri::command(async)]
+fn magazine_start(m: magazine::Magazine, text: String, first: String, ids: Vec<String>) -> serde_json::Value {
+    let lines: Vec<String> = text.split('\n').map(String::from).collect();
+    let nums = magazine::tool_numbers_in(&lines);
+    let at = |id: &str| magazine::slot_for_tool(&m, id).map(|s| s.n);
+    let slots: Vec<Option<f64>> = nums.iter().map(|&n| at(if n >= 1.0 { ids.get(n as usize - 1).map_or("", |s| s.as_str()) } else { "" })).collect();
+    serde_json::json!({ "nums": nums, "first": if first.is_empty() { None } else { at(&first) }, "slots": slots })
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1589,6 +1614,10 @@ pub fn run() {
             qr_encode,
             vector_export,
             long_board,
+            magazine_clean,
+            magazine_check,
+            magazine_forget,
+            magazine_start,
             lathe_generate,
             gamepad_read,
             list_ports,

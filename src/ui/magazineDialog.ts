@@ -5,6 +5,7 @@ import { getTools, toolLabel } from "../toolLibrary";
 import { insertRackZone } from "../rackView";
 import { drawingZero } from "../drawingZero";
 import { cleanMagazine, cleanOutput, forgetTests, MAX_SLOTS, rackBox, rackProblem, type Magazine } from "../magazine";
+import { checkImport, importInApp } from "../importers/importRust";
 import { magazine, MAGAZINE_CHANGED, saveMagazine } from "../magazineStore";
 import { atcBlocked, atcManual, onToolChange, toolChangeBusy, type AtcJob } from "../toolChange";
 import { confirmSpindle, spindleKnown, spindleText } from "./magazineStart";
@@ -25,7 +26,12 @@ export function openMagazine(log: (s: string) => void) {
   const close = () => { paintOpen = null; ov.remove(); };
   ov.addEventListener("keydown", e => { e.stopPropagation(); if (e.key === "Escape") close(); });
 
-  const put = (next: Magazine) => { saveMagazine(forgetTests(magazine(), cleanMagazine(next))); };
+  const put = (next: Magazine) => {
+    const prev = magazine(), r = forgetTests(prev, cleanMagazine(next));
+    // the same in Rust (magazine.rs), in the background; what is saved stays the TypeScript result
+    if (importInApp()) checkImport("magazine_forget", { prev, raw: next }, r);
+    saveMagazine(r);
+  };
   const row = (label: string, input: string, tipKey = "") => `<label class="dlg-row"${tipKey ? ` title="${esc(t(tipKey))}"` : ""}><span>${esc(label)}</span>${input}</label>`;
   const num = (key: string, v: number, unit: string, step = "1") => `<span class="dlg-num"><input type="number" step="${step}" data-g="${key}" value="${v}"${unit === "mm" || unit === "mm/min" ? "" : ' data-unit="none"'}><em>${unit}</em></span>`;
   const sel = (key: string, v: string, list: [string, string][]) => `<select data-g="${key}">${list.map(([k, l]) => `<option value="${k}"${k === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;

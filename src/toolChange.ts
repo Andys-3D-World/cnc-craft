@@ -39,7 +39,8 @@ import { getTools } from "./toolLibrary";
 import { fmtLenShort, unitName } from "./units";
 import { postCtx } from "./post/postContext";
 import { reportsInches } from "./units";
-import { getSteps, lookSteps, needsSteps, putSteps, rackBlocked, runsOn, slotForTool, slotOf, type RackBlock, type Slot, type Step } from "./magazine";
+import { getSteps, lookSteps, needsSteps, putSteps, rackBlocked, runsOn, slotForTool, slotOf, type Magazine, type RackBlock, type Slot, type Step } from "./magazine";
+import { checkImport, importInApp } from "./importers/importRust";
 import { magazine, rackOn, saveMagazine, setInSpindle, slotNumber } from "./magazineStore";
 
 export enum TcState {
@@ -595,12 +596,23 @@ export async function measureReference(): Promise<void> {
 
 /** Warum die Reihe gerade nicht fahren darf ("" = darf) */
 export function atcBlocked(): { why: RackBlock; n: number } {
+  return rackBlocked(magazine(), atcEnv());
+}
+function atcEnv() {
   const n = (k: string) => parseFloat(machine.settings.get(k) ?? "");
-  return rackBlocked(magazine(), {
+  return {
     grbl: machine.connected && machine.protocol === "grbl", firmware: machine.firmware,
     homed: ((n("$22") | 0) & 1) === 1 && machine.homeState !== "lost" && machine.homeState !== "pending",
     inches: reportsInches(machine.settings.get("$13")), sensor: s.tcMode === 1 && s.sensorSet === 1
-  });
+  };
+}
+/** The same in Rust (magazine.rs), in the background. The steps that run are always the TypeScript ones handed back */
+function rustCheck(m: Magazine, slot: Slot, what: "get" | "put" | "look", steps: Step[]): Step[] {
+  if (importInApp()) {
+    const env = atcEnv();
+    checkImport("magazine_check", { m, slot, what, env }, { steps: structuredClone(steps), blocked: rackBlocked(m, env), need: needsSteps(m, slot, what === "put" ? "put" : "get"), runs: runsOn(m, slot) });
+  }
+  return steps;
 }
 
 /** Z nach oben auf diese Maschinen-Höhe – nie nach unten */
@@ -659,13 +671,13 @@ async function atcSwap(want: Slot | null) {
   must(m.inSpindle === 0 || !!old, t("mag.why.spindle"));
   if (old) {
     setInSpindle(-1);
-    await atcRun(putSteps(m, old), needsSteps(m, old, "put"));
+    await atcRun(rustCheck(m, old, "put", putSteps(m, old)), needsSteps(m, old, "put"));
     setInSpindle(0);
     mark(old.n, "okPut");
   }
   if (want) {
     setInSpindle(-1);
-    await atcRun(getSteps(m, want), needsSteps(m, want, "get"));
+    await atcRun(rustCheck(m, want, "get", getSteps(m, want)), needsSteps(m, want, "get"));
     setInSpindle(want.n);
     mark(want.n, "okGet");
   }
@@ -699,7 +711,7 @@ export async function atcManual(what: AtcJob, n: number): Promise<boolean> {
     const gc = (await readStart()).gc;
     must(await step("M5"), "M5");
     must(await goSafe(), "safe");
-    if (what === "look") await atcRun(lookSteps(magazine(), slot!), true);
+    if (what === "look") await atcRun(rustCheck(magazine(), slot!, "look", lookSteps(magazine(), slot!)), true);
     else if (what === "put") { await atcSwap(null); tc.ref = null; tc.driftRef = null; }
     else {
       const had = magazine().inSpindle > 0;
