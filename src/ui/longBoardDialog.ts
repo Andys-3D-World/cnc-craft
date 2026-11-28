@@ -20,6 +20,7 @@ import { postCtx } from "../post/postContext";
 import { loadGcodeFromText } from "../machineStream";
 import { withPost, postedText, postFileName, postExtensions } from "../post/postExport";
 import { Axis, checkLong, cutBounds, holeLines, LongOpts, pinHits, Section, sections, SplitProgram, splitProgram, unsupported } from "../longBoard";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_longboard", SAFE_Z = 5.0;
 const esc = (s: string) => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
@@ -136,6 +137,7 @@ export async function openLongBoard(log: (s: string) => void) {
     return [...out, ...body, ...foot()].join("\n") + "\n";
   };
 
+  let rustChecked = false;
   const refresh = () => {
     for (const [id, k] of fields) if (document.activeElement !== $(id)) $(id).value = String(o[k]);
     $<HTMLSelectElement>("lb-axis").value = o.axis;
@@ -152,6 +154,16 @@ export async function openLongBoard(log: (s: string) => void) {
     if (!fits(pinTool())) warn.push(t("long.err.tool"));
     let hard = errs.length > 0 || wide || pinWide || !fits(pinTool());
     const keep = o.pinD / 2 + maxR + 1;
+    // once per dialog: the same in Rust (longboard.rs), in the background; the sections in use stay the TypeScript ones
+    if (!rustChecked && importInApp()) {
+      rustChecked = true;
+      const hl = holes(o.shift), x = pinTool(), depth = o.thick + 0.5;
+      const holeTool = { drill: x.type === "drill", diameter: x.diameter, feed: x.feedrate || 800, plunge: x.plungeFeed ?? DEFAULT_PLUNGE, stepZ: x.stepZ || 1 };
+      checkImport("long_board", { job: { text: full, opts: L, min, max, safeZ: SAFE_Z, toolPrefix, keepM6: false, keep, holes: hl, holeTool, holeDepth: depth } }, {
+        bad, bounds, errs, secs, parts, hits: parts.map(p => ({ pins: pinHits(p.trace, L.pins, keep), holes: pinHits(p.trace, hl, keep) })),
+        holeLines: holeLines(hl, o.pinD, depth, holeTool, SAFE_Z)
+      });
+    }
     parts.forEach((p, k) => {
       if (k > 0 && pinHits(p.trace, L.pins, keep).length) { hard = true; warn.push(t("long.hitPin", { k: k + 1 })); }
       if (k < parts.length - 1 && pinHits(p.trace, holes(o.shift), keep).length) { hard = true; warn.push(t("long.hitHole", { k: k + 1 })); }

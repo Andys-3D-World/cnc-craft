@@ -57,6 +57,7 @@ mod pathcheck;
 mod softlimits;
 mod qrencode;
 mod vexport;
+mod longboard;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1376,6 +1377,13 @@ fn vector_export(items: Vec<vexport::Item>, format: String) -> Result<vexport::E
     vexport::export(&items, &format).ok_or_else(|| format!("unknown format {format}"))
 }
 
+/// LANGE PLATTE (longboard.rs): ganzes Programm, Einstellungen und Stifte des Dialogs. Das Fenster vergleicht die Antwort
+/// mit longBoard.ts (longBoardDialog.ts); welche Abschnitte die Maschine bekommt, bestimmt weiter das Fenster.
+#[tauri::command(async)]
+fn long_board(job: longboard::Job) -> serde_json::Value {
+    longboard::run(&job)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1580,6 +1588,7 @@ pub fn run() {
             soft_limits,
             qr_encode,
             vector_export,
+            long_board,
             lathe_generate,
             gamepad_read,
             list_ports,
