@@ -921,6 +921,7 @@ fn flex_panels(o: &BoxOptions) -> Vec<Panel> {
     panels
 }
 
+#[allow(dead_code)] // deg: nur für dice_angle
 struct Dice {
     k: f64,
     ze: f64,
@@ -952,13 +953,15 @@ fn dice_levels(t: f64, di: f64, h: f64) -> Dice {
     let z1hi = z1lo + k * di * tan;
     Dice { k, ze, z3lo, z3hi, z2lo, z2hi, z1lo, z1hi, deg: (jsmath::atan(tan) * 180.0) / PI }
 }
-/// Würfelturm: Mindesthöhe außen (mm, aufgerundet)
+/// Würfelturm: Mindesthöhe außen (mm, aufgerundet). Im Fenster nur für Hinweise im Dialog: nur vom Test verglichen
+#[allow(dead_code)]
 pub fn dice_min_height(o: &BoxOptions) -> f64 {
     let t = mx(0.1, o.t);
     let di = outer_size(&BoxOptions { kind: Some("dice".into()), ..o.clone() }).1 - 2.0 * t;
     (t / 2.0 + 2.0 + (2.0 * t + 1.0 - t / 2.0) + 2.0 * 0.6 * di * dice_tan_min() + 26.0 + t).ceil()
 }
-/// Würfelturm: Neigung der Rampen in Grad
+/// Würfelturm: Neigung der Rampen in Grad (nur Anzeige, nur vom Test verglichen)
+#[allow(dead_code)]
 pub fn dice_angle(o: &BoxOptions) -> f64 {
     let t = mx(0.1, o.t);
     let (_, d, h) = outer_size(&BoxOptions { kind: Some("dice".into()), ..o.clone() });
