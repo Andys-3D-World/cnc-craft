@@ -26,12 +26,20 @@ const fnv = (t: string) => { let h = 0x811c9dc5; for (let i = 0; i < t.length; i
 
 test("photo V-carve: pinned result for Rust (photovcarve-cases.json.gz)", () => {
   const cases = [];
-  for (const gr of grids) {
+  const made = grids.map(gr => {
     const g = new Float32Array(gr.nx * gr.ny);
     for (let j = 0; j < gr.ny; j++) for (let i = 0; i < gr.nx; i++) g[j * gr.nx + i] = Math.max(0, Math.min(1, gr.f(i, j, gr.nx, gr.ny)));
-    for (const [k, lines] of [0, 45, 90, 30].entries()) {
+    return g;
+  });
+  const runs: { gi: number; k: number; tool?: Partial<PhotoOpts> }[] = [];
+  for (let gi = 0; gi < grids.length; gi++) for (let k = 0; k < 4; k++) runs.push({ gi, k });
+  // V-bit angles outside 10°–170° are taken as 10° or 170°
+  for (const angle of [5, 175, 0, 180]) runs.push({ gi: 0, k: 2, tool: { angle } });
+  for (const { gi, k, tool } of runs) {
+    const gr = grids[gi], g = made[gi], lines = [0, 45, 90, 30][k];
+    {
       const tl = tools[k % tools.length];
-      const opts: PhotoOpts = { x0: 10 + k, y0: 5, w: 40 + k * 7, h: 25 + k * 3, spacing: [1, 0.6, 1.5, 0.8][k], ...tl, maxDepth: [2, 0.3, 5, 1][k], stepDown: [0.5, 0.1, 2, 0.05][k], lines };
+      const opts: PhotoOpts = { x0: 10 + k, y0: 5, w: 40 + k * 7, h: 25 + k * 3, spacing: [1, 0.6, 1.5, 0.8][k], ...tl, ...tool, maxDepth: [2, 0.3, 5, 1][k], stepDown: [0.5, 0.1, 2, 0.05][k], lines };
       const { nx, ny } = gr, o = opts;
       // the sampler of photoVcarveDialog.ts
       const at = (u: number, v: number) => {
@@ -46,7 +54,7 @@ test("photo V-carve: pinned result for Rust (photovcarve-cases.json.gz)", () => 
       const pts = plan.segs.flat().flatMap(q => [q.x, q.y, q.d]);
       const segs = { n: plan.segs.length, pts: pts.length, h: fnv(pts.map(v => v.toFixed(6)).join(",")) };
       const gl = r.lines.length > 300 ? { n: r.lines.length, h: fnv(r.lines.join("\n")) } : r.lines;
-      cases.push({ name: `${gr.name} / ${lines}°`, head: { opts, nx, ny, feed, plunge, safeZ: 5 }, grid: Buffer.from(g.buffer).toString("base64"),
+      cases.push({ name: `${gr.name} / ${lines}°${tool ? ` / V-bit ${tool.angle}°` : ""}`, head: { opts, nx, ny, feed, plunge, safeZ: 5 }, grid: Buffer.from(g.buffer).toString("base64"),
         want: { plan: { ...plan, segs }, lines: gl, cut: r.cut, air: r.air, width: widthAtDepth(plan.deepest, opts) } });
     }
   }

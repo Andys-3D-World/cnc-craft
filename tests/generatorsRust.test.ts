@@ -15,7 +15,7 @@ const file = new URL("./fixtures/generators-cases.json.gz", import.meta.url);
 type Job = { kind: "hinge"; hinge: HingeOptions } | { kind: "vent"; vent: VentOptions } | { kind: "scale"; scale: ScaleOptions } | { kind: "mandala"; mandala: MandalaOptions };
 const jobs: Job[] = [];
 const H0: HingeOptions = { pattern: "lines", width: 120, height: 80, panel: true, length: 60, spacing: 1.8, cut: 18, bridge: 3, amplitude: 1, slotWidth: 1, thickness: 3 };
-for (const pattern of HINGE_PATTERNS) for (const v of [{}, { panel: false, length: 200 }, { spacing: 0.2, bridge: 0.5, cut: 0.8, amplitude: 3 }, { height: 10, cut: 30 }, { ...suggestForThickness(6), thickness: 6 }])
+for (const pattern of HINGE_PATTERNS) for (const v of [{}, { panel: false, length: 200 }, { spacing: 0.2, bridge: 0.5, cut: 0.8, amplitude: 3 }, { height: 10, cut: 30 }, { ...suggestForThickness(6), thickness: 6 }, { height: 33 }, { height: 53.5 }])
   jobs.push({ kind: "hinge", hinge: { ...H0, pattern, ...v } });
 const V0: VentOptions = { shape: "rect", width: 100, height: 70, radius: 8, margin: 5, pattern: "hex", size: 6, web: 2, slotLength: 20, plate: true, mountD: 4, mountInset: 6 };
 for (const shape of VENT_SHAPES) for (const pattern of VENT_PATTERNS) for (const v of [{}, { mountD: 0, plate: false }, { web: 0.5, size: 2.5, radius: 40 }, { margin: 60 }, { mountInset: 2 }])
