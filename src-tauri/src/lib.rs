@@ -63,6 +63,7 @@ mod twosided;
 mod sketchsolve;
 mod offsetopen;
 mod trim;
+mod generators;
 mod rotarywrap;
 mod controller;
 mod cycles;
@@ -1449,6 +1450,13 @@ fn trim_check(path: trim::Path, cutters: Vec<trim::Path>, at: trim::Pt) -> serde
     trim::check(&path, &cutters, at)
 }
 
+/// KLEINE GENERATOREN (generators.rs): Biegescharnier, Lüftungsgitter, Skalen, Mandala. Das Fenster vergleicht die
+/// Antwort mit dem TypeScript beim Einfügen; eingefügt wird weiter das Ergebnis des Fensters.
+#[tauri::command(async)]
+fn gen_check(job: generators::Job) -> Result<serde_json::Value, String> {
+    generators::run(&job)
+}
+
 /// DREHBANK (lathe.rs): Bahnen und G-Code aus dem Auftrag des Fensters (latheRust.ts). Das Fenster vergleicht die Antwort
 /// mit dem Ergebnis aus turn.ts (checkPost in camPost.ts).
 #[tauri::command(async)]
@@ -1664,6 +1672,7 @@ pub fn run() {
             sketch_freedom,
             offset_open,
             trim_check,
+            gen_check,
             lathe_generate,
             gamepad_read,
             list_ports,

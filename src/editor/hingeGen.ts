@@ -11,6 +11,7 @@ import { getMachineMode } from "../machineMode";
 import { toolForShape } from "../toolLibrary";
 import { t } from "../i18n/i18n";
 import { livingHinge, suggestForThickness, HINGE_PATTERNS, type HingeOptions, type HingeResult, type HingePattern, type XY } from "../livingHinge";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_hinge";
 const DEF: HingeOptions = { pattern: "lines", width: 200, height: 100, panel: true, length: 60, spacing: 1.8, cut: 18, bridge: 3,
@@ -134,6 +135,8 @@ export function openHingeDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r || !r.lines.length) return;
     const o = read();
+    // the same in Rust (generators.rs), in the background; what is inserted stays the TypeScript result
+    if (importInApp()) checkImport("gen_check", { job: { kind: "hinge", hinge: o } }, r);
     saveSettings(KEY, o);
     close();
     placeHinge(r, o);

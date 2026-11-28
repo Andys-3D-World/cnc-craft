@@ -12,6 +12,7 @@ import { getMachineMode } from "../machineMode";
 import { toolForShape } from "../toolLibrary";
 import { t } from "../i18n/i18n";
 import { vent, VENT_SHAPES, VENT_PATTERNS, type VentOptions, type VentResult, type VentShape, type VentPattern, type XY } from "../vent";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_vent";
 const DEF: VentOptions = { shape: "rect", width: 120, height: 80, radius: 6, margin: 6, pattern: "hex", size: 6, web: 1.5, slotLength: 20,
@@ -130,6 +131,8 @@ export function openVentDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r) return;
     const o = read();
+    // the same in Rust (generators.rs), in the background; what is inserted stays the TypeScript result
+    if (importInApp()) checkImport("gen_check", { job: { kind: "vent", vent: o } }, r);
     saveSettings(KEY, o);
     close();
     placeVent(r);

@@ -12,6 +12,7 @@ import { traceSingleLine } from "./singleLine";
 import { getLayers } from "../laserLayers";
 import { t } from "../i18n/i18n";
 import { scale, SCALE_KINDS, NUMERALS, type ScaleOptions, type ScaleResult, type ScaleKind, type Numerals, type XY } from "../scales";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_scale";
 const DEF: ScaleOptions = { kind: "ruler", unit: "mm", length: 150, width: 25, holeD: 6, radius: 60, diameter: 200, numerals: "arabic",
@@ -134,6 +135,8 @@ export function openScaleDialog(log: (s: string) => void, done: () => void) {
     const r = last;
     if (!r) return;
     const o = read();
+    // the same in Rust (generators.rs), in the background; what is inserted stays the TypeScript result
+    if (importInApp()) checkImport("gen_check", { job: { kind: "scale", scale: o } }, r);
     saveSettings(KEY, o);
     close();
     await placeScale(r, t("scale.kind." + o.kind));

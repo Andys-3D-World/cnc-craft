@@ -9,6 +9,7 @@ import { app, bedSizeMm } from "./editorState";
 import { createPolyline, MM_TO_PIXEL } from "../shapeTransform";
 import { t } from "../i18n/i18n";
 import { mandala, MandalaOptions, MandalaEdge, MandalaCenter, Motif, Pt, MOTIFS, MANDALA_EDGES, MANDALA_CENTERS } from "../mandala";
+import { checkImport, importInApp } from "../importers/importRust";
 
 const KEY = "cnc_craft_mandala";
 const EDGES = MANDALA_EDGES, CENTERS = MANDALA_CENTERS;
@@ -102,6 +103,8 @@ export function openMandalaDialog(log: (s: string) => void, done: () => void) {
     saveSettings(KEY, m);
     close();
     const res = mandala(m);
+    // the same in Rust (generators.rs), in the background; what is inserted stays the TypeScript result
+    if (importInApp()) checkImport("gen_check", { job: { kind: "mandala", mandala: m } }, res);
     // links unten aufs Bett (10 mm Rand) wie beim Box-Generator; größer als das Bett: Hinweis
     const bed = bedSizeMm(), R = m.d / 2;
     const cx = 10 + R, cy = 10 + R;
